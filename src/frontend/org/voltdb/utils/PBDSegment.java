@@ -152,8 +152,6 @@ public abstract class PBDSegment {
 
     abstract void closeAndDelete() throws IOException;
 
-    abstract void closeAndTruncate() throws IOException;
-
     abstract boolean isClosed();
 
     abstract void close() throws IOException;
