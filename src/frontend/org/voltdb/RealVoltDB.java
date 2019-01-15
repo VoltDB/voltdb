@@ -1250,13 +1250,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         partitions,
                         m_config.m_startAction,
                         m_partitionsToSitesAtStartupForExportInit);
-
-                // Pass the local HSIds to the MPI so it can farm out buddy sites
-                // to the RO MP site pool
-                List<Long> localHSIds = new ArrayList<>();
-                for (Initiator ii : m_iv2Initiators.values()) {
-                    localHSIds.add(ii.getInitiatorHSId());
-                }
+                m_iv2InitiatorStartingTxnIds.put(MpInitiator.MP_INIT_PID,
+                        TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
 
                 if (m_eligibleAsLeader) {
                     // Start the GlobalServiceElector. Not sure where this will actually belong.
@@ -1265,8 +1260,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
                     }
-                    m_iv2InitiatorStartingTxnIds.put(MpInitiator.MP_INIT_PID,
-                            TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+
+                    // Pass the local HSIds to the MPI so it can farm out buddy sites
+                    // to the RO MP site pool
+                    List<Long> localHSIds = new ArrayList<>();
+                    for (Initiator ii : m_iv2Initiators.values()) {
+                        localHSIds.add(ii.getInitiatorHSId());
+                    }
+
                     m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                     m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
                 }
