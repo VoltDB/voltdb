@@ -339,13 +339,9 @@ public class LocalCluster extends VoltServerConfig {
         //ArrayUtils.reverse(traces);
         int i;
         // skip all stack frames below this method
-        for (i = 0; ! traces[i].getClassName().equals(getClass().getName()); i++) {
-            ;
-        }
+        for (i = 0; ! traces[i].getClassName().equals(getClass().getName()); i++);
         // skip all stack frames from localcluster itself
-        for (;      traces[i].getClassName().equals(getClass().getName()); i++) {
-            ;
-        }
+        for (;      traces[i].getClassName().equals(getClass().getName()); i++);
         // skip the package name
         int dot = traces[i].getClassName().lastIndexOf('.');
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
