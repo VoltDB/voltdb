@@ -47,7 +47,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator extends BaseInitiator implements Promotable
+public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
@@ -87,7 +87,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
         // Hacky
-        MpScheduler sched = (MpScheduler)m_scheduler;
+        MpScheduler sched = m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
@@ -220,15 +220,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE,
                 isReplay, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-        MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateCatalog(diffCmds, context);
+        m_scheduler.updateCatalog(diffCmds, context);
     }
 
     public void updateSettings(CatalogContext context)
     {
         m_executionSite.updateSettings(context);
-        MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateSettings(context);
+        m_scheduler.updateSettings(context);
     }
 
     @Override
