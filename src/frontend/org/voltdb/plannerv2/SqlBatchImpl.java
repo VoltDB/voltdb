@@ -59,11 +59,13 @@ public class SqlBatchImpl extends SqlBatch {
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
      * Eventually we will let Calcite support all the VoltDB SQLs and remove this check from the code.
-     * Negative checks should be chained first (e.g.: {@link BanLargeQuery}).
+     * Disapproving checks should be chained first (e.g.: {@link BanLargeQuery}).
      */
     static final CalciteCompatibilityCheck CALCITE_CHECKS =
             CalciteCompatibilityCheck.chain(
+                    // Disapproving checks go first
                     new BanLargeQuery(),
+                    // Approving checks go next.
                     new AcceptDDLsAsWeCan(),
                     new AcceptAllSelect());
 
