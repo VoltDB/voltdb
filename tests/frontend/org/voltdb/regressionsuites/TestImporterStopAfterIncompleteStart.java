@@ -63,7 +63,7 @@ public class TestImporterStopAfterIncompleteStart {
                 1, 1, 0, 0,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING,
-                false, false, null);
+                false, null);
 
         List<String> logSearchPatterns = new ArrayList<>(1);
         logSearchPatterns.add(CHANNEL_UNREGISTRATION_PATTERN);
