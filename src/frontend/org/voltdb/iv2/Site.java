@@ -108,6 +108,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
+import com.google.common.collect.Lists;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 
@@ -1167,12 +1168,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return;
         }
 
-        ListIterator<UndoAction> iterator = (undo) ? undoLog.listIterator(undoLog.size()) : undoLog.listIterator();
-        for (; (undo ? iterator.hasPrevious() : iterator.hasNext());) {
+        if (undo) {
+            undoLog = Lists.reverse(undoLog);
+        }
+        for (UndoAction action : undoLog) {
             if (undo) {
-                iterator.previous().undo();
+                action.undo();
             } else {
-                iterator.next().release();
+                action.release();
             }
         }
         if (undo) {
