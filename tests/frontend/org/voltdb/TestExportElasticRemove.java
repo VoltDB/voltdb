@@ -68,6 +68,7 @@ public class TestExportElasticRemove extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, m_kfactor+1);
+        m_verifier.m_verifySequenceNumber = false;
     }
 
     @Override
@@ -110,7 +111,15 @@ public class TestExportElasticRemove extends TestExportBaseSocketExport {
         waitForRemovalToFinish(client);
 
         // must still be able to verify the export data.
-        quiesceAndVerifyTarget(client, m_verifier);
+        while (true) {
+            try {
+                quiesceAndVerifyTarget(client, m_verifier);
+                break;
+            } catch (ProcCallException pe) {
+                System.err.println("Encountered error while trying to verify export target, client connected hostList: " + client.getConnectedHostList());
+                pe.printStackTrace();
+            }
+        }
     }
 
     private void startRemove(Client client) throws NoConnectionsException, IOException, ProcCallException {

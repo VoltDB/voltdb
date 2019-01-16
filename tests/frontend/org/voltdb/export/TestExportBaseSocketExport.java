@@ -425,13 +425,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-    public void quiesceAndVerifyStream(final Client client, ExportTestExpectedData tester) throws Exception {
-        client.drain();
-        waitForStreamedTableAllocatedMemoryZero(client);
-        tester.verifyRows();
-        System.out.println("Passed!");
-    }
-
     public void quiesceAndVerifyTarget(final Client client, ExportTestExpectedData tester) throws Exception {
         client.drain();
         waitForStreamedTargetAllocatedMemoryZero(client);
