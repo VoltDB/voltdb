@@ -1652,6 +1652,7 @@ public class DDLCompiler {
         // can't be indexed like boolean, geo ... We gather rest of expression into
         // checkExpressions list.  We will check on them all at once.
         List<AbstractExpression> checkExpressions = new ArrayList<>();
+        final UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<>();
@@ -1672,7 +1673,6 @@ public class DDLCompiler {
                         throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
                     }
-
                     // rest of the validity guards will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
@@ -1684,6 +1684,7 @@ public class DDLCompiler {
                 assert(predicateXML != null);
                 predicate = buildPartialIndexPredicate(dummy, name,
                         predicateXML, table, compiler);
+                predicate.findUnsafeOperatorsForDDL(unsafeOps);
             }
         }
 
@@ -1706,7 +1707,6 @@ public class DDLCompiler {
             }
         }
 
-        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());

@@ -28,8 +28,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
@@ -381,6 +381,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForColumnExpression, "a / b", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "c || c", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "repeat(c, 100)", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "LOG(a), b", false);
 
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "NOT a > b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NULL", true);
@@ -395,6 +396,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NOT DISTINCT FROM b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b AND b > 0", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b OR b > 0", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "LOG10(b) < 1", false);
         }
         finally {
             teardownSystem();
@@ -432,6 +434,44 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                 teardownSystem();
             } catch (Exception e) {}
         }
+    }
+
+    @Test
+    public void testENG15213() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P5 (i INTEGER, j FLOAT);";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    Pair.of("CREATE INDEX PI1 ON P5(i, j);", true),                         // normal index on columns only: passes
+                    Pair.of("CREATE INDEX PI2 ON P5(i, LOG10(j));", true),                  // normal index with unsafe expression on empty table: passes
+                    Pair.of("CREATE INDEX PI3 ON P5(i) WHERE j > 0;", true),                // partial index with columns and safe predicate on empty table: passes
+                    Pair.of("CREATE INDEX PI4 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with columns and unsafe predicate on empty table: passes
+                    Pair.of("CREATE INDEX PI5 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with unsafe expression and unsafe predicate on empty table: passes
+                    Pair.of("DROP INDEX PI2; DROP INDEX PI4; DROP INDEX PI5", true),        // clean up indexes with unsafe operations
+                    Pair.of("INSERT INTO P5 values(0, 0);", true),                          // Table has rows: passes
+                    Pair.of("CREATE INDEX PI11 ON P5(i, j);", true),                        // normal index on columns only: passes
+                    Pair.of("CREATE INDEX PI31 ON P5(i) WHERE j > 0;", true),               // partial index with columns and safe predicate on non-empty table: passes
+                    Pair.of("CREATE INDEX PI21 ON P5(i, LOG10(j));", false),                 // normal index with unsafe expression on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI41 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", false),// partial index with columns and unsafe predicate on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI51 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", false))  // partial index with unsafe expression and unsafe predicate on non-empty table: rejected
+                    .forEachOrdered(stmtAndShouldPass -> {
+                        final String stmt = stmtAndShouldPass.getFirst();
+                        final boolean shouldPass = stmtAndShouldPass.getSecond();
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            assertTrue("Query \"" + stmt + "\" should pass", shouldPass);
+                        } catch (IOException | ProcCallException e) {
+                            assertFalse("Query \"" + stmt + "\" should fail", shouldPass);
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
+        }
+
     }
 
     private void createSchema(VoltDB.Configuration config,
