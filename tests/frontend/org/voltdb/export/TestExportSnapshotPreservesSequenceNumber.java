@@ -102,7 +102,7 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBaseSoc
         quiesce(client);
         Thread.sleep(2000);
         // must still be able to verify the export data.
-        quiesceAndVerifyStream(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
 
