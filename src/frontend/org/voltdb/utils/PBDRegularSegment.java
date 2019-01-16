@@ -213,9 +213,10 @@ public class PBDRegularSegment extends PBDSegment {
     public void closeAndTruncate() throws IOException {
         try
         {
-            if (m_ras != null) {
-                m_ras.setLength(0);
+            if (m_ras == null) {
+                m_ras = new RandomAccessFile( m_file, "rw");
             }
+            m_ras.setLength(0);
         }
         finally
         {
