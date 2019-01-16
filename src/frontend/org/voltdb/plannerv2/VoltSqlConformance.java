@@ -26,6 +26,10 @@ public class VoltSqlConformance extends SqlAbstractConformance {
     private VoltSqlConformance() {
     }
 
+    /**
+     * Whether to allow aliases from the {@code SELECT} clause to be used as
+     * column names in the {@code GROUP BY} clause.
+     */
     @Override public boolean isGroupByAlias() {
         return true;
     }

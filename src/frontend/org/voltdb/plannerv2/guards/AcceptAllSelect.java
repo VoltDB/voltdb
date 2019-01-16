@@ -39,6 +39,13 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         if (message.contains("No match found for function signature")) {
             return true;
         }
+        // TODO: select myUdf(NULL) from T;
+        // will throw this exception, calcite try to infer the type before check the existence of the function
+        // @see #SqlValidatorImpl.inferUnknownTypes
+        // We need to handle the type inference when we move to UDF support.
+        if (message.contains("Illegal use of 'NULL'")) {
+            return true;
+        }
         return false;
     }
 }
