@@ -150,7 +150,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
      * @return the {@link SqlConformance} that is used by the VoltlDB planner.
      */
     public SqlConformance getSqlConformance() {
-        return SqlConformanceEnum.DEFAULT;
+        return VoltSqlConformance.INSTANCE;
     }
 
     /**

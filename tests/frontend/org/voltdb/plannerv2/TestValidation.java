@@ -105,4 +105,8 @@ public class TestValidation extends Plannerv2TestCase {
                 .exception("Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*")
                 .test();
     }
+
+    public void testGroupByAlias() {
+        m_tester.sql("select i as foo, count(*) from R2 group by foo").test();
+    }
 }

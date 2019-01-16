@@ -223,6 +223,7 @@ public class VoltPlanner implements Planner {
             if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
                 throw new PlannerFallbackException(cce);
             }
+            throw cce;
         } catch (RuntimeException e) {
             throw new ValidationException(e);
         }
