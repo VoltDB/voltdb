@@ -32,7 +32,9 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.util.Util;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
@@ -166,6 +168,21 @@ public class MPQueryFallBackRule extends RelOptRule {
                     program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
         } else {
             return false;
+        }
+    }
+
+    /**
+     * A visitor to find {@link RexLocalRef} in a node tree.
+     */
+    private static final class RexLocalRefFinder extends RexVisitorImpl<Void> {
+        static final MPQueryFallBackRule.RexLocalRefFinder INSTANCE = new MPQueryFallBackRule.RexLocalRefFinder();
+
+        private RexLocalRefFinder() {
+            super(true);
+        }
+
+        @Override public Void visitLocalRef(RexLocalRef localRef) {
+            throw Util.FoundOne.NULL;
         }
     }
 }
