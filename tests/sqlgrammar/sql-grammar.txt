@@ -80,6 +80,29 @@
 #      table R1 has been specified elsewhere in the SQL statement, so using a
 #      definition such as {table-name;t1,t2,t3,t4,t5}.{any-column-name} makes
 #      this much more likely.
+#  11. An addition to the colon syntax for reusable names, described in #9
+#      above: if you wish to set multiple (possibly unique) values to multiple
+#      reusable names, you may use, for example, this syntax:
+#      {column-name:c1,c2,c3,c4,c5:10}. The first time that this is used (in a
+#      given SQL statement), it will find one possible value of {column-name},
+#      and set 'c1' equal to that; the second time, it will find another
+#      possible value, and set 'c2' to that; the third time, to 'c3', etc. The
+#      final number after the second colon, here '10', means that there is a 10%
+#      chance that repeat values of {column-name} will be allowed; if that value
+#      is instead '0', then distinct values of {column-name} will be used, with
+#      no duplicates, though if it runs out of distinct possible values of
+#      {column-name}, or out of reusable names, then duplicates will be used.
+#      The second colon and the repeat-percentage following it are optional; if
+#      not specified, there will be no attempt to avoid repeats.
+#  12. An addition to the semi-colon syntax for reusable names, described in
+#      #10 above: if you wish to get a list of reusable values, such as those
+#      defined in #11 above, you may use, for example, this syntax:
+#      {column-name;c1,c2,c3,c4,c5;', '}. This will produce a list of all the
+#      values of all of the reusable names listed, separated by the separator
+#      string (here, ', '); any reusable names that have not yet been given
+#      values (e.g., 'c4, 'c5') will be omitted from the list. The second semi-
+#      colon and the separator string are required to get a list in this manner,
+#      but the separator string may be the empty string, ''.
 #
 ################################################################################
 
@@ -115,8 +138,7 @@ legit-table-name        ::= {ddl-table-name} 0| {table-name-w-no-pk} | \
                             {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
                             {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
 
-# TODO: include {ddl-view-name} (with non-zero weight), once implemented:
-legit-view-name         ::= {ddl-view-name} 0| \
+legit-view-name         ::= {ddl-view-name} 6| \
                             VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | \
                             VR5 | VP5 | VR6 | VP6 | VR7 | VP7
 
@@ -198,10 +220,11 @@ non-int-str-column-name ::= {geo-column-name} 2| {timestamp-column-name} | {varb
 pg-point-column-name    ::= _variable\[point\]
 pg-polygon-column-name  ::= _variable\[polygon\]
 
+# For now, at least, TABLE and VIEW column names are the same
 table-column-name       ::= {numeric-column-name} 2| {string-column-name} | {non-int-str-column-name}
 view-column-name        ::= {table-column-name}
-legit-column-name       ::= {table-column-name} 9| {view-column-name}
-column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
+legit-column-name       ::= {table-column-name} 3| {view-column-name}
+column-name             ::= {legit-column-name} 999| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
 column-expression-list  ::= {column-expression} [, {column-expression-list}]
 
@@ -218,7 +241,7 @@ any-string-column-name  ::= {string-column-name} 4| {string-ipv-column-name} 2| 
 any-varbin-column-name  ::= {varbin-ipv-column-name} 2| {varbinary-column-name}
 any-table-column-name   ::= {table-column-name} 15| {varbin-ipv-column-name} 2| {string-ipv-column-name} 2| {json-column-name}
 any-view-column-name    ::= {any-table-column-name}
-any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
+any-legit-column-name   ::= {any-table-column-name} 3| {any-view-column-name}
 any-column-name         ::= {any-legit-column-name} 999| NONEXISTENT_COLUMN
 
 # Note: if you add a new column to the DDL file, add it here
@@ -232,6 +255,20 @@ every-col-name-backward ::= VBIPV6, VBIPV4, IPV6, IPV4, \
                             POLYGON, POINT, VARBIN, TIME, \
                             VCHAR_JSON, VCHAR, VCHAR_OUTLINE_MIN, VCHAR_INLINE_MAX, VCHAR_INLINE, \
                             DEC, NUM, BIG, INT, SMALL, TINY, ID
+# With the string (VARCHAR) columns listed first
+# TODO: these are not currently used
+every-column-name-str   ::= VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+                            TIME, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
+every-column-name-gb    ::= TINY, SMALL, ID, INT, BIG, NUM, DEC, \
+                            VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            TIME, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
+every-column-name-str-gb::= VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, \
+                            TIME, VARBIN, POINT, POLYGON, \
+                            IPV4, IPV6, VBIPV4, VBIPV6
 
 # These are obviously not the complete lists of all possible table and column
 # aliases, but using a short list makes it more likely that when you refer to
@@ -281,7 +318,7 @@ table-name-or-alias-set ::= {table-name-set} 3| {table-alias-set}
 table-or-view-name-set  ::= {table-name-set} 3| {view-name-set}
 view-name-or-alias-set  ::= {view-name-set}  3| {view-alias-set}
 
-table-ref-set           ::= {table-name-or-alias-set} 5| \
+table-ref-set           ::= {table-name-or-alias-set} 7| \
                             {view-name-or-alias-set}  2| \
                             {sub-query-set}
 
@@ -293,13 +330,22 @@ table-alias-ref         ::= {table-alias;t1,t2,t3,t4,t5}
 view-name-ref           ::= {view-name;t1,t2,t3,t4,t5}
 table-ref               ::= {table-name-ref} 2| {table-alias-ref} 2| {view-name-ref}
 
+# The use of "{table-ref}" is useful to refer to a table name or alias that has
+# already been defined, elsewhere in the SQL statement
+column-table-ref        ::= {table-ref}.{any-column-name} 19| {any-column-name}
+
 # Same '...-set' and '...-ref' ideas as above, but here for a column alias
-column-alias-set        ::= {column-alias:ca1} 6| \
-                            {column-alias:ca2} 6| \
-                            {column-alias:ca3} 3| \
-                            {column-alias:ca4} 2| \
-                            {column-alias:ca5}
-column-alias-ref        ::= {column-alias;ca1,ca2,ca3,ca4,ca5,c1,c2,c3,c4}
+column-alias-set        ::= {column-alias:ca0} | \
+                            {column-alias:ca1} | \
+                            {column-alias:ca2} | \
+                            {column-alias:ca3} | \
+                            {column-alias:ca4} | \
+                            {column-alias:ca5} | \
+                            {column-alias:ca6} | \
+                            {column-alias:ca7} | \
+                            {column-alias:ca8} | \
+                            {column-alias:ca9}
+column-alias-ref        ::= {column-alias;ca0,ca1,ca2,ca3,ca4,ca5,ca6,ca7,ca8,ca9,cj1,cj2,cj3,cj4}
 
 ################################################################################
 # Any SQL statement (this now includes some DDL statements):
@@ -330,7 +376,7 @@ insert-select-statement ::= {simple-insert-select} 9| {insert-clause} {select-st
 values-list             ::= {ordered-values-list}  9| {random-order-value-list}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-insert-clause           ::= INSERT INTO {table-name-set} [[({column-list})]]
+insert-clause           ::= INSERT INTO {table-name} [[({column-list})]]
 
 ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
                             {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
@@ -530,7 +576,7 @@ upsert-values-statement ::= {simple-upsert-values} 9| {upsert-clause} VALUES ({v
 upsert-select-statement ::= {simple-upsert-select} 9| {upsert-clause} {select-statement}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-upsert-clause           ::= UPSERT INTO {table-name-set} [[({column-list})]]
+upsert-clause           ::= UPSERT INTO {table-name} [[({column-list})]]
 
 simple-upsert-values    ::= UP{in-or-up-sert-values}
 simple-upsert-select    ::= UP{in-or-up-sert-select}
@@ -805,34 +851,44 @@ aggregate-depth-funcs2  ::=  , MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD,
                             [, MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD] | \
                             [, MIN(DEPTH) MND][, MAX(DEPTH) MXD][, COUNT(DEPTH) CTD][, SUM(DEPTH) SMD][, AVG(DEPTH) AVD]
 
+aggregate-func-ctec1    ::= {aggregate-function}({:ctec1}) 18| \
+                            COUNT(DISTINCT {:ctec1})         | \
+                            COUNT(*)
+aggregate-func-ctec2    ::= {aggregate-function}({:ctec2}) 18| \
+                            COUNT(DISTINCT {:ctec2})         | \
+                            COUNT(*)
+aggregate-func-ctec3    ::= {aggregate-function}({:ctec3}) 18| \
+                            COUNT(DISTINCT {:ctec3})         | \
+                            COUNT(*)
+
 # TODO: lots more options could be used here
 final-query-1num        ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1})    AG1 {aggregate-depth-funcs} FROM cte
+                            SELECT {aggregate-func-ctec1}            AG1 {aggregate-depth-funcs} FROM cte
 final-query-1non-num    ::= SELECT {star} FROM cte | \
                             SELECT {non-num-arg-aggr-func}({:ctec1}) AG1 {aggregate-depth-funcs} FROM cte
 final-query-1num-1non   ::= SELECT {star} FROM cte | \
-                            SELECT    {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                            SELECT {aggregate-func-ctec1}            AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
                                 {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,    {aggregate-function}({:ctec1}) AG1]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,            {aggregate-func-ctec1} AG1]\
                                 {aggregate-depth-funcs} FROM cte
 final-query-1non-1num   ::= SELECT {star} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,    {aggregate-function}({:ctec1}) AG2]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,            {aggregate-func-ctec2} AG2]\
                                 {aggregate-depth-funcs} FROM cte | \
-                            SELECT    {aggregate-function}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                            SELECT           {aggregate-func-ctec2}  AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
                                 {aggregate-depth-funcs} FROM cte
 final-query-3num        ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG1[, {aggregate-function}({:ctec1}) AG2]\
-                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG2[, {aggregate-function}({:ctec1}) AG1]\
-                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG3[, {aggregate-function}({:ctec1}) AG2]\
-                                [, {aggregate-function}({:ctec1}) AG1] {aggregate-depth-funcs} FROM cte
+                            SELECT {aggregate-func-ctec1} AG1[, {aggregate-func-ctec2} AG2]\
+                                [, {aggregate-func-ctec3} AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-func-ctec2} AG2[, {aggregate-func-ctec1} AG1]\
+                                [, {aggregate-func-ctec3} AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-func-ctec3} AG3[, {aggregate-func-ctec2} AG2]\
+                                [, {aggregate-func-ctec1} AG1] {aggregate-depth-funcs} FROM cte
 final-query-3non-num    ::= SELECT {star} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
-                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
-                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
-                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG3[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec3}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec2}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                [, {non-num-arg-aggr-func}({:ctec3}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec3}) AG3[, {non-num-arg-aggr-func}({:ctec2}) AG2]\
                                 [, {non-num-arg-aggr-func}({:ctec1}) AG1]   {aggregate-depth-funcs} FROM cte
 final-query-9num        ::= SELECT {star} FROM cte | \
                             SELECT {aggregate-function}({ctec1-9}) AG1[, {aggregate-function}({ctec1-9}) AG2][, {aggregate-function}({ctec1-9}) AG3] \
@@ -845,13 +901,13 @@ final-query-9non-num    ::= SELECT {star} FROM cte | \
                                 [, {non-num-arg-aggr-func}({ctec1-9}) AG7,  {non-num-arg-aggr-func}({ctec1-9}) AG8,   {non-num-arg-aggr-func}({ctec1-9}) AG9] \
                             {aggregate-depth-funcs} FROM cte
 final-query-9-mixed     ::= SELECT {star} FROM cte | \
-                            SELECT {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,  {aggregate-function}({:ctec3}) AG3] \
+                            SELECT {aggregate-func-ctec1}         AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,         {aggregate-func-ctec3}  AG3] \
                                 [, {aggregate-function}({:ctec4}) AG4,  {non-num-arg-aggr-func}({:ctec5}) AG5, {non-num-arg-aggr-func}({:ctec6}) AG6] \
                                 [, {aggregate-function}({:ctec7}) AG7,  {non-num-arg-aggr-func}({:ctec8}) AG8, {non-num-arg-aggr-func}({:ctec9}) AG9] \
                             {aggregate-depth-funcs} FROM cte | \
                             SELECT {non-num-arg-aggr-func}({:ctec9}) AG9[, {non-num-arg-aggr-func}({:ctec8}) AG8][, {aggregate-function}({:ctec7}) AG7] \
                                 [, {non-num-arg-aggr-func}({:ctec6}) AG6,  {non-num-arg-aggr-func}({:ctec5}) AG5,   {aggregate-function}({:ctec4}) AG4] \
-                                [,    {aggregate-function}({:ctec3}) AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-function}({:ctec1}) AG1] \
+                                [,           {aggregate-func-ctec3}  AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-func-ctec1}         AG1] \
                             {aggregate-depth-funcs} FROM cte
 
 ########################################
@@ -1355,7 +1411,8 @@ user-stored-proc        ::= {user-proc-0params} 2| {user-proc-1param} {integer-v
 # Grammar rules for a SELECT statement (lots of these!):
 ################################################################################
 #
-select-statement        ::= {basic-select-statement} 9| \
+select-statement        ::= {basic-select-statement}  8| \
+                            {groupby-select-statement} | \
                             {select-statement} {set-operator} {select-statement}
 set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
@@ -1363,34 +1420,31 @@ set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 # brackets makes them less likely
 basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} {from-clause}
 top-all-or-distinct     ::= [[[{top-clause}]]] [[{all-or-distinct}]]
-from-clause             ::= FROM {table-refs} [[{where-clause}]] [[{group-clause}]] [{sort-clause}] 38| \
+from-clause             ::= {simple-from-clause} [[[[{group-clause}]]]] [{sort-clause}] 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
+simple-from-clause      ::= FROM {table-refs} [[{where-clause}]]
 from-clause-no-limit    ::= FROM {table-refs} [[{where-clause}]] {group-order-no-limit} 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
-group-order-no-limit    ::= [[{group-clause}]] [{order-by-clause}]
+group-order-no-limit    ::= [[[[{group-clause}]]]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
 select-list             ::= {select-list-item}[[, {select-list}]]
-select-list-item        ::= {star} 5| {column-name-ref} [[AS ]{column-alias-set}] 14| \
+select-list-item        ::= {star} 5| {column-table-ref} [[AS ]{column-alias-set}] 14| \
                             {window-function-expr} [[AS ]{column-alias-set}]
 
 column-name-or-alias    ::= {any-column-name} 9| {column-alias-ref}
-column-expression       ::= {column-name-ref} 3| {selection-expression}
-
-# The use of "{table-ref}" is useful to refer to a table name or alias that has
-# already been defined, elsewhere in the SQL statement
-column-name-ref         ::= {table-ref}.{any-column-name} 4| {any-column-name}
-column-reference        ::= {column-name-ref} 18| {column-alias-ref} | \
+column-expression       ::= {column-table-ref} 3| {selection-expression}
+column-reference        ::= {column-table-ref} 18| {column-alias-ref} | \
                             {selection-expression}
 
 # Putting the ", {table-ref-list}" in more than one set of brackets makes it less likely
-table-refs              ::= {table-list} 8| {table-ref-list} | {join-clause}
-table-ref-list          ::= {table-ref-set}[[, {table-ref-list}]]
+table-refs              ::= {table-list} 16| {table-ref-list} 3| {join-clause}
+table-ref-list          ::= {table-ref-set}[[[[, {table-ref-list}]]]]
 table-list              ::= {table-reference-t1} \
-                            [[, {table-reference-t2} \
-                            [[, {table-reference-t3} \
-                            [[, {table-reference-t4} \
-                            [[, {table-reference-t5}]] ]] ]] ]]
+                            [[[[, {table-reference-t2} \
+                              [[, {table-reference-t3} \
+                              [[, {table-reference-t4} \
+                              [[, {table-reference-t5}]] ]] ]] ]]]]
 
 # Table/view/sub-query references that can be reused later in a SQL statement,
 # as ":t1", ":t2", etc.
@@ -1455,7 +1509,7 @@ value-expression        ::= {numeric-expression}  7| {string-expression}     4| 
                             {json-expression}      | {string-ipv4-expression} | {string-ipv6-expression} | \
                             {varbinary-expression} | {varbin-ipv4-expression} | {varbin-ipv6-expression} | \
                             {point-expression}     | {polygon-expression}
-selection-expression    ::= {value-expression} 9| COUNT(*)
+selection-expression    ::= {value-expression} 18| COUNT(DISTINCT {value-expression}) | COUNT(*)
 boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [NOT ]NULL | \
                             {boolean-numeric-expr}  7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
                             {boolean-varbinary-expr} | {boolean-point-expr}   | {boolean-polygon-expr} | \
@@ -1478,6 +1532,51 @@ simple-comparison-op    ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FRO
 str-comparison-operator ::= {simple-comparison-op} | LIKE | STARTS WITH
 
 ################################################################################
+# GROUP BY clauses, and the SELECT statements that use them; including SELECT
+# statements without GROUP BY that use aggregate functions in a similar way
+#
+groupby-select-statement::= {simple-groupby-select} 3| {random-groupby-select}
+
+simple-groupby-select   ::= SELECT [{top-all-or-distinct}] {groupby-select-list} \
+                            {simple-from-clause:sfc} {groupby-w-column-list}
+
+groupby-select-list     ::= {groupby-column-list;gcl}{comma;cm1}{comma;cm2} \
+                            {count-star}{comma;cm3} {aggregate-func-terms}
+comma                   ::= ,
+count-star              ::= COUNT(*) {count-star-alias:csa}{empty:cm2} 3| \
+                            {empty:cm1}{empty:csa}{empty:cm3}
+count-star-alias        ::= CS
+
+groupby-w-column-list   ::= GROUP BY {groupby-column-list0} 4| \
+                            {empty:gcl}{empty:cm1}{empty:cm2}
+groupby-column-list0    ::= {groupby-column-list:gcl}
+groupby-column-list     ::= {groupby-col-name-set}[, {groupby-column-list}]
+
+groupby-col-name-set    ::= {any-column-name:gc0,gc1,gc2,gc3,gc4,gc5,gc6,gc7,gc8,gc9,gc10,gc11,gc12,gc13,gc14,gc15,gc16,gc17,gc18,gc19:1}
+
+aggregate-func-terms    ::= {aggregate-func-terms0} 4| {empty:cm2}{empty:cm3}
+aggregate-func-terms0   ::= {aggregate-func-term}[, {aggregate-func-terms0}]
+aggregate-func-term     ::=   {aggr-func-for-group-by}({num-aggr-col-name-set})  9| \
+                            {non-num-arg-aggr-func-gb}({aggregate-col-name-set}) 9| \
+                                        COUNT(DISTINCT {aggregate-col-name-set})
+
+aggregate-col-name-set  ::= {any-column-name:ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19}
+num-aggr-col-name-set   ::= {numeric-column-name:ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19}
+aggregate-col-name-list ::= {;ac0,ac1,ac2,ac3,ac4,ac5,ac6,ac7,ac8,ac9,ac10,ac11,ac12,ac13,ac14,ac15,ac16,ac17,ac18,ac19;', '}
+
+# A CREATE VIEW statement needs to include a 'simple' SELECT statement,
+# usually using a GROUP BY clause (i.e., a {simple-groupby-select}); this
+# 'create-view-column-list' makes sure that the number, names, and types
+# of the columns match (mostly)
+create-view-column-list ::= {groupby-column-list;gcl}{comma;cm1}{comma;cm2} \
+                            {count-star-alias;csa}{comma;cm3} {aggregate-col-name-list}
+
+# TODO: better support for SELECT ... GROUP BY statements, without the
+# restrictions that exist for CREATE VIEW, e.g., no HAVING or ORDER BY
+# clauses; for now, only the CREATE VIEW types are supported
+random-groupby-select   ::= {simple-groupby-select}
+
+################################################################################
 # Joins, of various types, including multi-joins of up to 5 tables
 #
 join-clause             ::= {table-reference-t1} [{join-type} ]JOIN {table-reference-t2} {join-condition1} \
@@ -1487,24 +1586,24 @@ join-clause             ::= {table-reference-t1} [{join-type} ]JOIN {table-refer
 join-type               ::= INNER | {left-or-right}[ OUTER]
 left-or-right           ::= LEFT | RIGHT | FULL
 
-join-condition1         ::= USING ({column-name-or-alias:c1}) 2| \
-                            ON {:t1}.{column-name-or-alias:c1} = {:t2}.{:c1} | \
-                            ON {:t2}.{column-name-or-alias:c1} = {:t1}.{:c1} | \
+join-condition1         ::= USING ({column-name-or-alias:cj1}) 2| \
+                            ON {:t1}.{column-name-or-alias:cj1} = {:t2}.{:cj1} | \
+                            ON {:t2}.{column-name-or-alias:cj1} = {:t1}.{:cj1} | \
                             ON {:t1}.{column-name-or-alias} {comparison-operator} {:t2}.{column-name-or-alias} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias}
-join-condition2         ::= USING ({column-name-or-alias:c2}) 2| \
-                            ON {:t2}.{column-name-or-alias:c2} = {:t3}.{:c2} | \
-                            ON {:t3}.{column-name-or-alias:c2} = {:t1}.{:c2} | \
+join-condition2         ::= USING ({column-name-or-alias:cj2}) 2| \
+                            ON {:t2}.{column-name-or-alias:cj2} = {:t3}.{:cj2} | \
+                            ON {:t3}.{column-name-or-alias:cj2} = {:t1}.{:cj2} | \
                             ON {:t3}.{column-name-or-alias} {comparison-operator} {:t1}.{column-name-or-alias} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
-join-condition3         ::= USING ({column-name-or-alias:c3}) 2| \
-                            ON {:t3}.{column-name-or-alias:c3} = {:t4}.{:c3} | \
-                            ON {:t4}.{column-name-or-alias:c3} = {:t1}.{:c3} | \
+join-condition3         ::= USING ({column-name-or-alias:cj3}) 2| \
+                            ON {:t3}.{column-name-or-alias:cj3} = {:t4}.{:cj3} | \
+                            ON {:t4}.{column-name-or-alias:cj3} = {:t1}.{:cj3} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t4}.{column-name-or-alias} | \
                             ON {:t4}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
-join-condition4         ::= USING ({column-name-or-alias:c4}) 2| \
-                            ON {:t1}.{column-name-or-alias:c4} = {:t5}.{:c4} | \
-                            ON {:t5}.{column-name-or-alias:c4} = {:t4}.{:c4} | \
+join-condition4         ::= USING ({column-name-or-alias:cj4}) 2| \
+                            ON {:t1}.{column-name-or-alias:cj4} = {:t5}.{:cj4} | \
+                            ON {:t5}.{column-name-or-alias:cj4} = {:t4}.{:cj4} | \
                             ON {:t2}.{column-name-or-alias} {comparison-operator} {:t5}.{column-name-or-alias} | \
                             ON {:t5}.{column-name-or-alias} {comparison-operator} {:t3}.{column-name-or-alias}
 
@@ -1524,12 +1623,14 @@ point-sub-query         ::= (SELECT {top-all-or-distinct}     {point-expression}
 polygon-sub-query       ::= (SELECT {top-all-or-distinct}   {polygon-expression} {from-clause})
 numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  {from-clause}) 3| \
                             (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
-                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT         COUNT(DISTINCT {column-expression})  {from-clause})  | \
+                            (SELECT         COUNT(*)                             {from-clause})  | \
                             (SELECT {top-one}   {numeric-expression} {from-clause-no-limit})     | \
                             (SELECT             {numeric-expression} {from-clause-no-limit} {limit-one})
 integer-scalar-sub-q    ::= (SELECT  {aggregate-function}({int-expression})      {from-clause}) 3| \
                             (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
-                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT         COUNT(DISTINCT {column-expression})  {from-clause})  | \
+                            (SELECT         COUNT(*)                             {from-clause})  | \
                             (SELECT {top-one}   {int-expression}     {from-clause-no-limit})     | \
                             (SELECT             {int-expression}     {from-clause-no-limit} {limit-one})
 string-scalar-sub-q     ::= (SELECT {non-num-aggregate-func}({string-expression})  {from-clause}) 6| \
@@ -1599,7 +1700,8 @@ corltd-t0-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numer
 
 numeric-corltd-t0-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t0} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t0} 3| \
-                            SELECT COUNT(*)                                    {from-clause-corltd-t0}  | \
+                            SELECT         COUNT(DISTINCT {column-expression}) {from-clause-corltd-t0}  | \
+                            SELECT         COUNT(*)                            {from-clause-corltd-t0}  | \
                             SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t0}  | \
                             SELECT                       {numeric-expression}  {from-clause-corltd-t0} {limit-one}
 string-corltd-t0-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t0} 6| \
@@ -1651,7 +1753,8 @@ corltd-t1-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numer
 
 numeric-corltd-t1-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t1} 3| \
                             SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t1} 3| \
-                            SELECT COUNT(*)                                    {from-clause-corltd-t1}  | \
+                            SELECT         COUNT(DISTINCT {column-expression}) {from-clause-corltd-t1}  | \
+                            SELECT         COUNT(*)                            {from-clause-corltd-t1}  | \
                             SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t1}  | \
                             SELECT                       {numeric-expression}  {from-clause-corltd-t1} {limit-one}
 string-corltd-t1-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t1} 6| \
@@ -1738,12 +1841,18 @@ window-order-by-item    ::= {column-expression} 2| {int-expression} | {timestamp
 # Aggregate functions - used with various data types defined below
 # (and in the window functions and scalar sub-queries above)
 #
-# TODO: More use of these in GROUP BY queries
 num-only-aggregate-func ::= SUM | AVG
 num-result-aggr-func    ::= COUNT 3| APPROX_COUNT_DISTINCT
-non-num-aggregate-func  ::= MIN | MAX
+legit-non-num-aggr-func ::= MIN | MAX
+non-num-aggregate-func  ::= {legit-non-num-aggr-func} 399| NONEXISTENT_AGGR_FUNC
 non-num-arg-aggr-func   ::= {non-num-aggregate-func} 2| {num-result-aggr-func}
 aggregate-function      ::= {non-num-arg-aggr-func}  2| {num-only-aggregate-func}
+
+# For use with a GROUP BY clause, in a CREATE VIEW (DDL) statement, where only
+# SUM, COUNT, MIN, or MAX aggregate functions are allowed
+legit-non-num-aggr-f-gb ::= {non-num-aggregate-func}    2| {pg-num-result-aggr-func}
+non-num-arg-aggr-func-gb::= {legit-non-num-aggr-f-gb} 798| AVG | APPROX_COUNT_DISTINCT
+aggr-func-for-group-by  ::= {non-num-arg-aggr-func-gb}  3| SUM
 
 # PostgreSQL-compatible version of the above: avoids APPROX_COUNT_DISTINCT
 pg-num-result-aggr-func ::= COUNT
@@ -2231,13 +2340,13 @@ ng-polygon-value           ::= NULL
 # Grammar rules for all DDL statements:
 #
 # TODO: include all DDL statements (with non-zero weights), once implemented,
-# especially CREATE TABLE, CREATE VIEW, ALTER TABLE, and PARTITION statements
+# especially CREATE TABLE, ALTER TABLE, and PARTITION statements
 #
 ddl-statement           ::= {create-statement}     | {alter-table-statement} 0| \
                             {partition-statement} 0| {drop-statement}
 
-create-statement        ::= {create-table-statement} 0| {create-index-statement} | \
-                            {create-view-statement}  0| {create-proc-statement}
+create-statement        ::= {create-table-statement} 0| {create-view-statement} | \
+                            {create-index-statement}  | {create-proc-statement}
 
 ################################################################################
 # Names for tables, views, indexes, and stored procedures, to be used in DDL
@@ -2248,6 +2357,13 @@ ddl-table-name          ::= DT{digit-0-to-5}
 ddl-view-name           ::= DV{digit-0-to-5}
 ddl-index-name          ::= DIDX{digit-0-to-5}
 ddl-proc-name           ::= {random-proc-0params}
+
+################################################################################
+# Grammar rules for CREATE VIEW statements:
+################################################################################
+#
+create-view-statement   ::= CREATE VIEW {ddl-view-name} ({create-view-column-list;cvcl}) AS \
+                            {simple-groupby-select}
 
 ################################################################################
 # Grammar rules for a CREATE INDEX statement:
@@ -2295,8 +2411,8 @@ create-proc-as-statement::= CREATE PROCEDURE {ddl-proc-name:p0} \
 ################################################################################
 #
 # TODO: include all DROP statements (with non-zero weights), once implemented:
-drop-statement          ::= {drop-table-statement} 0| {drop-index-statement} | \
-                            {drop-view-statement}  0| {drop-proc-statement}
+drop-statement          ::= {drop-table-statement} 0| {drop-view-statement} | \
+                            {drop-index-statement}  | {drop-proc-statement}
 drop-table-statement    ::= DROP TABLE     {ddl-table-name}[[ IF EXISTS]][[ CASCADE]]
 drop-view-statement     ::= DROP VIEW      {ddl-view-name}[   IF EXISTS]
 drop-index-statement    ::= DROP INDEX     {ddl-index-name}[  IF EXISTS]
