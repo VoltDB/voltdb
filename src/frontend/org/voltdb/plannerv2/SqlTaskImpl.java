@@ -39,7 +39,7 @@ public class SqlTaskImpl implements SqlTask {
      * @throws SqlParseException when the parsing goes wrong.
      * @throws IllegalArgumentException if the SQL string is null or empty.
      */
-    SqlTaskImpl(String sql) throws SqlParseException {
+    public SqlTaskImpl(String sql) throws SqlParseException {
         if ((sql == null) || (sql = sql.trim()).isEmpty()) { // Remove any spaces or newlines
             throw new IllegalArgumentException("Can't plan empty or null SQL.");
         }
