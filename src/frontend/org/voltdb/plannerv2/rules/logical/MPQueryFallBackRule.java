@@ -104,8 +104,11 @@ public class MPQueryFallBackRule extends RelOptRule {
             switch (sqlKind) {
                 case EQUALS:
                     // SELECT ... FROM t WHERE PK = 0;
-                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
-                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                    // Note: SELECT ... FROM t WHERE PK = col1; is a MP query
+                    return (isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys)
+                            && !hasTableColumn(program, rexCall.getOperands().get(1))) ||
+                            (isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys)
+                                    && !hasTableColumn(program, rexCall.getOperands().get(0)));
                 case AND:
                     // SELECT ... FROM t WHERE PK = 0 and A = 1;
                     return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
@@ -146,8 +149,11 @@ public class MPQueryFallBackRule extends RelOptRule {
             switch (sqlKind) {
                 case NOT_EQUALS:
                     // SELECT ... FROM t WHERE NOT PK <> 0;
-                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
-                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                    // Note: SELECT ... FROM t WHERE Not PK <> col1; is a MP query
+                    return (isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys)
+                            && !hasTableColumn(program, rexCall.getOperands().get(1))) ||
+                            (isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys)
+                                    && !hasTableColumn(program, rexCall.getOperands().get(0)));
                 case NOT:
                     // SELECT ... FROM t WHERE NOT (NOT PK = 0);
                     // I assume this branch will never be reached, cause calcite have a ReduceExpressionsRule
@@ -172,17 +178,43 @@ public class MPQueryFallBackRule extends RelOptRule {
     }
 
     /**
-     * A visitor to find {@link RexLocalRef} in a node tree.
+     * Helper function to check if the rexNode is a table column or includes a table column
+     * in its subtrees.
+     *
+     * @param program the program of a {@link LogicalCalc}.
+     * @param rexNode the rexNode
+     * @return true if the rexNode is a table column or includes a table column or
+     * includes a table column in its subtrees
+     */
+    private static boolean hasTableColumn(RexProgram program, RexNode rexNode) {
+        try {
+            rexNode.accept(new RexLocalRefFinder(program));
+        } catch (Util.FoundOne found) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * A visitor to find {@link RexLocalRef} of a table column in a node tree.
      */
     private static final class RexLocalRefFinder extends RexVisitorImpl<Void> {
-        static final MPQueryFallBackRule.RexLocalRefFinder INSTANCE = new MPQueryFallBackRule.RexLocalRefFinder();
+        final private RexProgram m_program;
 
-        private RexLocalRefFinder() {
+        private RexLocalRefFinder(RexProgram program) {
             super(true);
+            m_program = program;
         }
 
-        @Override public Void visitLocalRef(RexLocalRef localRef) {
-            throw Util.FoundOne.NULL;
+        @Override
+        public Void visitLocalRef(RexLocalRef localRef) {
+            // True if the localRef is the Table Column
+            if (localRef.getIndex() < m_program.getProjectList().size()) {
+                throw Util.FoundOne.NULL;
+            }
+            // will visit recursively if the localRef is a expression or subquery
+            m_program.getExprList().get(localRef.getIndex()).accept(this);
+            return null;
         }
     }
 }

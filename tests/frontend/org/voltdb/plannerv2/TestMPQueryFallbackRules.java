@@ -299,4 +299,10 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select i from R1 where i in (select si from P1)").testFail();
     }
+
+    public void testPartitionKeyEqualToTableColumn() {
+        m_tester.sql("select * from P1 where i = si").testFail();
+
+        m_tester.sql("select * from P1 where NOT i <> si").testFail();
+    }
 }
