@@ -253,19 +253,8 @@ public class LocalCluster extends VoltServerConfig {
                         Map<String, String> env)
     {
         this(jarFileName, siteCount, hostCount, kfactor, target,
-                FailureState.ALL_RUNNING, false, false, env);
+                FailureState.ALL_RUNNING, false, env);
 
-    }
-
-    public LocalCluster(String jarFileName,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target,
-                        boolean isRejoinTest)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target,
-                FailureState.ALL_RUNNING, false, isRejoinTest, null);
     }
 
     public LocalCluster(String jarFileName,
@@ -273,11 +262,10 @@ public class LocalCluster extends VoltServerConfig {
             int hostCount,
             int kfactor,
             int clusterId,
-            BackendTarget target,
-            boolean isRejoinTest)
+            BackendTarget target)
     {
         this(jarFileName, siteCount, hostCount, kfactor, clusterId, target,
-            FailureState.ALL_RUNNING, false, isRejoinTest, null);
+            FailureState.ALL_RUNNING, false, null);
     }
 
     public LocalCluster(String jarFileName,
@@ -289,7 +277,7 @@ public class LocalCluster extends VoltServerConfig {
                         boolean debug)
     {
         this(jarFileName, siteCount, hostCount, kfactor, target,
-                failureState, debug, false, null);
+                failureState, debug, null);
     }
 
     public LocalCluster(String jarFileName,
@@ -299,10 +287,9 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target,
                         FailureState failureState,
                         boolean debug,
-                        boolean isRejoinTest,
                         Map<String, String> env) {
         this(jarFileName, siteCount, hostCount, kfactor, 0, target,
-                failureState, debug, isRejoinTest, env);
+                failureState, debug, env);
     }
 
     public LocalCluster(String jarFileName,
@@ -313,9 +300,8 @@ public class LocalCluster extends VoltServerConfig {
             BackendTarget target,
             FailureState failureState,
             boolean debug,
-            boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, env);
     }
 
     public LocalCluster(String schemaToStage,
@@ -328,7 +314,6 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target,
                         FailureState failureState,
                         boolean debug,
-                        boolean isRejoinTest,
                         Map<String, String> env)
     {
         m_usesStagedSchema = schemaToStage != null || classesJarToStage != null;
@@ -2411,7 +2396,7 @@ public class LocalCluster extends VoltServerConfig {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);
         }
         builder.setUseDDLSchema(true);
-        LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
+        LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI);
         lc.setReplicationPort(replicationPort);
         if (callingClassName != null) {
             lc.setCallingClassName(callingClassName);

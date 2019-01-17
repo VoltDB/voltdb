@@ -174,7 +174,9 @@ public class TestJSONInterface extends TestCase {
 
     static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
-        if (params == null) return s;
+        if (params == null) {
+            return s;
+        }
         for (Entry<String, String> e : params.entrySet()) {
             String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
             s += "&" + e.getKey() + "=" + encodedValue;
@@ -1013,7 +1015,7 @@ public class TestJSONInterface extends TestCase {
         builder.setSecurityEnabled(false, false);
         builder.setJSONAPIEnabled(true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, true);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         try {
             boolean success = cluster.compile(builder);
             assertTrue(success);
@@ -2313,8 +2315,8 @@ public class TestJSONInterface extends TestCase {
                     "localhost:8095/api",
                     "localhost:8095/api/1.0/invalid",
             };
-            for (int i=0; i<invalidURIs.length; i++) {
-                String result = getUrlOverJSON(protocolPrefix + invalidURIs[i], null, null, null, 404, null);
+            for (String invalidURI : invalidURIs) {
+                String result = getUrlOverJSON(protocolPrefix + invalidURI, null, null, null, 404, null);
                 assertTrue(result.contains("not found"));
             }
         } finally {
