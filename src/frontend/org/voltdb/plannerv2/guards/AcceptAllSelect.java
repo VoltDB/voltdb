@@ -17,6 +17,10 @@
 
 package org.voltdb.plannerv2.guards;
 
+import org.apache.commons.lang.StringUtils;
+
+import java.util.regex.Pattern;
+
 /**
  * Accepts all SELECT queries.
  *
@@ -24,6 +28,19 @@ package org.voltdb.plannerv2.guards;
  * @since 9.0
  */
 public class AcceptAllSelect extends CalciteCompatibilityCheck {
+    private static final Pattern IGNORE_PATTERN;
+
+    static {
+        // TODO: MICROS is a keyword in the TO_TIMESTAMP() function.
+        // QUARTER, MILLISECOND, MILLIS, MICROSECOND are keywords in the DATEADD() function.
+        // WEEK is a fake keyword using in the test of DATEADD()
+        // The ignore list should be resolved when we introduce those functions in calcite
+        String[] ignoreList = new String[]{"'MICROS'", "'QUARTER'", "'MILLISECOND'", "'MILLIS'", "'MICROSECOND'",
+                "'WEEK'"};
+        String pattern = String.format(".*Column (%s) not found in any table.*",
+                StringUtils.join(ignoreList, "|"));
+        IGNORE_PATTERN = Pattern.compile(pattern, Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
+    }
 
     @Override protected final boolean doCheck(String sql) {
         return sql.toUpperCase().startsWith("SELECT");
@@ -39,11 +56,15 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         if (message.contains("No match found for function signature")) {
             return true;
         }
-        // TODO: select myUdf(NULL) from T;
-        // will throw this exception, calcite try to infer the type before check the existence of the function
+        // TODO: select myUdf(NULL) from T; select myUdf(?) from T;
+        // will throw this exception, calcite try to infer the parameter types in function and disallow null and ? there
         // @see #SqlValidatorImpl.inferUnknownTypes
-        // We need to handle the type inference when we move to UDF support.
-        if (message.contains("Illegal use of 'NULL'")) {
+        // see ENG-15222
+        if (message.contains("Illegal use of 'NULL'") || message.contains("Illegal use of dynamic parameter")) {
+            return true;
+        }
+
+        if (IGNORE_PATTERN.matcher(message).find()) {
             return true;
         }
         return false;

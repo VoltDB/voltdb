@@ -43,6 +43,12 @@ create table R3 (
     vc varchar(256),
     ii integer);
 
+create table R4 (
+    pk integer,
+    vc varchar(256),
+    ii integer,
+    tm timestamp);
+
 create table RI3 (
     pk integer,
     vc varchar(256),
