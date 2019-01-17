@@ -170,7 +170,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
@@ -182,7 +182,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
          * compile a catalog without the NO_NULLS table for add/drop tests
          */
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();
@@ -201,7 +201,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
          * compile a catalog with an added table for add/drop tests
          */
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, k_factor,
-                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true,false,additionalEnv);
+                BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true,additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();

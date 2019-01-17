@@ -28,7 +28,7 @@ class TupleStreamException : public SQLException {
 public:
     TupleStreamException(std::string sqlState, std::string message) :
         SQLException(sqlState, message) {}
-    virtual ~TupleStreamException() {}
+    virtual ~TupleStreamException() throw() {}
 };
 }
 

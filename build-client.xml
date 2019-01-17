@@ -71,10 +71,10 @@
     <pathelement location='${build.client.dir}' />
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
-        <include name='commons-lang-2.6.jar' />
         <include name='javassist-3.20.0-GA.jar' />
     </fileset>
     <fileset dir='${lib.dir}'>
+        <include name='commons-lang3-3.8.1.jar' />
         <include name='log4j-1.2.16.jar' />
         <include name='commons-logging-1.1.3.jar' />
         <include name='slf4j-api-1.6.2.jar' />

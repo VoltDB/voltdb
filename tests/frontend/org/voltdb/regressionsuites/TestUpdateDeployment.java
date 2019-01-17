@@ -357,7 +357,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         LocalCluster config = new LocalCluster("catalogupdate-bad-export.jar", SITES_PER_HOST, HOSTS, K,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
