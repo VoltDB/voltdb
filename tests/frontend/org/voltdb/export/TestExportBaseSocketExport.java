@@ -444,30 +444,18 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         project.addExport(true /* enabled */, "custom", props, streamName);
     }
 
-    public static void wireupExportTableToSocketExport(String tableName) {
-        String streamName = tableName;
-        if (!m_portForTable.containsKey(streamName)) {
-            m_portForTable.put(streamName, getNextPort());
-        }
-        Properties props = new Properties();
-        m_isExportReplicated = false;
-        props.put("replicated", String.valueOf(m_isExportReplicated));
-        props.put("skipinternals", "false");
-        props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
-        props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+    public static void wireupExportTableToSocketExport(String streamName) {
+        wireupExportTableToSocketExport(streamName, false);
     }
 
-    public static void wireupExportTableToRejectingExport(String tableName) {
-        String streamName = tableName;
-        //This is done so that when we flip from rejecting to socket export we have ports configured for use.
+    public static void wireupExportTableToSocketExport(String streamName, boolean exportReplicated) {
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
         }
         Properties props = new Properties();
-        m_isExportReplicated = false;
-        props.put("replicated", String.valueOf(m_isExportReplicated));
+        props.put("replicated", String.valueOf(exportReplicated));
         props.put("skipinternals", "false");
+        props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
         project.addExport(true /* enabled */, "custom", props, streamName);
     }

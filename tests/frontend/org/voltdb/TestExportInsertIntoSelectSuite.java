@@ -214,7 +214,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         wireupExportTableToSocketExport(EXPORT_TARGET_PART);
 
         // the replicated export target
-        wireupExportTableToSocketExport(EXPORT_TARGET_REPL);
+        wireupExportTableToSocketExport(EXPORT_TARGET_REPL, true);
 
         // The partitioned source
         project.addPartitionInfo(SOURCE_PART, "PKEY");
