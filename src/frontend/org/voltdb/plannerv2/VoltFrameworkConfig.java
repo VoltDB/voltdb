@@ -100,7 +100,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     @Override public SqlToRelConverter.Config getSqlToRelConverterConfig() {
-        return SqlToRelConverter.Config.DEFAULT;
+        return VoltSqlToRelConverterConfig.INSTANCE;
     }
 
     @Override public SchemaPlus getDefaultSchema() {

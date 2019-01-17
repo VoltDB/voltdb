@@ -34,9 +34,10 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         // TODO: MICROS is a keyword in the TO_TIMESTAMP() function.
         // QUARTER, MILLISECOND, MILLIS, MICROSECOND are keywords in the DATEADD() function.
         // WEEK is a fake keyword using in the test of DATEADD()
+        // NOW is a keyword in volt
         // The ignore list should be resolved when we introduce those functions in calcite
         String[] ignoreList = new String[]{"'MICROS'", "'QUARTER'", "'MILLISECOND'", "'MILLIS'", "'MICROSECOND'",
-                "'WEEK'"};
+                "'WEEK'", "'NOW'"};
         String pattern = String.format(".*Column (%s) not found in any table.*",
                 StringUtils.join(ignoreList, "|"));
         IGNORE_PATTERN = Pattern.compile(pattern, Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);

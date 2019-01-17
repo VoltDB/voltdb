@@ -249,8 +249,18 @@ public class VoltPlanner implements Planner {
         ensure(State.STATE_2_VALIDATED);
         Preconditions.checkNotNull(m_validatedSqlNode, "Validated SQL node cannot be null.");
 
-        m_relRoot = m_sqlToRelConverter.convertQuery(
-                m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        try {
+            m_relRoot = m_sqlToRelConverter.convertQuery(
+                    m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        } catch (AssertionError ae) {
+            // TODO: PI is not supported in calcite, even it can pass the validation,
+            // it will throw an AssertionError "invalid literal: PI" in the conversion phase
+            // see ENG-15228
+            if (ae.getLocalizedMessage().contains("invalid literal: PI")) {
+                throw new PlannerFallbackException(ae);
+            }
+            throw ae;
+        }
 
         // Note - ethan - 1/2/2019:
         // Since we do not supported structured (compound) types in VoltDB now,
