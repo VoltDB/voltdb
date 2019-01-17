@@ -259,7 +259,7 @@ public class VoltPlanner implements Planner {
             if (ae.getLocalizedMessage().contains("invalid literal: PI")) {
                 throw new PlannerFallbackException(ae);
             }
-            throw ae;
+            throw new PlannerFallbackException(ae);
         }
 
         // Note - ethan - 1/2/2019:

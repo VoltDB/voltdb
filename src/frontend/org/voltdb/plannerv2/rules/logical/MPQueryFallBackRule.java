@@ -71,6 +71,10 @@ public class MPQueryFallBackRule extends RelOptRule {
             // See: org.voltdb.plannerv2.VoltTable.getStatistic().getDistribution()
             RelDistribution tableDist = tableScan.getTable().getDistribution();
             // RelDistribution.Type.SINGLETON means that the table is replicated.
+            // TODO: For views, the distribution type will be RANDOM_DISTRIBUTED.
+            if (tableDist.getType() == RelDistribution.Type.RANDOM_DISTRIBUTED) {
+                throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+            }
             // For partitioned tables, the distribution type will be HASH_DISTRIBUTED.
             if (tableDist.getType() != RelDistribution.Type.SINGLETON
                     && (calc.getProgram().getCondition() == null // SELECT ... FROM t (no filter)

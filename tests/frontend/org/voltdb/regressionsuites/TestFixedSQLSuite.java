@@ -2660,8 +2660,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             verifyStmtFails(client, sql, "HSQL-BACKEND ERROR");
             verifyStmtFails(client, sql, "to the left of the decimal point is 39 and the max is 26");
         } else {
-            verifyStmtFails(client, sql, "Maximum precision exceeded. "
-                    + "Maximum of 26 digits to the left of the decimal point");
+            verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
         }
 
         sql = "SELECT NUM + 111111.1111111111111111111111111111111111111 FROM R1";
@@ -3151,8 +3150,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         String sql;
         VoltTable vt;
-        final String vdbPlannerError = "Aggregate functions are not allowed in the ORDER BY clause " +
-                "if they do not also appear in the SELECT list.";
+        final String vdbPlannerError = "Aggregate expression is illegal in ORDER BY clause of non-aggregating SELECT";
         final String hsqlPlannerError = "invalid ORDER BY expression";
 
         // In this bug, both HSQL and VoltDB could not handle queries with:
@@ -3170,7 +3168,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // raw column reference in the OB clause.  However, because we can optimize away
         // the ORDER BY clause, we allow this.
         // (HSQL does not catch the error... this is ENG-14177.)
-        sql =  "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;";
+        sql =  "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {{null}}, vt);
 
@@ -3178,7 +3176,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         sql = "SELECT TOP 3  -699 AS CA4 " +
                 "FROM ENG_13852_R11, ENG_13852_VR5 " +
                 "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
-        verifyStmtFails(client, sql, vdbPlannerError);
+        verifyStmtFails(client, sql, "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
 
         // This query has an agg on OB clause not on the SELECT list
         // BUT, because the
@@ -3226,7 +3224,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         sql = "SELECT TOP 3  -699 AS CA4 " +
                 "FROM ENG_13852_R11 , ENG_13852_VR5     " +
                 "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
-        verifyStmtFails(client, sql, vdbPlannerError);
+        verifyStmtFails(client, sql, "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list");
     }
 
     //

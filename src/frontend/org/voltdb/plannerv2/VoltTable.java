@@ -100,6 +100,10 @@ public class VoltTable implements TranslatableTable {
                     return RelDistributions.SINGLETON;
                 } else {
                     Column partitionColumn = m_catTable.getPartitioncolumn();
+                    // partitionColumn == null when it is a Multi-partitioned view
+                    if (partitionColumn == null) {
+                        return RelDistributions.RANDOM_DISTRIBUTED;
+                    }
                     List<Integer> partitionColumnIds = Collections.list(partitionColumn.getIndex());
                     RelDistribution hashDist = RelDistributions.hash(partitionColumnIds);
                     return hashDist;
