@@ -221,8 +221,8 @@ final public class CreateIndexUtils {
      */
     static Pair<String, String> genIndexAndConstraintName(
             String constraintName, SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
-        if (constraintName != null) {
-            return Pair.of("VOLTDB_AUTOGEN_CONSTRAINT_IDX_" + constraintName, constraintName);
+        if (constraintName != null) {   // For named index with `CREATE INDEX index_name', the constraint name will be Index.m_typeName.
+            return Pair.of(constraintName, "VOLTDB_AUTOGEN_CONSTRAINT_CT_" + constraintName);
         } else {
             final String suffix,
                     type_str = type == SqlKind.PRIMARY_KEY ? "PK" : "CT",
@@ -290,7 +290,7 @@ final public class CreateIndexUtils {
         }
         index.setUnique(true);
         index.setAssumeunique(type == SqlKind.ASSUME_UNIQUE);
-        setConstraintType(t.getConstraints().add(constraintName), index, type, constraintName, t.getTypeName());
+        setConstraintType(t.getConstraints().add(constraintName), index, type, indexName, t.getTypeName());
         AtomicInteger i = new AtomicInteger(0);
         indexCols.forEach(column -> {
             final ColumnRef cref = index.getColumns().add(column.getName());
@@ -300,11 +300,12 @@ final public class CreateIndexUtils {
         if (! exprs.isEmpty()) {
             index.setExpressionsjson(toJSON(exprs, indexName, t.getTypeName()));
         }
-        if (predicate != null) {
-            index.setPredicatejson(toJSON(predicate, indexName, t.getTypeName()));
-        }
         final AbstractExpression.UnsafeOperatorsForDDL unsafeOp = new AbstractExpression.UnsafeOperatorsForDDL();
         exprs.forEach(expr -> expr.findUnsafeOperatorsForDDL(unsafeOp));
+        if (predicate != null) {
+            index.setPredicatejson(toJSON(predicate, indexName, t.getTypeName()));
+            predicate.findUnsafeOperatorsForDDL(unsafeOp);
+        }
         index.setIssafewithnonemptysources(! unsafeOp.isUnsafe());
         return index;
     }
