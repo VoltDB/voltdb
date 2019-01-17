@@ -47,6 +47,7 @@ public class ExportTestExpectedData {
     private final boolean m_exact;
     private final long m_copies;
     public boolean m_verifySequenceNumber = true;
+    public boolean m_verbose = true;
 
     public ExportTestExpectedData(Map<String, ServerListener> serverSockets, boolean isExportReplicated, boolean exact,
             int copies) {
@@ -56,8 +57,7 @@ public class ExportTestExpectedData {
         m_copies = copies;
     }
 
-    public synchronized void addRow(Client client, String tableName, Object partitionHash, Object[] data)
-            throws Exception {
+    public synchronized void addRow(Client client, String tableName, Object partitionHash, Object[] data) {
         long partition = ((ClientImpl) client).getPartitionForParameter(VoltType.typeFromObject(partitionHash)
                 .getValue(), partitionHash);
         ExportToSocketTestVerifier verifier = m_verifiers.get(tableName + partition);
@@ -86,18 +86,23 @@ public class ExportTestExpectedData {
 
             String next[] = null;
             assertEquals(getSize(tableName), f.getValue().getSize());
+            if (!m_exact) {
+                continue;
+            }
             while ((next = f.getValue().getNext()) != null) {
                 final int partitionId = Integer.valueOf(next[3]);
-                StringBuilder sb = new StringBuilder();
-                for (String s : next) {
-                    sb.append(s).append(", ");
+                if (m_verbose) {
+                    StringBuilder sb = new StringBuilder();
+                    for (String s : next) {
+                        sb.append(s).append(", ");
+                    }
+                    System.out.println(sb);
                 }
-                System.out.println(sb);
                 ExportToSocketTestVerifier verifier = m_verifiers.get(tableName + partitionId);
                 Long rowSeq = Long.parseLong(next[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
 
                 // verify occurrence if replicated
-                if (m_replicated && m_exact) {
+                if (m_replicated) {
                     assertEquals(m_copies, f.getValue().getCount(rowSeq));
                 }
 
@@ -105,8 +110,6 @@ public class ExportTestExpectedData {
             }
         }
     }
-
-
 
     private int getSize(String tableName) {
         return m_count.containsKey(tableName) ? m_count.get(tableName) : 0;
