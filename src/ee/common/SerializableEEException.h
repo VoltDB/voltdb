@@ -19,6 +19,7 @@
 #define SERIALIZABLEEEEXCEPTION_H_
 
 #include <string>
+#include <stdexcept>
 
 #define throwSerializableEEException(...) do { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); } while (false)
 
@@ -51,7 +52,7 @@ enum VoltEEExceptionType {
  * used to determine what exception class will be used to deserialize
  * this exception.
  */
-class SerializableEEException {
+class SerializableEEException : public std::runtime_error {
 public:
     /*
      * Constructor that performs the serialization to the engines
@@ -59,7 +60,7 @@ public:
      */
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
     SerializableEEException(std::string message);
-    virtual ~SerializableEEException();
+    virtual ~SerializableEEException() throw();
 
     void serialize (ReferenceSerializeOutput *output) const;
     virtual const std::string message() const { return m_message; }

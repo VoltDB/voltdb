@@ -140,10 +140,13 @@ public class GuestProcessor implements ExportDataProcessor {
                         return;
                     }
                     String tableName = source.getTableName().toLowerCase();
+                    String groupName = m_targetsByTableName.get(tableName);
                     if (source.getClient() == null) {
                         m_logger.warn("Table " + tableName + " has no configured connector.");
                         continue;
                     }
+                    //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
+                    m_clientsByTarget.putIfAbsent(groupName, source.getClient());
                     ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), source.getClient(), source);
                     // DataSource should start polling only after command log replay on a recover
                     source.setReadyForPolling(m_startPolling);
@@ -367,7 +370,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
                                         cont.updateStartTime(System.currentTimeMillis());
-                                        edb.onBlockStart();
+                                        if (firstRowOfBlock) {
+                                            edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
+                                        }
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.

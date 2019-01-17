@@ -49,17 +49,6 @@ limit-definition        ::= LIMIT PARTITION ROWS {non-negative-int-value} [EXECU
 index-or-limit-defn     ::= {index-definition} | {limit-definition}
 
 ################################################################################
-# Grammar rules for CREATE VIEW statements:
-################################################################################
-create-view-statement   ::= CREATE VIEW {view-name} ({column-name-list}) AS \
-                            SELECT {column-expression} [[AS] {column-alias}] \
-                            FROM {table-name} \
-                            [{where-clause}]  \
-                            [GROUP BY {column-expression}]
-
-column-name-list        ::= {column-name} [, {column-name-list}] [, {column-name-list}]
-
-################################################################################
 # Grammar rules for ALTER TABLE statements:
 ################################################################################
 alter-table-statement   ::= {alter-table-add} | {alter-table-alter} | {alter-table-drop}

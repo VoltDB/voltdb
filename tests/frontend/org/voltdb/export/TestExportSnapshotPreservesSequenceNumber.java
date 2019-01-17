@@ -138,7 +138,7 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBaseSoc
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 1, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(2));
         config.setHasLocalServer(false);
         //TODO: export overflow why is this test expects it to hang around?

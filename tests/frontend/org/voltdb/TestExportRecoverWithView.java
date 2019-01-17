@@ -65,7 +65,7 @@ public class TestExportRecoverWithView extends JUnit4LocalClusterTest {
         Properties props = new Properties();
         project.addExport(true /* enabled */, "custom", props);
         LocalCluster db = new LocalCluster("exportview.jar", 2, 1, 0, 2, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         boolean compile = db.compile(project);
         assertTrue(compile);
         if (db.isValgrind()) {

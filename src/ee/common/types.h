@@ -139,6 +139,8 @@ enum ConstraintType {
     CONSTRAINT_TYPE_PRIMARY_KEY    = 4,
     CONSTRAINT_TYPE_NOT_NULL       = 5,
     CONSTRAINT_TYPE_PARTITIONING   = 6,
+    CONSTRAINT_TYPE_LIMIT          = 7,                    // org.voltdb.types.ConstraintType.java
+    CONSTRAINT_TYPE_NUMERIC        = 8,
 };
 
 // ------------------------------------------------------------------

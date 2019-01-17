@@ -800,12 +800,10 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
-    }
-    catch (TupleStreamException& e) {
+    } catch (TupleStreamException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
@@ -971,6 +969,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
                                              CONSTRAINT_TYPE_UNIQUE);
         }
 
+        checkUpdateOnExpressions(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate);
         /**
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
@@ -1436,7 +1435,14 @@ void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
 
 void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict) {
     for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
-        m_indexes[i]->addEntry(tuple, conflict);
+       try {
+          m_indexes[i]->addEntry(tuple, conflict);
+       } catch (SQLException const& e) {    // ENG-15047, when inserting a value that causes Inf, the exception is SQLException. Clean up the mess.
+          for (int j = 0; j < i; ++j) {
+             m_indexes[j]->deleteEntry(tuple);
+          }
+          throw;
+       }
         FAIL_IF(!conflict->isNullTuple()) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
@@ -1447,6 +1453,21 @@ void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* confl
             return;
         }
     }
+}
+
+void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
+      TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
+   try {
+      BOOST_FOREACH (auto index, indexesToUpdate) {
+         BOOST_FOREACH (auto expr, index->getIndexedExpressions()) {
+            expr->eval(&sourceTupleWithNewValues, NULL);
+         }
+      }
+   } catch (SQLException const& e) {
+      throw ConstraintFailureException(this,
+            sourceTupleWithNewValues,
+            e.what());
+   }
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
