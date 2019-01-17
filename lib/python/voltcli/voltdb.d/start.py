@@ -41,7 +41,6 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
         VOLT.IntegerOption('-m', '--missing', 'missing', 'specifying how many nodes are missing at K-safe cluster startup'),
-        VOLT.BooleanOption('-t', '--restoreplacement', 'restoreplacement','Recover previous partition placement topology', default = True),
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -60,6 +59,4 @@ def start(runner):
         runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
-    if runner.opts.restoreplacement:
-        runner.args.extend(['restoreplacement'])
     runner.go()

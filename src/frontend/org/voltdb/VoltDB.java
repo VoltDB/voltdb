@@ -109,6 +109,8 @@ public class VoltDB {
     //Whatever the default timezone was for this locale before we replaced it
     public static final TimeZone REAL_DEFAULT_TIMEZONE;
 
+    public static final String DISABLE_PLACEMENT_RESTORE = "DISABLE_PLACEMENT_RESTORE";
+
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(GMT_TIMEZONE);
@@ -331,7 +333,9 @@ public class VoltDB {
         public File m_stagedClassesPath = null;
 
         /** Best effort to recover previous partition layout*/
-        public boolean m_restorePlacement = false;
+        public boolean m_restorePlacement = !Boolean.valueOf(System.getenv("DISABLE_PLACEMENT_RESTORE") == null ?
+                     Boolean.toString(Boolean.getBoolean("DISABLE_PLACEMENT_RESTORE")) : System.getenv("DISABLE_PLACEMENT_RESTORE"));
+;
         public String m_recoveredPartitions = "";
 
         public int getZKPort() {
@@ -721,8 +725,6 @@ public class VoltDB {
                         System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
                         referToDocAndExit();
                     }
-                } else if (arg.equalsIgnoreCase("restoreplacement")) {
-                    m_restorePlacement = true;
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

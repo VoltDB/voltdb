@@ -132,7 +132,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_sslExternal = m_sslExternal;
         cl.m_sslInternal = m_sslInternal;
         cl.m_placementGroup = m_placementGroup;
-        cl.m_restorePlacement = m_restorePlacement;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<>();
@@ -804,10 +803,6 @@ public class CommandLine extends VoltDB.Configuration
 
         if ( m_missingHostCount > 0) {
             cmdline.add("missing"); cmdline.add(Integer.toString(m_missingHostCount));
-        }
-
-        if (m_restorePlacement) {
-            cmdline.add("restoreplacement");
         }
         return cmdline;
     }

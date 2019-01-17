@@ -116,7 +116,6 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.AbstractTopology.PartitionRestoreException;
 import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.VoltDB.Configuration;
