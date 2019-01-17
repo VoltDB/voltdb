@@ -18,7 +18,6 @@
 package org.voltdb.plannerv2.guards;
 
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.SqlTaskImpl;
@@ -30,8 +29,6 @@ import org.voltdb.plannerv2.SqlTaskImpl;
  */
 public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
 
-    VoltLogger log = new VoltLogger("Calcite");
-
     private static String truncate(String src, int max) {
         if (src.length() <= max) {
             return src;
@@ -41,7 +38,7 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
     }
 
     @Override
-    protected boolean doCheck(String sql) {
+    protected boolean doCheck(String sql) throws SqlParseException {
         try {
             final SqlTask task = new SqlTaskImpl(sql);
             return task.isDDL() /*|| task.isDQL()*/;    // NOTE: enabling isDQL() check is the last stand to enable all DQL planning through Calcite.
