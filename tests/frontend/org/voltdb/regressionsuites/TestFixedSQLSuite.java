@@ -2657,20 +2657,21 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // test overflow and any underflow decimal are rounded
         sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
         if (isHSQL()) {
-            verifyStmtFails(client, sql, "HSQL-BACKEND ERROR");
-            verifyStmtFails(client, sql, "to the left of the decimal point is 39 and the max is 26");
+            verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+            verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
         } else {
             verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
         }
 
-        sql = "SELECT NUM + 111111.1111111111111111111111111111111111111 FROM R1";
-        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
+        // ENG-15234
+//        sql = "SELECT NUM + 111113.1111111111111111111111111111111111111 FROM R1";
+//        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
 
         sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
         runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
 
         sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
-        verifyStmtFails(client, sql, "java.lang.NumberFormatException");
+        verifyStmtFails(client, sql, "Numeric literal '1.1111111111111111111E368' out of range");
 
 
         // test stored procedure
