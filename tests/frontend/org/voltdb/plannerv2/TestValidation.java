@@ -107,6 +107,6 @@ public class TestValidation extends Plannerv2TestCase {
     }
 
     public void testGroupByAlias() {
-        m_tester.sql("SELECT PI * i FROM R1 WHERE I = 1").test();
+        m_tester.sql("select i as foo, count(*) from R2 group by foo").test();
     }
 }

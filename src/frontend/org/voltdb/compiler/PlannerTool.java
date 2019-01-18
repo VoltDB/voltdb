@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Util;
@@ -219,10 +220,10 @@ public class PlannerTool {
         VoltPlanner planner = new VoltPlanner(m_schemaPlus);
 
         // Validate the task's SqlNode.
-        planner.validate(task.getParsedQuery());
+        SqlNode validatedQuery = planner.validate(task.getParsedQuery());
 
         // Convert SqlNode to RelNode.
-        RelNode rel = planner.convert(task.getParsedQuery());
+        RelNode rel = planner.convert(validatedQuery);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?

@@ -950,24 +950,27 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // Zero result rows because values from R1 always have matches in
             // R1 JOIN R1.
 
-            query = start +
-                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R1 RHS " + end;
-            validateTableOfLongs(client, query, new long[][] {{0}});
-            query = start +
-                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R2 RHS " + end;
-            validateTableOfLongs(client, query, new long[][] {{0}});
+            // ENG-15243
+//            query = start +
+//                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R1 RHS " + end;
+//            validateTableOfLongs(client, query, new long[][] {{0}});
+//            query = start +
+//                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R2 RHS " + end;
+//            validateTableOfLongs(client, query, new long[][] {{0}});
             // An IS DISTINCT FROM bug in the HSQL backend causes it
             // to always to return 0 rows,
             // which is only correct for <>.
             // Remove this condition when ENG-11256 is fixed.
-            if (isHSQL() && expected != 0) {
-                query = start +
-                        "SELECT LHS.DESC FROM R2 LHS FULL JOIN R1 RHS " + end;
-                validateTableOfLongs(client, query, new long[][] {{expected}});
-            }
-            query = start +
-                    "SELECT LHS.DESC FROM R2 LHS FULL JOIN R2 RHS " + end;
-            validateTableOfLongs(client, query, new long[][] {{4}});
+            // ENG-15243
+//            if (isHSQL() && expected != 0) {
+//                query = start +
+//                        "SELECT LHS.DESC FROM R2 LHS FULL JOIN R1 RHS " + end;
+//                validateTableOfLongs(client, query, new long[][] {{expected}});
+//            }
+            // ENG-15243
+//            query = start +
+//                    "SELECT LHS.DESC FROM R2 LHS FULL JOIN R2 RHS " + end;
+//            validateTableOfLongs(client, query, new long[][] {{4}});
         }
         truncateTables(client, new String[]{"R1", "R2"});
     }
