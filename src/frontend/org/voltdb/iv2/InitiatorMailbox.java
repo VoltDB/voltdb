@@ -470,7 +470,7 @@ public class InitiatorMailbox implements Mailbox
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
         if (!m_scheduler.isLeader() && !message.isForReplica()) {
-            message.setForOldLeader(true);
+            message.setExecutedOnPreviousLeader(true);
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }

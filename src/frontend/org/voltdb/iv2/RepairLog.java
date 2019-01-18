@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -180,20 +179,21 @@ public class RepairLog
             m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         } else if (msg instanceof FragmentTaskMessage) {
             boolean newMp = false;
-            final FragmentTaskMessage m = (FragmentTaskMessage) msg;
-            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                m_lastMpHandle = m.getTxnId();
+            FragmentTaskMessage taskMsg = (FragmentTaskMessage) msg;
+            if (taskMsg.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                m_lastMpHandle = taskMsg.getTxnId();
                 newMp = true;
             }
 
             // We can't repair read only MP transactions. Just don't log them to the repair log.
-            if (m.isReadOnly()) {
+            if (taskMsg.isReadOnly()) {
                 return;
             }
 
-            truncate(m.getTruncationHandle(), IS_MP);
+            truncate(taskMsg.getTruncationHandle(), IS_MP);
             // only log the first fragment of a procedure (and handle 1st case)
             if (newMp) {
+                final FragmentTaskMessage m = new FragmentTaskMessage(taskMsg.getInitiatorHSId(), taskMsg.getCoordinatorHSId(), taskMsg);
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                 m_lastSpHandle = m.getSpHandle();
             }
@@ -215,7 +215,8 @@ public class RepairLog
             }
 
             truncate(ctm.getTruncationHandle(), IS_MP);
-            m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
+            CompleteTransactionMessage message = new CompleteTransactionMessage(ctm.getInitiatorHSId(), ctm.getCoordinatorHSId(), ctm);
+            m_logMP.add(new Item(IS_MP, message, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
         }
         else if (msg instanceof DumpMessage) {
