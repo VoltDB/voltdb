@@ -74,14 +74,15 @@ public class TestExistsNotFactoringSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc","INSERT INTO R2 VALUES (23, 'ClerOQlohIlIZz', NULL, 4.49327610653072695435e-01);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("@AdHoc", "select * from R1 where EXISTS (select RATIO from R1 INTERSECT select RATIO from R2);");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        int rowCount = 0;
-        VoltTable tbl = cr.getResults()[0];
-        while (tbl.advanceRow()) {
-            rowCount += 1;
-        }
-        assertEquals("Expected an empty result.", 0, rowCount);
+        // ENG-15160
+//        cr = client.callProcedure("@AdHoc", "select * from R1 where EXISTS (select RATIO from R1 INTERSECT select RATIO from R2);");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        int rowCount = 0;
+//        VoltTable tbl = cr.getResults()[0];
+//        while (tbl.advanceRow()) {
+//            rowCount += 1;
+//        }
+//        assertEquals("Expected an empty result.", 0, rowCount);
     }
     /**
      * Build a test configurations for testing ENG-8442.

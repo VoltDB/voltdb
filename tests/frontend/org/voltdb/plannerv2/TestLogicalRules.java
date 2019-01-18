@@ -465,4 +465,10 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
     }
+
+    public void testIntersect() {
+        // ENG-15160
+//        m_tester.sql("select * from R1 where EXISTS (select si from R1 intersect select si from R2)").
+//                transform("foo").test();
+    }
 }
