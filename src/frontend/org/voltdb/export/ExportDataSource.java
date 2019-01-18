@@ -216,7 +216,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L, false);
+        // Pretend it's rejoin so we set first unpolled to a safe place
+        resetStateInRejoinOrRecover(0L, true);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -352,7 +353,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L, false);
+         // Pretend it's rejoin so we set first unpolled to a safe place
+        resetStateInRejoinOrRecover(0L, true);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -742,7 +744,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> truncateExportToSeqNo(boolean isRecover, long sequenceNumber) {
+    public ListenableFuture<?> truncateExportToSeqNo(boolean isRecover, boolean isRejoin, long sequenceNumber) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -763,7 +765,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(sequenceNumber, isRecover);
+                    resetStateInRejoinOrRecover(sequenceNumber, isRejoin);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1635,13 +1637,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean isRecover) {
-        if (isRecover) {
-            m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
-        } else {
+    // During rejoin it's possible that the stream is blocked by a gap before the export
+    // sequence number carried by rejoin snapshot, so we couldn't trust the sequence number
+    // in snapshot to find where to poll next buffer. The right thing to do should be setting
+    // the firstUnpolled to a safe point in case of releasing a gap prematurely, waits for
+    // current master to tell us where to poll next buffer.
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean isRejoin) {
+        if (isRejoin) {
             if (!m_gapTracker.isEmpty()) {
                 m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, m_gapTracker.getFirstSeqNo() - 1);
             }
+        } else {
+            m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
         }
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
