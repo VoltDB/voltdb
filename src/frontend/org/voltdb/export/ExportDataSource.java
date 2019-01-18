@@ -216,7 +216,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L);
+        resetStateInRejoinOrRecover(0L, false);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -352,7 +352,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L);
+        resetStateInRejoinOrRecover(0L, false);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -763,7 +763,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(sequenceNumber);
+                    resetStateInRejoinOrRecover(sequenceNumber, isRecover);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1393,8 +1393,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         // jump over a gap for run everywhere
         if (m_runEveryWhere) {
+            // It's unlikely but thinking switch regular stream to replicated stream on the fly.
             if (m_gapTracker.getFirstGap() != null) {
                 m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                exportLog.info(toString() + " skipped stream gap because it's a replicated stream, " +
+                        "setting next poll sequence number to " + m_firstUnpolledSeqNo);
             }
             m_queueGap = 0;
             return;
@@ -1632,10 +1635,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
-        m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
-                Math.max(initialSequenceNumber,
-                        m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1));
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean isRecover) {
+        if (isRecover) {
+            m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
+        } else {
+            if (!m_gapTracker.isEmpty()) {
+                m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, m_gapTracker.getFirstSeqNo() - 1);
+            }
+        }
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }
