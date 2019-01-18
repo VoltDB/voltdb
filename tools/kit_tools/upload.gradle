@@ -151,7 +151,7 @@ uploadServerArchives {
             pom.project {
                name 'voltdb'
                packaging 'jar'
-               description 'VoltDB client interface libraries'
+               description 'VoltDB server libraries'
                url 'http://www.voltdb.com/'
 
                scm {
