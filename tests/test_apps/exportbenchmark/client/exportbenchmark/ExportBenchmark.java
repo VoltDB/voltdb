@@ -413,6 +413,8 @@ public class ExportBenchmark {
 
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
+        // Use this to correlate the total rows exported
+        System.out.println("Total inserts: " + totalInserts);
 
         testFinished.set(true);
         if (config.target.equals("socket")) {
@@ -654,53 +656,6 @@ public class ExportBenchmark {
                 stats.kPercentileLatencyAsDouble(0.99999));
     }
 
-    public synchronized Double calcRatio(StatClass index, StatClass indexPrime) {
-        Double ratio = new Double(0);
-        // Check for overlap format:
-        //      |-----index window-----|
-        //   |-----indexPrime window-----|
-        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
-            ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        //        |-indexPrime window-|
-        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
-            ratio = new Double(1);
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        //            |--indexPrime window--|
-        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
-            ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        // |--indexPrime window--|
-        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
-            ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        return ratio;
-    }
-
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -711,30 +666,17 @@ public class ExportBenchmark {
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
-        // Accumulate transaction counts of all partitions to the partition 0 entries,
-        // based on detecting time overlaps and calculating transaction number ratio 
-        // based on the time overlap.
-        ArrayList<StatClass> indexStats = new ArrayList<StatClass>();
+        // Calculate "server tps" i.e. export performance.
+        // Note that some stats messages may have been missed, so the number of 
+        // exported rows collected may be lower than the total inserts; however,
+        // we can verify that the sum of TUPLE_COUNT values in the export stats 
+        // do match the total inserts when no error occurred.
+        
+        long serverTxn= 0L;
         for (StatClass index : serverStats) {
-            if (index.m_partition == 0) {
-                Double transactions = new Double(index.m_transactions);
-                for (StatClass indexPrime : serverStats) {
-                    // If indexPrime is not partition 0 check for window overlap.
-                    // If an overlap exists, accumulate transaction ratio
-                    if (indexPrime.m_partition != 0) {
-                        Double ratio = calcRatio(index, indexPrime);
-                        transactions +=  ratio * indexPrime.m_transactions;
-                    }
-                }
-                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), index.m_startTime, index.m_endTime));
-            }
+            serverTxn += index.m_transactions;
         }
-
-        Double tpsSum = new Double(0);
-        for (StatClass index : indexStats) {
-            tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
-        }
-        tpsSum = (tpsSum / indexStats.size());
+        long serverTps = serverTxn * 1000 / (serverEndTS - serverStartTS);
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -755,8 +697,9 @@ public class ExportBenchmark {
         System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
+        System.out.println(" System Server Statistics (note that some stats messages may be missed)");
+        System.out.printf("Exported rows collected:       %,9d \n", serverTxn);
+        System.out.printf("Average throughput:            %,9d txns/sec\n", serverTps);
 
         System.out.println(HORIZONTAL_RULE);
 
@@ -776,7 +719,7 @@ public class ExportBenchmark {
                                     duration,
                                     successfulInserts.get(),
                                     serverEndTS - serverStartTS,
-                                    tpsSum.longValue()));
+                                    serverTps));
                 fw.close();
             }
         } catch (IOException e) {
