@@ -95,7 +95,8 @@ public class ExportBenchmark {
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
-    // Server-side stats
+
+    // Server-side stats - Note: access synchronized on serverStats 
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, partCount;
@@ -415,19 +416,15 @@ public class ExportBenchmark {
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
         // Use this to correlate the total rows exported
         System.out.println("Total inserts: " + totalInserts);
-
-        testFinished.set(true);
-        if (config.target.equals("socket")) {
-            statsSocketSelector.wakeup();
-        }
     }
 
     /**
      * Listens on a UDP socket for incoming statistics packets, until the
      * test is finished.
      */
-    private void listenForStats() {
+    private void listenForStats(CountDownLatch latch) {
 
+        latch.countDown();
         while (true) {
             // Wait for an event...
             try {
@@ -508,15 +505,17 @@ public class ExportBenchmark {
         }
         // This should always be true
         if (transactions > 0 && startTime > 0 && endTime > startTime) {
-            serverStats.add(new StatClass(partitionId, transactions, startTime, endTime));
-            if (startTime < serverStartTS || serverStartTS == 0) {
-                serverStartTS = startTime;
-            }
-            if (endTime > serverEndTS) {
-                serverEndTS = endTime;
-            }
-            if (partitionId > partCount) {
-                partCount = partitionId;
+            synchronized(serverStats) {
+                serverStats.add(new StatClass(partitionId, transactions, startTime, endTime));
+                if (startTime < serverStartTS || serverStartTS == 0) {
+                    serverStartTS = startTime;
+                }
+                if (endTime > serverEndTS) {
+                    serverEndTS = endTime;
+                }
+                if (partitionId > partCount) {
+                    partCount = partitionId;
+                }
             }
         }
         // If the else is called it means we received invalid data from the export client
@@ -561,6 +560,9 @@ public class ExportBenchmark {
      * @throws NoConnectionsException
      */
     private void runTest() throws InterruptedException {
+
+        boolean isSocketTest = config.target.equals("socket");
+
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -585,6 +587,23 @@ public class ExportBenchmark {
             benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
         }
 
+        // On a socket test, listen for stats until the exports are drained
+        // don't do this for Kafka -- nothing to listen to
+        Thread statsListener = null;
+        if (isSocketTest) {
+            final CountDownLatch listenerRunning = new CountDownLatch(1);
+            statsListener = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    System.out.println("Running statsListener ...");
+                    setupSocketListener();
+                    listenForStats(listenerRunning);
+                }
+            });
+            statsListener.start();
+            listenerRunning.await();
+        }
+
         // Do the inserts in a separate thread
         Thread writes = new Thread(new Runnable() {
             @Override
@@ -593,14 +612,7 @@ public class ExportBenchmark {
             }
         });
         writes.start();
-
-        // Listen for stats until we stop
         Thread.sleep(config.warmup * 1000);
-        // don't do this for Kafka -- nothing to listen to
-        if (config.target.equals("socket")) {
-            setupSocketListener();
-            listenForStats();
-        }
 
         writes.join();
         periodicStatsTimer.cancel();
@@ -623,6 +635,14 @@ public class ExportBenchmark {
         }
 
         System.out.println("Finished benchmark");
+
+        // On a socket test, stop the stats listener
+        testFinished.set(true);
+        if (isSocketTest) {
+            statsSocketSelector.wakeup();
+            statsListener.join();
+            System.out.println("Finished statsListener ...");
+        }
 
         // Print results & close
         printResults(benchmarkEndTS-benchmarkWarmupEndTS);
@@ -666,17 +686,25 @@ public class ExportBenchmark {
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
-        // Calculate "server tps" i.e. export performance.
-        // Note that some stats messages may have been missed, so the number of 
-        // exported rows collected may be lower than the total inserts; however,
-        // we can verify that the sum of TUPLE_COUNT values in the export stats 
-        // do match the total inserts when no error occurred.
+        // Calculate "server tps" i.e. export performance: this is only valid for
+        // socket tests as it is based on stats messages received via UDP. It is
+        // also only valid for the first test execution after voltdb startup,
+        // due to the way the timestamps are managed in SocketExporter.
+
+        long serverTxn = 0L;
+        long serverTps = 0L;
+        long elapsedMs = 0L;
         
-        long serverTxn= 0L;
-        for (StatClass index : serverStats) {
-            serverTxn += index.m_transactions;
+        // Note:normally the serverStats should be stopped but synchronizing nonetheless
+        synchronized(serverStats) {
+            elapsedMs = serverEndTS - serverStartTS;
+            if (elapsedMs > 0) {
+                for (StatClass index : serverStats) {
+                    serverTxn += index.m_transactions;
+                }
+                serverTps = serverTxn * 1000 / (serverEndTS - serverStartTS);
+            }
         }
-        long serverTps = serverTxn * 1000 / (serverEndTS - serverStartTS);
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -697,7 +725,7 @@ public class ExportBenchmark {
         System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics (note that some stats messages may be missed)");
+        System.out.println(" System Server Statistics (note: only valid on socket tests for first test execution after voltdb startup)");
         System.out.printf("Exported rows collected:       %,9d \n", serverTxn);
         System.out.printf("Average throughput:            %,9d txns/sec\n", serverTps);
 
@@ -718,7 +746,7 @@ public class ExportBenchmark {
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
-                                    serverEndTS - serverStartTS,
+                                    elapsedMs,
                                     serverTps));
                 fw.close();
             }
