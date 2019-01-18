@@ -119,8 +119,10 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                    boolean isRecover, long sequenceNumber) {
+        public void updateInitialExportStateToSeqNo(int partitionId,
+                String signature, boolean isRecover,
+                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                boolean isLowestSite) {
         }
 
         @Override
