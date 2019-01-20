@@ -31,6 +31,7 @@ import fileinput
 import re
 from traceback import format_exc
 from tempfile import mkstemp
+import random
 
 
 # mount point for persistent volume voltdbroot
@@ -156,6 +157,11 @@ def str_to_arg_list(text):
     return al
 
 
+def get_fqhostname():
+    # get the pod's hostname, typically cluster-name-ORDINAL.domain
+    return os.getenv('VOLTDB_K8S_ADAPTER_FQHOSTNAME', socket.getfqdn())
+
+
 def get_hostname_tuple(fqdn):
     try:
         hostname, domain = fqdn.split('.', 1)
@@ -167,23 +173,23 @@ def get_hostname_tuple(fqdn):
 
 
 def setup_logging():
-    log_format = '%(asctime)s %(filename)14s:%(lineno)-6d %(levelname)-8s %(message)s'
+    log_format = '%(asctime)s %(levelname)-8s %(filename)14s:%(lineno)-6d %(message)s'
     loglevel = logging.DEBUG
     console_loglevel = logging.DEBUG
     # got our voltdbroot?
+    ssname, pod_ordinal, my_hostname, domain = get_hostname_tuple(get_fqhostname())
     # TODO: there could be multiple roots, for which this won't work
-    logfile = ""
+    plogfile = os.path.join(PV_VOLTDBROOT, "voltdbk8s.log")
+    merge_logfile = ""
     try:
-        logfile = subprocess.check_output(shlex.split("find "+PV_VOLTDBROOT+" -type f -name 'volt.log'")).strip()
-    except OSError as e:
-        if e.errno != 2:  # not found
-            raise e
-    if not len(logfile):
-        logfile = os.path.join(PV_VOLTDBROOT, "voltdbk8s.log")
+        merge_logfile = subprocess.check_output(shlex.split("find -L "+os.path.join(PV_VOLTDBROOT, ssname, 'voltdbroot')
+                                                                           +" -type f -name 'volt.log'")).strip()
+    except subprocess.CalledProcessError as e:
+        merge_logfile = ""
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
     logger.propogate = True
-    file = logging.FileHandler(logfile, 'a')
+    file = logging.FileHandler(plogfile, 'a')
     console = logging.StreamHandler()
     file.setLevel(loglevel)
     console.setLevel(console_loglevel)
@@ -191,25 +197,40 @@ def setup_logging():
     file.setFormatter(formatter)
     console.setFormatter(formatter)
     logging.getLogger('').handlers = []
-    logging.getLogger('').addHandler(file)
     logging.getLogger('').addHandler(console)
+    logging.getLogger('').addHandler(file)
+    if merge_logfile:
+        voltdblog = logging.FileHandler(merge_logfile, 'a')
+        voltdblog.setFormatter(formatter)
+        logging.getLogger('').addHandler(voltdblog)
 
+    # print banner
     logging.info("VoltDB K8S CONTROLLER")
     logging.info("GMT is: " + strftime("%Y-%m-%d %H:%M:%S", gmtime()) +
                  " LOCALTIME is: " + strftime("%Y-%m-%d %H:%M:%S", localtime()) +
                  " TIMEZONE OFFSET is: " + str(timezone))
-    logging.info("logging to '%s'" % logfile)
-    logging.debug(sys.argv)
+    logging.info("logging to: '%s'" % plogfile)
+    if merge_logfile:
+        logging.info("logging to: '%s'" % merge_logfile)
+    logging.info("command line: %s" % ' '.join(sys.argv))
     for k, v in os.environ.items():
         logging.debug("environment: " + k + "=" + v)
     logging.debug(os.getcwd())
 
 
-def main():
+def hang():
+    # launch as a subprocess
+    sp = Popen(['sleep', '999999'], stderr=STDOUT)
+    logging.info("maintenance mode sleep ... pid " + str(sp.pid))
+    sys.stdout.flush()
+    sys.stderr.flush()
+    sp.wait()
 
+
+def main():
     # See if /voltdbroot (persistent storage mount) is exists
     if not os.path.exists(PV_VOLTDBROOT):
-        print("ERROR: persistent volume '%s' is not mounted!!!!" % PV_VOLTDBROOT)
+        logging.error("Persistent volume '%s' is not mounted!!!!" % PV_VOLTDBROOT)
         sys.exit(1)
 
     # setup loggers
@@ -221,9 +242,7 @@ def main():
         logging.error("WARNING: expected voltdb start command but found '%s'" % sys.argv[1])
         sys.exit(1)
 
-    # get the pod's hostname, typically cluster-name-ORDINAL.domain
-    fqhostname = os.getenv('VOLTDB_K8S_ADAPTER_FQHOSTNAME', socket.getfqdn())
-
+    fqhostname = get_fqhostname()
     logging.info("HOSTNAME: " +fqhostname)
 
     # use the domain of the leader address to find other pods in our cluster
@@ -233,7 +252,7 @@ def main():
     ssname, pod_ordinal, my_hostname, domain = hn
 
     if len(hn) != 4 or not pod_ordinal.isdigit():
-        logging.error("ERROR: Hostname parse error, is this a statefulset pod?, cannot continue")
+        logging.error("Hostname parse error, is this a statefulset pod?, cannot continue")
         sys.exit(1)
     pod_ordinal = int(pod_ordinal)
 
@@ -331,7 +350,7 @@ def main():
             if ',' in args[ix]:
                 li = args[ix].split(',')
                 if len(li) < pod_ordinal:
-                    logging.error("ERROR treating '%s' as a pod_ordinal comma separated list but there appear to be"
+                    logging.error("Treating '%s' as a pod_ordinal comma separated list but there appear to be"
                              " insufficient entries for host '%s'" % (oa, pod_ordinal))
                     sys.exit(1)
                 args[ix] = li[pod_ordinal]
@@ -344,6 +363,9 @@ def main():
 
     while True:
         cluster_pods = query_dns_srv(domain)
+        if fqhostname in cluster_pods:
+            # remove ourself
+            cluster_pods.remove(fqhostname)
         cluster_pods_responding_mesh = []
         cluster_pods_up = []
         connect_hosts = [ssname + "-0." + domain]
@@ -380,7 +402,7 @@ def main():
         if os.path.isfile(license_file):
             add_or_replace_arg(args, "-l,--license", license_file)
     add_or_replace_arg(args, "-D,--dir", working_voltdbroot, action="replace")
-    add_or_replace_arg(args, "-H,--host", ','.join(connect_hosts))
+    add_or_replace_arg(args, "-H,--host", random.choice(connect_hosts))
 
     # fix path.properties voltdbroot path
     # ensure that all fq paths to voltdbroot use the ssname symlink
@@ -405,20 +427,14 @@ def main():
     # For maintenance mode, don't bring up the database just sleep indefinitely
     # nb. in maintenance mode, liveness checks will timeout if enabled
     if '--k8s-maintenance' in args:
-        # launch as a subprocess
-        sp = Popen(['sleep','999999'], stderr=STDOUT)
-        logging.info("maintenance mode sleep ... pid " + sp.pid)
-        sys.stdout.flush()
-        sys.stderr.flush()
-        sp.wait()
+        hang()
         #os.execv('tail' '-f', '/dev/null')
 
     # build the voltdb start command line
     logging.debug(os.getcwd())
-    logging.debug(args)
     args = shlex.split(' '.join(args))
 
-    logging.info("VoltDB cmd is '%s'" % args[1:])
+    logging.info("VoltDB cmd is '%s'" % ' '.join(args[1:]))
     logging.info("Starting VoltDB...")
 
     # flush so we see our output in k8s logs
