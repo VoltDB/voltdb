@@ -30,6 +30,7 @@ import logging
 import fileinput
 import re
 from traceback import format_exc
+from tempfile import mkstemp
 
 
 # mount point for persistent volume voltdbroot
@@ -383,19 +384,23 @@ def main():
 
     # fix path.properties voltdbroot path
     # ensure that all fq paths to voltdbroot use the ssname symlink
-    res = ".*\." + domain.replace('.','\.')
-    logging.debug(res)
+    res = "=(.*)/.+?\." + domain.replace('.','\.') +"/"
     cre = re.compile(res, flags=re.MULTILINE)
-    with open('voltdbroot/config/path.properties', 'r+') as f:
+    with open('voltdbroot/config/path.properties', 'r') as f:
         lines = f.read()
         if len(lines) == 0:
-            logging.error("ERROR path.properties is empty")
+            logging.error("path.properties is empty")
             os.system("find . -ls")
             #sleep(9999999)
             sys.exit(1)
-        lines = cre.sub(ssname, lines)
-        f.seek(0)
-        f.write(lines)
+        lines = cre.sub("=\g<1>/"+ssname+"/", lines)
+        tfd, tmpfilepath = mkstemp(dir="voltdbroot/config")
+        with os.fdopen(tfd, 'w') as f:
+            f.write(lines)
+    # need this to be atomic
+    os.rename(tmpfilepath, "voltdbroot/config/path.properties")
+    with open('voltdbroot/config/path.properties', 'r') as f:
+        lines = f.read()
 
     # For maintenance mode, don't bring up the database just sleep indefinitely
     # nb. in maintenance mode, liveness checks will timeout if enabled
