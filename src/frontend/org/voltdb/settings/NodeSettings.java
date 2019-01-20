@@ -233,8 +233,23 @@ public interface NodeSettings extends Settings {
     }
 
     default void store() {
+        for (File f : Settings.getConfigDir().listFiles()) {
+            if (f.getName().endsWith(".tmp")) {
+                f.delete();
+            }
+        }
+        File tempFH = null;
+        try {
+            tempFH = File.createTempFile("path", null, Settings.getConfigDir());
+        } catch (IOException e) {
+            throw new SettingsException("failed to create temp file in config dir");
+        }
         File configFH = new File(Settings.getConfigDir(), "path.properties");
-        store(configFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
+        store(tempFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
+        // need rename to be atomic on the platform...
+        if (!tempFH.renameTo(configFH)) {
+            throw new SettingsException("unable to rename path properties");
+        }
 
         File deprectedConfigFH = new File(getVoltDBRoot(),".paths");
         if (deprectedConfigFH.exists()) deprectedConfigFH.delete();
