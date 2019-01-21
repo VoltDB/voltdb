@@ -88,7 +88,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     static final VoltLogger tmLog = new VoltLogger("TM");
     static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final Object threadDumpLock = new Object();
-    static long JSTACK_DUMP_TXNID = 0;
+    static long txnIdForSiteThreadDump = 0;
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
@@ -1442,11 +1442,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         builder.append("END of STATE DUMP FOR SITE: ").append(who);
         synchronized(threadDumpLock) {
-            if (message.getTxnId() > JSTACK_DUMP_TXNID) {
-                JSTACK_DUMP_TXNID = message.getTxnId();
-                builder.append("\nTHREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
+            if (message.getTxnId() > txnIdForSiteThreadDump) {
+                txnIdForSiteThreadDump = message.getTxnId();
+                builder.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
                 builder.append(generateSiteThreadDump());
-                builder.append("\nEND OF THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+                builder.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
             }
         }
         hostLog.warn(builder.toString());
