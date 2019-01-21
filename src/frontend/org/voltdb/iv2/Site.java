@@ -25,7 +25,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -140,7 +139,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final static int kStateRunning = 0;
     private final static int kStateRejoining = 1;
     private final static int kStateReplayingRejoin = 2;
-    private int m_rejoinState;
+    private final static int kStateLeaving = 3;
+    private int m_siteState;
     private final TaskLog m_rejoinTaskLog;
     private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
@@ -640,7 +640,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
+        m_siteState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_genId);
@@ -833,7 +833,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
-                if (m_rejoinState == kStateRunning) {
+                if (m_siteState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_scheduler.take();
                     if (task instanceof TransactionTask) {
@@ -841,7 +841,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
                     task.run(getSiteProcedureConnection());
-                } else if (m_rejoinState == kStateReplayingRejoin) {
+                } else if (m_siteState == kStateLeaving) {
+                    // This partition is being elastically removed. Nothing to do here.
+                    // We don't even need to write things into taskLog.
+                } else if (m_siteState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
                     SiteTasker task = m_scheduler.peek();
@@ -859,7 +862,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // If m_rejoinState didn't change to kStateRunning because of replayFromTaskLog(),
                         // remove the task from the scheduler and give it to task log.
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
-                        if (m_rejoinState != kStateRunning) {
+                        if (m_siteState != kStateRunning) {
                             m_scheduler.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
@@ -912,7 +915,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     boolean replayFromTaskLog(MinimumRatioMaintainer mrm) throws IOException
     {
         // not yet time to catch-up.
-        if (m_rejoinState != kStateReplayingRejoin) {
+        if (m_siteState != kStateReplayingRejoin) {
             return false;
         }
 
@@ -1005,6 +1008,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return sysproc != null && !sysproc.isDurable();
         }
         return false;
+    }
+
+    @Override
+    public void moveToLeavingState() {
+        m_siteState = kStateLeaving;
+        hostLog.info("Site for partition " + m_partitionId + " moving to inactive state because of Elastic Shrink");
     }
 
     public void startShutdown()
@@ -1458,7 +1467,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
-        assert(m_rejoinState == kStateRejoining);
+        assert(m_siteState == kStateRejoining);
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");
@@ -1519,15 +1528,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
             }
         }
-        m_rejoinState = kStateReplayingRejoin;
+        m_siteState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
     }
 
     private void setReplayRejoinComplete() {
         // transition out of rejoin replay to normal running state.
-        assert(m_rejoinState == kStateReplayingRejoin);
+        assert(m_siteState == kStateReplayingRejoin);
         m_replayCompletionAction.run();
-        m_rejoinState = kStateRunning;
+        m_siteState = kStateRunning;
     }
 
     @Override

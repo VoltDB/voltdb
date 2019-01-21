@@ -148,7 +148,7 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
-    static {                                                                                                                    // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
+    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,   false,            true,         true  ));
@@ -223,7 +223,8 @@ public class SystemProcedureCatalog {
         builder.put("@NibbleDeleteMP",          new Config("org.voltdb.sysprocs.NibbleDeleteMP",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
         builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true,  false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
         builder.put("@ExportControl",           new Config("org.voltdb.sysprocs.ExportControl",            false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
-        builder.put("@ElasticRemoveNT",         new Config("org.voltdb.sysprocs.ElasticRemoveNT",        false, false, false, 0,    VoltType.INVALID,   true, false, true, true,      false,  false,            false,        false ));
+        builder.put("@ElasticRemoveNT",         new Config("org.voltdb.sysprocs.ElasticRemoveNT",          false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
+        builder.put("@ElasticRemoveSites",      new Config("org.voltdb.sysprocs.ElasticRemoveSites",       false, false, false, 0,    VoltType.INVALID,   true,  false, false, true,      true,   false,            true,         true ));
 
         listing = builder.build();
     }

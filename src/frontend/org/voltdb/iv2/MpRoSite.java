@@ -743,4 +743,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
     }
+
+    @Override
+    public void moveToLeavingState() {
+        throw new RuntimeException("moveToLeavingState shouldn't be called on MP RO Site");
+    }
 }

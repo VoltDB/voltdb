@@ -262,4 +262,10 @@ public interface SiteProcedureConnection {
     public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
 
     public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
+
+    /**
+     * Used during elastic remove operation to put a site into a state
+     * where it doesn't participate in MP txns anymore.
+     */
+    public void moveToLeavingState();
 }

@@ -235,6 +235,10 @@ public class SysProcFragmentId
     public static final long PF_exportControl = 350;
     public static final long PF_exportControlAggregate = 351;
 
+    // Elastic remove sites
+    public static final long PF_elasticRemoveSites = 360;
+    public static final long PF_elasticRemoveSitesAggregate = 361;
+
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
