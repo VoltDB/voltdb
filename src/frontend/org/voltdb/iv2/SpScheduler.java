@@ -17,6 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,7 +87,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     static final VoltLogger tmLog = new VoltLogger("TM");
     static final VoltLogger hostLog = new VoltLogger("HOST");
-
+    private static final Object threadDumpLock = new Object();
+    static long txnIdForSiteThreadDump = 0;
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
@@ -462,7 +466,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else if (message instanceof DumpMessage) {
-            handleDumpMessage();
+            handleDumpMessage((DumpMessage)message);
         } else if (message instanceof DumpPlanThenExitMessage) {
             handleDumpPlanMessage((DumpPlanThenExitMessage)message);
         }
@@ -1411,11 +1415,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private void handleDumpMessage()
+    private void handleDumpMessage(DumpMessage message)
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         StringBuilder builder = new StringBuilder();
         builder.append("START OF STATE DUMP FOR SITE: ").append(who);
+        if (message.getTxnId() > 0) {
+            builder.append(" FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+        }
         builder.append("\n  partition: ").append(m_partitionId).append(", isLeader: ").append(m_isLeader);
         if (m_isLeader) {
             builder.append("  replicas: ").append(CoreUtils.hsIdCollectionToString(m_replicaHSIds));
@@ -1434,6 +1441,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         builder.append("END of STATE DUMP FOR SITE: ").append(who);
+        synchronized(threadDumpLock) {
+            if (message.getTxnId() > txnIdForSiteThreadDump) {
+                txnIdForSiteThreadDump = message.getTxnId();
+                builder.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
+                builder.append(generateSiteThreadDump());
+                builder.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+            }
+        }
         hostLog.warn(builder.toString());
     }
 
@@ -1823,5 +1838,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // flush all RO transactions out of backlog
         m_pendingTasks.removeMPReadTransactions();
+    }
+
+    private static String generateSiteThreadDump() {
+        StringBuilder threadDumps = new StringBuilder();
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
+        for (ThreadInfo t : threadInfos) {
+            if (t.getThreadName().startsWith("SP") || t.getThreadName().startsWith("MP Site") || t.getThreadName().startsWith("RO MP Site"))
+            threadDumps.append(t);
+        }
+        return threadDumps.toString();
     }
 }
