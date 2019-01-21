@@ -506,7 +506,7 @@ public final class InvocationDispatcher {
             // unable to hash to a site, return an error
             return getMispartitionedErrorResponse(task, catProc, e);
         }
-        boolean success = createTransaction(handler.connectionId(),
+        CreateTransactionResult result = createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
@@ -514,26 +514,24 @@ public final class InvocationDispatcher {
                         partitions,
                         task.getSerializedSize(),
                         nowNanos);
-        if (!success) {
+        if (result == CreateTransactionResult.NO_CLIENT_HANDLER) {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
             // Return an error.
             // Another case is when elastic shrink, the target partition may be
             // removed in between the transaction is created
-            if (m_cihm.get(handler.connectionId()) == null) {
-                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
                     "VoltDB failed to create the transaction internally.  It is possible this "
-                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
-                    + "it should be safe to resend the work, as the work was never started.",
+                            + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                            + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
-            } else {
-                return new ClientResponseImpl(ClientResponseImpl.TXN_MISPARTITIONED,
-                    new VoltTable[0],
-                    "VoltDB failed to create the transaction internally.  It is possible this "
-                    + "was caused by elastic shrink event that removed master partition.",
+        } else if (result == CreateTransactionResult.PARTITION_REMOVED) {
+            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.TXN_MISPARTITIONED,
+                    new VoltTable[0], "VoltDB failed to create the transaction internally.  It is possible this "
+                            + "was caused by elastic shrink event that removed master partition.",
                     task.clientHandle);
-            }
+            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+            return response;
         }
 
         return null;
@@ -1279,7 +1277,7 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
@@ -1304,7 +1302,7 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public  boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final long txnId,
             final long uniqueId,
@@ -1324,7 +1322,7 @@ public final class InvocationDispatcher {
                     "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
-            return false;
+            return CreateTransactionResult.NO_CLIENT_HANDLER;
         }
 
         Long initiatorHSId = null;
@@ -1350,7 +1348,7 @@ public final class InvocationDispatcher {
             hostLog.rateLimitedLog(60, Level.INFO, null,
                     "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to parition leader being removed during elastic shrink.");
-            return false;
+            return CreateTransactionResult.PARTITION_REMOVED;
         }
 
         long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
@@ -1383,7 +1381,7 @@ public final class InvocationDispatcher {
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);
-        return true;
+        return CreateTransactionResult.SUCCESS;
     }
 
     final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
