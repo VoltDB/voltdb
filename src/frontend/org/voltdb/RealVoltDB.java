@@ -1710,7 +1710,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         long version = topology.version;
         Map<String, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
-        if (!StringUtils.isEmpty(recoverPartitions)) {
+        if (m_config.m_restorePlacement && !StringUtils.isEmpty(recoverPartitions)) {
             restoredPartitionsByHosts.put(recoverPartitions, Arrays.asList(m_messenger.getHostId()));
         }
         AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,

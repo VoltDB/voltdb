@@ -946,6 +946,8 @@ public class AbstractTopology {
      * @param liveHosts      The live host ids
      * @param localHostId    The rejoining host id
      * @param placementGroup The rejoining placement group
+     * @param restoredPartitionsByHosts the partition by host map to be restored
+     * @param recover a flag indicates recover or rejoin
      * @return recovered topology if a matching node is found
      */
     public static AbstractTopology mutateRecoverTopology(AbstractTopology topology, Set<Integer> liveHosts,
@@ -961,18 +963,23 @@ public class AbstractTopology {
             recoverPartitions = restoredPartitionsByHosts.keySet().iterator().next();
         }
         for (Host h : topology.hostsById.values()) {
-            if (!liveHosts.contains(h.id) && h.haGroup.equalsIgnoreCase(placementGroup)) {
-                if (replaceHost == null) {
-                    replaceHost = h;
-                }
-                String partitions = h.getPartitionIdList().stream()
-                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
-                if (partitions.equals(recoverPartitions)) {
-                    replaceHost = h;
-                    break;
-                }
+
+            // filter out
+            if (liveHosts.contains(h.id) || !h.haGroup.equalsIgnoreCase(placementGroup)) {
+                continue;
             }
-        };
+            if (replaceHost == null) {
+                replaceHost = h;
+            }
+
+            // use the matched host. if no match found, use any one available.
+            String partitions = h.getPartitionIdList().stream()
+                    .map(n -> n.toString()).collect(Collectors.joining( "," ));
+            if (partitions.equals(recoverPartitions)) {
+                replaceHost = h;
+                break;
+            }
+        }
 
         if (replaceHost == null) {
            return null;
@@ -1015,7 +1022,8 @@ public class AbstractTopology {
         return new AbstractTopology(topology, hostsByIdBuilder.build(), partitionsById);
     }
 
-    private static AbstractTopology restoreParttionsForReovery(AbstractTopology topology, Map<String, List<Integer>>restoredPartitionsByHosts) {
+    private static AbstractTopology restoreParttionsForReovery(AbstractTopology topology,
+                               Map<String, List<Integer>>restoredPartitionsByHosts) {
         if (restoredPartitionsByHosts == null || restoredPartitionsByHosts.isEmpty()) {
             return topology;
         }
@@ -1041,7 +1049,7 @@ public class AbstractTopology {
                 }
             }
 
-            // all the partitions are on the right hosts or no matching layout found, no restoration needed
+            // all the partitions are on the right hosts or no matching layout found
             if (restoredHosts.isEmpty() || matchedHosts.isEmpty()) {
                 continue;
             }
