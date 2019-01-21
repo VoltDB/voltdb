@@ -20,6 +20,7 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.Map;
 
+import org.voltdb.CreateTransactionResult;
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -49,7 +50,7 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param messageSize Size in bytes of the message that created this invocation
      */
     @Override
-    public abstract boolean createTransaction(
+    public abstract CreateTransactionResult createTransaction(
             long connectionId,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
@@ -84,7 +85,7 @@ public abstract class TransactionInitiator implements TransactionCreator {
      *            Size in bytes of the message that created this invocation
      */
     @Override
-    public abstract boolean createTransaction(
+    public abstract CreateTransactionResult createTransaction(
             long connectionId,
             long txnId,
             long timestamp,

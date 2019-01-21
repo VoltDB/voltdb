@@ -19,6 +19,7 @@ package org.voltdb.dtxn;
 
 import org.voltcore.network.Connection;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.CreateTransactionResult;
 import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.StoredProcedureInvocation;
 
@@ -28,7 +29,7 @@ import org.voltdb.StoredProcedureInvocation;
 public interface TransactionCreator
 {
     // create a new transaction.
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             long connectionId,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
@@ -39,7 +40,7 @@ public interface TransactionCreator
             long nowNanos);
 
     // Create a transaction using the provided txnId.
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             long connectionId,
             long txnId,
             long uniqueId,
