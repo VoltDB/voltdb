@@ -307,8 +307,8 @@ public class TestAbstractTopology {
 
     @Test
     public void testKTooLarge() {
-        Map<Integer, HostInfo> hosts = ImmutableMap.of(0, new HostInfo("", "0", 2,""), 1, new HostInfo("", "0", 2, ""), 2,
-                new HostInfo("", "0", 2, ""));
+        Map<Integer, HostInfo> hosts = ImmutableMap.of(0, new HostInfo("", "0", 2), 1, new HostInfo("", "0", 2), 2,
+                new HostInfo("", "0", 2));
 
         try {
             AbstractTopology.getTopology(hosts, Collections.emptySet(), 3);
@@ -328,8 +328,8 @@ public class TestAbstractTopology {
         AbstractTopology topo = AbstractTopology.getTopology(td.hosts, Collections.emptySet(), td.kfactor);
 
         int lastHostId = td.hosts.keySet().stream().mapToInt(Integer::intValue).max().getAsInt();
-        Map<Integer, HostInfo> hosts = ImmutableMap.of(lastHostId, new HostInfo("", "0", 6, ""), lastHostId + 1,
-                new HostInfo("", "0", 6, ""));
+        Map<Integer, HostInfo> hosts = ImmutableMap.of(lastHostId, new HostInfo("", "0", 6), lastHostId + 1,
+                new HostInfo("", "0", 6));
         try {
             AbstractTopology.mutateAddNewHosts(topo, hosts);
             fail();
@@ -408,7 +408,7 @@ public class TestAbstractTopology {
         TestDescription td = new TestDescription();
         td.hosts = new HashMap<>();
         for (int i = 0; i < totalNodeCount; i++) {
-            td.hosts.put(i, new HostInfo("", haGroups.get(i % haGroups.size()), sph, ""));
+            td.hosts.put(i, new HostInfo("", haGroups.get(i % haGroups.size()), sph));
         }
         td.kfactor = k;
 
@@ -510,7 +510,7 @@ public class TestAbstractTopology {
 
         td.hosts = new HashMap<>();
         for (int i = 0; i < nodeCount; i++) {
-            td.hosts.put(i + hostIdOffset, new HostInfo("", haGroupTags.get(i % haGroupTags.size()), sph, ""));
+            td.hosts.put(i + hostIdOffset, new HostInfo("", haGroupTags.get(i % haGroupTags.size()), sph));
         }
 
         td.kfactor = k;
@@ -541,7 +541,7 @@ public class TestAbstractTopology {
         td.hosts = new HashMap<>();
         for (int i = 0; i < nodeCount; i++) {
             int haIndex = random.nextInt(haGroupTags.size());
-            td.hosts.put(i, new HostInfo("", haGroupTags.get(haIndex), sph, ""));
+            td.hosts.put(i, new HostInfo("", haGroupTags.get(haIndex), sph));
         }
 
         td.expectedMaxReplicationPerHAGroup = 0;
@@ -654,7 +654,7 @@ public class TestAbstractTopology {
             HostInfo orig = td.hosts.get(hostIndexToCopyTo);
 
             td.hosts.put(hostIndexToCopyTo,
-                    new HostInfo(orig.m_hostIp, td.hosts.get(hostIndedToCopyFrom).m_group, orig.m_localSitesCount, ""));
+                    new HostInfo(orig.m_hostIp, td.hosts.get(hostIndedToCopyFrom).m_group, orig.m_localSitesCount));
         }
     }
 
@@ -702,17 +702,17 @@ public class TestAbstractTopology {
     @Test
     public void testTopologyStatibility() throws InterruptedException {
         Map<Integer, HostInfo> hostInfos = new HashMap<>();
-        hostInfos.put(0, new HostInfo("", "g0", 6, ""));
-        hostInfos.put(1, new HostInfo("", "g0", 6, ""));
-        hostInfos.put(2, new HostInfo("", "g0", 6, ""));
-        hostInfos.put(3, new HostInfo("", "g0", 6, ""));
+        hostInfos.put(0, new HostInfo("", "g0", 6));
+        hostInfos.put(1, new HostInfo("", "g0", 6));
+        hostInfos.put(2, new HostInfo("", "g0", 6));
+        hostInfos.put(3, new HostInfo("", "g0", 6));
         //test 1
         doStabilityTest(hostInfos, 2);
 
-        hostInfos.put(4, new HostInfo("", "g1", 6, ""));
-        hostInfos.put(5, new HostInfo("", "g1", 6, ""));
-        hostInfos.put(6, new HostInfo("", "g1", 6, ""));
-        hostInfos.put(7, new HostInfo("", "g1", 6, ""));
+        hostInfos.put(4, new HostInfo("", "g1", 6));
+        hostInfos.put(5, new HostInfo("", "g1", 6));
+        hostInfos.put(6, new HostInfo("", "g1", 6));
+        hostInfos.put(7, new HostInfo("", "g1", 6));
         //test 2
         doStabilityTest(hostInfos, 3);
     }
