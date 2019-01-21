@@ -602,6 +602,7 @@ public class InitiatorMailbox implements Mailbox
         else if (repairWork instanceof FragmentTaskMessage) {
             // We need to get this into the repair log in case we've never seen it before.  Adding fragment
             // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
+            ((FragmentTaskMessage)repairWork).setExecutedOnPreviousLeader(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
@@ -609,6 +610,7 @@ public class InitiatorMailbox implements Mailbox
             // CompleteTransactionMessages should always be safe to handle.  Either the work was done, and we'll
             // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
             // get into the repair log and then let them run their course.
+            ((CompleteTransactionMessage)repairWork).setRequireAck(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }

@@ -1335,7 +1335,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
         DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
         boolean txnDone = true;
-
         if (msg.isRestart()) {
             // Don't mark txn done for restarts
             txnDone = false;
@@ -1369,7 +1368,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             m_duplicateCounters.remove(duplicateCounterKey);
 
-            if (txn != null) {
+            if (txn != null && !txn.isReadOnly()) {
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
@@ -1382,8 +1381,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // sent to the MPI because it doesn't care about it.
         //
         // The SPI uses this response message to track if all replicas have
-        // committed the transaction.
-        if (!m_isLeader && msg.requireAck()) {
+        // committed the transaction. avoid sending to itself from some stale message.
+        if (!m_isLeader && msg.requireAck() && msg.getSPIHSId() != m_mailbox.getHSId()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
