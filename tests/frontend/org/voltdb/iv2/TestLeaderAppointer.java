@@ -116,7 +116,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
         Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
         for (int hostId = 0; hostId < hostCount; hostId++) {
-            hostInfos.put(hostId, new HostInfo("", "0", sitesPerHost, ""));
+            hostInfos.put(hostId, new HostInfo("", "0", sitesPerHost));
         }
         m_kfactor = replicationFactor;
         m_topo = AbstractTopology.getTopology(hostInfos, new HashSet<Integer>(), replicationFactor);

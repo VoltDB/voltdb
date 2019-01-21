@@ -272,6 +272,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         // comma separated partition ids
         public final String m_recoveredPartitions;
+
+        public HostInfo(String hostIp, String group, int localSitesCount) {
+            m_hostIp = hostIp;
+            m_group = group;
+            m_localSitesCount = localSitesCount;
+            m_recoveredPartitions = "";
+        }
+
         public HostInfo(String hostIp, String group, int localSitesCount, String partitionIds) {
             m_hostIp = hostIp;
             m_group = group;
