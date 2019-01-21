@@ -541,7 +541,9 @@ public final class InvocationDispatcher {
 
     private final boolean shouldLoadSchemaFromSnapshot() {
         CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-        if(tables.size() == 0) return true;
+        if(tables.size() == 0) {
+            return true;
+        }
         for(Table t : tables) {
             if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR")) {
                 return false;
@@ -581,7 +583,9 @@ public final class InvocationDispatcher {
         }
 
         if (voltdb.isPreparingShuttingdown()) {
-            if (procedure.getAllowedinshutdown()) return null;
+            if (procedure.getAllowedinshutdown()) {
+                return null;
+            }
 
             return serverUnavailableResponse(
                     SHUTDOWN_MSG,
