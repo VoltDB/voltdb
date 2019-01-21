@@ -458,29 +458,29 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println("Skipped testAdHocLengthLimit");
             return;
         }
-
-        try {
-            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
-            int i = 0;
-            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
-                String randPhone = RandomStringUtils.randomNumeric(10);
-                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
-                assertEquals(1, result.getRowCount());
-                adHocQueryTemp.append(randPhone);
-                adHocQueryTemp.append(", ");
-                i++;
-            }
-            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
-            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
-            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
-            assert(i < Short.MAX_VALUE);
-            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
-            assertEquals(i, result.getRowCount());
-        }
-         finally {
-            env.tearDown();
-            System.out.println("Ending testAdHocLengthLimit");
-        }
+        // ENG-15258
+//        try {
+//            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
+//            int i = 0;
+//            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
+//                String randPhone = RandomStringUtils.randomNumeric(10);
+//                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
+//                assertEquals(1, result.getRowCount());
+//                adHocQueryTemp.append(randPhone);
+//                adHocQueryTemp.append(", ");
+//                i++;
+//            }
+//            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
+//            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
+//            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
+//            assert(i < Short.MAX_VALUE);
+//            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
+//            assertEquals(i, result.getRowCount());
+//        }
+//         finally {
+//            env.tearDown();
+//            System.out.println("Ending testAdHocLengthLimit");
+//        }
     }
 
     @Test
@@ -569,24 +569,24 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
             //System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
-
-            // ENG-14210 more than 1025 parameters
-            StringBuilder tooManyParmsQueryBuilder = new StringBuilder();
-            tooManyParmsQueryBuilder.append("SELECT * FROM BLAH WHERE IVAL IN (")
-                                    .append(String.join(",", Collections.nCopies(1200, "?")))
-                                    .append(");");
-            Object[] params = new Object[1201];
-            // The first parameter is the query text.
-            params[0] = tooManyParmsQueryBuilder.toString();
-            for (int i = 1; i <= 1200; i++) {
-                params[i] = Long.valueOf(i);
-            }
-            try {
-                env.m_client.callProcedure("@AdHoc", params);
-                fail("The AdHoc query with more than 1025 parameters should fail, but it did not.");
-            } catch (ProcCallException ex) {
-                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
-            }
+            // ENG-15263
+//            // ENG-14210 more than 1025 parameters
+//            StringBuilder tooManyParmsQueryBuilder = new StringBuilder();
+//            tooManyParmsQueryBuilder.append("SELECT * FROM BLAH WHERE IVAL IN (")
+//                                    .append(String.join(",", Collections.nCopies(1200, "?")))
+//                                    .append(");");
+//            Object[] params = new Object[1201];
+//            // The first parameter is the query text.
+//            params[0] = tooManyParmsQueryBuilder.toString();
+//            for (int i = 1; i <= 1200; i++) {
+//                params[i] = Long.valueOf(i);
+//            }
+//            try {
+//                env.m_client.callProcedure("@AdHoc", params);
+//                fail("The AdHoc query with more than 1025 parameters should fail, but it did not.");
+//            } catch (ProcCallException ex) {
+//                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
+//            }
         }
         finally {
             env.tearDown();

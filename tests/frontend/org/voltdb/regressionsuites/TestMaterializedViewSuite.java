@@ -1389,7 +1389,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
          *    Senior,Lexington,2
          */
         results = client.callProcedure("@AdHoc",
-                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
+                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge'").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());

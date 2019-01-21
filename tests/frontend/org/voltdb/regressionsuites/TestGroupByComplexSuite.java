@@ -79,41 +79,41 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable vt;
         long[][] expected;
-
-        for (String tb: tbs) {
-            // Test group by PRIMARY KEY
-            // Test pass-through columns, group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
-                    " GROUP BY id ORDER BY dept DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
-            validateTableOfLongs(vt, expected);
-
-            // Test duplicates, operator expression, group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
-                    " GROUP BY id ORDER BY id");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
-            validateTableOfLongs(vt, expected);
-
-            // Test function expression with group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
-                    " GROUP BY id ORDER BY id");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
-            validateTableOfLongs(vt, expected);
-
-            // Test order by alias from display list
-            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
-                    " GROUP BY dept ORDER BY tag DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-            validateTableOfLongs(vt, expected);
-        }
+        // ENG-15256
+//        for (String tb: tbs) {
+//            // Test group by PRIMARY KEY
+//            // Test pass-through columns, group by primary key
+//            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
+//                    " GROUP BY id ORDER BY dept DESC");
+//            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//            vt = cr.getResults()[0];
+//            expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
+//            validateTableOfLongs(vt, expected);
+//
+//            // Test duplicates, operator expression, group by primary key
+//            cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
+//                    " GROUP BY id ORDER BY id");
+//            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//            vt = cr.getResults()[0];
+//            expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
+//            validateTableOfLongs(vt, expected);
+//
+//            // Test function expression with group by primary key
+//            cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
+//                    " GROUP BY id ORDER BY id");
+//            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//            vt = cr.getResults()[0];
+//            expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
+//            validateTableOfLongs(vt, expected);
+//
+//            // Test order by alias from display list
+//            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
+//                    " GROUP BY dept ORDER BY tag DESC");
+//            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//            vt = cr.getResults()[0];
+//            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+//            validateTableOfLongs(vt, expected);
+//        }
     }
 
     public void testComplexAggsSuite() throws IOException, ProcCallException {
