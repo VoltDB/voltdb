@@ -39,7 +39,7 @@ public interface Generation {
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
                                  long uniqueId, ByteBuffer buffer, boolean sync);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover,
+                                                boolean isRecover, boolean isRejoin,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
                                                 boolean isLowestSite);
 

@@ -724,7 +724,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover,
+                                                boolean isRecover, boolean isRejoin,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
@@ -737,7 +737,7 @@ public class ExportGeneration implements Generation {
             if (source != null) {
                 Pair<Long, Long> usoAndSeq = sequenceNumberPerPartition.get(partitionId);
                 if (usoAndSeq != null) {
-                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, usoAndSeq.getSecond());
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, usoAndSeq.getSecond());
                     tasks.add(task);
                 }
             }
@@ -751,7 +751,7 @@ public class ExportGeneration implements Generation {
                         if (!source.inCatalog()) {
                             Pair<Long, Long> pair = sequenceNumberPerPartition.get(source.getPartitionId());
                             if (pair != null) {
-                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, pair.getSecond());
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, pair.getSecond());
                                 tasks.add(task);
                             }
                         }

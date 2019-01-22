@@ -64,7 +64,7 @@ spec:
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
-          initialDelaySeconds: 60
+          initialDelaySeconds: 180
           periodSeconds: 60
           successThreshold: 1
           tcpSocket:
@@ -95,7 +95,7 @@ spec:
             command:
             - k8sreadycheck.py
           failureThreshold: 3
-          initialDelaySeconds: 60
+          initialDelaySeconds: 180
           periodSeconds: 60
           successThreshold: 1
           timeoutSeconds: 1

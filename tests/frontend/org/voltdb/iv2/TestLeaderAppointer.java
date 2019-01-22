@@ -125,7 +125,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_mpi = mock(MpInitiator.class);
         createAppointer();
 
-        m_cache = new LeaderCache(m_zk, VoltZK.iv2appointees, m_changeCallback);
+        m_cache = new LeaderCache(m_zk, "", VoltZK.iv2appointees, m_changeCallback);
         m_cache.start(true);
     }
 
@@ -159,7 +159,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     void registerLeader(int partitionId, long HSId) throws KeeperException, InterruptedException
     {
-        LeaderCacheWriter iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters);
+        LeaderCacheWriter iv2masters = new LeaderCache(m_zk, "", VoltZK.iv2masters);
         iv2masters.put(partitionId, HSId);
     }
 
