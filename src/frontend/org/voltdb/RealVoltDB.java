@@ -1167,7 +1167,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
-            // Always create a mailbox for elastic join data transfer
+            // Always create a mailbox for elastic service data transfer
             if (m_config.m_isEnterprise) {
                 long elasticHSId = m_messenger.getHSIdForLocalSite(HostMessenger.REBALANCE_SITE_ID);
                 m_messenger.createMailbox(elasticHSId, new SiteMailbox(m_messenger, elasticHSId));
@@ -1613,7 +1613,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
             TTLManager.initialze();
             getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
-            // Start elastic join service
+            // Start elastic services
             try {
                 if (m_config.m_isEnterprise) {
                     m_elasticService = ProClass.newInstanceOf("org.voltdb.elastic.ElasticCoordinator",
@@ -1624,7 +1624,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_elasticService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to instantiate elastic join service", false, e);
+                VoltDB.crashLocalVoltDB("Failed to instantiate elastic services", false, e);
             }
 
             // set additional restore agent stuff
@@ -3889,7 +3889,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE,
                         requiresNewExportGeneration, partitions);
 
-                // 1.1 Update the elastic join throughput settings
+                // 1.1 Update the elastic service throughput settings
                 if (m_elasticService != null) {
                     m_elasticService.updateConfig(m_catalogContext);
                 }
