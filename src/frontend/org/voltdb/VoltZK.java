@@ -54,7 +54,7 @@ public class VoltZK {
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String catalogbytesPrevious = "/db/catalogbytes_previous";
     //This node doesn't mean as much as it used to, it is accurate at startup
-    //but isn't updated after elastic join. We use the cartographer for most things
+    //but isn't updated after elastic operation. We use the cartographer for most things
     //now
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
@@ -173,16 +173,16 @@ public class VoltZK {
     public static final String migrate_partition_leader = "migrate_partition_leader_blocker";
     public static final String migratePartitionLeaderBlocker = actionBlockers + "/" + migrate_partition_leader;
 
-    // three elastic join blockers
-    // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
-    // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
-    //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
+    // three elastic blockers
+    // elasticOperationInProgress blocks the rejoin (create in init state, release before data migration start)
+    // banElasticOperation blocks elastic operation (currently created by DRProducer if the agreed protocol version
+    //                                     for the mesh does not support elastic operation during DR (i.e. version <= 7).
     //                                     It is now only released after a DR global reset.)
-    // elasticJoinMigration only blocks SPI Migration
+    // elasticMigration only blocks SPI Migration
     public static final String leafNodeElasticOperationInProgress = "elastic_blocker";
     public static final String elasticOperationInProgress = actionBlockers + "/" + leafNodeElasticOperationInProgress;
     public static final String leafNodeBanElasticOperation = "no_elastic_blocker";
-    public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticOperation;
+    public static final String banElasticOperation = actionBlockers + "/" + leafNodeBanElasticOperation;
     public static final String leafNodeElasticMigration = "elastic_migration_blocker";
     public static final String elasticMigration = actionBlockers + "/" + leafNodeElasticMigration;
 
@@ -396,14 +396,14 @@ public class VoltZK {
     }
 
     /**
-     * Create a ZK node under action blocker directory.
-     * Exclusive execution of elastic join, rejoin or catalog update is checked.
+     * Create a ZK node under action blocker directory. Exclusive execution of elastic operation, rejoin or catalog
+     * update is checked.
      * </p>
      * Catalog update can not happen during node rejoin.
      * </p>
-     * Node rejoin can not happen during catalog update or elastic join.
+     * Node rejoin can not happen during catalog update or elastic operation.
      * </p>
-     * Elastic join can not happen during node rejoin or catalog update.
+     * Elastic operation can not happen during node rejoin or catalog update.
      *
      * @param zk
      * @param node
@@ -448,11 +448,11 @@ public class VoltZK {
         }
 
         /*
-         * Validate exclusive access of elastic join, rejoin, MigratePartitionLeader and catalog update.
+         * Validate exclusive access of elastic operation, rejoin, MigratePartitionLeader and catalog update.
          */
 
         // UAC can not happen during node rejoin
-        // some UAC can happen with elastic join
+        // some UAC can happen with elastic operation
         // UAC NT and TXN are exclusive
         String errorMsg = null;
         try {
@@ -468,11 +468,11 @@ public class VoltZK {
                 }
                 break;
             case rejoinInProgress:
-                // node rejoin can not happen during UAC or elastic join
+                // node rejoin can not happen during UAC or elastic operation
                 if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
                     errorMsg = "while a catalog update is active. Please retry node rejoin later.";
                 } else if (blockers.contains(leafNodeElasticOperationInProgress)) {
-                    errorMsg = "while an elastic join is active. Please retry node rejoin later.";
+                    errorMsg = "while an elastic operation is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
                 } else if (blockers.contains(mpRepairBlocker)){
@@ -483,35 +483,35 @@ public class VoltZK {
                 }
                 break;
             case elasticOperationInProgress:
-                // elastic join can not happen during node rejoin
+                // elastic operation can not happen during node rejoin
                 if (blockers.contains(leafNodeRejoinInProgress)) {
-                    errorMsg = "while a node rejoin is active. Please retry elastic join later.";
+                    errorMsg = "while a node rejoin is active. Please retry elastic operation later.";
                 } else if (blockers.contains(leafNodeCatalogUpdateInProgress)) {
-                    errorMsg = "while a catalog update is active. Please retyr elastic join later.";
+                    errorMsg = "while a catalog update is active. Please retyr elastic operation later.";
                 } else if (blockers.contains(leafNodeBanElasticOperation)) {
-                    errorMsg = "while elastic join is blocked by DR established with a cluster that " +
-                            "does not support remote elastic join during DR. " +
-                            "DR needs to be reset before elastic join is allowed again.";
+                    errorMsg = "while elastic operation is blocked by DR established with a cluster that "
+                            + "does not support remote elastic operation during DR. "
+                            + "DR needs to be reset before elastic operation is allowed again.";
                 } else if ( blockers.contains(migrate_partition_leader)) {
-                    errorMsg = "while leader migration is active. Please retry elastic join later.";
+                    errorMsg = "while leader migration is active. Please retry elastic operation later.";
                 }
                 break;
             case migratePartitionLeaderBlocker:
                 //MigratePartitionLeader can not happen when join (before data fully migrated), rejoin, catalog update, or repair is in progress.
                 blockers.remove(leafNodeBanElasticOperation);
                 if (blockers.size() > 1) {
-                    errorMsg = "while elastic join, rejoin or catalog update is active";
+                    errorMsg = "while elastic operation, rejoin or catalog update is active";
                 }
                 break;
             case elasticMigration:
-                // elastic join balancePartition currently cannot coexist with partition leader migration
+                // elastic operation balancePartition currently cannot coexist with partition leader migration
                if (blockers.contains(migrate_partition_leader)) {
                    errorMsg = "while leader migration is active.";
                }
                break;
-            case banElasticJoin:
+            case banElasticOperation:
                 if (blockers.contains(leafNodeElasticOperationInProgress)) {
-                    errorMsg = "while an elastic join is active";
+                    errorMsg = "while an elastic operation is active";
                 }
                 break;
             case mpRepairInProgress:
