@@ -173,8 +173,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
-                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
-                            m_zkMailboxNode);
+                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(), "MpInitiator", m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     TTLManager.instance().scheduleTTLTasks();
                 }

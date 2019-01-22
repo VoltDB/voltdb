@@ -102,7 +102,7 @@ public class MpTerm implements Term
     public void start()
     {
         try {
-            m_leaderCache = new LeaderCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
+            m_leaderCache = new LeaderCache(m_zk, "MpTerm-iv2masters", VoltZK.iv2masters, m_leadersChangeHandler);
             m_leaderCache.start(true);
         }
         catch (ExecutionException ee) {
