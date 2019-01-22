@@ -253,14 +253,15 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         expected = new long[][] {{10, Long.MIN_VALUE, 1}};
         validateTableOfLongs(client, sql, expected);
 
-        sql = "select S1.wage, count(*) from S1 Right Join S2 "+
-                "on S2.wage is distinct from " +
-                "(SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +
-                "GROUP BY S1.wage " +
-                "HAVING COUNT(*) is not distinct from 1;";
-        validateTableOfLongs(client, sql, new long[][] {});
+        // temperally disabled, see ENG-15229
+//        sql = "select S1.wage, count(*) from S1 Right Join S2 "+
+//                "on S2.wage is distinct from " +
+//                "(SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +
+//                "GROUP BY S1.wage " +
+//                "HAVING COUNT(*) is not distinct from 1;";
+//        validateTableOfLongs(client, sql, new long[][] {});
 
-        // temporally disabled, see ENG-15229
+        // temperally disabled, see ENG-15229
 //        sql = "select * from S1 where S1.wage = ANY " +
 //                "(select S2.wage from S2 " +
 //                "where S2.wage is distinct from 5253 " +
