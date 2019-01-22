@@ -86,7 +86,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/DRTupleStream.h"
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && defined(MACOSX)
 // Mute EXC_BAD_ACCESS in the debug mode for running LLDB.
 #include <mach/task.h>
 #include <mach/mach_init.h>
@@ -2160,7 +2160,7 @@ std::string VoltDBEngine::dumpCurrentHashinator() const {
 
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
-    #ifndef NDEBUG
+    #if !defined(NDEBUG) && defined(MACOSX)
     // When debugging the VoltDB execution engine started via JNI with LLDB,
     // It is very common to run into an EXC_BAD_ACCESS in the debugger and cannot
     // get out. LLDB uses task_set_exception_ports() to change the exception port of
