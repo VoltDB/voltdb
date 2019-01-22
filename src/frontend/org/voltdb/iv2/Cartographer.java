@@ -242,8 +242,10 @@ public class Cartographer extends StatsSource
         super(false);
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
-        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
-        m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
+        m_iv2Masters = new LeaderCache(m_zk, "Cartographer-iv2Masters-" + hostMessenger.getHostId(),
+                VoltZK.iv2masters, m_SPIMasterCallback);
+        m_iv2Mpi = new LeaderCache(m_zk, "Cartographer-iv2Mpi-" + hostMessenger.getHostId(),
+                VoltZK.iv2mpi, m_MPICallback);
         m_configuredReplicationFactor = configuredReplicationFactor;
         try {
             m_iv2Masters.start(true);

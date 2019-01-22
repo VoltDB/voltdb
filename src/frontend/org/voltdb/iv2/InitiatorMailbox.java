@@ -177,7 +177,8 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog = repairLog;
         m_joinProducer = joinProducer;
 
-        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(),
+                "InitiatorMailbox-masterLeaderCache-" + m_partitionId, VoltZK.iv2masters);
         try {
             m_masterLeaderCache.start(false);
         } catch (InterruptedException ignored) {
@@ -394,7 +395,8 @@ public class InitiatorMailbox implements Mailbox
         m_newLeaderHSID = newLeaderHSId;
         m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.STARTED;
 
-        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(),
+                "initiateSPIMigrationIfRequested-" + m_partitionId, VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
             leaderAppointee.put(pid, LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
