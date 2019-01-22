@@ -306,11 +306,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public Set<Integer> getRecoveredPartitions() {
+            Set<Integer> partitionSet = Sets.newHashSet();
             if (StringUtils.isEmpty(m_recoveredPartitions)) {
-                return Sets.newHashSet();
+                return partitionSet;
             }
-            return Stream.of(m_recoveredPartitions.split(","))
-                    .map(Integer::parseInt).collect(Collectors.toSet());
+            String partitions[] = m_recoveredPartitions.split(",");
+            for (String partition : partitions) {
+                try {
+                    partitionSet.add(Integer.valueOf(partition));
+                } catch (NumberFormatException e) {}
+            }
+            return partitionSet;
         }
 
         @Override
