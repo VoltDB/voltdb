@@ -728,7 +728,7 @@ public class TestAbstractTopology {
 
         int newId = topo.getHostCount() + 1;
         AbstractTopology replaced = AbstractTopology.mutateRecoverTopology(topo, liveHosts, newId,
-                hostToReplace.haGroup, null, false);
+                hostToReplace.haGroup, null);
         Host newHost = replaced.hostsById.get(newId);
         Set<Integer> origPartitionIds = hostToReplace.partitions.stream().map(p -> p.id).collect(Collectors.toSet());
         Set<Integer> newPartitionIds = newHost.partitions.stream().map(p -> p.id).collect(Collectors.toSet());
@@ -741,7 +741,7 @@ public class TestAbstractTopology {
 
         validate(replaced);
 
-        assertNull(AbstractTopology.mutateRecoverTopology(topo, liveHosts, newId, "NotReallyAGroup", null, false));
+        assertNull(AbstractTopology.mutateRecoverTopology(topo, liveHosts, newId, "NotReallyAGroup", null));
     }
 
     private void doStabilityTest(Map<Integer, HostInfo> hostInfos, int kfactor) throws InterruptedException {

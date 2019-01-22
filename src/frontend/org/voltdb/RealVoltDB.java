@@ -210,7 +210,6 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
@@ -1231,9 +1230,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Set<Integer> partitionGroupPeers = null;
                 if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    String recoverPartitions = null;
+                    Set<Integer> recoverPartitions = null;
                     if (m_config.m_restorePlacement) {
-                        recoverPartitions = hostInfos.get(m_messenger.getHostId()).m_recoveredPartitions;
+                        recoverPartitions = hostInfos.get(m_messenger.getHostId()).getRecoveredPartitions();
                     }
                     partitions = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
                     if (partitions == null) {
@@ -1704,21 +1703,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * Topology will be updated on ZK if successful
      * @param topology The topology from ZK, which contains the partition assignments for live or lost hosts
      * @param haGroup The placement group of the recovering host
+     * @param recoverPartitions the partition placement to be recovered on this host
      * @return A list of partitions if recover effort is a success.
      */
-    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, String recoverPartitions) {
+    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
 
         long version = topology.version;
-        Map<String, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
-        if (m_config.m_restorePlacement && !StringUtils.isEmpty(recoverPartitions)) {
-            restoredPartitionsByHosts.put(recoverPartitions, Arrays.asList(m_messenger.getHostId()));
-        }
         AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
                 m_messenger.getLiveHostIds(),
                 m_messenger.getHostId(),
                 haGroup,
-                restoredPartitionsByHosts,
-                false);
+                recoverPartitions);
         if (recoveredTopo == null) {
             return null;
         }
@@ -1727,7 +1722,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
             return partitions;
         }
-        if (version < recoveredTopo.version && !StringUtils.isEmpty(recoverPartitions)) {
+        if (version < recoveredTopo.version && !recoverPartitions.isEmpty()) {
             consoleLog.info("Partition placement layout has been restored for rejoining.");
         }
         return null;
@@ -2179,7 +2174,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (totalSites % (kfactor + 1) != 0) {
                 VoltDB.crashLocalVoltDB("Total number of sites is not divisible by the number of partitions.", false, null);
             }
-            topology = AbstractTopology.getTopology(hostInfos, missingHosts, kfactor);
+            topology = AbstractTopology.getTopology(hostInfos, missingHosts, kfactor,
+                    (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()));
             String err;
             if ((err = topology.validateLayout()) != null) {
                 hostLog.warn("Unable to find optimal placement layout. " + err);
@@ -2190,23 +2186,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
-            if (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()){
-                Map<String, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
-                hostInfos.forEach((k, v) -> {
-                    if (!StringUtils.isEmpty(v.m_recoveredPartitions)) {
-                        List<Integer> hosts = restoredPartitionsByHosts.get(v.m_recoveredPartitions);
-                        if (hosts == null) {
-                            hosts = Lists.newArrayList();
-                            restoredPartitionsByHosts.put(v.m_recoveredPartitions, hosts);
-                        }
-                        hosts.add(k);
-                    }
-                });
-                long version = topology.version;
-                topology = AbstractTopology.mutateRecoverTopology(topology, m_messenger.getLiveHostIds(), -1, "", restoredPartitionsByHosts, true);
-                if (version < topology.version) {
-                    consoleLog.info("Partition placement has been restored.");
-                }
+            if (m_config.m_restorePlacement && m_config.m_startAction.doesRecover() && topology.version > 0){
+                consoleLog.info("Partition placement has been restored.");
             }
             topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }

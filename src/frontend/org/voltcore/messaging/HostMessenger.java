@@ -82,7 +82,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.probe.MeshProber;
 
-import com.google.common.collect.Lists;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableCollection;
@@ -306,13 +305,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     obj.getString(RECOVERED_PARTITION_IDS));
         }
 
-        public List<Integer> getRecoveredPartitions() {
+        public Set<Integer> getRecoveredPartitions() {
             if (StringUtils.isEmpty(m_recoveredPartitions)) {
-                return Lists.newArrayList();
+                return Sets.newHashSet();
             }
-            List<Integer> partitions = Stream.of(m_recoveredPartitions.split(","))
-                    .map(Integer::parseInt).sorted().collect(Collectors.toList());
-            return partitions;
+            return Stream.of(m_recoveredPartitions.split(","))
+                    .map(Integer::parseInt).collect(Collectors.toSet());
         }
 
         @Override
