@@ -734,6 +734,9 @@ public class DDLCompiler {
         final CatalogMap<Table> tables = db.getTables();
         for (Table table : tables) {
             String tableName = table.getTypeName();
+            // Here, we restore that the table is always replicated, and set it to be partitioned if
+            // the partition makes sense.
+            table.setIsreplicated(true);
 
             if (m_tracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
                 String colName = m_tracker.m_partitionMap.get(tableName.toLowerCase());
@@ -1270,8 +1273,11 @@ public class DDLCompiler {
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
         // all tables start replicated
         // if a partition is found in the project file later,
-        //  then this is reversed
-        table.setIsreplicated(true);
+        //  then this is reversed;
+        // But the index creation needs to know if the table is replicated, and coerce
+        // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
+        // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
+        table.setIsreplicated(! node.attributes.containsKey("partitioncolumn"));
 
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
@@ -1827,7 +1833,17 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
-        if (assumeUnique) {
+        if (! index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) && table.getIsreplicated() && assumeUnique) {
+            // Warn and convert AssumeUnique -> Unique index only on
+            // non-auto-generated index (i.e. from "CREATE ASSUMEUNIQUE INDEX ..." statement rather than "CREATE TABLE(...)" statement),
+            // because "PARTITION TABLE ..." statement cannot be specified together with "CREATE TABLE" statement!
+            final String warn = String.format(
+                    "Converting ASSUMEUNIQUE index %s to UNIQUE because table %s is a replicated table.",
+                    index.getTypeName(), table.getTypeName());
+            compiler.addWarn(warn);
+            System.err.println(warn);
+            assumeUnique = false;
+        } else if (assumeUnique) {
             index.setUnique(true);
         }
         index.setAssumeunique(assumeUnique);
