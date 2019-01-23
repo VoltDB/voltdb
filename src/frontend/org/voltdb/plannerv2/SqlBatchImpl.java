@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.util.UnmodifiableArrayList;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.plannerv2.guards.AcceptAllSelect;
@@ -47,7 +48,8 @@ import com.google.common.collect.ImmutableList;
 public class SqlBatchImpl extends SqlBatch {
 
     private final ImmutableList<SqlTask> m_tasks;
-    private final ImmutableList<Object> m_userParams;
+    // use UnmodifiableArrayList in calcite instead of immutableList in Guava because we want to allow null elements
+    private final UnmodifiableArrayList<Object> m_userParams;
     private final Boolean m_isDDLBatch;
     private final Context m_context;
 
@@ -59,12 +61,15 @@ public class SqlBatchImpl extends SqlBatch {
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
      * Eventually we will let Calcite support all the VoltDB SQLs and remove this check from the code.
+     * Disapproving checks should be chained first (e.g.: {@link BanLargeQuery}).
      */
     static final CalciteCompatibilityCheck CALCITE_CHECKS =
             CalciteCompatibilityCheck.chain(
+                    // Disapproving checks go first
+                    new BanLargeQuery(),
+                    // Approving checks go next.
                     new AcceptDDLsAsWeCan(),
-                    new AcceptAllSelect(),
-                    new BanLargeQuery());
+                    new AcceptAllSelect());
 
     /**
      * Build a batch from a string of one or more SQL statements. </br>
@@ -117,7 +122,7 @@ public class SqlBatchImpl extends SqlBatch {
         }
         m_tasks = taskBuilder.build();
         if (userParams != null) {
-            m_userParams = ImmutableList.copyOf(userParams);
+            m_userParams = UnmodifiableArrayList.of(userParams);
         } else {
             m_userParams = null;
         }

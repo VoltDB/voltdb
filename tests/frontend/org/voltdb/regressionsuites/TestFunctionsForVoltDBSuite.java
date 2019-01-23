@@ -505,8 +505,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
           fail("char_length on columns which are not string expression is not supported");
         }
         catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
-
+            assertTrue(pce.getMessage().contains("Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'"));
         }
 
     }
@@ -2022,10 +2021,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                         "can't be cast as DECIMAL");
         verifyStmtFails(client,
                         "select ROUND(tm, 2) from R3 where id = 1",
-                        "incompatible data type in operation");
+                        "Cannot apply 'ROUND' to arguments of type");
         verifyStmtFails(client,
                         "select ROUND(var, 2) from R3 where id = 1",
-                        "incompatible data type in operation");
+                        "Cannot apply 'ROUND' to arguments of type");
         verifyStmtFails(client,
                         "select ROUND(DEC, -19) from D1 where id = 12",
                         "out of range");

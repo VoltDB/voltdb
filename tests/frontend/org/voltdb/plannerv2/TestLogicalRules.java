@@ -396,6 +396,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
     }
 
     public void testJoin() {
+        // TODO: Calcite casting to INTEGER instead of BigInt.
+        // We may fail some JUnit tests when we execute such Calcite plan.
         m_tester.sql("select R1.i, R2.v from R1, R2 where R2.si = R1.i and R2.v = 'foo'")
                 .transform("VoltLogicalCalc(expr#0..11=[{inputs}], I=[$t0], V=[$t11])\n" +
                         "  VoltLogicalJoin(condition=[=(CAST($7):INTEGER, $0)], joinType=[inner])\n" +
@@ -462,5 +464,17 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
+    }
+
+    public void testIntersect() {
+        // ENG-15160
+//        m_tester.sql("select * from R1 where EXISTS (select si from R1 intersect select si from R2)").
+//                transform("foo").test();
+    }
+
+    public void testLogicalValues() {
+        // ENG-15258
+//        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+//                .transform("foo").test();
     }
 }

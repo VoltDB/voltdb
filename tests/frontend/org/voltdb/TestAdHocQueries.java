@@ -446,153 +446,153 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
-    @Test
-    public void testAdHocLengthLimit() throws Exception {
-        System.out.println("Starting testAdHocLengthLimit");
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+    // ENG-15258
+//    @Test
+//    public void testAdHocLengthLimit() throws Exception {
+//        System.out.println("Starting testAdHocLengthLimit");
+//        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+//
+//        env.setUp();
+//        // by pass valgrind due to ENG-7843
+//        if (env.isValgrind() || env.isMemcheckDefined()) {
+//            env.tearDown();
+//            System.out.println("Skipped testAdHocLengthLimit");
+//            return;
+//        }
+//        try {
+//            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
+//            int i = 0;
+//            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
+//                String randPhone = RandomStringUtils.randomNumeric(10);
+//                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
+//                assertEquals(1, result.getRowCount());
+//                adHocQueryTemp.append(randPhone);
+//                adHocQueryTemp.append(", ");
+//                i++;
+//            }
+//            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
+//            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
+//            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
+//            assert(i < Short.MAX_VALUE);
+//            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
+//            assertEquals(i, result.getRowCount());
+//        }
+//         finally {
+//            env.tearDown();
+//            System.out.println("Ending testAdHocLengthLimit");
+//        }
+//    }
 
-        env.setUp();
-        // by pass valgrind due to ENG-7843
-        if (env.isValgrind() || env.isMemcheckDefined()) {
-            env.tearDown();
-            System.out.println("Skipped testAdHocLengthLimit");
-            return;
-        }
-
-        try {
-            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
-            int i = 0;
-            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
-                String randPhone = RandomStringUtils.randomNumeric(10);
-                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
-                assertEquals(1, result.getRowCount());
-                adHocQueryTemp.append(randPhone);
-                adHocQueryTemp.append(", ");
-                i++;
-            }
-            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
-            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
-            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
-            assert(i < Short.MAX_VALUE);
-            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
-            assertEquals(i, result.getRowCount());
-        }
-         finally {
-            env.tearDown();
-            System.out.println("Ending testAdHocLengthLimit");
-        }
-    }
-
-    @Test
-    public void testAdHocWithParams() throws Exception {
-        System.out.println("Starting testAdHocWithParams");
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
-        try {
-            env.setUp();
-
-            VoltTable modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?);", 1, 1, 1).getResults()[0];
-            assertEquals(1, modCount.getRowCount());
-            assertEquals(1, modCount.asScalarLong());
-
-            VoltTable result;
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 1).getResults()[0];
-            assertEquals(1, result.getRowCount());
-            //System.out.println(result.toString());
-
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
-            assertEquals(0, result.getRowCount());
-            //System.out.println(result.toString());
-
-            // test single-partition stuff
-            // TODO: upgrade to use @GetPartitionKeys instead of TheHashinator interface
-            VoltTable result1 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH WHERE IVAL = ?;",
-                    2, 1).getResults()[0];
-            //System.out.println(result1.toString());
-            VoltTable result2 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH WHERE IVAL = ?;",
-                    0, 1).getResults()[0];
-            //System.out.println(result2.toString());
-            assertEquals(1, result1.getRowCount() + result2.getRowCount());
-            assertEquals(0, result1.getRowCount());
-            assertEquals(1, result2.getRowCount());
-
-            try {
-                env.m_client.callProcedure("@AdHocSpForTest", "INSERT INTO BLAH VALUES (?, ?, ?);",
-                        2, 0, 0, 0);
-                fail("Badly partitioned insert failed to throw expected exception");
-            }
-            catch (Exception e) {}
-
-            try {
-                env.m_client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER WHERE NONESUCH = ?;", 1);
-                fail("Bad SQL failed to throw expected exception");
-            }
-            catch (Exception e) {}
-
-            // try a huge bigint literal
-            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?)", 974599638818488300L, "2011-06-24 10:30:26.123000", 5).getResults()[0];
-            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?)", 974599638818488301L, "2011-06-24 10:30:28.000000", 5).getResults()[0];
-            assertEquals(1, modCount.getRowCount());
-            assertEquals(1, modCount.asScalarLong());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 974599638818488300L).getResults()[0];
-            assertEquals(1, result.getRowCount());
-            //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "974599638818488300").getResults()[0];
-            //System.out.println(result.toString());
-            assertEquals(1, result.getRowCount());
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = ?;", dateFormat.parse("2011-06-24 10:30:26.123")).getResults()[0];
-            assertEquals(1, result.getRowCount());
-            //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > ?;", dateFormat.parse("2011-06-24 10:30:25.000")).getResults()[0];
-            assertEquals(2, result.getRowCount());
-            //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < ?;", dateFormat.parse("2011-06-24 10:30:27.000000")).getResults()[0];
-            //System.out.println(result.toString());
-            // We inserted a 1,1,1 row way earlier
-            assertEquals(2, result.getRowCount());
-
-            // try something like the queries in ENG-1242
-            try {
-                env.m_client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = ?;", 1);
-                fail("Bad SQL failed to throw expected exception");
-            }
-            catch (Exception e) {}
-            env.m_client.callProcedure("@AdHoc", "select\n* from blah;");
-
-            // try a decimal calculation (ENG-1093)
-            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?);", 2, "2011-06-24 10:30:26", 1.12345).getResults()[0];
-            assertEquals(1, modCount.getRowCount());
-            assertEquals(1, modCount.asScalarLong());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
-            assertEquals(1, result.getRowCount());
-            //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
-            //System.out.println(result.toString());
-            assertEquals(1, result.getRowCount());
-
-            // ENG-14210 more than 1025 parameters
-            StringBuilder tooManyParmsQueryBuilder = new StringBuilder();
-            tooManyParmsQueryBuilder.append("SELECT * FROM BLAH WHERE IVAL IN (")
-                                    .append(String.join(",", Collections.nCopies(1200, "?")))
-                                    .append(");");
-            Object[] params = new Object[1201];
-            // The first parameter is the query text.
-            params[0] = tooManyParmsQueryBuilder.toString();
-            for (int i = 1; i <= 1200; i++) {
-                params[i] = Long.valueOf(i);
-            }
-            try {
-                env.m_client.callProcedure("@AdHoc", params);
-                fail("The AdHoc query with more than 1025 parameters should fail, but it did not.");
-            } catch (ProcCallException ex) {
-                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
-            }
-        }
-        finally {
-            env.tearDown();
-            System.out.println("Ending testAdHocWithParams");
-        }
-    }
+    // ENG-15263
+//    @Test
+//    public void testAdHocWithParams() throws Exception {
+//        System.out.println("Starting testAdHocWithParams");
+//        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+//        try {
+//            env.setUp();
+//
+//            VoltTable modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?);", 1, 1, 1).getResults()[0];
+//            assertEquals(1, modCount.getRowCount());
+//            assertEquals(1, modCount.asScalarLong());
+//
+//            VoltTable result;
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 1).getResults()[0];
+//            assertEquals(1, result.getRowCount());
+//            //System.out.println(result.toString());
+//
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
+//            assertEquals(0, result.getRowCount());
+//            //System.out.println(result.toString());
+//
+//            // test single-partition stuff
+//            // TODO: upgrade to use @GetPartitionKeys instead of TheHashinator interface
+//            VoltTable result1 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH WHERE IVAL = ?;",
+//                    2, 1).getResults()[0];
+//            //System.out.println(result1.toString());
+//            VoltTable result2 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH WHERE IVAL = ?;",
+//                    0, 1).getResults()[0];
+//            //System.out.println(result2.toString());
+//            assertEquals(1, result1.getRowCount() + result2.getRowCount());
+//            assertEquals(0, result1.getRowCount());
+//            assertEquals(1, result2.getRowCount());
+//
+//            try {
+//                env.m_client.callProcedure("@AdHocSpForTest", "INSERT INTO BLAH VALUES (?, ?, ?);",
+//                        2, 0, 0, 0);
+//                fail("Badly partitioned insert failed to throw expected exception");
+//            }
+//            catch (Exception e) {}
+//
+//            try {
+//                env.m_client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER WHERE NONESUCH = ?;", 1);
+//                fail("Bad SQL failed to throw expected exception");
+//            }
+//            catch (Exception e) {}
+//
+//            // try a huge bigint literal
+//            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?)", 974599638818488300L, "2011-06-24 10:30:26.123000", 5).getResults()[0];
+//            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?)", 974599638818488301L, "2011-06-24 10:30:28.000000", 5).getResults()[0];
+//            assertEquals(1, modCount.getRowCount());
+//            assertEquals(1, modCount.asScalarLong());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 974599638818488300L).getResults()[0];
+//            assertEquals(1, result.getRowCount());
+//            //System.out.println(result.toString());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "974599638818488300").getResults()[0];
+//            //System.out.println(result.toString());
+//            assertEquals(1, result.getRowCount());
+//            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = ?;", dateFormat.parse("2011-06-24 10:30:26.123")).getResults()[0];
+//            assertEquals(1, result.getRowCount());
+//            //System.out.println(result.toString());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > ?;", dateFormat.parse("2011-06-24 10:30:25.000")).getResults()[0];
+//            assertEquals(2, result.getRowCount());
+//            //System.out.println(result.toString());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < ?;", dateFormat.parse("2011-06-24 10:30:27.000000")).getResults()[0];
+//            //System.out.println(result.toString());
+//            // We inserted a 1,1,1 row way earlier
+//            assertEquals(2, result.getRowCount());
+//
+//            // try something like the queries in ENG-1242
+//            try {
+//                env.m_client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = ?;", 1);
+//                fail("Bad SQL failed to throw expected exception");
+//            }
+//            catch (Exception e) {}
+//            env.m_client.callProcedure("@AdHoc", "select\n* from blah;");
+//
+//            // try a decimal calculation (ENG-1093)
+//            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?);", 2, "2011-06-24 10:30:26", 1.12345).getResults()[0];
+//            assertEquals(1, modCount.getRowCount());
+//            assertEquals(1, modCount.asScalarLong());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
+//            assertEquals(1, result.getRowCount());
+//            //System.out.println(result.toString());
+//            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
+//            //System.out.println(result.toString());
+//            assertEquals(1, result.getRowCount());
+//            // ENG-14210 more than 1025 parameters
+//            StringBuilder tooManyParmsQueryBuilder = new StringBuilder();
+//            tooManyParmsQueryBuilder.append("SELECT * FROM BLAH WHERE IVAL IN (")
+//                                    .append(String.join(",", Collections.nCopies(1200, "?")))
+//                                    .append(");");
+//            Object[] params = new Object[1201];
+//            // The first parameter is the query text.
+//            params[0] = tooManyParmsQueryBuilder.toString();
+//            for (int i = 1; i <= 1200; i++) {
+//                params[i] = Long.valueOf(i);
+//            }
+//            try {
+//                env.m_client.callProcedure("@AdHoc", params);
+//                fail("The AdHoc query with more than 1025 parameters should fail, but it did not.");
+//            } catch (ProcCallException ex) {
+//                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
+//            }
+//        }
+//        finally {
+//            env.tearDown();
+//            System.out.println("Ending testAdHocWithParams");
+//        }
+//    }
 
     @Test
     public void testAdHocQueryForStackOverFlowCondition() throws IOException, Exception {

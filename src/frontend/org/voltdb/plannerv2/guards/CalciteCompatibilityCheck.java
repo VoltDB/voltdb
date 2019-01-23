@@ -17,6 +17,12 @@
 
 package org.voltdb.plannerv2.guards;
 
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 /**
  * Check if a SQL statement should be routed to Calcite planner.
  * This is a temporary check before we can make Calcite support all the VoltDB syntaxes.
@@ -34,9 +40,13 @@ public abstract class CalciteCompatibilityCheck {
     /**
      * All the {@link CalciteCompatibilityCheck} subclasses should implement this method
      * to do their own checks and return a result.
+     * </br>
+     * <strong>Note:</strong> If you are adding a disapproving check, please make sure to
+     * mark it with the {@code @DisapprovingCheck} annotation.
      *
      * @param sql the SQL statement to check
      * @return true if the SQL statement passed the check.
+     * @see DisapprovingCheck
      */
     protected abstract boolean doCheck(String sql);
 
@@ -73,6 +83,13 @@ public abstract class CalciteCompatibilityCheck {
      * @return the instance appended.
      */
     public final CalciteCompatibilityCheck addNext(CalciteCompatibilityCheck next) {
+        // If I am not a disapproving check but the one I am linking is, then I need to
+        // throw an exception because any disapproving checks should go before me.
+        if (! this.getClass().isAnnotationPresent(DisapprovingCheck.class)
+                && next.getClass().isAnnotationPresent(DisapprovingCheck.class)) {
+            throw new RuntimeException("Disapproving check " + next.getClass() +
+                    " should be chained before any approving checks.");
+        }
         m_next = next;
         return m_next;
     }
@@ -92,5 +109,16 @@ public abstract class CalciteCompatibilityCheck {
             cur = cur.addNext(checks[i]);
         }
         return head;
+    }
+
+
+    /**
+     * Marks a disapproving check (which needs to be chained before any approving checks).
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public @interface DisapprovingCheck {
+
     }
 }

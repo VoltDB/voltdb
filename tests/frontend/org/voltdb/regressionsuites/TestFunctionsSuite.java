@@ -91,8 +91,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         verifyStmtFails(client, "select MOD(2, 25.32) from R1", "incompatible data type in operation");
 
         // Test guards on other types
-        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "incompatible data type in operation");
-        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
+        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "Cannot apply 'MOD' to arguments of type");
+        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "Cannot apply 'MOD' to arguments of type");
     }
 
     public void testUnaryMinus() throws Exception {
@@ -130,7 +130,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals( 0, r.get("C1", VoltType.INTEGER));
 
         // invalid data type for unary minus
-        verifyStmtFails(client, "select -desc from P1", "incompatible data type in operation");
+        verifyStmtFails(client, "select -desc from P1", "Cannot apply '-' to arguments of type");
 
         // check -(-var) = var
         cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
@@ -297,7 +297,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         long resultB;
 
         // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
@@ -706,7 +706,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
             caught = true;
         }
         assertTrue(caught);
@@ -717,7 +717,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
             caught = true;
         }
         assertTrue(caught);
@@ -877,7 +877,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
             caught = true;
         }
         assertTrue(caught);
@@ -888,7 +888,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
             caught = true;
         }
         assertTrue(caught);
@@ -899,7 +899,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("incompatible data type") != -1);
+            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
             caught = true;
         }
         assertTrue(caught);
@@ -3375,7 +3375,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
             fail();
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data types"));
+            assertTrue(pcex.getMessage().contains("Illegal mixing of types in CASE or COALESCE statement"));
         }
         try {
             doTestThreeColCoalesce(cl, "S1", "I2", "T3", "100");

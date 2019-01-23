@@ -360,11 +360,11 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         verifyStmtFails(client,
                 "select pk, pt + pt from t order by pk",
-                "incompatible data types in combination");
+                "Cannot apply '\\+' to arguments of type");
 
         verifyStmtFails(client,
                 "select pk, pt + 1 from t order by pk",
-                "incompatible data types in combination");
+                "Cannot apply '\\+' to arguments of type");
     }
 
     public void testPointNotNull() throws Exception {

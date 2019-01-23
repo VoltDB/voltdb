@@ -382,10 +382,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
         fillTable(client, "t", 0);
 
         verifyStmtFails(client, "select pk, poly + poly from t order by pk",
-                "incompatible data types in combination");
+                "Cannot apply '\\+' to arguments of type");
 
         verifyStmtFails(client, "select pk, poly + 1 from t order by pk",
-                "incompatible data types in combination");
+                "Cannot apply '\\+' to arguments of type");
     }
 
     // The shell is 5 fixed but arbitrarily selected points.

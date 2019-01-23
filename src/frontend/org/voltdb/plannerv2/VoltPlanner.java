@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -44,6 +45,8 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Pair;
+import org.voltdb.plannerv2.guards.AcceptAllSelect;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
@@ -214,6 +217,13 @@ public class VoltPlanner implements Planner {
             // Meanwhile, any identifiers in the query will be fully-qualified.
             // For example: select a from T; -> select T.a from catalog.T as T;
             m_validatedSqlNode = m_validator.validate(sqlNode);
+        } catch (CalciteContextException cce) {
+            // Some of the validation errors happened because of the lack of support
+            // we ought to add to Calcite. We need to fallback for those cases.
+            if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
+                throw new PlannerFallbackException(cce);
+            }
+            throw cce;
         } catch (RuntimeException e) {
             throw new ValidationException(e);
         }
@@ -239,8 +249,18 @@ public class VoltPlanner implements Planner {
         ensure(State.STATE_2_VALIDATED);
         Preconditions.checkNotNull(m_validatedSqlNode, "Validated SQL node cannot be null.");
 
-        m_relRoot = m_sqlToRelConverter.convertQuery(
-                m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        try {
+            m_relRoot = m_sqlToRelConverter.convertQuery(
+                    m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        } catch (AssertionError ae) {
+            // TODO: PI is not supported in calcite, even it can pass the validation,
+            // it will throw an AssertionError "invalid literal: PI" in the conversion phase
+            // see ENG-15228
+            if (ae.getLocalizedMessage().contains("invalid literal: PI")) {
+                throw new PlannerFallbackException(ae);
+            }
+            throw ae;
+        }
 
         // Note - ethan - 1/2/2019:
         // Since we do not supported structured (compound) types in VoltDB now,

@@ -66,7 +66,8 @@ public class VoltFrameworkConfig implements FrameworkConfig {
             RelCollationTraitDef.INSTANCE);
 
     static final Config PARSER_CONFIG =
-            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
+            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY)
+                    .setConformance(VoltSqlConformance.INSTANCE).build();
     static final String DEFAULT_SCHEMA_NAME = "public";
 
     // -- Additional states that do not belong to the original FrameworkConfig interface.
@@ -100,7 +101,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     @Override public SqlToRelConverter.Config getSqlToRelConverterConfig() {
-        return SqlToRelConverter.Config.DEFAULT;
+        return VoltSqlToRelConverterConfig.INSTANCE;
     }
 
     @Override public SchemaPlus getDefaultSchema() {
@@ -150,7 +151,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
      * @return the {@link SqlConformance} that is used by the VoltlDB planner.
      */
     public SqlConformance getSqlConformance() {
-        return SqlConformanceEnum.DEFAULT;
+        return VoltSqlConformance.INSTANCE;
     }
 
     /**
