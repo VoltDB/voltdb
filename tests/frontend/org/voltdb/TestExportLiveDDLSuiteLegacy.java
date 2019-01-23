@@ -298,7 +298,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        quiesceAndVerifyTarget(client,m_verifier);
+        quiesceAndVerifyStream(client,m_verifier);
 
         // must still be able to verify the export data.
         client.close();

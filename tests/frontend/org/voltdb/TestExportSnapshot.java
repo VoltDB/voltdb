@@ -117,7 +117,7 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         Thread.sleep(2000);
         quiesce(client);
         Thread.sleep(2000);
-        quiesceAndVerifyTarget(client, m_verifier);
+        quiesceAndVerifyStream(client, m_verifier);
     }
 
     public TestExportSnapshot(final String name) {
