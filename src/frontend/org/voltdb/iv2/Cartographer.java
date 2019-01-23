@@ -242,8 +242,10 @@ public class Cartographer extends StatsSource
         super(false);
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
-        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
-        m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
+        m_iv2Masters = new LeaderCache(m_zk, "Cartographer-iv2Masters-" + hostMessenger.getHostId(),
+                VoltZK.iv2masters, m_SPIMasterCallback);
+        m_iv2Mpi = new LeaderCache(m_zk, "Cartographer-iv2Mpi-" + hostMessenger.getHostId(),
+                VoltZK.iv2mpi, m_MPICallback);
         m_configuredReplicationFactor = configuredReplicationFactor;
         try {
             m_iv2Masters.start(true);
@@ -606,35 +608,6 @@ public class Cartographer extends StatsSource
         return partitionsToReplace;
     }
 
-    /**
-     * Compute the new partition IDs to add to the cluster based on the new topology.
-     *
-     * @param  zk Zookeeper client
-     * @param newPartitionTotalCount The new total partition count
-     * @return A list of partitions IDs to add to the cluster.
-     * @throws JSONException
-     */
-    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, int newPartitionTotalCount)
-            throws JSONException
-    {
-        List<Integer> newPartitions = new ArrayList<Integer>();
-        Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
-        // Remove MPI
-        existingParts.remove(MpInitiator.MP_INIT_PID);
-        int partsToAdd = newPartitionTotalCount - existingParts.size();
-
-        hostLog.info("Computing " + partsToAdd + " new partitions to add. Total partitions: " + newPartitionTotalCount);
-        if (partsToAdd > 0) {
-            for (int i = 0; newPartitions.size() != partsToAdd; i++) {
-                if (!existingParts.contains(i)) {
-                    newPartitions.add(i);
-                }
-            }
-            hostLog.info("Adding new partitions: " + newPartitions);
-        }
-        return newPartitions;
-    }
-
     private List<MailboxNodeContent> getMailboxNodeContentList()
     {
         List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
@@ -968,8 +941,7 @@ public class Cartographer extends StatsSource
         Map<Integer, Host> hostsMap = Maps.newHashMap();
         Set<Integer> allMasters = new HashSet<Integer>();
         allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
-        for ( Iterator<Integer> it = allMasters.iterator(); it.hasNext();) {
-            Integer partitionId = it.next();
+        for (Integer partitionId : allMasters) {
             int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
 
             //sanity check to make sure that the topology is not in the middle of leader promotion

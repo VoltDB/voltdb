@@ -20,29 +20,42 @@
 #include <vector>
 #include <cstdio>
 #include <string>
+#include <iostream>
+#include <sstream>
 
 namespace voltdb {
 
 class StackTrace {
 public:
-    StackTrace();
+    // By default do not include the frame with the constructor
+    StackTrace(uint32_t skipFrames = 1);
     ~StackTrace();
 
     static void printMangledAndUnmangledToFile(FILE *targetFile);
 
     static void printStackTrace() {
-        StackTrace st;
-        for (int ii=1; ii < st.m_traces.size(); ii++) {
-            printf("   %s\n", st.m_traces[ii].c_str());
-        }
+        StackTrace(2).printLocalTrace();
     }
 
-    static std::string stringStackTrace();
+    static std::string stringStackTrace(std::string prefix) {
+        std::ostringstream stacked;
+        StackTrace(2).streamLocalTrace(stacked, prefix);
+        return stacked.str();
+    }
+
+    static void streamStackTrace(std::ostream& stream, std::string prefix) {
+        StackTrace(2).streamLocalTrace(stream, prefix);
+    }
 
     void printLocalTrace() {
-        for (int ii=1; ii < m_traces.size(); ii++) {
-            printf("   %s\n", m_traces[ii].c_str());
+        streamLocalTrace(std::cout, "    ");
+    }
+
+    void streamLocalTrace(std::ostream& stream, std::string prefix) {
+        for (int ii=0; ii < m_traces.size(); ii++) {
+            stream << prefix << m_traces[ii] << '\n';
         }
+        stream.flush();
     }
 
 private:

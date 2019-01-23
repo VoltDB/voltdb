@@ -40,8 +40,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
-import org.voltdb.VoltZK;
-import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -52,6 +50,23 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * children. The children data objects must be JSONObjects.
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
+    protected final ZooKeeper m_zk;
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    protected final Callback m_cb; // the callback when the cache changes
+    private final String m_whoami; // identify the owner of the leader cache
+
+    // the children of this node are observed.
+    protected final String m_rootNode;
+
+    // All watch processing is run serially in this thread.
+    private final ListeningExecutorService m_es;
+
+    // previous children snapshot for internal use.
+    protected Set<String> m_lastChildren = new HashSet<String>();
+
+    // the cache exposed to the public. Start empty. Love it.
+    protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
+
 
     private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
 
@@ -125,16 +140,18 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     /** Instantiate a LeaderCache of parent rootNode. The rootNode must exist. */
-    public LeaderCache(ZooKeeper zk, String rootNode)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode)
     {
-        this(zk, rootNode, null);
+        this(zk, from, rootNode, null);
     }
 
-    public LeaderCache(ZooKeeper zk, String rootNode, Callback cb)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode, Callback cb)
     {
         m_zk = zk;
+        m_whoami = from;
         m_rootNode = rootNode;
         m_cb = cb;
+        m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache-" + m_whoami, 15000);
     }
 
     /** Initialize and start watching the cache. */
@@ -144,6 +161,16 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (block) {
             task.get();
         }
+    }
+
+    /**
+     * Initialized and start watching partition level cache, this function is blocking.
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void startPartitionWatch() throws InterruptedException, ExecutionException {
+        Future<?> task = m_es.submit(new PartitionWatchEvent());
+        task.get();
     }
 
     /** Stop caring */
@@ -212,22 +239,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         return m_publicCache.containsKey(partitionId);
     }
 
-    protected final ZooKeeper m_zk;
-    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    protected final Callback m_cb; // the callback when the cache changes
-
-    // the children of this node are observed.
-    protected final String m_rootNode;
-
-    // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
-
-    // previous children snapshot for internal use.
-    protected Set<String> m_lastChildren = new HashSet<String>();
-
-    // the cache exposed to the public. Start empty. Love it.
-    protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
-
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
         public ParentEvent(WatchedEvent event) {
@@ -246,26 +257,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
-    // child node sees modification or deletion
-    private class ChildEvent implements Runnable {
-        private final WatchedEvent m_event;
-        public ChildEvent(WatchedEvent event) {
-            m_event = event;
-        }
-
-        @Override
-        public void run() {
-            try {
-                processChildEvent(m_event);
-            } catch (Exception e) {
-                // ignore post-shutdown session termination exceptions.
-                if (!m_shutdown.get()) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
-                }
-            }
-        }
-    }
-
     // Boilerplate to forward zookeeper watches to the executor service
     protected final Watcher m_parentWatch = new Watcher() {
         @Override
@@ -275,39 +266,12 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                     m_es.submit(new ParentEvent(event));
                 }
             } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
+                if (!m_es.isShutdown()) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
                 }
             }
         }
     };
-
-    // Boilerplate to forward zookeeper watches to the executor service
-    protected final Watcher m_childWatch = new Watcher() {
-        @Override
-        public void process(final WatchedEvent event) {
-            try {
-                if (!m_shutdown.get()) {
-                    m_es.submit(new ChildEvent(event));
-                }
-            } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
-                }
-            }
-        }
-    };
-
-    // example zkPath string: /db/iv2masters/1
-    protected static int getPartitionIdFromZKPath(String zkPath)
-    {
-        String array[] = zkPath.split("/");
-        return Integer.valueOf(array[array.length - 1]);
-    }
 
     /**
      * Rebuild the point-in-time snapshot of the children objects
@@ -338,6 +302,10 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         for (ByteArrayCallback callback : callbacks) {
             try {
                 byte payload[] = callback.getData();
+                // During initialization children node may contain no data.
+                if (payload == null) {
+                    continue;
+                }
                 String data = new String(payload, "UTF-8");
                 LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
                 Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
@@ -352,6 +320,42 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             m_cb.run(m_publicCache);
         }
     }
+
+    // child node sees modification or deletion
+    private class ChildEvent implements Runnable {
+        private final WatchedEvent m_event;
+        public ChildEvent(WatchedEvent event) {
+            m_event = event;
+        }
+
+        @Override
+        public void run() {
+            try {
+                processChildEvent(m_event);
+            } catch (Exception e) {
+                // ignore post-shutdown session termination exceptions.
+                if (!m_shutdown.get()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
+                }
+            }
+        }
+    }
+
+    // Boilerplate to forward zookeeper watches to the executor service
+    protected final Watcher m_childWatch = new Watcher() {
+        @Override
+        public void process(final WatchedEvent event) {
+            try {
+                if (!m_shutdown.get()) {
+                    m_es.submit(new ChildEvent(event));
+                }
+            } catch (RejectedExecutionException e) {
+                if (!m_es.isShutdown()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
+                }
+            }
+        }
+    };
 
     /**
      * Update a modified child and republish a new snapshot. This may indicate
@@ -377,6 +381,40 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_cb != null) {
             m_cb.run(m_publicCache);
         }
+    }
+
+    // parent (root node) sees new or deleted child
+    private class PartitionWatchEvent implements Runnable {
+        public PartitionWatchEvent() {
+        }
+
+        @Override
+        public void run() {
+            try {
+                processPartitionWatchEvent();
+            } catch (Exception e) {
+                // ignore post-shutdown session termination exceptions.
+                if (!m_shutdown.get()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
+                }
+            }
+        }
+    }
+
+    // Race to create partition-specific zk node and put a watch on it.
+    private void processPartitionWatchEvent() throws KeeperException, InterruptedException {
+        try {
+            m_zk.create(m_rootNode, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        } catch (KeeperException.NodeExistsException e) {
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        }
+    }
+
+    // example zkPath string: /db/iv2masters/1
+    protected static int getPartitionIdFromZKPath(String zkPath)
+    {
+        return Integer.parseInt(zkPath.substring(zkPath.lastIndexOf('/') + 1));
     }
 
     @Override

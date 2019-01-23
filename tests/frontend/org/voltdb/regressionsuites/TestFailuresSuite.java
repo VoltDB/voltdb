@@ -24,11 +24,14 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
+import org.junit.After;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -48,11 +51,11 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniqueness;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCatchException;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+import org.voltdb_testprocs.regressionsuites.failureprocs.InsertReplicatedAfterDupPartitionedInsert;
 
 import junit.framework.Test;
 
 public class TestFailuresSuite extends RegressionSuite {
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -436,6 +439,27 @@ public class TestFailuresSuite extends RegressionSuite {
         }
     }
 
+    public void testReplicatedInsertAfterBadPartitionedInsert() throws IOException {
+        System.out.println("STARTING testReplicatedInsertAfterBadPartitionedInsert");
+        Client client = getClient();
+
+        try {
+            client.callProcedure("InsertReplicatedAfterDupPartitionedInsert", 0);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().startsWith("VOLTDB ERROR: CONSTRAINT VIOLATION"));
+        }
+
+        try {
+            ((ClientImpl)client).callProcedureWithClientTimeout(100, "PartitionedSelect", 100, TimeUnit.MILLISECONDS);
+        }
+        catch (ProcCallException e) {
+            m_fatalFailure = true;
+            fail();
+        }
+    }
+
+
     public void testAppStatus() throws Exception {
         System.out.println("STARTING testAppStatus");
         Client client = getClient();
@@ -478,7 +502,8 @@ public class TestFailuresSuite extends RegressionSuite {
         BadVarcharCompare.class, BadFloatToVarcharCompare.class,
         BadDecimalToVarcharCompare.class,
         WorkWithBigString.class, InsertBigString.class,
-        ReturnAppStatus.class
+        ReturnAppStatus.class,
+        InsertReplicatedAfterDupPartitionedInsert.class
     };
 
 
@@ -519,6 +544,7 @@ public class TestFailuresSuite extends RegressionSuite {
 
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);",
                 new ProcedurePartitionData("NEW_ORDER", "NO_W_ID", "2"));
+        project.addStmtProcedure("PartitionedSelect", "SELECT * FROM NEW_ORDER;");
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend

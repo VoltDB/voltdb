@@ -268,7 +268,7 @@ public class TestKafkaImportSuite extends RegressionSuite {
         project.addImport(true, "kafka", "csv", null, props);
 
         config = new LocalCluster("kafka-importer.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(true);
         boolean compile = config.compile(project);
         assertTrue(compile);

@@ -215,10 +215,10 @@ public class PlannerTool {
         VoltPlanner planner = new VoltPlanner(schemaPlus);
 
         // Validate the task's SqlNode.
-        SqlNode validatedQuery = planner.validate(sqlNode);
+        SqlNode validatedNode = planner.validate(sqlNode);
 
         // Convert SqlNode to RelNode.
-        RelNode rel = planner.convert(validatedQuery);
+        RelNode rel = planner.convert(validatedNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
         System.out.println(RelOptUtil.toString(rel));
 
@@ -249,12 +249,11 @@ public class PlannerTool {
         // the LogicalCalc and Calc-related rules to fix this.
         planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
-        // Add RelDistributions.ANY trait to the relational tree.
+        // Add RelDistributions.ANY trait to the rel tree.
         transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
 
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.
-        // This planning phase will be removed in future versions when we support MP query planning.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.

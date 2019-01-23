@@ -223,7 +223,7 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 3, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
