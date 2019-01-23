@@ -311,7 +311,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             for (String partition : partitions) {
                 try {
                     partitionSet.add(Integer.valueOf(partition));
-                } catch (NumberFormatException e) {}
+                } catch (NumberFormatException e) {
+                    // The partition list is persisted by server and should not
+                    // be edited. If non-numeric chars get in, ignore it to avoid confusing users.
+                }
             }
             return partitionSet;
         }

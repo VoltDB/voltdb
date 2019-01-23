@@ -93,8 +93,8 @@ public class AbstractTopology {
 
     public static class Partition implements Comparable<Partition>{
         public final int id;
-        public int leaderHostId;
-        public ImmutableSortedSet<Integer> hostIds;
+        private int leaderHostId;
+        private ImmutableSortedSet<Integer> hostIds;
 
         private Partition(int id, int leaderHostId, Collection<Integer> hostIds) {
             this.id = id;
@@ -106,6 +106,17 @@ public class AbstractTopology {
             hostIds = ImmutableSortedSet.copyOf(hostIds);
         }
 
+        public ImmutableSortedSet<Integer> getHostIds(){
+            return hostIds;
+        }
+
+        public int getLeaderHostId() {
+            return leaderHostId;
+        }
+
+        public void setLeaderHostId(int hostId) {
+            leaderHostId = hostId;
+        }
         @Override
         public String toString() {
             String[] hostIdStrings = hostIds.stream().map(id -> String.valueOf(id)).toArray(String[]::new);
@@ -145,7 +156,7 @@ public class AbstractTopology {
     public static class Host implements Comparable<Host> {
         public final int id;
         public final String haGroup;
-        public ImmutableSortedSet<Partition> partitions;
+        private ImmutableSortedSet<Partition> partitions;
 
         public final boolean isMissing;
 
@@ -183,11 +194,14 @@ public class AbstractTopology {
             this.isMissing = missing;
         }
 
-        public List<Integer> getPartitionIdList() {
+        public Set<Integer> getPartitionIdList() {
             return partitions.stream()
                     .map(p -> p.id)
-                    .sorted()
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
+        }
+
+        public ImmutableSortedSet<Partition> getPartitions() {
+            return partitions;
         }
 
         public int getleaderCount() {
@@ -985,9 +999,7 @@ public class AbstractTopology {
 
             // use the matched host. if no match found, use any one available.
             if (recoverPartitions != null && !recoverPartitions.isEmpty()) {
-                Set<Integer> partitions = Sets.newHashSet();
-                partitions.addAll(h.getPartitionIdList());
-                if (Sets.difference(partitions, recoverPartitions).isEmpty()) {
+                if (h.getPartitionIdList().equals(recoverPartitions)) {
                     replaceHost = h;
                     break;
                 }
@@ -1056,11 +1068,9 @@ public class AbstractTopology {
             List<Integer> matchedHosts = new ArrayList<>();
             for (Iterator<Map.Entry<Integer, Host>> it = hostsById.entrySet().iterator(); it.hasNext();) {
                 Host host = it.next().getValue();
-                Set<Integer> partitions = Sets.newHashSet();
-                partitions.addAll(host.getPartitionIdList());
 
                 // host the same list of partitions but different host id, a candidate for swap
-                if (Sets.difference(partitions, entry.getKey()).isEmpty()) {
+                if (host.getPartitionIdList().equals(entry.getKey())) {
                     if (!restoredHosts.remove(Integer.valueOf(host.id))) {
                         matchedHosts.add(host.id);
                     } else {
@@ -1284,7 +1294,7 @@ public class AbstractTopology {
         return peers;
     }
 
-    public List<Integer> getPartitionIdList(int hostId) {
+    public Set<Integer> getPartitionIdList(int hostId) {
         Host h = hostsById.get(hostId);
         return (h != null) ? h.getPartitionIdList() : null;
     }

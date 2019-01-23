@@ -203,6 +203,7 @@ import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.collect.Lists;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Supplier;
@@ -1249,7 +1250,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
-                    partitions = topo.getPartitionIdList(m_messenger.getHostId());
+                    partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
@@ -1709,6 +1710,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
 
         long version = topology.version;
+        if (!recoverPartitions.isEmpty()) {
+            // In rejoin case, partition list from the rejoining node could be out of range if the rejoining
+            // host is a previously elastic removed node or some other used nodes, if out of range, do not restore
+            if (Collections.max(recoverPartitions) > Collections.max(m_cartographer.getPartitions())) {
+                recoverPartitions.clear();
+            }
+        }
         AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
                 m_messenger.getLiveHostIds(),
                 m_messenger.getHostId(),
@@ -1717,7 +1725,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (recoveredTopo == null) {
             return null;
         }
-        List<Integer> partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
+        List<Integer> partitions = Lists.newArrayList(recoveredTopo.getPartitionIdList(m_messenger.getHostId()));
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
             return partitions;
