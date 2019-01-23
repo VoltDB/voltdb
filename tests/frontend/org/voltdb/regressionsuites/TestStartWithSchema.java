@@ -109,7 +109,7 @@ final public class TestStartWithSchema {
                 kfactor,
                 clusterID,
                 BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
+                FailureState.ALL_RUNNING, false, null);
         cluster.setHasLocalServer(false);
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();

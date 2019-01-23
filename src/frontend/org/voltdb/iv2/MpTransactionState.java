@@ -465,8 +465,8 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     tmLog.warn(deadlockMsg.toString());
-                    m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
-                    m_mbox.send(m_mbox.getHSId(), new DumpMessage());
+                    m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage(txnId));
+                    m_mbox.send(m_mbox.getHSId(), new DumpMessage(txnId));
                 }
 
                 if (msg != null) {
