@@ -15,15 +15,13 @@
 # - in the voltdb repo:
 #
 #   cd tools
-#   1. Convert the renotes into a csv file
-#       python ./relnotesparser.py ~/workspace/voltdb-doc/userdocs/releasenotes.xml > /tmp/relnotes.csv
-#   2. Do a dry-run of the jira inserts
-#       python ./relnotesupdater.py /tmp/relnotes.csv
-#   3. Review the errors on your screen - see if they make sense
-#   4. Fix anything in the xml and rerun steps 1 and 2
-#   5. Run and actually update
-#       python ./relnotesupdater.py /tmp/relnotes.csv -w
-#   6. Scan the issues and make sure the updates are in the right place. 
+#   1. Do a dry-run of the jira inserts
+#       python ./relnotesupdater.py ~/workspace/voltdb-doc/userdocs/releasenotes.xml
+#   2. Review the errors on your screen - see if they make sense
+#   3. Fix anything in the xml and rerun steps 1 and 2
+#   4. Run and actually update
+#       python ./relnotesupdater.py ~/workspace/voltdb-doc/userdocs/releasenotes.xml -w
+#   5. Scan the issues and make sure the updates are in the right place. 
 #      Here's a search that finds all issues with non-empty relnotes field that were updated today:
 #
 #   https://issues.voltdb.com/issues/?jql=project%20%3D%20ENG%20and%20%22Release%20Note%22%20%20is%20not%20empty%20and%20updated%20%3E%20startOfDay()%20order%20by%20updated%20DESC
@@ -38,6 +36,8 @@ import sys
 import textwrap
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
+
+import relnotesparser
 
 
 # Each row in results is a tuple containing
@@ -95,74 +95,75 @@ def is_valid_jid(jid):
 def cleanstring(str):
     return ' '.join(str.strip().split())
 
+# Get the release notes from relnotesparser as a two column array
+reader = relnotesparser.parsefile(args.file)
 
+for row in reader:
+    #print row
+    fields = len(row)
+    if fields < 2:
+        results.append(('ERROR', 'NULL', row, 'Not a valid row, too few columns.'))
+        continue
+    if fields > 2:
+        results.append(('ERROR', 'NULL', row, 'Not a valid row, too many columns.'))
+        continue
+    text = row[1]
+    keys = row[0].split(",")
+    for key in keys:
+        #key = row[i]
+        jid = 'ENG-%s' % (cleanstring(key))
+        #print jid
 
-with open (args.file) as csvfile:
-    reader = csv.reader(csvfile, escapechar='\\')
-    for row in reader:
-        #print row
-        fields = len(row)
-        if fields < 2:
-            results.append(('ERROR', 'NULL', row, 'Not a valid row'))
+        #Is it valid number?
+        if not is_valid_jid(jid):
+            results.append(('ERROR', jid, text, 'Not a valid issue #'))
             continue
-        text = row[-1]
-        #print text
-        #
-        for i in range(0, fields - 1):
-            key = row[i]
-            jid = 'ENG-%s' % (cleanstring(key))
-            #print jid
 
-            #Is it valid number?
-            if not is_valid_jid(jid):
-                results.append(('ERROR', jid, text, 'Not a valid issue #'))
-                continue
+        #Does it exist in Jira?
+        try:
+            issue = jira.issue(jid)
+        except:
+            results.append(('ERROR', jid, text, 'Issue does not exist'))
+            continue
 
-            #Does it exist in Jira?
-            try:
-                issue = jira.issue(jid)
-            except:
-                results.append(('ERROR', jid, text, 'Issue does not exist'))
-                continue
-
-            #Get the release note and decide what to do with it
-            existing_relnote = getattr(issue.fields, relnote_field)
-            #Has a release note?
-            if existing_relnote:
-                #Are they the same?
-                # Calculate score
-                fuzzyscore = fuzz.ratio(cleanstring(existing_relnote), cleanstring(text))
-                if fuzzyscore == 100:
-                    ##release notes are the same. Nothing to do
-                    pass
-                elif 90 <= fuzzyscore <= 99:
-                    if (errors_only): continue
-                    #print "Text comparison SCORE", fuzzyscore
-                    #print "updating JIRA release note with voltdb-doc release note"
-                    #infostr = 'Inserted'
-                    infostr = "Updated from release note (SCORE %s)" % (str(fuzzyscore)+'%')
-                    if not args.dryrun:
-                        issue.update(fields={relnote_field : text})
-                    else:
-                        infostr += '-- dry run, no updates done'
-                        results.append(('INFO', jid, text, infostr))
-
-                #if (cleanstring(existing_relnote) == cleanstring(text)):
-                    #Okay - it exists and it matches what is there. Nothing to do
-                    #pass
-                else:
-                    #Hmm - something else is there. and it is alot different
-                    #print "Text comparison SCORE", fuzzyscore
-                    errorstr = 'Another release note already exists (SCORE %s):\n\told note:\n\t%s' % (str(fuzzyscore)+'%',existing_relnote )
-                    results.append(('ERROR', jid, "new note:\n\t" + text, errorstr))
-            else:
+        #Get the release note and decide what to do with it
+        existing_relnote = getattr(issue.fields, relnote_field)
+        #Has a release note?
+        if existing_relnote:
+            #Are they the same?
+            # Calculate score
+            fuzzyscore = fuzz.ratio(cleanstring(existing_relnote), cleanstring(text))
+            if fuzzyscore == 100:
+                ##release notes are the same. Nothing to do
+                pass
+            elif 90 <= fuzzyscore <= 99:
                 if (errors_only): continue
-                infostr = 'Inserted'
+                #print "Text comparison SCORE", fuzzyscore
+                #print "updating JIRA release note with voltdb-doc release note"
+                #infostr = 'Inserted'
+                infostr = "Updated from release note (SCORE %s)" % (str(fuzzyscore)+'%')
                 if not args.dryrun:
                     issue.update(fields={relnote_field : text})
                 else:
                     infostr += '-- dry run, no updates done'
-                results.append(('INFO', jid, text, infostr))
+                    results.append(('INFO', jid, text, infostr))
+
+            #if (cleanstring(existing_relnote) == cleanstring(text)):
+                #Okay - it exists and it matches what is there. Nothing to do
+                #pass
+            else:
+                #Hmm - something else is there. and it is alot different
+                #print "Text comparison SCORE", fuzzyscore
+                errorstr = 'Another release note already exists (SCORE %s):\n\told note:\n\t%s' % (str(fuzzyscore)+'%',existing_relnote )
+                results.append(('ERROR', jid, "new note:\n\t" + text, errorstr))
+        else:
+            if (errors_only): continue
+            infostr = 'Inserted'
+            if not args.dryrun:
+                issue.update(fields={relnote_field : text})
+            else:
+                infostr += '-- dry run, no updates done'
+            results.append(('INFO', jid, text, infostr))
 
 if (errors_only and len(results) == 0): print("SUCCESS - No errors found.")
 printresults(results)
