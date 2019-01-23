@@ -37,12 +37,12 @@ import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}
- * target at {@link #VOLTDB_PHYSICAL} convention
+ * target at {@link #CONVENTION} convention
  *
  * @author Michael Alexeev
  * @since 9.0
  */
-public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implements VoltDBPRel {
+public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implements VoltPhysicalRel {
 
     // If Limit ?, it's likely to be a small number. So pick up 50 here.
     private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
@@ -85,9 +85,9 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
                                        RelDataType preAggregateRowType,
                                        RexProgram preAggregateProgram,
                                        int splitCount) {
-        super(cluster, traitSet.plus(VoltDBPRel.VOLTDB_PHYSICAL), table, voltDBTable);
+        super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
-        Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltDBPAggregate);
+        Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltPhysicalAggregate);
         Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0);
         m_program = program;
         m_offset = offset;

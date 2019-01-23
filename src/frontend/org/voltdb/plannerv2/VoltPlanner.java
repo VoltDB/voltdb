@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -44,11 +45,97 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Pair;
+import org.voltdb.plannerv2.guards.AcceptAllSelect;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+
+/*
+ * Some quick notes about "How Calcite Planner work".
+ * reference https://www.slideshare.net/JordanHalterman/introduction-to-apache-calcite
+ * steps:
+ * 1. Optimize the logical plan (the SQL query can directly translate to a initial logical plan,
+ *    then we optimize it to a better logical plan)
+ * 2. Convert the logical plan into a physical plan (represents the physical execution stages)
+ *
+ * Common optimizations:
+ * Prune unused fields, Merge projections, Convert sub-queries to joins, Reorder joins,
+ * Push down projections, Push down filters
+ *
+ * Key Concepts:
+ * # {@link org.apache.calcite.rel.RelNode} represents a relational expression
+ * Sort, Join, Project, Filter, Scan...
+ * e.g.:
+ * select col1 as id, col2 as name from foo where col1=21;
+ *
+ * Project ( id = [$0], name = [$1] ) <-- expression
+ * Filter (condition=[= ($0, 21)])   <-- children/input
+ * TableScan (table = [foo])
+ *
+ * # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
+ * = scalar expression
+ * Projection fields, conditions
+ * Input column reference  -->  RexInputRef
+ * Literal                 -->  RexLiteral
+ * Struct field access     -->  RexFieldAccess
+ * Function call           -->  RexCall
+ * Window expression       -->  RexOver
+ *
+ * # Traits
+ * Defined by the {@link org.apache.calcite.plan.RelTrait} interface
+ * Traits are used to validate plan output
+ * {@link org.apache.calcite.plan.Convention}
+ * {@link org.apache.calcite.rel.RelCollation}
+ * {@link org.apache.calcite.rel.RelDistribution}
+ *
+ * ## Convention
+ * Convention is a type of RelTrait, it is associated with a RelNode interface.
+ * Conventions are used to represent a single data source,
+ * describing how the expression passes data to its consuming relational expression
+ * Inputs to a relational expression must be in the same convention.
+ *
+ * # Rules
+ * Rules are used to modify query plans.
+ * Defined by the {@link org.apache.calcite.plan.RelOptRule} interface
+ *
+ * Rules are matched to elements of a query plan using pattern matching
+ * {@link org.apache.calcite.plan.RelOptRuleOperand}
+ *
+ * ## Converter
+ * {@link org.apache.calcite.rel.convert.ConverterRule}
+ * convert() is called for matched rules
+ *
+ * {@link org.apache.calcite.rel.convert.Converter}
+ * By declaring itself to be a converter, a relational expression is telling the planner
+ * about this equivalence, and the planner groups expressions which are logically equivalent
+ * but have different physical traits into groups called RelSets.
+ *
+ * Q: why we need to put logically equivalent RelNode to a RelSet?
+ * A: RelSet provides a level of indirection that allows Calcite to optimize queries.
+ * If the input to a relational operator is an equivalence class, not a particular relational
+ * expression, then Calcite has the freedom to choose the member of the equivalence class that
+ * has the cheapest cost.
+ *
+ *
+ * ## Transformer
+ * onMatch() is called for matched rules
+ * call.transformTo()
+ *
+ * # Planners
+ * {@link org.apache.calcite.plan.volcano.VolcanoPlanner}
+ * {@link org.apache.calcite.plan.hep.HepPlanner}
+ *
+ * # Program
+ * {@link org.apache.calcite.tools.Program}
+ *
+ * Program that transforms a relational expression into another relational expression.
+ * A planner is a sequence of programs, each of which is sometimes called a "phase".
+ *
+ * The most typical program is an invocation of the volcano planner with a particular RuleSet.
+ */
 
 /**
  * Implementation of {@link org.apache.calcite.tools.Planner}.
@@ -130,6 +217,13 @@ public class VoltPlanner implements Planner {
             // Meanwhile, any identifiers in the query will be fully-qualified.
             // For example: select a from T; -> select T.a from catalog.T as T;
             m_validatedSqlNode = m_validator.validate(sqlNode);
+        } catch (CalciteContextException cce) {
+            // Some of the validation errors happened because of the lack of support
+            // we ought to add to Calcite. We need to fallback for those cases.
+            if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
+                throw new PlannerFallbackException(cce);
+            }
+            throw cce;
         } catch (RuntimeException e) {
             throw new ValidationException(e);
         }
@@ -155,8 +249,18 @@ public class VoltPlanner implements Planner {
         ensure(State.STATE_2_VALIDATED);
         Preconditions.checkNotNull(m_validatedSqlNode, "Validated SQL node cannot be null.");
 
-        m_relRoot = m_sqlToRelConverter.convertQuery(
-                m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        try {
+            m_relRoot = m_sqlToRelConverter.convertQuery(
+                    m_validatedSqlNode, false /*needs validation*/, true /*top*/);
+        } catch (AssertionError ae) {
+            // TODO: PI is not supported in calcite, even it can pass the validation,
+            // it will throw an AssertionError "invalid literal: PI" in the conversion phase
+            // see ENG-15228
+            if (ae.getLocalizedMessage().contains("invalid literal: PI")) {
+                throw new PlannerFallbackException(ae);
+            }
+            throw ae;
+        }
 
         // Note - ethan - 1/2/2019:
         // Since we do not supported structured (compound) types in VoltDB now,
@@ -199,25 +303,33 @@ public class VoltPlanner implements Planner {
      * @return the transformed relational expression tree.
      */
     public static RelNode transformHep(PlannerRules.Phase phase, RelNode rel) {
-        return transformHep(phase, null, rel);
+        return transformHep(phase, HepMatchOrder.BOTTOM_UP, rel, false);
     }
 
     /**
      * Use the {@link HepPlanner} to convert one relational expression tree into another relational
      * expression based on a particular rule set and requires set of traits.
      *
-     * @param phase     The planner phase
-     * @param bottomUp  Whether to use the bottom-up match order.
-     * @param rel       The root node
+     * @param phase      The planner phase
+     * @param matchOrder The match order.
+     * @param rel        The root node
+     * @param ordered    If it is true, rules will only apply once in order
      * @return the transformed relational expression tree.
      */
-    public static RelNode transformHep(PlannerRules.Phase phase, HepMatchOrder matchOrder, RelNode rel) {
+    public static RelNode transformHep(PlannerRules.Phase phase, HepMatchOrder matchOrder, RelNode rel, boolean ordered) {
         final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
         if (matchOrder != null) {
             hepProgramBuilder.addMatchOrder(matchOrder);
         }
-        phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+        if (ordered) {
+            phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+        } else {
+            hepProgramBuilder.addGroupBegin();
+            phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+            hepProgramBuilder.addGroupEnd();
+        }
         HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+
         planner.setRoot(rel);
         return planner.findBestExp();
     }
@@ -228,6 +340,11 @@ public class VoltPlanner implements Planner {
 
     @Override public RelTraitSet getEmptyTraitSet() {
         return m_relPlanner.emptyTraitSet();
+    }
+
+    @SuppressWarnings("rawtypes")
+    public void addRelTraitDef(RelTraitDef def) {
+        m_relPlanner.addRelTraitDef(def);
     }
 
     /**

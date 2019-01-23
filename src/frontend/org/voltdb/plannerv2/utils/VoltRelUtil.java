@@ -19,7 +19,7 @@ package org.voltdb.plannerv2.utils;
 
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 import com.google.common.base.Preconditions;
 
@@ -39,9 +39,7 @@ public class VoltRelUtil {
     }
 
     public static int decideSplitCount(RelNode rel) {
-        return (rel instanceof VoltDBPRel) ?
-                ((VoltDBPRel) rel).getSplitCount() : 1;
+        return (rel instanceof VoltPhysicalRel) ?
+                ((VoltPhysicalRel) rel).getSplitCount() : 1;
     }
-
-
 }

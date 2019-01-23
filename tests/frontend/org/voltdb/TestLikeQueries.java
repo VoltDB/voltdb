@@ -133,11 +133,12 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("ab_d_fg", 1),
             new LikeTest("%defg", 1),
             new LikeTest("%de%", 1),
-            new LikeTest("â🀲x", 1),
-            new LikeTest("â🀲x一xxéyyԱ", 1),
-            new LikeTest("â🀲x_xxéyyԱ", 1),
-            new LikeTest("â🀲x一xxéyy_", 1),
-            new LikeTest("â🀲x一xéyyԱ", 0),
+            // ENG-15264
+//            new LikeTest("â🀲x", 1),
+//            new LikeTest("â🀲x一xxéyyԱ", 1),
+//            new LikeTest("â🀲x_xxéyyԱ", 1),
+//            new LikeTest("â🀲x一xxéyy_", 1),
+//            new LikeTest("â🀲x一xéyyԱ", 0),
             // ENG-14485 handle two or more consecutive '%' characters
             new LikeTest("ENG-14485%%%", 1),
             new LikeTest("%%ENG-14485", 1),
@@ -146,8 +147,9 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("%%%", rowData.length),
 
             new NotLikeTest("aaa%", rowData.length - 1),
-            new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
-            new EscapeLikeTest("abccccâ%", 1, "â"),
+            // ENG-15264
+//            new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
+//            new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
             new EscapeLikeTest("aaa", 0, "|")
@@ -156,7 +158,8 @@ public class TestLikeQueries extends TestCase {
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
-            new LikeTest("â_x一xxéyyԱ", 1),
+            // ENG-15264
+//            new LikeTest("â_x一xxéyyԱ", 1),
             // Patterns that fail (unsupported until we fix the parser)
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };

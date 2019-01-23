@@ -43,6 +43,12 @@ create table R3 (
     vc varchar(256),
     ii integer);
 
+create table R4 (
+    pk integer,
+    vc varchar(256),
+    ii integer,
+    tm timestamp);
+
 create table RI3 (
     pk integer,
     vc varchar(256),
@@ -108,4 +114,8 @@ create table PI1 (
     v varchar(32));
     partition table PI1 on column i;
     CREATE INDEX PI1_IND1 ON PI1 (ii);
+
+CREATE VIEW V_P3 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
+    SELECT i, si, count(*), sum(ti), sum(bi) FROM R1
+    GROUP BY i, si;
 

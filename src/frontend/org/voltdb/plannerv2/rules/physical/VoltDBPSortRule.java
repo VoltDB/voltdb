@@ -23,11 +23,11 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
  * Convert LogicalSort to a collation that would be propagated by Calcite and recreated back
- * a VoltDBPSort at the later stage
+ * a VoltPhysicalSort at the later stage
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -53,7 +53,7 @@ public class VoltDBPSortRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalSort sort = call.rel(0);
         RelNode input = sort.getInput();
-        RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltPhysicalRel.CONVENTION);
         RelNode convertedInput = convert(input, convertedTraits);
         call.transformTo(convertedInput);
     }

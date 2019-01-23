@@ -19,20 +19,31 @@ package org.voltdb.plannerv2.rules;
 
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
+import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterMergeRule;
+import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rel.rules.ReduceExpressionsRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 import com.google.common.collect.ImmutableList;
 
@@ -49,11 +60,22 @@ public class PlannerRules {
      */
     public enum Phase {
         LOGICAL {
-            @Override
-            public RuleSet getRules() {
+            @Override public RuleSet getRules() {
                 return PlannerRules.LOGICAL;
             }
-        };
+        },
+        // Always use a HEP_BOTTOM_UP planner for MP_FALLBACK, it is match order sensitive.
+        MP_FALLBACK {
+            @Override public RuleSet getRules() {
+                return PlannerRules.MP_FALLBACK;
+            }
+        },
+        PHYSICAL_CONVERSION {
+            @Override public RuleSet getRules() {
+                return PlannerRules.PHYSICAL_CONVERSION;
+            }
+        }
+        ;
         public abstract RuleSet getRules();
     }
 
@@ -76,6 +98,12 @@ public class PlannerRules {
             // Is there an example of this merge?
             // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
+            FilterProjectTransposeRule.INSTANCE,
+            FilterJoinRule.FILTER_ON_JOIN,
+            FilterJoinRule.JOIN,
+
+            // Reduces constants inside a LogicalCalc.
+            ReduceExpressionsRule.CALC_INSTANCE,
 
             // -- VoltDB logical rules.
             VoltLSortRule.INSTANCE,
@@ -83,6 +111,7 @@ public class PlannerRules {
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
             VoltLJoinRule.INSTANCE
+
 //            // Filter   ->  Project
 //            // Project      Filter
 //            FilterProjectTransposeRule.INSTANCE,
@@ -111,9 +140,25 @@ public class PlannerRules {
 //            SortProjectTransposeRule.INSTANCE,
             );
 
+    private static final RuleSet MP_FALLBACK = RuleSets.ofList(
+            MPQueryFallBackRule.INSTANCE,
+            MPJoinQueryFallBackRule.INSTANCE
+    );
+
+    private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
+            VoltPCalcRule.INSTANCE,
+            VoltPSeqScanRule.INSTANCE,
+            VoltPSortConvertRule.INSTANCE_VOLTDB,
+            VoltPLimitRule.INSTANCE,
+            VoltPAggregateRule.INSTANCE,
+            VoltPJoinRule.INSTANCE
+    );
+
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(
-                    LOGICAL
+                    LOGICAL,
+                    MP_FALLBACK,
+                    PHYSICAL_CONVERSION
                     )
             );
 

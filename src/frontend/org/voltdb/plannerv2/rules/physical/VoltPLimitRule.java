@@ -23,12 +23,12 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPLimit;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltDBPLimit}.
+ * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltPhysicalLimit}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -47,12 +47,12 @@ public class VoltPLimitRule extends RelOptRule {
         VoltLogicalLimit limitOffset = call.rel(0);
         RelNode input = limitOffset.getInput();
         RelTraitSet convertedTraits = limitOffset.getTraitSet()
-                .replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
+                .replace(VoltPhysicalRel.CONVENTION).simplify();
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+                input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
         int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
-        call.transformTo(new VoltDBPLimit(
+        call.transformTo(new VoltPhysicalLimit(
                 limitOffset.getCluster(),
                 convertedTraits,
                 convertedInput,

@@ -100,6 +100,10 @@ public class VoltTable implements TranslatableTable {
                     return RelDistributions.SINGLETON;
                 } else {
                     Column partitionColumn = m_catTable.getPartitioncolumn();
+                    // partitionColumn == null when it is a Multi-partitioned view
+                    if (partitionColumn == null) {
+                        return RelDistributions.RANDOM_DISTRIBUTED;
+                    }
                     List<Integer> partitionColumnIds = Collections.list(partitionColumn.getIndex());
                     RelDistribution hashDist = RelDistributions.hash(partitionColumnIds);
                     return hashDist;
@@ -149,7 +153,7 @@ public class VoltTable implements TranslatableTable {
      * @return the created {@link org.apache.calcite.rel.type.RelDataType}.
      */
     public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
-        SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
+        SqlTypeName sqlTypeName = ColumnTypes.getCalciteType(vt);
         RelDataType rdt;
         // Note - ethan - 1/1/2019:
         // We probably need some code refactor for this type conversion.

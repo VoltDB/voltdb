@@ -1078,7 +1078,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
             // Test it with extra meaningless order by.
             vt = client.callProcedure("@AdHoc", "Select count(*) from "
-                    + tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
+                    + tb + " where V_G1 > 10;").getResults()[0];
             assertEquals(3, vt.asScalarLong());
 
             // Test AND

@@ -22,14 +22,10 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
-import org.apache.calcite.rel.RelDistributions;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
-import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPSingletonExchange;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltSeqTableScan;
-import org.voltdb.plannerv2.rel.physical.VoltDBPUnionExchange;
 
 /**
  * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltSeqTableScan}.
@@ -49,12 +45,13 @@ public class VoltPSeqScanRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalTableScan tableScan = call.rel(0);
-        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
 
         // Table distribution
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
                 1 : Constants.DISTRIBUTED_SPLIT_COUNT;
+
         VoltSeqTableScan scanRel = new VoltSeqTableScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),
@@ -62,28 +59,6 @@ public class VoltPSeqScanRule extends RelOptRule {
                 tableScan.getVoltTable(),
                 scanSplitCount);
 
-        AbstractVoltDBPExchange exchangeRel;
-        if (Type.SINGLETON == tableDist.getType()) {
-            exchangeRel = new VoltDBPSingletonExchange(
-                    tableScan.getCluster(),
-                    convertedTraits.plus(RelDistributions.SINGLETON),
-                    scanRel,
-                    false);
-        } else {
-            // Fragment's exchange
-            exchangeRel = new VoltDBPUnionExchange(
-                    tableScan.getCluster(),
-                    convertedTraits.plus(tableDist),
-                    scanRel,
-                    scanSplitCount,
-                    false);
-            // Coordinator's exchange
-            exchangeRel = new VoltDBPSingletonExchange(
-                    tableScan.getCluster(),
-                    convertedTraits.plus(RelDistributions.SINGLETON),
-                    exchangeRel,
-                    true);
-        }
-        call.transformTo(exchangeRel);
+        call.transformTo(scanRel);
     }
 }

@@ -25,11 +25,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPJoin;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalJoin} to {@link VoltDBPJoin}.
+ * VoltDB physical rule that transform {@link VoltLogicalJoin} to {@link VoltPhysicalJoin}.
  *
  * @author Chao Zhou
  * @since 9.0
@@ -47,14 +47,14 @@ public class VoltPJoinRule extends RelOptRule {
         VoltLogicalJoin join = call.rel(0);
         RelNode left = join.getLeft();
         RelNode right = join.getRight();
-        RelTraitSet convertedTraits = join.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
-        RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
-        RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
+        RelTraitSet convertedTraits = join.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
+        RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
+        RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
         ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(join.getSystemFieldList());
 
         // TODO: How many number of concurrent processes that a Join will be executed in ?
         // I use 1 for now.
-        call.transformTo(new VoltDBPJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
+        call.transformTo(new VoltPhysicalJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
                 join.getCondition(), join.getVariablesSet(), join.getJoinType(),
                 join.isSemiJoinDone(), systemFieldList, Constants.JOIN_SPLIT_COUNT));
     }

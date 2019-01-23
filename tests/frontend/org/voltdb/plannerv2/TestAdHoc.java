@@ -43,7 +43,9 @@ public class TestAdHoc extends RegressionSuite {
         Client client = getClient();
 //        client.callProcedure("@AdHoc", "select a from t1 where a > some (select c from t2 where c = 1)");
 //        client.callProcedure("@AdHoc", "select a from t1 where a > 0;");
-        client.callProcedure("@AdHoc", "select a from t1 where a > ? limit 2 offset ?;", 100, 2);
+//        client.callProcedure("@AdHoc", "select a from t1 where a > ? limit 2 offset ?;", 100, 2);
+//        client.callProcedure("@AdHoc", "select b, sum(a) from t1 where b is not null group by b having sum(a) > 10;");
+        client.callProcedure("@AdHoc", "select * from t1;");
     }
 
     static public junit.framework.Test suite() throws IOException {
@@ -52,7 +54,8 @@ public class TestAdHoc extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("create table t1(a int, b varchar);");
+        project.addLiteralSchema("create table t1(a int not null, b varchar);");
+        project.addLiteralSchema("partition table t1 on column a;");
         project.addLiteralSchema("create table t2(c int, d varchar);");
 
         LocalCluster config = new LocalCluster("calcite-adhoc.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
