@@ -1833,9 +1833,14 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
-        if (table.getIsreplicated() && assumeUnique) {
-            compiler.addWarn(String.format("On replicated table %s, ASSUMEUNIQUE index %s is converted to UNIQUE index.",
-                    table.getTypeName(), index.getTypeName()));
+        if (! index.getTypeName().startsWith("VOLTDB_AUTOGEN_IDX_") && table.getIsreplicated() && assumeUnique) {
+            // Warn and convert AssumeUnique -> Unique index only on
+            // non-auto-generated index (i.e. from "CREATE ASSUMEUNIQUE INDEX ..." statement rather than "CREATE TABLE(...)" statement),
+            // because "PARTITION TABLE ..." statement cannot be specified together with "CREATE TABLE" statement!
+            final String warn = String.format("On replicated table %s, ASSUMEUNIQUE index %s is converted to UNIQUE index.",
+                    table.getTypeName(), index.getTypeName());
+            compiler.addWarn(warn);
+            System.err.println(warn);
             assumeUnique = false;
         } else if (assumeUnique) {
             index.setUnique(true);
