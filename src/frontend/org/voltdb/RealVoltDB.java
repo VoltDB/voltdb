@@ -1068,8 +1068,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_startAction.doesRecover()) {
                 m_config.m_hostCount = fromPropertyFile.hostcount();
             }
-            if (m_config.m_restorePlacement && !StringUtils.isEmpty(fromPropertyFile.partitionids())) {
-                m_config.m_recoveredPartitions = fromPropertyFile.partitionids();
+            if (m_config.m_restorePlacement && !StringUtils.isEmpty(fromPropertyFile.partitionIds())) {
+                m_config.m_recoveredPartitions = fromPropertyFile.partitionIds();
             }
 
             Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();

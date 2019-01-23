@@ -845,7 +845,7 @@ public class VoltDB {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
-                    .put(ClusterSettings.PARTIITON_IDS, m_recoveredPartitions)
+                    .put(ClusterSettings.PARTITITON_IDS, m_recoveredPartitions)
                     .build();
         }
 
