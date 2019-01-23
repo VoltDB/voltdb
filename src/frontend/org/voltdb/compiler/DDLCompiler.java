@@ -1833,7 +1833,7 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
-        if (! index.getTypeName().startsWith("VOLTDB_AUTOGEN_IDX_") && table.getIsreplicated() && assumeUnique) {
+        if (! index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) && table.getIsreplicated() && assumeUnique) {
             // Warn and convert AssumeUnique -> Unique index only on
             // non-auto-generated index (i.e. from "CREATE ASSUMEUNIQUE INDEX ..." statement rather than "CREATE TABLE(...)" statement),
             // because "PARTITION TABLE ..." statement cannot be specified together with "CREATE TABLE" statement!
