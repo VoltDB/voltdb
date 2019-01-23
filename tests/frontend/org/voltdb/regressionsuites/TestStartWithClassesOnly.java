@@ -68,7 +68,7 @@ final public class TestStartWithClassesOnly {
                 kfactor,
                 clusterID,
                 BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
+                FailureState.ALL_RUNNING, false, null);
         cluster.setHasLocalServer(true);
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();

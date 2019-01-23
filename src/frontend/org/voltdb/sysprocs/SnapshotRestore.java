@@ -1593,7 +1593,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     signature);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
             ExportManagerInterface.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
-                    isRecover, sequenceNumberPerPartition, context.isLowestSiteId());
+                    isRecover, false, sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }
 

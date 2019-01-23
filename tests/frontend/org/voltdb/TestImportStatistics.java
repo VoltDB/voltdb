@@ -563,7 +563,7 @@ public class TestImportStatistics extends RegressionSuite {
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
         config = new LocalCluster("import-stats-ddl-cluster-rep.jar", 4, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);

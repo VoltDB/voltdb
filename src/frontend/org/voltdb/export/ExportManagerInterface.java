@@ -125,7 +125,7 @@ public interface ExportManagerInterface {
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-            boolean isRecover,
+            boolean isRecover, boolean isRejoin,
             Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
             boolean isLowestSite);
 
