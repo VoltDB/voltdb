@@ -37,7 +37,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExtensibleSnapshotDigestData;
-import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
@@ -54,7 +53,6 @@ import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
@@ -122,9 +120,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         // Create post snapshot update hashinator work
-        List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
         if (!partitionsToAdd.isEmpty()) {
-            createUpdatePartitionCountTasksForSites(localPartitions, newPartitionCount);
+            createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
         // Mark snapshot start in registry
@@ -401,43 +398,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
         }
         return builder.build();
-    }
-
-    private static void createUpdatePartitionCountTasksForSites(Collection<Integer> localPartitions,
-                                                                Integer newPartitionCount)
-    {
-        Preconditions.checkNotNull(newPartitionCount);
-        PostSnapshotTask task = new UpdatePartitionCount(newPartitionCount);
-        assert !localPartitions.isEmpty();
-        Iterator<Integer> iter = localPartitions.iterator();
-        while (iter.hasNext()) {
-            int partition = iter.next();
-            SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(partition, task);
-        }
-    }
-
-    /**
-     * A post-snapshot site task that updates the partition count on each site.
-     */
-    private static class UpdatePartitionCount implements PostSnapshotTask {
-        private final int m_newPartitionCount;
-
-        public UpdatePartitionCount(int newPartitionCount)
-        {
-            m_newPartitionCount = newPartitionCount;
-        }
-
-        @Override
-        public void run(SystemProcedureExecutionContext context)
-        {
-            if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("P" + context.getPartitionId() +
-                               " updating partition count to: " + m_newPartitionCount);
-            }
-
-            // Update partition count stored on this site
-            context.setNumberOfPartitions(m_newPartitionCount);
-        }
     }
 
     /**
