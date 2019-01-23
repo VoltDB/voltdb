@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,7 +56,6 @@ import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Multimap;
-import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -85,7 +83,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(jsData, context.getDatabase());
         final List<StreamSnapshotRequestConfig.Stream> localStreams =
-            filterRemoteStreams(config.streams, Longs.asList(tracker.getLocalSites()));
+                filterRemoteStreams(config.streams, tracker.getSitesForHost(context.getHostId()));
         final Map<Integer, Set<Long>> destsByHostId = collectTargetSitesByHostId(config.streams);
         final Set<Integer> partitionsToAdd = getPartitionsToAdd(localStreams);
 
@@ -167,19 +165,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     private static boolean haveAnyStreamPairs(List<StreamSnapshotRequestConfig.Stream> localStreams) {
-        boolean haveAny = false;
         if (localStreams != null && !localStreams.isEmpty()) {
-            int pairCount = 0;
-            Iterator<StreamSnapshotRequestConfig.Stream> itr = localStreams.iterator();
-            while (itr.hasNext() && pairCount == 0) {
-                StreamSnapshotRequestConfig.Stream stream = itr.next();
-                if (stream != null && stream.streamPairs != null) {
-                    pairCount = stream.streamPairs.size();
+            for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
+                if (stream != null && stream.streamPairs != null && !stream.streamPairs.isEmpty()) {
+                    return true;
                 }
             }
-            haveAny = pairCount > 0;
         }
-        return haveAny;
+        return false;
     }
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
@@ -222,12 +215,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                                             (destHSId == stream.lowestSiteSinkHSId),
                                                                             destsByHostId.get(CoreUtils.getHostIdFromHSId(destHSId)),
                                                                             hashinatorConfig, schemas, sender, ackReceiver));
-//                    if (destHSId == stream.lowestSiteSinkHSId) {
-//                        sdts.add(0, nextTarget);
-//                    }
-//                    else {
-                        sdts.add(nextTarget);
-//                    }
+                    sdts.add(nextTarget);
                 }
             }
         }
@@ -287,11 +275,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // For Rejoin, there will only be one element in this list
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
             ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
-
-            for (Entry<Long, Long> streamPair : stream.streamPairs.entries()) {
-                // Only include entries where the sourceHSId is a local HSID
-                if (localHSIds.contains(streamPair.getKey())) {
-                    streamPairs.put(streamPair.getKey(), streamPair.getValue());
+            for (Long localHsId : localHSIds) {
+                Collection<Long> destinations = stream.streamPairs.get(localHsId);
+                if (!destinations.isEmpty()) {
+                    streamPairs.putAll(localHsId, destinations);
                 }
             }
 
@@ -311,14 +298,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // For Rejoin, there will only be one element in this list
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
             for (Long targetHSId : stream.streamPairs.values()) {
-                int hostId = CoreUtils.getHostIdFromHSId(targetHSId);
+                Integer hostId = CoreUtils.getHostIdFromHSId(targetHSId);
                 Set<Long> targetSet = targetHSIdsByHostId.get(hostId);
                 if (targetSet == null) {
-                    targetHSIdsByHostId.put(hostId, new HashSet<Long>(Arrays.asList(targetHSId)));
+                    targetSet = new HashSet<>();
+                    targetHSIdsByHostId.put(hostId, targetSet);
                 }
-                else {
-                    targetSet.add(targetHSId);
-                }
+                targetSet.add(targetHSId);
             }
         }
 
