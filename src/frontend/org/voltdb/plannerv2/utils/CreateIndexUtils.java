@@ -53,6 +53,11 @@ import java.util.stream.StreamSupport;
  * Util class to help with "CREATE INDEX" DDL statement through Calcite
  */
 final public class CreateIndexUtils {
+    /**
+     * Prefix for auto-generated index name (i.e. implicitly created with "CREATE TABLE" statement, rather than
+     * "CREATE INDEX" statement.
+     */
+    private static final String AUTOGEN_PREFIX = "VOLTDB_AUTOGEN_";
     private CreateIndexUtils() {}
 
     /**
@@ -222,15 +227,15 @@ final public class CreateIndexUtils {
     static Pair<String, String> genIndexAndConstraintName(
             String constraintName, SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
         if (constraintName != null) {   // For named index with `CREATE INDEX index_name', the constraint name will be Index.m_typeName.
-            return Pair.of(constraintName, "VOLTDB_AUTOGEN_CONSTRAINT_CT_" + constraintName);
+            return Pair.of(constraintName, String.format("%sCONSTRAINT_CT_%s", AUTOGEN_PREFIX, constraintName));
         } else {
             final String suffix,
                     type_str = type == SqlKind.PRIMARY_KEY ? "PK" : "CT",
                     index = cols.stream().map(Column::getName)
-                            .reduce(String.format("VOLTDB_AUTOGEN_IDX_%s_%s", type_str, tableName),
+                            .reduce(String.format("%sIDX_%s_%s", AUTOGEN_PREFIX, type_str, tableName),
                                     (acc, colName) -> acc + "_" + colName),
                     constr = cols.stream().map(Column::getName)
-                            .reduce(String.format("VOLTDB_AUTOGEN_CT__%s_%s", type_str, tableName),
+                            .reduce(String.format("%sCT__%s_%s", AUTOGEN_PREFIX, type_str, tableName),
                                     (acc, colName) -> acc + "_" + colName);
             if (hasExpression) {        // For index involving filter(s), generate a UID string as suffix, and pretending that
                 // filter-groups for different constraints are never the same
@@ -290,6 +295,16 @@ final public class CreateIndexUtils {
         }
         index.setUnique(true);
         index.setAssumeunique(type == SqlKind.ASSUME_UNIQUE);
+        // Port of ENG-15220 fix
+        // TODO: since the master branch fix temporarily sets table's replicated flag before evaluating the 'PARTITION TABLE'
+        // statement, the `t.getIsreplicated() will return correct value. Without master's fix, it always returns true (i.e. a
+        // table is always replicated). Remove the "false" from the condition after merging from master branch.
+        if (false && t.getIsreplicated() && index.getAssumeunique() && ! indexName.startsWith(AUTOGEN_PREFIX)) {
+            final String warn = String.format("On replicated table %s, ASSUMEUNIQUE index %s is converted to UNIQUE index.",
+                    t.getTypeName(), indexName);
+            System.err.println(warn);
+            index.setAssumeunique(false);
+        }
         setConstraintType(t.getConstraints().add(constraintName), index, type, indexName, t.getTypeName());
         AtomicInteger i = new AtomicInteger(0);
         indexCols.forEach(column -> {
