@@ -59,6 +59,7 @@ import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
+import org.voltdb.utils.VoltFile;
 
 import com.google.common.collect.Iterables;
 import com.google_voltpatches.common.collect.ContiguousSet;
@@ -786,6 +787,7 @@ public class TestAbstractTopology {
 
     @Test
     public void testRestorePlacementOnRecovery() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
         LocalCluster cluster = null;
         try{
             cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 6, 3, 1);
