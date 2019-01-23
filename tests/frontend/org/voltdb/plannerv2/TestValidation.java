@@ -110,6 +110,10 @@ public class TestValidation extends Plannerv2TestCase {
         m_tester.sql("select i as foo, count(*) from R2 group by foo").test();
     }
 
+    public void testBangEqual() {
+        m_tester.sql("select i from R1 where i != 3").test();
+    }
+
     public void testFullJoinWithoutColumnScope() {
         // TODO: fix this
 //        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").test();

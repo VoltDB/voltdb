@@ -66,7 +66,8 @@ public class VoltFrameworkConfig implements FrameworkConfig {
             RelCollationTraitDef.INSTANCE);
 
     static final Config PARSER_CONFIG =
-            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
+            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY)
+                    .setConformance(VoltSqlConformance.INSTANCE).build();
     static final String DEFAULT_SCHEMA_NAME = "public";
 
     // -- Additional states that do not belong to the original FrameworkConfig interface.
