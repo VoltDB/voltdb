@@ -96,7 +96,7 @@ public class ExportBenchmark {
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
 
-    // Server-side stats - Note: access synchronized on serverStats 
+    // Server-side stats - Note: access synchronized on serverStats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, partCount;
@@ -150,6 +150,9 @@ public class ExportBenchmark {
         @Option(desc = "How many tuples to push includes priming count.")
         int count = 0; // 10000000+40000
 
+        @Option(desc="How many tuples to insert for each procedure call (default = 1)")
+        int multiply = 1;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -159,6 +162,7 @@ public class ExportBenchmark {
             if (!target.equals("socket") && !target.equals("kafka") && !target.equals("measuring")) {
                 exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"measuring\"");
             }
+            if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
             if (target.equals("measuring")) {
                count = 10000000+40000;
                System.out.println("Using count mode with count: " + count);
@@ -361,7 +365,7 @@ public class ExportBenchmark {
                             new NullCallback(),
                             "InsertExport",
                             rowId.getAndIncrement(),
-                            0);
+                            config.multiply);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -394,7 +398,7 @@ public class ExportBenchmark {
                         new ExportCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
-                        0);
+                        config.multiply);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
@@ -412,10 +416,11 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
-        System.out.println("Failed to insert " + failedInserts.get() + " objects");
+        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls");
+        System.out.println("Failed " + failedInserts.get() + " procedure calls");
         // Use this to correlate the total rows exported
-        System.out.println("Total inserts: " + totalInserts);
+        System.out.println("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
+                + (totalInserts * config.multiply));
     }
 
     /**
@@ -694,7 +699,7 @@ public class ExportBenchmark {
         long serverTxn = 0L;
         long serverTps = 0L;
         long elapsedMs = 0L;
-        
+
         // Note:normally the serverStats should be stopped but synchronizing nonetheless
         synchronized(serverStats) {
             elapsedMs = serverEndTS - serverStartTS;
