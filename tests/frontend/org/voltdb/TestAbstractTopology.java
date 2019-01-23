@@ -788,7 +788,7 @@ public class TestAbstractTopology {
     public void testRestorePlacementOnRecovery() throws Exception {
         LocalCluster cluster = null;
         try{
-            cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 10, 3, 1);
+            cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 6, 3, 1);
             cluster.startUp();
             cluster.shutDown();
             // host ids in LocalCluster will be assigned async. So when a local host is recovered, it may be assigned

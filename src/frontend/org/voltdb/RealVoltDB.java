@@ -1080,7 +1080,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     fromCommandLine, fromPropertyFile.asMap(), fromDeploymentFile);
 
             clusterSettings.store();
-            m_clusterSettings.set(clusterSettings, 1);
+            int clusterSettingVersion = 1;
+            m_clusterSettings.set(clusterSettings, clusterSettingVersion++);
 
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
@@ -1256,12 +1257,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
 
                 // persist the merged settings
-                Collections.sort(partitions);
-                m_config.m_recoveredPartitions = partitions.stream().map( n -> n.toString()).collect(Collectors.joining( "," ));
+                m_config.m_recoveredPartitions = Joiner.on(",").join(partitions);
                 clusterSettings = ClusterSettings.create(
                         m_config.asClusterSettingsMap(), fromPropertyFile.asMap(), fromDeploymentFile);
                 clusterSettings.store();
-                m_clusterSettings.set(clusterSettings, 2);
+                m_clusterSettings.set(clusterSettings, clusterSettingVersion++);
                 hostLog.info("Partitions on this host:" +  m_config.m_recoveredPartitions);
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
