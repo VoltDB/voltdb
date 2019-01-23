@@ -1837,8 +1837,9 @@ public class DDLCompiler {
             // Warn and convert AssumeUnique -> Unique index only on
             // non-auto-generated index (i.e. from "CREATE ASSUMEUNIQUE INDEX ..." statement rather than "CREATE TABLE(...)" statement),
             // because "PARTITION TABLE ..." statement cannot be specified together with "CREATE TABLE" statement!
-            final String warn = String.format("On replicated table %s, ASSUMEUNIQUE index %s is converted to UNIQUE index.",
-                    table.getTypeName(), index.getTypeName());
+            final String warn = String.format(
+                    "Converting ASSUMEUNIQUE index %s to UNIQUE because table %s is a replicated table.",
+                    index.getTypeName(), table.getTypeName());
             compiler.addWarn(warn);
             System.err.println(warn);
             assumeUnique = false;
