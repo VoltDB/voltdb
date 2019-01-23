@@ -49,7 +49,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.MispartitionedException;
@@ -1479,7 +1478,7 @@ public class ProcedureRunner {
             }
             // two fragments
             else {
-                int outputDepId = m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                int outputDepId = m_txnState.getNextDependencyId();
                 m_depsForLocalTask[index] = outputDepId;
                 // Add local and distributed fragments.
                 if (stmt.inCatalog) {
