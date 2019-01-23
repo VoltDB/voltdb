@@ -95,18 +95,19 @@ public class ExportBenchmark {
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
-    // Server-side stats
+
+    // Server-side stats - Note: access synchronized on serverStats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, partCount;
 
     class StatClass {
-        public Integer m_partition;
-        public Long m_transactions;
-        public Long m_startTime;
-        public Long m_endTime;
+        public int m_partition;
+        public long m_transactions;
+        public long m_startTime;
+        public long m_endTime;
 
-        StatClass (Integer partition, Long transactions, Long startTime, Long endTime) {
+        StatClass (int partition, long transactions, long startTime, long endTime) {
             m_partition = partition;
             m_transactions = transactions;
             m_startTime = startTime;
@@ -149,6 +150,9 @@ public class ExportBenchmark {
         @Option(desc = "How many tuples to push includes priming count.")
         int count = 0; // 10000000+40000
 
+        @Option(desc="How many tuples to insert for each procedure call (default = 1)")
+        int multiply = 1;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -158,6 +162,7 @@ public class ExportBenchmark {
             if (!target.equals("socket") && !target.equals("kafka") && !target.equals("measuring")) {
                 exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"measuring\"");
             }
+            if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
             if (target.equals("measuring")) {
                count = 10000000+40000;
                System.out.println("Using count mode with count: " + count);
@@ -360,7 +365,7 @@ public class ExportBenchmark {
                             new NullCallback(),
                             "InsertExport",
                             rowId.getAndIncrement(),
-                            0);
+                            config.multiply);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -393,7 +398,7 @@ public class ExportBenchmark {
                         new ExportCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
-                        0);
+                        config.multiply);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
@@ -411,21 +416,20 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
-        System.out.println("Failed to insert " + failedInserts.get() + " objects");
-
-        testFinished.set(true);
-        if (config.target.equals("socket")) {
-            statsSocketSelector.wakeup();
-        }
+        System.out.println("Benchmark complete: " + successfulInserts.get() + " successful procedure calls");
+        System.out.println("Failed " + failedInserts.get() + " procedure calls");
+        // Use this to correlate the total rows exported
+        System.out.println("Total inserts: (" + totalInserts + " * " + config.multiply + ") = "
+                + (totalInserts * config.multiply));
     }
 
     /**
      * Listens on a UDP socket for incoming statistics packets, until the
      * test is finished.
      */
-    private void listenForStats() {
+    private void listenForStats(CountDownLatch latch) {
 
+        latch.countDown();
         while (true) {
             // Wait for an event...
             try {
@@ -487,10 +491,10 @@ public class ExportBenchmark {
             return;
         }
 
-        final Integer partitionId;
-        final Long transactions;
-        final Long startTime;
-        final Long endTime;
+        int  partitionId;
+        long transactions;
+        long startTime;
+        long endTime;
         try {
             partitionId = new Integer(json.getInt("partitionId"));
             transactions = new Long(json.getLong("transactions"));
@@ -500,17 +504,23 @@ public class ExportBenchmark {
             System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
             return;
         }
+        // Round up elapsed time to 1 ms to avoid invalid data when startTime == endTime
+        if (startTime > 0 && endTime == startTime) {
+            endTime += 1;
+        }
         // This should always be true
         if (transactions > 0 && startTime > 0 && endTime > startTime) {
-            serverStats.add(new StatClass(partitionId, transactions, startTime, endTime));
-            if (startTime < serverStartTS || serverStartTS == 0) {
-                serverStartTS = startTime;
-            }
-            if (endTime > serverEndTS) {
-                serverEndTS = endTime;
-            }
-            if (partitionId > partCount) {
-                partCount = partitionId;
+            synchronized(serverStats) {
+                serverStats.add(new StatClass(partitionId, transactions, startTime, endTime));
+                if (startTime < serverStartTS || serverStartTS == 0) {
+                    serverStartTS = startTime;
+                }
+                if (endTime > serverEndTS) {
+                    serverEndTS = endTime;
+                }
+                if (partitionId > partCount) {
+                    partCount = partitionId;
+                }
             }
         }
         // If the else is called it means we received invalid data from the export client
@@ -555,6 +565,9 @@ public class ExportBenchmark {
      * @throws NoConnectionsException
      */
     private void runTest() throws InterruptedException {
+
+        boolean isSocketTest = config.target.equals("socket");
+
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -579,6 +592,23 @@ public class ExportBenchmark {
             benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
         }
 
+        // On a socket test, listen for stats until the exports are drained
+        // don't do this for Kafka -- nothing to listen to
+        Thread statsListener = null;
+        if (isSocketTest) {
+            final CountDownLatch listenerRunning = new CountDownLatch(1);
+            statsListener = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    System.out.println("Running statsListener ...");
+                    setupSocketListener();
+                    listenForStats(listenerRunning);
+                }
+            });
+            statsListener.start();
+            listenerRunning.await();
+        }
+
         // Do the inserts in a separate thread
         Thread writes = new Thread(new Runnable() {
             @Override
@@ -587,14 +617,7 @@ public class ExportBenchmark {
             }
         });
         writes.start();
-
-        // Listen for stats until we stop
         Thread.sleep(config.warmup * 1000);
-        // don't do this for Kafka -- nothing to listen to
-        if (config.target.equals("socket")) {
-            setupSocketListener();
-            listenForStats();
-        }
 
         writes.join();
         periodicStatsTimer.cancel();
@@ -617,6 +640,14 @@ public class ExportBenchmark {
         }
 
         System.out.println("Finished benchmark");
+
+        // On a socket test, stop the stats listener
+        testFinished.set(true);
+        if (isSocketTest) {
+            statsSocketSelector.wakeup();
+            statsListener.join();
+            System.out.println("Finished statsListener ...");
+        }
 
         // Print results & close
         printResults(benchmarkEndTS-benchmarkWarmupEndTS);
@@ -650,53 +681,6 @@ public class ExportBenchmark {
                 stats.kPercentileLatencyAsDouble(0.99999));
     }
 
-    public synchronized Double calcRatio(StatClass index, StatClass indexPrime) {
-        Double ratio = new Double(0);
-        // Check for overlap format:
-        //      |-----index window-----|
-        //   |-----indexPrime window-----|
-        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
-            ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        //        |-indexPrime window-|
-        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
-            ratio = new Double(1);
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        //            |--indexPrime window--|
-        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
-            ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        // Check for overlap format:
-        //      |-----index window-----|
-        // |--indexPrime window--|
-        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
-            ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-            if (ratio <= 0 || ratio > 1) {
-                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                System.exit(-1);
-            }
-        }
-        return ratio;
-    }
-
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -707,26 +691,25 @@ public class ExportBenchmark {
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
-        ArrayList<StatClass> indexStats = new ArrayList<StatClass>();
-        for (StatClass index : serverStats) {
-            if (index.m_partition.equals(0)) {
-                Double transactions = new Double(index.m_transactions);
-                for (StatClass indexPrime : serverStats) {
-                    // If indexPrime is not partition 0 check for window overlap
-                    if (!indexPrime.m_partition.equals(0)) {
-                        Double ratio = calcRatio(index, indexPrime);
-                        transactions +=  ratio * indexPrime.m_transactions;
-                    }
+        // Calculate "server tps" i.e. export performance: this is only valid for
+        // socket tests as it is based on stats messages received via UDP. It is
+        // also only valid for the first test execution after voltdb startup,
+        // due to the way the timestamps are managed in SocketExporter.
+
+        long serverTxn = 0L;
+        long serverTps = 0L;
+        long elapsedMs = 0L;
+
+        // Note:normally the serverStats should be stopped but synchronizing nonetheless
+        synchronized(serverStats) {
+            elapsedMs = serverEndTS - serverStartTS;
+            if (elapsedMs > 0) {
+                for (StatClass index : serverStats) {
+                    serverTxn += index.m_transactions;
                 }
-                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), index.m_startTime, index.m_endTime));
+                serverTps = serverTxn * 1000 / (serverEndTS - serverStartTS);
             }
         }
-
-        Double tpsSum = new Double(0);
-        for (StatClass index : indexStats) {
-            tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
-        }
-        tpsSum = (tpsSum / indexStats.size());
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -747,8 +730,9 @@ public class ExportBenchmark {
         System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
+        System.out.println(" System Server Statistics (note: only valid on socket tests for first test execution after voltdb startup)");
+        System.out.printf("Exported rows collected:       %,9d \n", serverTxn);
+        System.out.printf("Average throughput:            %,9d txns/sec\n", serverTps);
 
         System.out.println(HORIZONTAL_RULE);
 
@@ -767,8 +751,8 @@ public class ExportBenchmark {
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
-                                    serverEndTS - serverStartTS,
-                                    tpsSum.longValue()));
+                                    elapsedMs,
+                                    serverTps));
                 fw.close();
             }
         } catch (IOException e) {

@@ -94,7 +94,7 @@ function server() {
     cp exportbenchmark-exporter.jar ${VOLTDB_LIB}/extension
 
     # Set up options
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
     [[ -d log && -w log ]] && > log/volt.log
     # run the server
@@ -129,6 +129,26 @@ function run_benchmark() {
     java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function run_benchmark_10x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=30 \
+	--multiply=10 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function run_benchmark_100x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=60 \
+	--multiply=100 \
         --servers=localhost \
         --statsfile=exportbench.csv
 }
