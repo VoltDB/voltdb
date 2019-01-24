@@ -31,15 +31,19 @@ import org.voltcore.utils.CoreUtils;
  */
 public class DumpMessage extends VoltMessage
 {
-    public DumpMessage()
-    {
-        super();
+    private long m_txnId;
+    public DumpMessage(){
+        this(0);
     }
 
+    public DumpMessage(long txnId){
+        super();
+        m_txnId = txnId;
+    }
     @Override
     public int getSerializedSize()
     {
-        int msgsize = super.getSerializedSize();
+        int msgsize = super.getSerializedSize() + 8;
         return msgsize;
     }
 
@@ -47,13 +51,14 @@ public class DumpMessage extends VoltMessage
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.DUMP);
-
+        buf.putLong(m_txnId);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
+        m_txnId = buf.getLong();
     }
 
     @Override
@@ -63,5 +68,9 @@ public class DumpMessage extends VoltMessage
         sb.append("DUMP (FROM ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         return sb.toString();
+    }
+
+    public long getTxnId() {
+        return m_txnId;
     }
 }

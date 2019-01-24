@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "attach",
+            "name": "Attach",
+            "pid": "${command:pickMyProcess}", // use ${command:pickProcess} to pick other users' processes
+            "postRunCommands": [
+                "setting set escape-non-printables false",
+                "pro hand -s false -n false SIGBUS"
+            ]
+        }
+    ]
+}
