@@ -71,9 +71,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
+        Integer newPartitionCount = jsData == null ? null : (Integer) jsData.opt("partitionCount");
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 jsData, context, result, extraSnapshotData, tracker, hashinatorData,
-                timestamp, context.getNumberOfPartitions());
+                timestamp, newPartitionCount);
     }
 
     Callable<Boolean> createSetupInternal(String file_path, String pathType,
@@ -87,7 +88,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
-                                                    int newPartitionCount)
+                                                    Integer newPartitionCountInteger)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
         if (hashinatorData == null) {
@@ -101,6 +102,17 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
         } else {
             tableArray = config.tables;
+        }
+
+        final int newPartitionCount;
+        if (newPartitionCountInteger == null) {
+            newPartitionCount = context.getNumberOfPartitions();
+        } else {
+            newPartitionCount = newPartitionCountInteger.intValue();
+
+            if (newPartitionCount != context.getNumberOfPartitions()) {
+                createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
+            }
         }
 
         m_snapshotRecord =
