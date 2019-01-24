@@ -29,6 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CommandLog;
@@ -115,7 +116,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 "SP", agent, startAction);
         ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()),
                 m_initiatorMailbox);
-        m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
+        m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
+                ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
         ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
     }
@@ -134,7 +136,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
-            m_leaderCache.start(true);
+            // Put child watch on /db/iv2appointees/<partition> node
+            m_leaderCache.startPartitionWatch();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
@@ -247,6 +250,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
+                            "SpInitiator-iv2masters-" + m_partitionId,
                             m_zkMailboxNode);
 
                     if (migratePartitionLeader) {

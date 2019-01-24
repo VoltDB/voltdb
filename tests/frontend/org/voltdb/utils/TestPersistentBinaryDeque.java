@@ -91,7 +91,9 @@ public class TestPersistentBinaryDeque {
     public static TreeSet<String> getSortedDirectoryListing() {
         TreeSet<String> names = new TreeSet<String>();
         for (File f : TEST_DIR.listFiles()) {
-            names.add(f.getName());
+            if (f.length() > 0) {
+                names.add(f.getName());
+            }
         }
         return names;
     }
