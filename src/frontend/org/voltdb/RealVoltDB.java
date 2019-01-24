@@ -1258,7 +1258,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 clusterSettings = ClusterSettings.create(
                         m_config.asClusterSettingsMap(), fromPropertyFile.asMap(), fromDeploymentFile);
                 clusterSettings.store();
-                hostLog.info("Partitions on this host:" +  m_config.m_recoveredPartitions);
+                hostLog.info("Partitions on this host:" + m_config.m_recoveredPartitions);
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
@@ -2180,6 +2180,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             topology = AbstractTopology.getTopology(hostInfos, missingHosts, kfactor,
                     (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()));
+            List<Integer> partitions = Lists.newArrayList(topology.getPartitionIdList(m_messenger.getHostId()));
             String err;
             if ((err = topology.validateLayout()) != null) {
                 hostLog.warn("Unable to find optimal placement layout. " + err);
@@ -2194,6 +2195,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Partition placement has been restored.");
             }
             topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
+
+            // verify the topology built on this host is same as the one from ZK
+            partitions.removeAll(Lists.newArrayList(topology.getPartitionIdList(m_messenger.getHostId())));
+            assert(partitions.isEmpty());
         }
         return topology;
     }
