@@ -17,7 +17,7 @@
 
 package org.voltdb.plannerv2.guards;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.regex.Pattern;
 
