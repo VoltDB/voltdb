@@ -37,19 +37,30 @@ public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     public final Table[] tables;
+    public final Integer partitionCount;
 
     /**
      * @param tables    Tables to snapshot, cannot be null.
      */
     public SnapshotRequestConfig(List<Table> tables)
     {
+        this(tables, null);
+    }
+
+    public SnapshotRequestConfig(List<Table> tables, int partitionCount) {
+        this(tables, Integer.valueOf(partitionCount));
+    }
+
+    private SnapshotRequestConfig(List<Table> tables, Integer partitionCount) {
         Preconditions.checkNotNull(tables);
-        this.tables = tables.toArray(new Table[0]);
+        this.tables = tables.toArray(new Table[tables.size()]);
+        this.partitionCount = partitionCount;
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
     {
         tables = getTablesToInclude(jsData, catalogDatabase);
+        partitionCount = jsData == null ? null : (Integer) jsData.opt("partitionCount");
     }
 
     private static Table[] getTablesToInclude(JSONObject jsData,
@@ -130,6 +141,9 @@ public class SnapshotRequestConfig {
                 stringer.value(table.getTypeName());
             }
             stringer.endArray();
+        }
+        if (partitionCount != null) {
+            stringer.keySymbolValuePair("partitionCount", partitionCount.longValue());
         }
     }
 }

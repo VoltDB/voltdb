@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,7 +52,6 @@ import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.ArrayListMultimap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Multimap;
 
@@ -85,7 +83,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final List<StreamSnapshotRequestConfig.Stream> localStreams =
                 filterRemoteStreams(config.streams, tracker.getSitesForHost(context.getHostId()));
         final Map<Integer, Set<Long>> destsByHostId = collectTargetSitesByHostId(config.streams);
-        final Set<Integer> partitionsToAdd = getPartitionsToAdd(localStreams);
 
         /*
          * The snapshot (if config.shouldTruncate) will only contain existing partitions. Write the new partition count
@@ -104,7 +101,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        final int newPartitionCount = partitionsToAdd.isEmpty() ? context.getNumberOfPartitions() : Collections.max(partitionsToAdd) + 1;
+        Integer newPartitionCount = config.partitionCount;
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
@@ -115,10 +112,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                            hashinatorData,
                                            timestamp,
                                            newPartitionCount);
-        }
-
-        // Create post snapshot update hashinator work
-        if (!partitionsToAdd.isEmpty()) {
+        } else if (newPartitionCount != null) {
+            // Create post snapshot update hashinator work
             createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
@@ -247,7 +242,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,
-                                                             int newPartitionCount)
+                                                             Integer newPartitionCount)
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
@@ -369,21 +364,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             }
         }
-    }
-
-    /**
-     * Look at all streams and consolidate the ranges of all streams.
-     * @return A map of tokens to partition IDs
-     */
-    private static Set<Integer> getPartitionsToAdd(Collection<StreamSnapshotRequestConfig.Stream> streams)
-    {
-        ImmutableSet.Builder<Integer> builder = ImmutableSet.builder();
-        for (StreamSnapshotRequestConfig.Stream stream : streams) {
-            if (stream.newPartition != null) {
-                builder.add(stream.newPartition);
-            }
-        }
-        return builder.build();
     }
 
     /**

@@ -83,6 +83,14 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         this.shouldTruncate = shouldTruncate;
     }
 
+    public StreamSnapshotRequestConfig(List<Table> tables, int newPartitionCount, List<Stream> streams,
+            boolean shouldTruncate) {
+        super(tables, newPartitionCount);
+
+        this.streams = ImmutableList.copyOf(streams);
+        this.shouldTruncate = shouldTruncate;
+    }
+
     public StreamSnapshotRequestConfig(JSONObject jsData,
                                        Database catalogDatabase)
     {

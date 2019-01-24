@@ -41,7 +41,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Maps;
 
 /**
@@ -237,9 +236,7 @@ public abstract class SnapshotWritePlan
     }
 
     protected static void createUpdatePartitionCountTasksForSites(SiteTracker tracker,
-            SystemProcedureExecutionContext context, Integer newPartitionCount) {
-
-        Preconditions.checkNotNull(newPartitionCount);
+            SystemProcedureExecutionContext context, int newPartitionCount) {
         PostSnapshotTask task = new UpdatePartitionCount(newPartitionCount);
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
         assert !localPartitions.isEmpty();
