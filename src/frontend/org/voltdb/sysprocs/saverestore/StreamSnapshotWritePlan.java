@@ -278,7 +278,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
 
             localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
-                                                                    stream.newPartition,
                                                                     stream.lowestSiteSinkHSId));
         }
 
