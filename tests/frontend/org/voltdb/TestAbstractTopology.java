@@ -419,7 +419,7 @@ public class TestAbstractTopology {
 
         // see if partition layout is balanced
         String err;
-        if ((err = topo.validateLayout()) != null) {
+        if ((err = topo.validateLayout(null)) != null) {
             System.out.println(err);
             System.out.println(topo.topologyToJSON());
         }
@@ -472,7 +472,7 @@ public class TestAbstractTopology {
 
         // see if partition layout is balanced
         String err;
-        if ((err = topo.validateLayout()) != null) {
+        if ((err = topo.validateLayout(null)) != null) {
             System.out.println(err);
             System.out.println(topo.topologyToJSON());
         }

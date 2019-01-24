@@ -102,8 +102,8 @@ public class AbstractTopology {
             this.hostIds = ImmutableSortedSet.copyOf(hostIds);
         }
 
-        public void updateHosts(Collection<Integer> hostIds) {
-            hostIds = ImmutableSortedSet.copyOf(hostIds);
+        public void updateHosts(Collection<Integer> theHostIds) {
+            hostIds = ImmutableSortedSet.copyOf(theHostIds);
         }
 
         public ImmutableSortedSet<Integer> getHostIds(){
@@ -214,14 +214,14 @@ public class AbstractTopology {
             return leaders;
         }
 
-        public void updatePartitions(Collection<Partition> partitions) {
-            partitions = ImmutableSortedSet.copyOf(partitions);
+        public void updatePartitions(Collection<Partition> thePartitions) {
+            partitions = ImmutableSortedSet.copyOf(thePartitions);
         }
 
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
-            return String.format("Host %d sph:%d ha:%s (Partitions %s)",
+            return String.format("Host %d, ha:%s (Partitions %s)",
                     id, haGroup, String.join(",", partitionIdStrings));
         }
 
@@ -1104,30 +1104,31 @@ public class AbstractTopology {
 
     // exchange partitions between two hosts
     private static void exhangePartitionPlacement(Host restoredHost, Host matchedHost) {
-        List<Partition> restoredPartitionsOnHost = Lists.newArrayList();
-        for (Partition p: restoredHost.partitions) {
-            List<Integer> hostIds = new ArrayList<>(p.hostIds);
-            if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
-                hostIds.remove(Integer.valueOf(restoredHost.id));
-                hostIds.add(matchedHost.id);
-            }
-            p.leaderHostId = (p.leaderHostId == restoredHost.id) ? matchedHost.id : p.leaderHostId;
-            p.updateHosts(hostIds);
-            restoredPartitionsOnHost.add(p);
-        }
-        List<Partition> macthedPartitionsOnHost = Lists.newArrayList();
-        for (Partition p: matchedHost.partitions) {
-            List<Integer> hostIds = new ArrayList<>(p.hostIds);
-            if (hostIds.contains(matchedHost.id) && !hostIds.contains(restoredHost.id)) {
-                hostIds.remove(Integer.valueOf(matchedHost.id));
-                hostIds.add(restoredHost.id);
-            }
-            p.leaderHostId = (p.leaderHostId == matchedHost.id) ? restoredHost.id : p.leaderHostId;
-            p.updateHosts(hostIds);
-            macthedPartitionsOnHost.add(p);
-        }
+        List<Partition> restoredPartitionsOnHost = Lists.newArrayList(restoredHost.partitions);
+        List<Partition> macthedPartitionsOnHost = Lists.newArrayList(matchedHost.partitions);
         restoredHost.updatePartitions(macthedPartitionsOnHost);
         matchedHost.updatePartitions(restoredPartitionsOnHost);
+        Set<Partition> combinedPartitions = Sets.newHashSet(restoredPartitionsOnHost);
+        combinedPartitions.addAll(macthedPartitionsOnHost);
+        for (Partition p : combinedPartitions) {
+            List<Integer> hostIds = new ArrayList<>(p.hostIds);
+
+            // have both or none, no swap
+            if ((hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)) ||
+                    (!hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id))) {
+                continue;
+            }
+            if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
+              hostIds.remove(Integer.valueOf(restoredHost.id));
+              hostIds.add(matchedHost.id);
+              p.leaderHostId = (p.leaderHostId == restoredHost.id) ? matchedHost.id : p.leaderHostId;
+            } else if (!hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)){
+                hostIds.remove(Integer.valueOf(matchedHost.id));
+                hostIds.add(restoredHost.id);
+                p.leaderHostId = (p.leaderHostId == matchedHost.id) ? restoredHost.id : p.leaderHostId;
+            }
+            p.updateHosts(hostIds);
+        }
     }
 
     /////////////////////////////////////
@@ -1352,10 +1353,26 @@ public class AbstractTopology {
      *
      * @return null if the topology is balanced, otherwise return the error message
      */
-    public String validateLayout() {
+    public String validateLayout(Set<Integer> liveHosts) {
         if (m_unbalancedPartitionCount > 0) {
             return String.format("%d out of %d partitions are unbalanced across placement groups.",
                     m_unbalancedPartitionCount, partitionsById.size());
+        }
+
+        if (liveHosts == null) {
+            return null;
+        }
+
+        // verify the partition leaders on live hosts
+        for (Host host : hostsById.values()) {
+            if (liveHosts.contains(Integer.valueOf(host.id))) {
+                for (Partition p : host.partitions) {
+                    if (!liveHosts.contains(Integer.valueOf(p.leaderHostId))) {
+                        return String.format("The leader host %d of partition %d is not on live host.",
+                                p.leaderHostId, p.id);
+                    }
+                }
+            }
         }
         return null;
     }

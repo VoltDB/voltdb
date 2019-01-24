@@ -2182,7 +2182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()));
             List<Integer> partitions = Lists.newArrayList(topology.getPartitionIdList(m_messenger.getHostId()));
             String err;
-            if ((err = topology.validateLayout()) != null) {
+            if ((err = topology.validateLayout(m_messenger.getLiveHostIds())) != null) {
                 hostLog.warn("Unable to find optimal placement layout. " + err);
                 hostLog.warn("When using placement groups, follow two rules to get better cluster availability:\n" +
                              "   1. Each placement group must have the same number of nodes, and\n" +
