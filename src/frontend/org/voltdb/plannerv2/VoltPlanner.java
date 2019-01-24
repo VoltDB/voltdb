@@ -277,7 +277,8 @@ public class VoltPlanner implements Planner {
     }
 
     @Override public RelNode convert(SqlNode sql) throws RelConversionException {
-        return rel(sql).rel;
+        // we want to add an additional {@link LogicalProject} if the root node is not {@link LogicalProject}
+        return rel(sql).project();
     }
 
     @Override public RelDataTypeFactory getTypeFactory() {
