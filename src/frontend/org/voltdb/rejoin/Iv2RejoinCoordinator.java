@@ -151,7 +151,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests, Long lowestSiteSinkHSId)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, lowestSiteSinkHSId);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, lowestSiteSinkHSId);
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
         return SnapshotUtil.makeSnapshotRequest(config);
