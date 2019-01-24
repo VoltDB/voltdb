@@ -1224,7 +1224,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Wait until all the nodes have built a mesh.
      */
     public Map<Integer, HostInfo> waitForGroupJoin(int expectedHosts) {
-        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
+        Map<Integer, HostInfo> hostInfos = Maps.newTreeMap();
 
         try {
             while (true) {
