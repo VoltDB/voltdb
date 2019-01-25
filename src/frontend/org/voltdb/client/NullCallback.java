@@ -24,13 +24,7 @@ package org.voltdb.client;
 public final class NullCallback implements ProcedureCallback {
 
     @Override
-<<<<<<< HEAD:src/frontend/org/voltdb/client/NullCallback.java
     public void clientCallback(ClientResponse clientResponse) {
-=======
-    protected final boolean doCheck(String sql) {
-        return sql.toUpperCase().startsWith("SELECT");
-    }
->>>>>>> clean up:src/frontend/org/voltdb/newplanner/guards/AcceptAllSelect.java
 
     }
 
