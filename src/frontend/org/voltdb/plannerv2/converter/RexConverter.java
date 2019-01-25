@@ -320,7 +320,7 @@ public class RexConverter {
                     }
                     break;
                 case OTHER_FUNCTION:
-                    ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName(), aeOperands, null);
+                    ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName().toLowerCase(), aeOperands, null);
                     TypeConverter.setType(ae, call.getType());
                     break;
                 default:

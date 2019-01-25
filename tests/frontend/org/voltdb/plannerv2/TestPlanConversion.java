@@ -213,7 +213,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testBinaryIntExpr() {
         String sql = "select 5 + i from R1";
         Map<String, String> ignores = new HashMap<>();
-        // different column name of expression
+        // different column name for expression
         ignores.put("EXPR$0", "C1");
         // No default NUMERIC type widening
         ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
@@ -221,4 +221,202 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         comparePlans(sql, ignores);
     }
 
+    public void testConstIntExpr() {
+        String sql = "select 5 from R1";
+        Map<String, String> ignores = new HashMap<>();
+        // different column name for constant
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConstRealExpr() {
+        String sql = "select 5.1 from R1";
+        Map<String, String> ignores = new HashMap<>();
+        // different column name for const
+        ignores.put("EXPR$0", "C1");
+        // "5.1" is NUMERIC in Calcite but float in Volt
+        ignores.put("\"TYPE\":30,\"VALUE_TYPE\":22,\"ISNULL\":false,\"VALUE\":\"5.1\"",
+                "\"TYPE\":30,\"VALUE_TYPE\":8,\"ISNULL\":false,\"VALUE\":5.1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConstStringExpr() {
+        String sql = "select 'FOO' from R1";
+        Map<String, String> ignores = new HashMap<>();
+        // different column name for const
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConcatConstStringExpr() {
+        String sql = "select '55' || '22' from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // HSQL concatenates the strings while parsing
+        String calciteExpr = "\"TYPE\":100,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ARGS\":[{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"55\"},{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"22\"}],\"NAME\":\"concat\",\"FUNCTION_ID\":124";
+        String voltDBExpr = "\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"5522\"";
+        ignores.put(calciteExpr, voltDBExpr);
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConcatStringExpr() {
+        String sql = "select v || '22' from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    // Arithmetic Expressions
+    public void testPlusExpr() {
+        String sql = "select i + si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testMinusExpr() {
+        String sql = "select i - si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":2,\"VALUE_TYPE\":5", "\"TYPE\":2,\"VALUE_TYPE\":6");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testMultExpr() {
+        String sql = "select i * si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":3,\"VALUE_TYPE\":5", "\"TYPE\":3,\"VALUE_TYPE\":6");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testDivExpr() {
+        String sql = "select i / si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // No default NUMERIC type widening
+        ignores.put("\"TYPE\":4,\"VALUE_TYPE\":5", "\"TYPE\":4,\"VALUE_TYPE\":6");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testDatetimeExpr() {
+        String sql = "select ts from RTYPES";
+        comparePlans(sql);
+    }
+
+    public void testDatetimeConstExpr() {
+        String sql = "select TIMESTAMP '1969-07-20 20:17:40' from RTYPES";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+
+    public void testDatetimeConstMinusExpr() {
+        String sql = "select TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY from RTYPES";
+        // HSQL directly evaluates TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        String calciteExpr = "\"TYPE\":100,\"VALUE_TYPE\":11,\"ARGS\":[{\"TYPE\":1,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":100,\"VALUE_TYPE\":6,\"ARGS\":[{\"TYPE\":30,\"VALUE_TYPE\":11,\"ISNULL\":false,\"VALUE\":-14182940000000}],\"NAME\":\"since_epoch\",\"FUNCTION_ID\":20008,\"IMPLIED_ARGUMENT\":\"MICROSECOND\"},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":6,\"ISNULL\":false,\"VALUE\":86400000000}}],\"NAME\":\"to_timestamp\",\"FUNCTION_ID\":20012,\"IMPLIED_ARGUMENT\":\"MICROSECOND\"";
+        String voltExpr = "\"TYPE\":30,\"VALUE_TYPE\":11,\"ISNULL\":false,\"VALUE\":-14096540000000";
+        ignores.put(calciteExpr, voltExpr);
+        comparePlans(sql, ignores);
+    }
+
+    public void testConjunctionAndExpr() {
+        String sql = "select 1 from RTYPES where i = 1 and vc = 'foo'";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConjunctionOrExpr() {
+        String sql = "select 1 from RTYPES where i = 1 or i = 4";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testCompareInExpr1() {
+        String sql = "select 1 from RTYPES where i IN (1, ?, 3)";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+        // but in the RexConverter, we convert the =1 or =? or =3 to in(1, ? ,3) (when there are
+        // more than two conjunct ORs).
+        comparePlans(sql, ignores);
+    }
+
+    public void testCompareInExpr2() {
+        String sql = "select 1 from RTYPES where i IN (?)"; // Calcite Regular EQUAL
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // TODO: volt use the in operator but calcite will convert it to equal operator
+//        comparePlans(sql, ignores);
+    }
+
+    public void testCompareInExpr3() {
+        String sql = "select 1 from RTYPES where i IN ?"; // Calcite Regular EQUAL
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // TODO: ENG-15280: IN ? is not support by the calcite parser
+//        comparePlans(sql, ignores);
+    }
+
+    public void testCompareInExpr4() {
+        String sql = "select 1 from RTYPES where i IN (1, 2)"; // Calcite Regular OR
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+//        comparePlans(sql, ignores);
+    }
+
+    public void testCompareLikeExpr1() {
+        String sql = "select 1 from RTYPES where vc LIKE 'ab%c'";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // TODO: HSQL transfroms the LIKE 'ab%c' expression into
+        // (((VC LIKE 'ab%c') AND (VC >= 'ab')) AND (VC <= 'ab'))
+        // I think it is redundant
+//        comparePlans(sql, ignores);
+    }
+
+    public void testCompareLikeExprWithParam() {
+        String sql = "select 1 from RTYPES where vc LIKE ?";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testAbsExpr() {
+        String sql = "select abs(i) from RTYPES";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // TODO: need a RESULT_TYPE_PARAM_IDX for the result of the function call
+//        comparePlans(sql, ignores);
+    }
+
+    // TODO: tests on Aggr
+    // TODO: tests on Join
 }
