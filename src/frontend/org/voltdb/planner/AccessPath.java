@@ -27,17 +27,16 @@ import org.voltdb.types.SortDirectionType;
 
 /**
  * We may may have several ways to access data in tables.  We
- * may use a simple table scan or an index scan.  Index scans may
- * have sort orders.  There are also other data we may want to
- * attach to a particular plan.  This is a convenient place to
- * organize everything associated with accessing tables or indexes.
+ * may use a simple table scan or an index scan.
+ * Index scans may have sort orders.
+ * There are also other data we may want to attach to a particular plan.
+ *
+ * This is a convenient place to organize everything associated with accessing tables or indexes.
+ * (TODO: not really; needs better controlled way to access/udpate).
  */
 public class AccessPath {
     Index index = null;
     IndexUseType use = IndexUseType.COVERING_UNIQUE_EQUALITY;
-    boolean nestLoopIndexJoin = false;
-    boolean requiresSendReceive = false;
-    boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
     // The initial expression is needed to adjust (forward) the start of the reverse
@@ -57,10 +56,10 @@ public class AccessPath {
     // then no window function uses the index, but
     // the window function ordering is compatible with the statement
     // level ordering, and the statement level order does not need
-    // an order by node.  If it is set to SubPlanAssembler.NO_INDEX_USE,
+    // an order by node.  If it is set to WindowFunctionScoreboard.NO_INDEX_USE,
     // then nothing uses the index.
     //
-    int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
+    int m_windowFunctionUsesIndex = WindowFunctionScoreboard.NO_INDEX_USE;
     //
     // This is true iff there is a window function which
     // uses an index for order, but the statement level
@@ -79,48 +78,48 @@ public class AccessPath {
 
     @Override
     public String toString() {
-        String retval = "";
-
-        retval += "INDEX: " + ((index == null) ? "NULL" : (index.getParent().getTypeName() + "." + index.getTypeName())) + "\n";
-        retval += "USE:   " + use.toString() + "\n";
-        retval += "FOR:   " + indexPurposeString() + "\n";
-        retval += "TYPE:  " + lookupType.toString() + "\n";
-        retval += "DIR:   " + sortDirection.toString() + "\n";
-        retval += "ITER?: " + String.valueOf(keyIterate) + "\n";
-        retval += "NLIJ?: " + String.valueOf(nestLoopIndexJoin) + "\n";
-
-        retval += "IDX EXPRS:\n";
+        final StringBuilder retval = new StringBuilder()
+                .append("INDEX: ")
+                .append((index == null) ? "NULL" : (index.getParent().getTypeName() + "." + index.getTypeName()))
+                .append("\n")
+                .append("USE:   ").append(use.toString()).append("\n")
+                .append("FOR:   ").append(indexPurposeString()).append("\n")
+                .append("TYPE:  ").append(lookupType.toString()).append("\n")
+                .append("DIR:   ").append(sortDirection.toString()).append("\n")
+                .append("ITER?: ").append(false).append("\n")
+                .append("NLIJ?: ").append(false).append("\n")
+                .append("IDX EXPRS:\n");
         int i = 0;
         for (AbstractExpression expr : indexExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+            retval.append("\t(").append(i++).append(") ").append(expr.toString()).append("\n");
 
-        retval += "END EXPRS:\n";
+        retval.append("END EXPRS:\n");
         i = 0;
         for (AbstractExpression expr : endExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+            retval.append("\t(").append(i++).append(") ").append(expr.toString()).append("\n");
 
-        retval += "OTHER EXPRS:\n";
+        retval.append("OTHER EXPRS:\n");
         i = 0;
         for (AbstractExpression expr : otherExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+            retval.append("\t(").append(i++).append(") ").append(expr.toString()).append("\n");
 
-        retval += "JOIN EXPRS:\n";
+        retval.append("JOIN EXPRS:\n");
         i = 0;
         for (AbstractExpression expr : joinExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+            retval.append("\t(").append(i++).append(") ").append(expr.toString()).append("\n");
 
-        retval += "ELIMINATED POST FILTER EXPRS:\n";
+        retval.append("ELIMINATED POST FILTER EXPRS:\n");
         i = 0;
         for (AbstractExpression expr : eliminatedPostExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-
-        return retval;
+            retval.append("\t(").append(i++).append(") ").append(expr.toString()).append("\n");
+        return retval.toString();
     }
+
     private String indexPurposeString() {
         switch (m_windowFunctionUsesIndex) {
-        case SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX:
+        case WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX:
             return "Statement Level Order By";
-        case SubPlanAssembler.NO_INDEX_USE:
+        case WindowFunctionScoreboard.NO_INDEX_USE:
             return "No Indexing Used";
         default:
             if (0 <= m_windowFunctionUsesIndex) {
@@ -133,4 +132,9 @@ public class AccessPath {
         assert(false);
         return "";
     }
+
+    public SortDirectionType getSortDirection() {
+        return sortDirection;
+    }
 }
+

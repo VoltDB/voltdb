@@ -21,8 +21,8 @@ import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
-import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
  * Extend this class to create a decorator for a {@link SqlBatch}.
@@ -47,7 +47,7 @@ public abstract class AbstractSqlBatchDecorator extends SqlBatch {
     }
 
     @Override public CompletableFuture<ClientResponse> execute()
-            throws AdHocPlanningException, PlannerFallbackException {
+            throws PlanningErrorException, PlannerFallbackException {
         return m_batchToDecorate.execute();
     }
 

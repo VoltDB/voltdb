@@ -29,9 +29,9 @@ import java.util.TreeMap;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class encapsulates the representation and common operations for
