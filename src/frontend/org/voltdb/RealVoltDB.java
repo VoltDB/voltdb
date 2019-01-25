@@ -34,7 +34,6 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -1431,23 +1430,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // DR overflow directory
             if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
-                try {
-                    Class<?> ndrgwClass = null;
-                    ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, boolean.class, boolean.class, boolean.class, int.class, int.class);
-                    m_producerDRGateway =
-                            (ProducerDRGateway) ndrgwConstructor.newInstance(
-                                    new VoltFile(VoltDB.instance().getDROverflowPath()),
-                                    new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    willDoActualRecover(),
-                                    m_config.m_startAction.doesRejoin(),
-                                    m_config.m_startAction == StartAction.JOIN,
-                                    m_replicationActive.get(),
-                                    m_configuredNumberOfPartitions,
-                                    (m_catalogContext.getClusterSettings().hostcount()-m_config.m_missingHostCount));
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
-                }
+                m_producerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.DRProducer", "DR Producer",
+                        ProClass.HANDLER_CRASH,
+                        new VoltFile(VoltDB.instance().getDROverflowPath()),
+                        new VoltFile(VoltDB.instance().getSnapshotPath()), willDoActualRecover(),
+                        m_config.m_startAction.doesRejoin(), m_config.m_startAction == StartAction.JOIN,
+                        m_replicationActive.get(), m_configuredNumberOfPartitions,
+                        (m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount));
             }
             else {
                 // set up empty stats for the DR Producer
@@ -4654,28 +4643,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRPublicInterfaceAndPortFromMetadata(m_localMetadata);
-            try {
-                Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
-                Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
-                        ClientInterface.class,
-                        Cartographer.class,
-                        HostMessenger.class,
-                        byte.class,
-                        byte.class,
-                        String.class,
-                        int.class);
-                m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
-                        m_clientInterface,
-                        m_cartographer,
-                        m_messenger,
-                        drConsumerClusterId,
-                        (byte) m_catalogContext.cluster.getPreferredsource(),
-                        drIfAndPort.getFirst(),
-                        drIfAndPort.getSecond());
-                m_globalServiceElector.registerService(m_consumerDRGateway);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
-            }
+            m_consumerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.ConsumerDRGatewayImpl", "DR Consumer",
+                    ProClass.HANDLER_CRASH,
+                    m_clientInterface, m_cartographer, m_messenger, drConsumerClusterId,
+                    (byte) m_catalogContext.cluster.getPreferredsource(), drIfAndPort.getFirst(),
+                    drIfAndPort.getSecond());
+            m_globalServiceElector.registerService(m_consumerDRGateway);
             return true;
         }
         return false;
