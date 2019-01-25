@@ -25,6 +25,8 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.util.UnmodifiableArrayList;
+import org.apache.commons.lang3.StringUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.plannerv2.guards.AcceptAllSelect;
@@ -52,6 +54,7 @@ public class SqlBatchImpl extends SqlBatch {
     private final UnmodifiableArrayList<Object> m_userParams;
     private final Boolean m_isDDLBatch;
     private final Context m_context;
+    VoltLogger log = new VoltLogger("Calcite");
 
     static final String ADHOC_ERROR_RESPONSE =
             "The @AdHoc stored procedure when called with more than one parameter "
@@ -104,12 +107,22 @@ public class SqlBatchImpl extends SqlBatch {
         ImmutableList.Builder<SqlTask> taskBuilder = new ImmutableList.Builder<>();
         // Are all the queries in this input batch DDL? (null means not determined yet)
         Boolean isDDLBatch = null;
+        int lineNo = 0;
         // Iterate over the SQL string list and build SqlTasks out of the SQL strings.
         for (final String sql : sqlList) {
-            if (! CALCITE_CHECKS.check(sql)) {
-                // The query cannot pass the compatibility check, throw a fall-back exception
-                // so that VoltDB will use the legacy parser and planner.
-                throw new PlannerFallbackException();
+            try {
+                if (! CALCITE_CHECKS.check(sql)) {
+                    // The query cannot pass the compatibility check, throw a fall-back exception
+                    // so that VoltDB will use the legacy parser and planner.
+                    throw new PlannerFallbackException();
+                }
+            } catch (SqlParseException e) {
+                final String errMsg = "Error: invalid SQL statement in line: " + (lineNo + e.getPos().getLineNum()) + ", column: " + e.getPos().getColumnNum() + ". " +
+                                      "Expecting one of: " + e.getExpectedTokenNames();
+                log.debug(errMsg);
+                throw new PlannerFallbackException(errMsg);
+                // TODO throw a parse exception instead of fallback exception to reflect error position
+                // TODO respond error message back to sqlcmd
             }
             SqlTask sqlTask = SqlTask.from(sql);
             if (isDDLBatch == null) {
@@ -119,6 +132,7 @@ public class SqlBatchImpl extends SqlBatch {
                 throw new UnsupportedOperationException("Mixing DDL with DML/DQL queries is unsupported.");
             }
             taskBuilder.add(sqlTask);
+            lineNo += StringUtils.countMatches(sql, "\n") + 1;
         }
         m_tasks = taskBuilder.build();
         if (userParams != null) {
