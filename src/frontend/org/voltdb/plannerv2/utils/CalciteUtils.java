@@ -23,7 +23,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 
 /**
  * Utilities that serve the package only.

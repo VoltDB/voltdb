@@ -37,6 +37,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;

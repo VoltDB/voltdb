@@ -37,7 +37,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
 

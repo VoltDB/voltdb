@@ -19,7 +19,7 @@ package org.voltdb.plannerv2.guards;
 
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.VoltFastSqlParser;
 
 /**
