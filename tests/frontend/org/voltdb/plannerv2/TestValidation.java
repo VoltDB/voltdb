@@ -114,6 +114,10 @@ public class TestValidation extends Plannerv2TestCase {
         m_tester.sql("select i from R1 where i != 3").test();
     }
 
+    public void testNull() {
+        m_tester.sql("select abs(null) from R1").test();
+    }
+
     public void testFullJoinWithoutColumnScope() {
         // TODO: fix this
 //        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").test();
