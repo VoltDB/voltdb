@@ -1444,11 +1444,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         synchronized(threadDumpLock) {
             if (message.getTxnId() > txnIdForSiteThreadDump) {
                 txnIdForSiteThreadDump = message.getTxnId();
-                builder.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
-                builder.append(generateSiteThreadDump());
-                builder.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
+            } else {
+                hostLog.warn(builder.toString());
+                return;
             }
         }
+        builder.append("\nSITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()) +"\n");
+        builder.append(generateSiteThreadDump());
+        builder.append("\nEND OF SITE THREAD DUMP FROM TXNID:" + TxnEgo.txnIdToString(message.getTxnId()));
         hostLog.warn(builder.toString());
     }
 
