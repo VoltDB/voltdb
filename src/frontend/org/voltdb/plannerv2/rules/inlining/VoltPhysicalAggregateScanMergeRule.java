@@ -23,6 +23,11 @@ import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltPhysicalAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
 
+/**
+ * The rule that Merges/inline Aggregate into a Scan.
+ *
+ * @author mikealexeev
+ */
 public class VoltPhysicalAggregateScanMergeRule extends RelOptRule {
 
     public static final VoltPhysicalAggregateScanMergeRule INSTANCE = new VoltPhysicalAggregateScanMergeRule();
@@ -40,5 +45,4 @@ public class VoltPhysicalAggregateScanMergeRule extends RelOptRule {
         RelNode newScan = scan.copyWithAggregate(scan.getTraitSet(), aggregate);
         call.transformTo(newScan);
     }
-
 }

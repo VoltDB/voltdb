@@ -29,6 +29,8 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 /**
  * This simply merges/inlines Calc's condition into an Aggregate node.
  * In the VoltDB land this condition represents aggregate's HAVING clause
+ *
+ * @author mikealexeev
  */
 public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
 
@@ -82,5 +84,4 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
 
         call.transformTo(newCalc);
     }
-
 }

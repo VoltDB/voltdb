@@ -220,7 +220,6 @@ public class PlannerTool {
         // Convert SqlNode to RelNode.
         RelNode rel = planner.convert(validatedNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
-        System.out.println(RelOptUtil.toString(rel));
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
@@ -236,8 +235,6 @@ public class PlannerTool {
         RelNode transformed = planner.transform(
                 Phase.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
-
-        System.out.println(RelOptUtil.toString(transformed));
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
 
@@ -267,13 +264,9 @@ public class PlannerTool {
         transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),
                 requiredPhysicalOutputTraits, transformed);
 
-        System.out.println(RelOptUtil.toString(transformed));
-
         // apply inlining rules.
         transformed = VoltPlanner.transformHep(Phase.INLINE,
                 HepMatchOrder.ARBITRARY, transformed, true);
-
-        System.out.println(RelOptUtil.toString(transformed));
 
         // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);

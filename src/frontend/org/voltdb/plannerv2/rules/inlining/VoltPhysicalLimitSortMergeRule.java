@@ -25,6 +25,11 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 
+/**
+ * The rule that Transform  VoltDBPLimit / VoltDBPSort to VoltDBPSort with Limit.
+ *
+ * @author mikealexeev
+ */
 public class VoltPhysicalLimitSortMergeRule extends RelOptRule {
 
     public static final VoltPhysicalLimitSortMergeRule INSTANCE_1 =
@@ -71,5 +76,4 @@ public class VoltPhysicalLimitSortMergeRule extends RelOptRule {
 
         call.transformTo(newRel);
     }
-
 }

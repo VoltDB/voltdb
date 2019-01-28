@@ -420,13 +420,4 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     // TODO: tests on index table scan
     // TODO: tests on Aggr
     // TODO: tests on Join
-
-
-    public void testReplicatedJoin() throws Exception {
-        String sql;
-        sql = "select R2.si, R1.i from R1 inner join " +
-                "R2  on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i";
-
-        comparePlans(sql);
-    }
 }

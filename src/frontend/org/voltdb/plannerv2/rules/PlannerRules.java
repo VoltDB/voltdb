@@ -170,10 +170,8 @@ public class PlannerRules {
             VoltPhysicalCalcScanMergeRule.INSTANCE,
             VoltPhysicalLimitSerialAggregateMergeRule.INSTANCE,
             VoltPhysicalLimitSortMergeRule.INSTANCE_1,
-            VoltPhysicalLimitSortMergeRule.INSTANCE_2,
             VoltPhysicalAggregateScanMergeRule.INSTANCE,
-            VoltPhysicalLimitScanMergeRule.INSTANCE_1,
-            VoltPhysicalLimitScanMergeRule.INSTANCE_2
+            VoltPhysicalLimitScanMergeRule.INSTANCE_1
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(

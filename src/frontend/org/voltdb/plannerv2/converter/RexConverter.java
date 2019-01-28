@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.converter;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -139,7 +140,7 @@ public class RexConverter {
                 value = literal.getValue().toString();
             }
 
-            assert value != null;
+            Preconditions.checkNotNull(value);
 
             cve.setValue(value);
             TypeConverter.setType(cve, literal.getType());
@@ -153,7 +154,7 @@ public class RexConverter {
             List<AbstractExpression> aeOperands = new ArrayList<>();
             for (RexNode operand : call.operands) {
                 AbstractExpression ae = operand.accept(this);
-                assert ae != null;
+                Preconditions.checkNotNull(ae);
                 aeOperands.add(ae);
             }
 
@@ -328,7 +329,7 @@ public class RexConverter {
                             call.op.kind.toString());
             }
 
-            assert ae != null;
+            Preconditions.checkNotNull(ae);
             TypeConverter.setType(ae, call.getType());
             return ae;
         }
@@ -341,7 +342,7 @@ public class RexConverter {
          * @return
          */
         private AbstractExpression buildExprTree(ExpressionType exprType, List<AbstractExpression> aeOperands) {
-            assert (aeOperands.size() > 1);
+            Preconditions.checkArgument(aeOperands.size() > 1);
             AbstractExpression ae = new ConjunctionExpression(exprType);
             int idx = 0;
             for (AbstractExpression operand : aeOperands) {
@@ -361,85 +362,9 @@ public class RexConverter {
         }
     }
 
-    /**
-     * Resolve filter expression for a standalone table (numLhsFieldsForJoin = -1)
-     * or outer table from a join (possibly inline inner node for NLIJ).
-     * The resolved expression is used to identify a suitable index to access the data
-     */
-    private static class RefExpressionConvertingVisitor extends ConvertingVisitor {
-
-        private RexProgram m_program = null;
-        private List<Column> m_catColumns = null;
-        private String m_catTableName = "";
-
-        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
-            super(numLhsFieldsForJoin);
-            m_catTableName = catTableName;
-            m_catColumns = catColumns;
-            m_program = program;
-        }
-
-        public RefExpressionConvertingVisitor(RexProgram program) {
-            this(null, null, program, -1);
-        }
-
-        @Override
-        public AbstractExpression visitLocalRef(RexLocalRef localRef) {
-            assert (m_program != null);
-            int exprIndx = localRef.getIndex();
-            if (isFromRHSTable(exprIndx)) {
-                exprIndx -= m_numLhsFieldsForJoin;
-            }
-
-            assert (exprIndx < m_program.getExprCount());
-            RexNode expr = m_program.getExprList().get(exprIndx);
-            return expr.accept(this);
-        }
-
-        @Override
-        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            int exprInputIndx = inputRef.getIndex();
-
-            int inputIdx = exprInputIndx;
-            RelDataType inputType = inputRef.getType();
-
-            boolean rhsTable = isFromRHSTable(exprInputIndx);
-            String columnName = null;
-            String tableName = null;
-            int tableIndex = rhsTable ? 1 : 0;
-            // Resolve column name if it is not a join or it's inner table from a join
-            // To resolve the names of the outer table set  the numLhsFieldsForJoin = -1
-            if (rhsTable || m_numLhsFieldsForJoin < 0) {
-                exprInputIndx -= (m_numLhsFieldsForJoin < 0) ? 0 : m_numLhsFieldsForJoin;
-                if (rhsTable && m_program.getProjectList() != null) {
-                    // This input reference is part of a join expression that refers an expression
-                    // that comes from the inner node. To resolve it we need to find its index
-                    // in the inner node's expression list using the inner node projection
-                    assert (exprInputIndx < m_program.getProjectList().size());
-                    RexLocalRef inputLocalRef = m_program.getProjectList().get(exprInputIndx);
-                    inputIdx = inputLocalRef.getIndex();
-                    inputType = inputLocalRef.getType();
-                }
-                if (m_catColumns != null && inputIdx < m_catColumns.size()) {
-                    columnName = m_catColumns.get(inputIdx).getTypeName();
-                }
-                tableName = m_catTableName;
-            }
-
-            return visitInputRef(tableIndex, inputIdx, inputType, tableName, columnName);
-        }
-    }
-
     public static AbstractExpression convert(RexNode rexNode) {
         AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
-        assert ae != null;
-        return ae;
-    }
-
-    public static AbstractExpression convertJoinPred(int numLhsFields,
-                                                     RexNode condition) {
-        AbstractExpression ae = condition.accept(new ConvertingVisitor(numLhsFields));
-        assert ae != null;
+        Preconditions.checkNotNull(ae);
         return ae;
     }
 
@@ -458,27 +383,6 @@ public class RexConverter {
         return nodeSchema;
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(List<Pair<RexNode, String>> namedProjects) {
-        NodeSchema nodeSchema = new NodeSchema();
-        int i = 0;
-        for (Pair<RexNode, String> item : namedProjects) {
-            AbstractExpression ae = item.left.accept(ConvertingVisitor.INSTANCE);
-            nodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
-            ++i;
-        }
-
-        return nodeSchema;
-    }
-
-    public static List<RexNode> expandLocalRef(List<RexLocalRef> localRefList, RexProgram program) {
-        List<RexNode> rexNodeLists = new ArrayList<>();
-        for (RexLocalRef localRef : localRefList) {
-            RexNode rexNode = program.expandLocalRef(localRef);
-            rexNodeLists.add(rexNode);
-        }
-        return rexNodeLists;
-    }
-
     public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
         NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
@@ -486,107 +390,11 @@ public class RexConverter {
             String name = item.right;
             RexNode rexNode = program.expandLocalRef(item.left);
             AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
-            assert (ae != null);
+            Preconditions.checkNotNull(ae);
             newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));
             ++i;
         }
 
         return newNodeSchema;
     }
-
-    /**
-     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
-     * a corresponding TVE. If the numLhsFieldsForJoin is set to something other than -1 it means
-     * that this table is an inner table of some join and its expression indexes must be adjusted
-     *
-     * @param rexNode             RexNode to be converted
-     * @param catTableName        a catalog table name
-     * @param catColumns          column name list
-     * @param program             programs that is associated with this table
-     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
-     * @return
-     */
-    public static AbstractExpression convertRefExpression(
-            RexNode rexNode, String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
-        AbstractExpression ae = rexNode.accept(
-                new RefExpressionConvertingVisitor(catTableName, catColumns, program, numLhsFieldsForJoin));
-        assert ae != null;
-        return ae;
-    }
-
-    /**
-     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
-     * a corresponding TVE without setting table and column names
-     *
-     * @param rexNode RexNode to be converted
-     * @param program programs that is associated with this table
-     * @return
-     */
-    public static AbstractExpression convertRefExpression(RexNode rexNode, RexProgram program) {
-        AbstractExpression ae = rexNode.accept(
-                new RefExpressionConvertingVisitor(program));
-        assert ae != null;
-        return ae;
-    }
-
-    /**
-     * Given an AbstractExpression convert it into a Calcite reference expression
-     *
-     * @param expression
-     * @param program
-     * @return
-     */
-    public static RexLocalRef convertAbstractExpression(AbstractExpression expression, RexProgram program) {
-        // @TODO
-        assert (false);
-        return null;
-    }
-
-    public static RexNode convertAbstractExpression(AbstractExpression expression) {
-        assert (expression != null);
-        // @TODO
-        assert (false);
-//        RexNode op1 = null;
-//        RexNode op2 = null;
-//        if (expression.getLeft() != null) {
-//            op1 = convertAbstractExpression(expression.getLeft());
-//        }
-//        if (expression.getRight() != null) {
-//            op2 = convertAbstractExpression(expression.getRight());
-//        }
-//        switch (expression.getExpressionType()) {
-//            // ----------------------------
-//            // Arthimetic Operators
-//            // ----------------------------
-//            case OPERATOR_PLUS  : return
-//                    new RexCall(TypeConverter.voltTypeToSqlType(expression.getValueType(), );
-//
-//                // left + right (both must be number. implicitly casted)
-//            OPERATOR_MINUS                 (OperatorExpression.class,  2, "-"),
-//                // left - right (both must be number. implicitly casted)
-//            OPERATOR_MULTIPLY              (OperatorExpression.class,  3, "*"),
-//                // left * right (both must be number. implicitly casted)
-//            OPERATOR_DIVIDE                (OperatorExpression.class,  4, "/"),
-//                // left / right (both must be number. implicitly casted)
-//            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
-//                // left || right (both must be char/varchar)
-//            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
-//                // left % right (both must be integer)
-//            OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
-//                // explicitly cast left as right (right is integer in ValueType enum)
-//            OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT", true),
-//                // logical not
-//            OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL", true),
-//            // unary null evaluation
-//            OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
-//            // unary exists evaluation
-//            // 19 is assigned to COMPARE_NOTDISTINCT, 20, 21 to CONJUNCTION_AND and CONJUNCTION_OR
-//            OPERATOR_UNARY_MINUS           (OperatorExpression.class, 22, "UNARY MINUS", true),
-//            // unary exists evaluation
-//
-//            default : return null;
-//        }
-        return null;
-    }
-
 }

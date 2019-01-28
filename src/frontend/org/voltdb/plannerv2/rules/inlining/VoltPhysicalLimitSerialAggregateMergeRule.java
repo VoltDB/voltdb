@@ -23,6 +23,11 @@ import org.apache.calcite.plan.RelOptRuleOperand;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
 
+/**
+ * The rule that Transform  VoltDBPLimit / VoltDBPSerialAggregate to VoltDBPSerialAggregate with Limit.
+ *
+ * @author mikealexeev
+ */
 public class VoltPhysicalLimitSerialAggregateMergeRule extends RelOptRule {
 
     public static final VoltPhysicalLimitSerialAggregateMergeRule INSTANCE =
@@ -59,5 +64,4 @@ public class VoltPhysicalLimitSerialAggregateMergeRule extends RelOptRule {
 
         call.transformTo(newAggregate);
     }
-
 }

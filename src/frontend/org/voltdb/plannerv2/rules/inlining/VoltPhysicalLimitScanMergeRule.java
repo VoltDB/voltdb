@@ -26,11 +26,20 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
 
+/**
+ * The rule that Merges/inline Limit into a Scan.
+ *
+ * @author mikealexeev
+ */
 public class VoltPhysicalLimitScanMergeRule extends RelOptRule {
 
     public static final VoltPhysicalLimitScanMergeRule INSTANCE_1 =
             new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalTableScan.class, none())));
+
+    // TODO: This one seems redundant, we first apply the VoltPhysicalCalcScanMergeRule
+    // to Transform VoltDBPLimit / Calc / AbstractVoltDBPTableScan to VoltDBPLimit / AbstractVoltDBPTableScan,
+    // than it goes to the #INSTANCE_1 pattern
     public static final VoltPhysicalLimitScanMergeRule INSTANCE_2 =
             new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalCalc.class,
@@ -72,5 +81,4 @@ public class VoltPhysicalLimitScanMergeRule extends RelOptRule {
         }
         call.transformTo(newRel);
     }
-
 }

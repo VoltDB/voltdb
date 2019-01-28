@@ -116,9 +116,6 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
      *                  between Calcite plan result to Volt plan result.
      */
     protected void comparePlans(String sql, Map<String, String> ignoreMap) {
-        CompiledPlan voltdbPlan1 = compileAdHocPlan(sql, true, true);
-        PlanNodeTree calcitePlanTree = new PlanNodeTree(voltdbPlan1.rootPlanGraph);
-        System.out.println(calcitePlanTree.toJSONString());
         CompiledPlan calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
         CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, true);
 

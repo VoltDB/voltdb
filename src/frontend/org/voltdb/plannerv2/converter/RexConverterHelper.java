@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.converter;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.rel.type.RelDataType;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
@@ -82,7 +83,7 @@ public class RexConverterHelper {
             ExpressionType intervalOperatorType,
             List<AbstractExpression> aeOperands) {
         // There must be two operands
-        assert (2 == aeOperands.size());
+        Preconditions.checkArgument(2 == aeOperands.size());
         // One of them is timestamp and another one is interval (BIGINT) in microseconds
         AbstractExpression timestamp = null;
         AbstractExpression interval = null;
@@ -133,15 +134,14 @@ public class RexConverterHelper {
 
     public static AbstractExpression createInComparisonExpression(
             RelDataType relDataType, List<AbstractExpression> aeOperands) {
-        //
-        assert (aeOperands.size() > 0);
+        Preconditions.checkArgument(aeOperands.size() > 0);
         // The left expression should be the same for all operands because it is IN expression
         AbstractExpression leftInExpr = aeOperands.get(0).getLeft();
-        assert (leftInExpr != null);
+        Preconditions.checkNotNull(leftInExpr);
         AbstractExpression rightInExpr = new VectorValueExpression();
         List<AbstractExpression> inArgs = new ArrayList<>();
         for (AbstractExpression expr : aeOperands) {
-            assert (expr.getRight() != null);
+            Preconditions.checkNotNull(expr.getRight());
             inArgs.add(expr.getRight());
         }
         rightInExpr.setArgs(inArgs);

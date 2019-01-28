@@ -17,7 +17,7 @@
 
 package org.voltdb.plannerv2.converter;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.sql.SqlKind;
 import org.voltdb.types.ExpressionType;
 
@@ -25,21 +25,15 @@ public class ExpressionTypeConverter {
 
     private final static ImmutableMap<String, ExpressionType> calciteToVoltDBExpressionTypeMap;
 
-    private static ImmutableMap<String, ExpressionType> mapCalciteToVoltDB() {
-        ImmutableMap.Builder<String, ExpressionType> mapBuilder = ImmutableMap.builder();
-
-        mapBuilder.put(SqlKind.MIN.lowerName, ExpressionType.AGGREGATE_MIN);
-        mapBuilder.put(SqlKind.MAX.lowerName, ExpressionType.AGGREGATE_MAX);
-        mapBuilder.put(SqlKind.SUM.lowerName, ExpressionType.AGGREGATE_SUM);
-        mapBuilder.put(SqlKind.SUM0.lowerName, ExpressionType.AGGREGATE_SUM);
-        mapBuilder.put(SqlKind.AVG.lowerName, ExpressionType.AGGREGATE_AVG);
-        mapBuilder.put(SqlKind.COUNT.lowerName, ExpressionType.AGGREGATE_COUNT);
-
-        return mapBuilder.build();
-    }
-
     static {
-        calciteToVoltDBExpressionTypeMap = mapCalciteToVoltDB();
+        calciteToVoltDBExpressionTypeMap = ImmutableMap.<String, ExpressionType>builder()
+                .put(SqlKind.MIN.lowerName, ExpressionType.AGGREGATE_MIN)
+                .put(SqlKind.MAX.lowerName, ExpressionType.AGGREGATE_MAX)
+                .put(SqlKind.SUM.lowerName, ExpressionType.AGGREGATE_SUM)
+                .put(SqlKind.SUM0.lowerName, ExpressionType.AGGREGATE_SUM)
+                .put(SqlKind.AVG.lowerName, ExpressionType.AGGREGATE_AVG)
+                .put(SqlKind.COUNT.lowerName, ExpressionType.AGGREGATE_COUNT)
+                .build();
     }
 
     public static ExpressionType calciteTypeToVoltType(SqlKind sqlKind) {
