@@ -540,6 +540,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void setViewsEnabled(const std::string& viewNames, bool value);
 
+        void disableExternalStreams();
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 
