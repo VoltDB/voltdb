@@ -88,7 +88,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public boolean requireAck() {
         return m_ackRequired;
     }
-    
+
     @Override
     public int getSerializedSize()
     {
@@ -164,3 +164,4 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_executedOnPreviousLeader = onOldLeader;
     }
 }
+
