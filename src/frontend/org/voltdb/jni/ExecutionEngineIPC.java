@@ -132,7 +132,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , ExecuteTask(28)
         , ApplyBinaryLog(29)
         , ShutDown(30)
-        , SetViewsEnabled(31);
+        , SetViewsEnabled(31)
+        , DisableExternalStreams(32);
 
         Commands(final int id) {
             m_id = id;
@@ -1844,6 +1845,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.write();
         } catch (final IOException e) {
             System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        System.out.println("Disabling all external streams in EE");
+        m_data.clear();
+        m_data.putInt(Commands.DisableExternalStreams.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException();
         }
     }
