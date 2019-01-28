@@ -345,7 +345,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             node.setOutputSchema(aggr.getOutputSchema());
             node.setHaveSignificantOutputSchema(true);
             // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltPhysicalLimitScanMergeRule.
-            // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltPhysicalLimitScanMergeRule
+            // The VoltPhysicalAggregateScanMergeRule should be triggered prior to the VoltPhysicalLimitScanMergeRule
             // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
             Preconditions.checkArgument((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
                     aggr instanceof AggregatePlanNode);

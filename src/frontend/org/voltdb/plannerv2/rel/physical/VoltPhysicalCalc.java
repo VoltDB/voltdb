@@ -110,6 +110,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
         // contains Project fields and no condition (Filter)
         RexProgram program = getProgram();
         if (program.getCondition() != null) {
+            // we always push the filter down and then inline the filter in the table scan.
             throw new IllegalStateException(
                     "VoltDBCalc(with Condition).toPlanNode is not implemented.");
         }
