@@ -25,6 +25,7 @@ package org.voltdb.plannerv2;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -226,6 +227,21 @@ public class Plannerv2TestCase extends PlannerTestCase {
                     physicalTraits, m_transformedNode);
             if (m_ruleSetIndex == PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {
                 String actualTransform = RelOptUtil.toString(m_transformedNode);
+                assertEquals(m_expectedTransform, actualTransform);
+            }
+        }
+    }
+
+    public class InlineRulesTester extends PhysicalConversionRulesTester {
+        @Override public void test() throws AssertionError {
+            super.test();
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
+                    HepMatchOrder.ARBITRARY, m_transformedNode, true);
+            if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal() && m_expectedTransform != null) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                // eliminate the HepRelVertex number which can be arbitrary
+                m_expectedTransform = m_expectedTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
+                actualTransform = actualTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
                 assertEquals(m_expectedTransform, actualTransform);
             }
         }
