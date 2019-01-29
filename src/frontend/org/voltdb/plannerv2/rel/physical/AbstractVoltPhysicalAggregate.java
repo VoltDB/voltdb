@@ -236,5 +236,4 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
             apn.setPostPredicate(havingExpression);
         }
     }
-
 }

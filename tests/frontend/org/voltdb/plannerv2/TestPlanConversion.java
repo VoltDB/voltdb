@@ -57,6 +57,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
         // in volt planner: int*int -> bigint; while in calcite: int*int -> int
+        // ENG-15292
         ignores.put("\"TYPE\":3,\"VALUE_TYPE\":5", "\"TYPE\":3,\"VALUE_TYPE\":6");
         comparePlans("select i * 5 from R1", ignores);
     }
@@ -74,7 +75,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     }
 
     public void testSeqScanWithFilterWithTypeConversion() {
-        // calcite adds a CAST expression to cast SMALLINT to INT
+        // calcite adds a CAST expression to cast SMALLINT to INT: ENG-15293
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"TYPE\":7,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}",
                 "\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1");
@@ -97,7 +98,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String voltLimit = "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"";
         ignores.put(calciteLimit, voltLimit);
 
-        // TODO: limit / offset as expressions or parameters
+        // TODO: limit / offset as expressions or parameters: ENG-15294
 //        comparePlans("select i from R1 limit ?", ignores);
     }
 
@@ -120,9 +121,11 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testSeqScanWithOrderByAndFilter() {
         comparePlans("select * from R1 where si > 3 order by i");
 
-        // TODO: Calcite and VoltDB plans differ significantly
+        // TODO: Calcite and VoltDB plans differ significantly : ENG-15298
         // Calcite plan is SeqScan -> OrderBy -> Send
         // VoltDB plan is SeqScan -> OrderBy -> Projection -> Send
+//        comparePlans("select i from R1 where si > 3 order by v");
+
 //        comparePlans("select i, bi, si from R1 where si > 3 order by i");
     }
 
@@ -141,7 +144,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testSeqScanWithOrderBy2() {
         String sql = "select bi, i, si from R1 order by i, si desc";
 
-        // Calcite and VoltDB plans differ significantly
+        // Calcite and VoltDB plans differ significantly : ENG-15298
         // Calcite plan is SeqScan -> OrderBy -> Send
         // VoltDB plan is SeqScan -> OrderBy -> Projection -> Send
 //        comparePlans(sql);
@@ -166,7 +169,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 //        comparePlans(sql);
         // VoltDB SeqScan (Inline Projection) -> OrderBy (Inline Limit) -> Projection -> Send
         // Calcite SeqScan (Inline Projection) -> OrderBy (Inline Limit) -> Send
-        // Calcite doesn't have the last project because it is exactly same with the Inline Projection in SeqScan
+        // Calcite doesn't have the last project because it is exactly same with the Inline Projection in SeqScan : ENG-15298
         String calcitePlan = toJSONPlan(sql, PlannerType.CALCITE);
         String expectedCalcitePlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"INLINE_NODES\":[{\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\",\"OFFSET\":0,\"LIMIT\":5,\"OFFSET_PARAM_IDX\":-1,\"LIMIT_PARAM_IDX\":-1,\"LIMIT_EXPRESSION\":null}],\"CHILDREN_IDS\":[4],\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"SORT_DIRECTION\":\"ASC\"}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}]}";
         assertEquals(expectedCalcitePlan, calcitePlan);
@@ -202,7 +205,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select 5 + 5 from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // Volt evaluates 5 + 5 into a single 10
+        // Volt evaluates 5 + 5 into a single 10 :  ENG-15299
         String calciteExpr = "\"TYPE\":1,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":5}";
         String voltExpr = "\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":10";
         ignores.put(calciteExpr, voltExpr);
@@ -213,9 +216,9 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testBinaryIntExpr() {
         String sql = "select 5 + i from R1";
         Map<String, String> ignores = new HashMap<>();
-        // different column name for expression
+        // different column name for expression : ENG-15300
         ignores.put("EXPR$0", "C1");
-        // No default NUMERIC type widening
+        // No default NUMERIC type widening  ENG-15292
         ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
@@ -224,7 +227,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testConstIntExpr() {
         String sql = "select 5 from R1";
         Map<String, String> ignores = new HashMap<>();
-        // different column name for constant
+        // different column name for constant : ENG-15300
         ignores.put("EXPR$0", "C1");
 
         comparePlans(sql, ignores);
@@ -233,9 +236,9 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testConstRealExpr() {
         String sql = "select 5.1 from R1";
         Map<String, String> ignores = new HashMap<>();
-        // different column name for const
+        // different column name for const : ENG-15300
         ignores.put("EXPR$0", "C1");
-        // "5.1" is NUMERIC in Calcite but float in Volt
+        // "5.1" is NUMERIC in Calcite but float in Volt : ENG-15301
         ignores.put("\"TYPE\":30,\"VALUE_TYPE\":22,\"ISNULL\":false,\"VALUE\":\"5.1\"",
                 "\"TYPE\":30,\"VALUE_TYPE\":8,\"ISNULL\":false,\"VALUE\":5.1");
 
@@ -245,7 +248,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     public void testConstStringExpr() {
         String sql = "select 'FOO' from R1";
         Map<String, String> ignores = new HashMap<>();
-        // different column name for const
+        // different column name for const : ENG-15300
         ignores.put("EXPR$0", "C1");
 
         comparePlans(sql, ignores);
@@ -255,7 +258,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select '55' || '22' from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // HSQL concatenates the strings while parsing
+        // HSQL concatenates the strings while parsing :  ENG-15299
         String calciteExpr = "\"TYPE\":100,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ARGS\":[{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"55\"},{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"22\"}],\"NAME\":\"concat\",\"FUNCTION_ID\":124";
         String voltDBExpr = "\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"5522\"";
         ignores.put(calciteExpr, voltDBExpr);
@@ -276,7 +279,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select i + si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // No default NUMERIC type widening
+        // No default NUMERIC type widening ENG-15292
         ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
@@ -286,7 +289,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select i - si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // No default NUMERIC type widening
+        // No default NUMERIC type widening ENG-15292
         ignores.put("\"TYPE\":2,\"VALUE_TYPE\":5", "\"TYPE\":2,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
@@ -296,7 +299,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select i * si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // No default NUMERIC type widening
+        // No default NUMERIC type widening ENG-15292
         ignores.put("\"TYPE\":3,\"VALUE_TYPE\":5", "\"TYPE\":3,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
@@ -306,7 +309,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         String sql = "select i / si from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
-        // No default NUMERIC type widening
+        // No default NUMERIC type widening ENG-15292
         ignores.put("\"TYPE\":4,\"VALUE_TYPE\":5", "\"TYPE\":4,\"VALUE_TYPE\":6");
 
         comparePlans(sql, ignores);
@@ -326,7 +329,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 
     public void testDatetimeConstMinusExpr() {
         String sql = "select TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY from RTYPES";
-        // HSQL directly evaluates TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY
+        // HSQL directly evaluates TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY :  ENG-15299
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
         String calciteExpr = "\"TYPE\":100,\"VALUE_TYPE\":11,\"ARGS\":[{\"TYPE\":1,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":100,\"VALUE_TYPE\":6,\"ARGS\":[{\"TYPE\":30,\"VALUE_TYPE\":11,\"ISNULL\":false,\"VALUE\":-14182940000000}],\"NAME\":\"since_epoch\",\"FUNCTION_ID\":20008,\"IMPLIED_ARGUMENT\":\"MICROSECOND\"},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":6,\"ISNULL\":false,\"VALUE\":86400000000}}],\"NAME\":\"to_timestamp\",\"FUNCTION_ID\":20012,\"IMPLIED_ARGUMENT\":\"MICROSECOND\"";
@@ -396,7 +399,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 
         // TODO: HSQL transfroms the LIKE 'ab%c' expression into
         // (((VC LIKE 'ab%c') AND (VC >= 'ab')) AND (VC <= 'ab'))
-        // I think it is redundant
+        // I think it is redundant : ENG-15302
 //        comparePlans(sql, ignores);
     }
 
