@@ -60,6 +60,8 @@ static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_S
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
 
+static int64_t s_seqNo = 1;
+
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest()
@@ -117,8 +119,9 @@ public:
             m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
         }
         // append into the buffer
+        int64_t seqNo = s_seqNo;
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, 1, *m_tuple,
+                               currentTxnId, s_seqNo++, 1, 1, *m_tuple,
                                 1,
                                ExportTupleStream::INSERT);
     }

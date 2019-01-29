@@ -116,9 +116,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
 
-    m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
-    m_uncommittedTupleCount = 0;
-
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
         (lastCommittedSpHandle == m_committedSpHandle)) {
@@ -135,6 +132,9 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
 
         return;
     }
+
+    m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
+    m_uncommittedTupleCount = 0;
 
     // If the current TXN ID has advanced, then we know that:
     // - The old open transaction has been committed
@@ -210,7 +210,7 @@ void TupleStreamBase::pushPendingBlocks()
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
+void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t rollbackTo)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future: mark %jd, current USO %jd.",
@@ -223,9 +223,16 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
     // back up the universal stream counter
     m_uso = mark;
     // make the stream of tuples contiguous outside of actual system failures
-    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
-    assert (m_uncommittedTupleCount >= 0 || exportSeqNo == SIZE_MAX);
-    m_exportSequenceNumber = exportSeqNo;
+    // TODO:
+    // Because right now every appendTuple in export stream incorporates a commit,
+    // most of time uncommitted tuple count will be 1, if there are multiple stream table inserts
+    // in a transaction and it is rolled back, uncommitted tuple count may be negative.
+    // The real fix would be stream table commits at end of transaction or flush.
+    m_uncommittedTupleCount -= m_exportSequenceNumber - rollbackTo;
+    if (m_uncommittedTupleCount < 0 && rollbackTo != SIZE_MAX) {
+        m_uncommittedTupleCount = 0;
+    }
+    m_exportSequenceNumber = rollbackTo;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
