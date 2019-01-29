@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 
 def COLORS(k):
     return (((k ** 3) % 255) / 255.0,
