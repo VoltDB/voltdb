@@ -24,7 +24,7 @@ import csv
 import time
 import datetime
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 NaN = float("nan")
 MASTER = 'master'
 
