@@ -133,7 +133,7 @@ void AbstractDRTupleStream::handleOpenTransaction(StreamBlock *oldBlock)
     m_currBlock->recordLastBeginTxnOffset();
     m_currBlock->consumed(partialTxnLength);
     ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
-    oldBlock->truncateTo(uso);
+    oldBlock->truncateTo(uso, SIZE_MAX);
     oldBlock->clearLastBeginTxnOffset();
     // If the whole previous block has been moved to new block, discards the empty one.
     if (oldBlock->offset() == 0) {

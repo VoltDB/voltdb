@@ -118,10 +118,13 @@ public:
     size_t m_headerSpace;
 
     /**
-     * The number of Export Tuples applied to the Export Stream Block in the current txn;
-     * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
+     * Count of exported tuples not yet counted in the row count header of the Export Stream Block for the current transaction;
+     * this count will be added to the row count header (and this count reset to 0) on the following conditions:
+     * 1) current transaction appears "committed" when we start handling the _next_ transaction
+     * 2) when the current transaction needs a new Stream Block
+     * 3) current transaction is rolled back (with the rollback affecting one or more Stream blocks)
      */
-    int64_t m_uncommittedTupleCount;
+    int64_t m_stashedTupleCount;
 
     int64_t m_exportSequenceNumber;
 };

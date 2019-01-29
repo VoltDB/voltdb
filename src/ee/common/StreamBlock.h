@@ -229,10 +229,13 @@ namespace voltdb
             m_offset += consumed;
         }
 
-        void truncateTo(size_t mark) {
-            // just move offset. pretty easy.
+        void truncateTo(size_t mark, int64_t exportSeqNo) {
+            // just move offset and update export row count. pretty easy.
             if (((m_uso + offset()) >= mark ) && (m_uso <= mark)) {
                 m_offset = mark - m_uso;
+                if (lastExportSequenceNumber() >= exportSeqNo && startExportSequenceNumber() <= exportSeqNo) {
+                    m_rowCountForExport = exportSeqNo - startExportSequenceNumber() + 1;
+                }
             }
             else {
                 throwFatalException("Attempted Export block truncation past start of block."

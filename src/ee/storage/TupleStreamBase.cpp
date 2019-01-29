@@ -53,8 +53,8 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-      m_uncommittedTupleCount(0),
-      m_exportSequenceNumber(1) // sequence number starts from 1
+      m_stashedTupleCount(0),
+      m_exportSequenceNumber(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -116,9 +116,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
 
-    m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
-    m_uncommittedTupleCount = 0;
-
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
         (lastCommittedSpHandle == m_committedSpHandle)) {
@@ -156,6 +153,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
         m_openUniqueId = uniqueId;
+        m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+        m_stashedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -171,6 +170,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
         m_committedUniqueId = m_openUniqueId;
+        m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+        m_stashedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -222,15 +223,16 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
 
     // back up the universal stream counter
     m_uso = mark;
-    // make the stream of tuples contiguous outside of actual system failures
-    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
+    // Simply reset stashedTupleCount because row count of all previous blocks have already
+    // been updated. Row count of the last non-empty block is handled by truncateTo().
+    m_stashedTupleCount = 0;
     m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
     // the block that contains mark.
-    if (m_currBlock != NULL && !(m_currBlock->uso() >= mark)) {
-        m_currBlock->truncateTo(mark);
+    if (m_currBlock != NULL && m_currBlock->uso() < mark) {
+        m_currBlock->truncateTo(mark, exportSeqNo);
     }
     else {
         StreamBlock *sb = NULL;
@@ -243,7 +245,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
                 discardBlock(sb);
             }
             else {
-                sb->truncateTo(mark);
+                sb->truncateTo(mark, exportSeqNo);
                 m_currBlock = sb;
                 break;
             }
@@ -285,6 +287,10 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
+            // Update tuple count in current block with the number of tuples
+            // inserted so far by the current transaction
+            m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+            m_stashedTupleCount = 0;
             m_pendingBlocks.push_back(m_currBlock);
             oldBlock = m_currBlock;
             m_currBlock = NULL;
@@ -311,8 +317,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
-
-    m_currBlock->recordStartExportSequenceNumber(m_exportSequenceNumber);
 
     if (openTransaction) {
         handleOpenTransaction(oldBlock);

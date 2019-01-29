@@ -60,6 +60,8 @@ static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_S
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
 
+static int64_t s_seqNo = 1;
+
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest()
@@ -118,7 +120,7 @@ public:
         }
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, 1, *m_tuple,
+                               currentTxnId, s_seqNo++, 1, 1, *m_tuple,
                                 1,
                                ExportTupleStream::INSERT);
     }
@@ -395,6 +397,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->getRowCountforExport(), m_tuplesToFill);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
 }
 
@@ -420,9 +423,11 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
  */
 TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
 
+    size_t mark = m_wrapper->bytesUsed();
+    size_t seqNo = s_seqNo;
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper->rollbackTo(0, 0, 1);
+    m_wrapper->rollbackTo(mark, 0, seqNo);
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
@@ -433,6 +438,7 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->getRowCountforExport(), 1);
     EXPECT_EQ(results->offset(), m_tupleSize);
 }
 
@@ -461,6 +467,7 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize));
+    EXPECT_EQ(results->getRowCountforExport(), m_tuplesToFill - 1);
 }
 
 /**
@@ -482,13 +489,59 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
         appendTuple(10, 11);
     }
     m_wrapper->rollbackTo(mark, 0, seqNo);
+    EXPECT_GE(m_wrapper->m_stashedTupleCount, 0);
     m_wrapper->periodicFlush(-1, 3);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
+    EXPECT_EQ(m_wrapper->m_stashedTupleCount, 0);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * 3));
+    EXPECT_EQ(results->getRowCountforExport(), 3);
+}
+
+TEST_F(ExportTupleStreamTest, PartialRollback)
+{
+    // append a bunch of tuples
+    for (int i = 1; i <= 3; i++) {
+        appendTuple(i-1, i);
+    }
+    // now, fill a couple of buffers with tuples from a single transaction
+    /*------------------------------
+     * Txn1 | Txn2 | Txn3 | Txn11  |
+     *------------------------------
+     * Txn11 | <- rollback         |
+     *------------------------------
+     * Txn11                       |
+     *------------------------------
+     * Txn11 |
+     *--------
+     */
+    size_t mark;
+    int64_t seqNo;
+    for (int i = 4; i < (m_tuplesToFill + 1) * 2; i++)
+    {
+        appendTuple(10, 11);
+        if (i == m_tuplesToFill + 1) {
+            mark = m_wrapper->bytesUsed();
+            seqNo = m_wrapper->getSequenceNumber();
+        }
+    }
+    m_wrapper->rollbackTo(mark, 0, seqNo);
+    EXPECT_GE(m_wrapper->m_stashedTupleCount, 0);
+    m_wrapper->periodicFlush(-1, 11);
+    ASSERT_TRUE(m_topend.receivedExportBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(m_wrapper->m_stashedTupleCount, 0);
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
+    EXPECT_EQ(results->getRowCountforExport(), m_tuplesToFill);
+    results = m_topend.blocks.front();
+    EXPECT_EQ(results->uso(), m_tupleSize * m_tuplesToFill);
+    EXPECT_EQ(results->offset(), (m_tupleSize * 1));
+    EXPECT_EQ(results->getRowCountforExport(), 1);
 }
 
 
