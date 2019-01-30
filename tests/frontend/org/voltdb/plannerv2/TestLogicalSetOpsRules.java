@@ -27,14 +27,14 @@ import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 
 public class TestLogicalSetOpsRules extends Plannerv2TestCase {
 
-    private LogicalRulesTester m_tester = new LogicalRulesTester();
+    private LogicalRulesTester m_logicalTester = new LogicalRulesTester();
     private ValidationTester m_validationTester = new ValidationTester();
 
     @Override protected void setUp() throws Exception {
         setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
         init();
-        m_tester.phase(Phase.LOGICAL);
+        m_logicalTester.phase(Phase.LOGICAL);
     }
 
     @Override public void tearDown() throws Exception {
@@ -42,7 +42,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testUnion() {
-        m_tester.sql("select si from R1 union ALL select si from R2")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2")
                 .transform("VoltLogicalUnion(all=[true])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -50,7 +50,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union select si from R2 union select ii from R3")
+        m_logicalTester.sql("select si from R1 union select si from R2 union select ii from R3")
                 .transform("VoltLogicalUnion(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -60,7 +60,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union select si from R2 union ALL select ii from R3")
+        m_logicalTester.sql("select si from R1 union select si from R2 union ALL select ii from R3")
                 .transform("VoltLogicalUnion(all=[true])\n" +
                            "  VoltLogicalUnion(all=[false])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
@@ -71,7 +71,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union ALL select si from R2 union select ii from R3")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2 union select ii from R3")
                 .transform("VoltLogicalUnion(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -83,7 +83,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testSetOpsLimit() {
-        m_tester.sql("select si from R1 union ALL select si from R2 limit 5 offset 4")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2 limit 5 offset 4")
                 .transform("VoltLogicalLimit(limit=[5], offset=[4])\n" +
                            "  VoltLogicalUnion(all=[true])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
@@ -92,7 +92,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union ALL select si from R2 limit ? offset ?")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2 limit ? offset ?")
                 .transform("VoltLogicalLimit(limit=[?0], offset=[?1])\n" +
                            "  VoltLogicalUnion(all=[true])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
@@ -101,7 +101,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
                .transform("VoltLogicalLimit(limit=[5], offset=[4])\n" +
                           "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
                           "    VoltLogicalUnion(all=[true])\n" +
@@ -113,7 +113,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testSetOpsOrderBy() {
-        m_tester.sql("select si*2 as msi from R1 union ALL select si from R2 order by msi")
+        m_logicalTester.sql("select si*2 as msi from R1 union ALL select si from R2 order by msi")
                 .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
                            "  VoltLogicalUnion(all=[true])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], MSI=[$t7])\n" +
@@ -122,7 +122,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si*2 as si2, si as si1 from R1 union ALL select i, bi from R2 order by si2 ASC, si1 DESC")
+        m_logicalTester.sql("select si*2 as si2, si as si1 from R1 union ALL select i, bi from R2 order by si2 ASC, si1 DESC")
                 .transform("VoltLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC])\n" +
                            "  VoltLogicalUnion(all=[true])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], SI2=[$t7], SI1=[$t1])\n" +
@@ -131,7 +131,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 union ALL select si from R2 order by si+1")
+        m_logicalTester.sql("select si from R1 union ALL select si from R2 order by si+1")
                 .transform("VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
                            "  VoltLogicalUnion(all=[true])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[1], expr#7=[+($t1, $t6)], SI=[$t1], EXPR$1=[$t7])\n" +
@@ -157,7 +157,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testIntersect() {
-        m_tester.sql("select si from R1 intersect ALL select si from R2 where si > 3")
+        m_logicalTester.sql("select si from R1 intersect ALL select si from R2 where si > 3")
                 .transform("VoltLogicalIntersect(all=[true])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -165,7 +165,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 intersect select si from R2 intersect select ii from R3")
+        m_logicalTester.sql("select si from R1 intersect select si from R2 intersect select ii from R3")
                 .transform("VoltLogicalIntersect(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -175,7 +175,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 intersect ALL select si from R2 intersect select ii from R3")
+        m_logicalTester.sql("select si from R1 intersect ALL select si from R2 intersect select ii from R3")
                 .transform("VoltLogicalIntersect(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -185,7 +185,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                         "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 intersect select si from R2 intersect ALL select ii from R3")
+        m_logicalTester.sql("select si from R1 intersect select si from R2 intersect ALL select ii from R3")
                 .transform("VoltLogicalIntersect(all=[true])\n" +
                            "  VoltLogicalIntersect(all=[false])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
@@ -198,18 +198,41 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testSetOpsWithExpressionSubqueiries() {
-        m_tester.sql("select * from R1 where EXISTS (select si from R1 intersect select si from R2)")
-                .transform("foo")
-                .test();
+        // @TODO Need to validate the results
+        m_logicalTester.sql("select * from R1 where EXISTS (select si from R1 intersect select si from R2)")
+//                       .transform("VoltLogicalCalc(expr#0..6=[{inputs}], proj#0..5=[{exprs}])\n" +
+//                                  "  VoltLogicalJoin(condition=[true], joinType=[inner])\n" +
+//                                  "    VoltLogicalTableScan(table=[[public, R1]])\n" +
+//                                  "    VoltLogicalCalc(expr#0=[{inputs}], expr#1=[IS NOT NULL($t0)], $f0=[$t0], $condition=[$t1])\n" +
+//                                  "      VoltLogicalAggregate(group=[{}], agg#0=[MIN($0)])\n" +
+//                                  "        VoltLogicalCalc(expr#0=[{inputs}], expr#1=[true], $f0=[$t1])\n" +
+//                                  "          VoltLogicalIntersect(all=[false])\n" +
+//                                  "            VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+//                                  "              VoltLogicalTableScan(table=[[public, R1]])\n" +
+//                                  "            VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+//                                  "              VoltLogicalTableScan(table=[[public, R2]])\n")
+                       .test();
 
-        m_tester.sql("select si from R2 union select i from R1 where i in (select i from R2 where R1.I > i)")
-                .transform("foo")
-                .test();
+        m_logicalTester.sql("select si from R2 union select i from R1 where i in (select i from R2 where R1.I > i)")
+//                       .transform("VoltLogicalUnion(all=[false])\n" +
+//                                  "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+//                                  "    VoltLogicalTableScan(table=[[public, R2]])\n" +
+//                                  "  VoltLogicalCalc(expr#0..7=[{inputs}], I=[$t0])\n" +
+//                                  "    VoltLogicalJoin(condition=[AND(=($0, $7), =($0, $6))], joinType=[inner])\n" +
+//                                  "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+//                                  "      VoltLogicalAggregate(group=[{0, 1}])\n" +
+//                                  "        VoltLogicalCalc(expr#0..6=[{inputs}], I=[$t0], I0=[$t6])\n" +
+//                                  "          VoltLogicalJoin(condition=[>($6, $0)], joinType=[inner])\n" +
+//                                  "            VoltLogicalTableScan(table=[[public, R2]])\n" +
+//                                  "            VoltLogicalAggregate(group=[{0}])\n" +
+//                                  "              VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+//                                  "                VoltLogicalTableScan(table=[[public, R1]])\n")
+                       .test();
 
     }
 
     public void testMultipleSetOps() {
-        m_tester.sql("select si from R1 intersect select si from R2 union select ii from R3")
+        m_logicalTester.sql("select si from R1 intersect select si from R2 union select ii from R3")
                 .transform("VoltLogicalUnion(all=[false])\n" +
                            "  VoltLogicalIntersect(all=[false])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
@@ -220,7 +243,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 intersect (select si from R2 union select ii from R3)")
+        m_logicalTester.sql("select si from R1 intersect (select si from R2 union select ii from R3)")
                 .transform("VoltLogicalIntersect(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -233,7 +256,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testExcept() {
-        m_tester.sql("select si from R1 except ALL select si from R2")
+        m_logicalTester.sql("select si from R1 except ALL select si from R2")
                 .transform("VoltLogicalMinus(all=[true])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -241,7 +264,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                         "    VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 except select si from R2 except select ii from R3")
+        m_logicalTester.sql("select si from R1 except select si from R2 except select ii from R3")
                 .transform("VoltLogicalMinus(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -251,7 +274,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 except ALL select si from R2 except ALL select ii from R3")
+        m_logicalTester.sql("select si from R1 except ALL select si from R2 except ALL select ii from R3")
                 .transform("VoltLogicalMinus(all=[true])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -261,7 +284,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltLogicalTableScan(table=[[public, R3]])\n")
                 .test();
 
-        m_tester.sql("select si from R1 except (select si from R2 except select ii from R3)")
+        m_logicalTester.sql("select si from R1 except (select si from R2 except select ii from R3)")
                 .transform("VoltLogicalMinus(all=[false])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -274,7 +297,7 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     }
 
     public void testSetOpsFilter() {
-        m_tester.sql("select si from (select si from R1 union ALL select si from R2) u where si > 0")
+        m_logicalTester.sql("select si from (select si from R1 union ALL select si from R2) u where si > 0")
                 .transform("VoltLogicalUnion(all=[true])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n" +
