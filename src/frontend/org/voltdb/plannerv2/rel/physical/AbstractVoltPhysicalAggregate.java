@@ -30,10 +30,9 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.plannerv2.converter.ExpressionTypeConverter;
-import org.voltdb.plannerv2.converter.RelConverter;
-import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannerv2.converter.ExpressionTypeConverter;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -202,7 +201,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
             AbstractExpression aggrExpr = null;
             if (!aggrExprIndexes.isEmpty()) {
                 RelDataTypeField field = fields.get(aggrExprIndexes.get(0));
-                aggrExpr = RelConverter.convertDataTypeField(field);
+                aggrExpr = RexConverter.convertDataTypeField(field);
             } else if (ExpressionType.AGGREGATE_COUNT == aggrType) {
                 aggrType = ExpressionType.AGGREGATE_COUNT_STAR;
             }
@@ -225,7 +224,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
         List<RelDataTypeField> rowTypeList = this.getRowType().getFieldList();
         for (int index = groupBy.nextSetBit(0); index != -1; index = groupBy.nextSetBit(index + 1)) {
             assert(index < rowTypeList.size());
-            AbstractExpression groupByExpr = RelConverter.convertDataTypeField(rowTypeList.get(index));
+            AbstractExpression groupByExpr = RexConverter.convertDataTypeField(rowTypeList.get(index));
             apn.addGroupByExpression(groupByExpr);
         }
     }

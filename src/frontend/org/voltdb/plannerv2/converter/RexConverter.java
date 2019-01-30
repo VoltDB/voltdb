@@ -34,7 +34,6 @@ import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
-import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
@@ -396,5 +395,17 @@ public class RexConverter {
         }
 
         return newNodeSchema;
+    }
+
+    public static AbstractExpression convertDataTypeField(RelDataTypeField dataTypeField) {
+        int columnIndex = dataTypeField.getIndex();
+        int tableIndex = 0;
+        String tableName = "";
+        String columnName = String.format("%03d", columnIndex);
+
+        TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
+        tve.setTableIndex(tableIndex);
+        TypeConverter.setType(tve, dataTypeField.getType());
+        return tve;
     }
 }

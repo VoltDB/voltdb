@@ -18,27 +18,17 @@
 package org.voltdb.plannerv2.utils;
 
 import com.google_voltpatches.common.base.Preconditions;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexProgramBuilder;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.plannerv2.converter.RelConverter;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.SortDirectionType;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class VoltDBRexUtil {
@@ -59,7 +49,7 @@ public class VoltDBRexUtil {
             AbstractExpression voltExpr = RexConverter.convert(expr);
             voltExprList.add(voltExpr);
         }
-        List<Pair<Integer, SortDirectionType>> collFields = RelConverter.convertCollation(collation);
+        List<Pair<Integer, SortDirectionType>> collFields = convertCollation(collation);
         Preconditions.checkArgument(voltExprList.size() == collFields.size());
         int index = 0;
         for (Pair<Integer, SortDirectionType> collField : collFields) {
@@ -67,5 +57,17 @@ public class VoltDBRexUtil {
             opn.getSortDirections().add(collField.right);
         }
         return opn;
+    }
+
+    private static List<Pair<Integer, SortDirectionType>> convertCollation(RelCollation collation) {
+        List<Pair<Integer, SortDirectionType>> collFields = new ArrayList<>();
+        for (RelFieldCollation collField : collation.getFieldCollations()) {
+            Direction dir = collField.getDirection();
+            SortDirectionType voltDir = ("ASC".equalsIgnoreCase(dir.shortString)) ? SortDirectionType.ASC :
+                    SortDirectionType.DESC;
+            int fieldIndex = collField.getFieldIndex();
+            collFields.add(Pair.of(fieldIndex, voltDir));
+        }
+        return collFields;
     }
 }
