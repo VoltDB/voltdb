@@ -47,6 +47,7 @@ import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 import com.google.common.collect.ImmutableList;
@@ -164,7 +165,10 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
-            VoltPJoinRule.INSTANCE
+            VoltPJoinRule.INSTANCE,
+            VoltPSetOpsRule.INSTANCE_UNION,
+            VoltPSetOpsRule.INSTANCE_INTERSECT,
+            VoltPSetOpsRule.INSTANCE_EXCEPT
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
