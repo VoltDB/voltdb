@@ -36,7 +36,7 @@ import com.google.common.base.Preconditions;
 public class VoltLogicalMinus extends Minus implements VoltLogicalRel {
 
     /**
-     * Creates a VoltLogicalUnion.
+     * Creates a VoltLogicalMinus.
      *
      * @param cluster          Cluster
      * @param traitSet         Trait set

@@ -36,7 +36,7 @@ import com.google.common.base.Preconditions;
 public class VoltLogicalIntersect extends Intersect implements VoltLogicalRel {
 
     /**
-     * Creates a VoltLogicalUnion.
+     * Creates a VoltLogicalIntersect.
      *
      * @param cluster          Cluster
      * @param traitSet         Trait set
