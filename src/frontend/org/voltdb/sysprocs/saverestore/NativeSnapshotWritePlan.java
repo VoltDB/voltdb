@@ -42,7 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
@@ -219,7 +219,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     @Override
                     public void run()
                     {
-                        ExportManager.sync(false);
+                        ExportManagerInterface.instance().sync(false);
                     }
                 });
 

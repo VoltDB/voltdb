@@ -621,15 +621,15 @@ public class ExportManager implements ExportManagerInterface
         }
     }
 
-    public static synchronized void sync(final boolean nofsync) {
+    @Override
+    public synchronized void sync(final boolean nofsync) {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
-        ExportManagerInterface.instance().syncSources(nofsync);
+        syncSources(nofsync);
     }
 
-    @Override
-    public void syncSources(final boolean nofsync) {
+    private void syncSources(final boolean nofsync) {
 
         Generation generation = ExportManagerInterface.instance().getGeneration();
         if (generation != null) {

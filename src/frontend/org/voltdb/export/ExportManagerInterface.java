@@ -143,5 +143,5 @@ public interface ExportManagerInterface {
             ByteBuffer buffer,
             boolean sync);
 
-    public void syncSources(final boolean nofsync);
+    public void sync(final boolean nofsync);
 }
