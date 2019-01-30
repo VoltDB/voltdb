@@ -38,7 +38,7 @@ public interface CommandLog {
      */
     public abstract void init(int logSize,
                                  long txnId,
-                                 int partitionCount, String coreBinding,
+                                 String coreBinding,
                                  Map<Integer, Long> perPartitionTxnId);
 
     /**
@@ -52,7 +52,7 @@ public interface CommandLog {
      */
     public abstract void initForRejoin(int logSize,
                                           long txnId,
-                                          int partitionCount, boolean isRejoin,
+                                          boolean isRejoin,
                                           String coreBinding, Map<Integer, Long> perPartitionTxnId);
 
     public abstract boolean needsInitialization();
