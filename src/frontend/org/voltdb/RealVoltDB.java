@@ -1396,7 +1396,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_commandLog.initForRejoin(
                         m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
                         Long.MIN_VALUE,
-                        m_configuredNumberOfPartitions,
                         true,
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
@@ -4409,7 +4408,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
             m_commandLog.init(m_catalogContext.cluster.getLogconfig().get("log").getLogsize(),
-                              txnId, m_cartographer.getPartitionCount(),
+                              txnId,
                               m_config.m_commandLogBinding,
                               perPartitionTxnIds);
             try {
