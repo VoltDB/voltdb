@@ -229,7 +229,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t rollbackTo)
     // in a transaction and it is rolled back, uncommitted tuple count may be negative.
     // The real fix would be stream table commits at end of transaction or flush.
     m_uncommittedTupleCount -= m_exportSequenceNumber - rollbackTo;
-    if (m_uncommittedTupleCount < 0 && rollbackTo != SIZE_MAX) {
+    if (m_uncommittedTupleCount < 0) {
         m_uncommittedTupleCount = 0;
     }
     m_exportSequenceNumber = rollbackTo;
