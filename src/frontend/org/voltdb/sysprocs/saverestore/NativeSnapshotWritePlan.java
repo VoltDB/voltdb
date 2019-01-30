@@ -71,10 +71,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
-        Integer newPartitionCount = jsData == null ? null : (Integer) jsData.opt("partitionCount");
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 jsData, context, result, extraSnapshotData, tracker, hashinatorData,
-                timestamp, newPartitionCount);
+                timestamp, null);
     }
 
     Callable<Boolean> createSetupInternal(String file_path, String pathType,
@@ -96,23 +95,22 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
-        final Table[] tableArray;
-        // TRAIL [SnapSave:5]  - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
-        if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
-            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
-        } else {
-            tableArray = config.tables;
-        }
+        // TRAIL [SnapSave:5] - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
+        final Table[] tableArray = config.tables;
 
         final int newPartitionCount;
-        if (newPartitionCountInteger == null) {
-            newPartitionCount = context.getNumberOfPartitions();
+        final int partitionCount;
+        if (config.partitionCount != null) {
+            partitionCount = newPartitionCount = config.partitionCount;
+        } else if (newPartitionCountInteger == null) {
+            partitionCount = newPartitionCount = context.getNumberOfPartitions();
         } else {
             newPartitionCount = newPartitionCountInteger.intValue();
+            partitionCount = context.getNumberOfPartitions();
+        }
 
-            if (newPartitionCount != context.getNumberOfPartitions()) {
-                createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
-            }
+        if (newPartitionCount != context.getNumberOfPartitions()) {
+            createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
         m_snapshotRecord =
@@ -161,14 +159,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
         boolean isTruncationSnapshot = true;
-        if (jsData != null) {
+        if (jsData != null && config.partitionCount == null) {
             isTruncationSnapshot = jsData.has("truncReqId");
         }
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 context, extraSnapshotData, tracker, hashinatorData, timestamp,
-                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
+                partitionCount, newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
@@ -182,6 +180,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
+                                                  final int partitionCount,
                                                   final int newPartitionCount,
                                                   final Table[] tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
@@ -245,7 +244,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
                                                       context.getHostId(), context.getCluster().getTypeName(),
-                                                      context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                                                      context.getDatabase().getTypeName(), partitionCount,
                                                       DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()),
                                                       tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);

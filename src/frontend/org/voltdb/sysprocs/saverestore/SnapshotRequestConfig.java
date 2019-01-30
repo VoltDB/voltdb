@@ -44,16 +44,19 @@ public class SnapshotRequestConfig {
      */
     public SnapshotRequestConfig(List<Table> tables)
     {
-        this(tables, null);
+        this(Preconditions.checkNotNull(tables), null);
     }
 
-    public SnapshotRequestConfig(List<Table> tables, int partitionCount) {
-        this(tables, Integer.valueOf(partitionCount));
+    public SnapshotRequestConfig(int partitionCount) {
+        this((Table[]) null, Integer.valueOf(partitionCount));
     }
 
-    private SnapshotRequestConfig(List<Table> tables, Integer partitionCount) {
-        Preconditions.checkNotNull(tables);
-        this.tables = tables.toArray(new Table[tables.size()]);
+    protected SnapshotRequestConfig(List<Table> tables, Integer partitionCount) {
+        this(tables.toArray(new Table[tables.size()]), partitionCount);
+    }
+
+    private SnapshotRequestConfig(Table[] tables, Integer partitionCount) {
+        this.tables = tables;
         this.partitionCount = partitionCount;
     }
 
@@ -105,7 +108,7 @@ public class SnapshotRequestConfig {
         if (tableNamesToInclude != null && tableNamesToInclude.isEmpty()) {
             // Stream snapshot may specify empty snapshot sometimes.
             tables.clear();
-        } else {
+        } else if (tableNamesToInclude != null || tableNamesToExclude != null) {
             ListIterator<Table> iter = tables.listIterator();
             while (iter.hasNext()) {
                 Table table = iter.next();
@@ -129,7 +132,7 @@ public class SnapshotRequestConfig {
                     Joiner.on(", ").join(tableNamesToExclude));
         }
 
-        return tables.toArray(new Table[0]);
+        return tables.toArray(new Table[tables.size()]);
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException
