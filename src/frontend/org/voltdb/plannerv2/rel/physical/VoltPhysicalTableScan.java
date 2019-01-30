@@ -218,7 +218,11 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     protected int getOffset() {
         if (m_offset != null) {
-            return RexLiteral.intValue(m_offset);
+            if (m_offset instanceof RexDynamicParam) {
+                return -1;
+            } else {
+                return RexLiteral.intValue(m_offset);
+            }
         } else {
             return 0;
         }
@@ -287,7 +291,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     protected AbstractPlanNode addPredicate(AbstractScanPlanNode scan) {
         // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
         RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
-        assert program != null;
+        Preconditions.checkNotNull(program);
 
         RexLocalRef condition = program.getCondition();
         if (condition != null) {

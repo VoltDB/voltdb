@@ -88,18 +88,7 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
     }
 
     public void testSeqScanWithLimitParam() {
-        Map<String, String> ignores = new HashMap<>();
-        // Inline nodes ids are swapped
-        String calciteProj = "\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
-        String voltProj = "\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
-        ignores.put(calciteProj, voltProj);
-
-        String calciteLimit = "\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"";
-        String voltLimit = "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"";
-        ignores.put(calciteLimit, voltLimit);
-
-        // TODO: limit / offset as expressions or parameters: ENG-15294
-//        comparePlans("select i from R1 limit ?", ignores);
+        comparePlans("select i from R1 limit ?");
     }
 
     public void testSeqScanWithFilterAndLimit() {
@@ -418,6 +407,20 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 
         // TODO: need a RESULT_TYPE_PARAM_IDX for the result of the function call
 //        comparePlans(sql, ignores);
+    }
+
+    public void testENG15294() {
+        comparePlans("select i from R1 where i=1 limit 11 offset 22");
+
+        comparePlans("select i from R1 where i=1 limit 1 offset ?");
+
+        comparePlans("select i from R1 where i=1 limit ? offset 1");
+
+        comparePlans("select i from R1 where i=1 limit ? offset ?");
+
+        comparePlans("select i from R1 where i=? limit ? offset ?");
+
+        comparePlans("select i from R1 where i=? limit ?");
     }
 
     // TODO: tests on index table scan

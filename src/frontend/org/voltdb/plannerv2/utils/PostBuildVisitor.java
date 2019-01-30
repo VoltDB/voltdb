@@ -17,8 +17,11 @@
 
 package org.voltdb.plannerv2.utils;
 
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.plannerv2.ColumnTypes;
+import org.voltdb.plannerv2.converter.TypeConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -39,6 +42,22 @@ public class PostBuildVisitor extends AbstractPlanNodeVisitor {
     public void visitNode(AbstractPlanNode node) {
         if (node instanceof LimitPlanNode) {
             m_hasLimitOffset = true;
+            // add the Limit Parameter
+            if (((LimitPlanNode) node).getLimitParameterIndex() >= 0) {
+                ParameterValueExpression pve = new ParameterValueExpression();
+                pve.setParameterIndex((int) ((LimitPlanNode) node).getLimitParameterIndex());
+                // we don't care about precision for ParameterValueExpression
+                TypeConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
+                m_pveSet.add(pve);
+            }
+            // add the Offset Parameter
+            if (((LimitPlanNode) node).getOffsetParameterIndex() >= 0) {
+                ParameterValueExpression pve = new ParameterValueExpression();
+                pve.setParameterIndex((int) ((LimitPlanNode) node).getOffsetParameterIndex());
+                // we don't care about precision for ParameterValueExpression
+                TypeConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
+                m_pveSet.add(pve);
+            }
         }
         // Collect pve
         Set<AbstractExpression> pves = new HashSet<>();

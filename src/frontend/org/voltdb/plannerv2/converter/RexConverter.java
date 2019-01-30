@@ -59,6 +59,14 @@ public class RexConverter {
         NEXT_PARAMETER_ID = 0;
     }
 
+    public static int getParameterIndex() {
+        return NEXT_PARAMETER_ID;
+    }
+
+    public static void setParameterIndex(int index) {
+        NEXT_PARAMETER_ID = index;
+    }
+
     private static class ConvertingVisitor extends RexVisitorImpl<AbstractExpression> {
 
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();

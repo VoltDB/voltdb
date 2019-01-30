@@ -951,7 +951,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
-        // and the output column expressions if there were no projection
+        // add the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
             schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
