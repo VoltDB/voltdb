@@ -27,6 +27,7 @@ import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.rel.rules.ReduceExpressionsRule;
+import org.apache.calcite.rel.rules.UnionMergeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -36,6 +37,7 @@ import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
@@ -101,6 +103,10 @@ public class PlannerRules {
             FilterProjectTransposeRule.INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
+            // combining two non-distinct SetOps into a single
+            UnionMergeRule.INSTANCE,
+            UnionMergeRule.INTERSECT_INSTANCE,
+            UnionMergeRule.MINUS_INSTANCE,
 
             // Reduces constants inside a LogicalCalc.
             ReduceExpressionsRule.CALC_INSTANCE,
@@ -110,7 +116,10 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
-            VoltLJoinRule.INSTANCE
+            VoltLJoinRule.INSTANCE,
+            VoltLSetOpsRule.INSTANCE_UNION,
+            VoltLSetOpsRule.INSTANCE_INTERSECT,
+            VoltLSetOpsRule.INSTANCE_EXCEPT
 
 //            // Filter   ->  Project
 //            // Project      Filter
