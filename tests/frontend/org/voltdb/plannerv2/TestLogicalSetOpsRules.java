@@ -273,4 +273,13 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
                 .test();
     }
 
+    public void testSetOpsFilter() {
+        m_tester.sql("select si from (select si from R1 union ALL select si from R2) u where si > 0")
+                .transform("VoltLogicalUnion(all=[true])\n" +
+                           "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7])\n" +
+                           "    VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7])\n" +
+                           "    VoltLogicalTableScan(table=[[public, R2]])\n")
+                .test();
+    }
 }
