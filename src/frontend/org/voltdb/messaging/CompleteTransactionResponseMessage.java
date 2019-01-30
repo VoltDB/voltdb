@@ -31,6 +31,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     boolean m_isRestart;
     boolean m_isRecovering = false;
     boolean m_ackRequired = false;
+    boolean m_executedOnPreviousLeader = false;
     boolean m_isAborted;
 
     /** Empty constructor for de-serialization */
@@ -92,7 +93,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1 + 1 + 1 + 1;
+        msgsize += 8 + 8 + 8 + 1 + 1 + 1 + 1 + 1;
         return msgsize;
     }
 
@@ -106,6 +107,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
         buf.put((byte) (m_ackRequired ? 1 : 0));
+        buf.put((byte) (m_executedOnPreviousLeader ? 1 : 0));
         buf.put((byte) (m_isAborted ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -120,6 +122,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
         m_ackRequired = buf.get() == 1;
+        m_executedOnPreviousLeader = buf.get() == 1;
         m_isAborted = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
@@ -152,4 +155,13 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public String getMessageInfo() {
         return "CompleteTransactionResponseMessage TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
+
+    public boolean isExecutedOnPreviousLeader() {
+        return m_executedOnPreviousLeader;
+    }
+
+    public void setExecutedOnPreviousLeader(boolean onOldLeader) {
+        m_executedOnPreviousLeader = onOldLeader;
+    }
 }
+
