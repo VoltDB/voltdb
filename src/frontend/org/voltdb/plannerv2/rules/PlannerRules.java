@@ -25,6 +25,7 @@ import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.rel.rules.ReduceExpressionsRule;
 import org.apache.calcite.rel.rules.UnionMergeRule;
@@ -107,6 +108,7 @@ public class PlannerRules {
             UnionMergeRule.INSTANCE,
             UnionMergeRule.INTERSECT_INSTANCE,
             UnionMergeRule.MINUS_INSTANCE,
+            ProjectSetOpTransposeRule.INSTANCE,
 
             // Reduces constants inside a LogicalCalc.
             ReduceExpressionsRule.CALC_INSTANCE,

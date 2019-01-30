@@ -85,65 +85,59 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     public void testSetOpsLimit() {
         m_tester.sql("select si from R1 union ALL select si from R2 limit 5 offset 4")
                 .transform("VoltLogicalLimit(limit=[5], offset=[4])\n" +
-                           "  VoltLogicalCalc(expr#0=[{inputs}], SI=[$t0])\n" +
-                           "    VoltLogicalUnion(all=[true])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R2]])\n")
+                           "  VoltLogicalUnion(all=[true])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
         m_tester.sql("select si from R1 union ALL select si from R2 limit ? offset ?")
                 .transform("VoltLogicalLimit(limit=[?0], offset=[?1])\n" +
-                           "  VoltLogicalCalc(expr#0=[{inputs}], SI=[$t0])\n" +
-                           "    VoltLogicalUnion(all=[true])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R2]])\n")
+                           "  VoltLogicalUnion(all=[true])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
                .transform("VoltLogicalLimit(limit=[5], offset=[4])\n" +
                           "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                          "    VoltLogicalCalc(expr#0=[{inputs}], SI=[$t0])\n" +
-                          "      VoltLogicalUnion(all=[true])\n" +
-                          "        VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                          "          VoltLogicalTableScan(table=[[public, R1]])\n" +
-                          "        VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                          "          VoltLogicalTableScan(table=[[public, R2]])\n")
+                          "    VoltLogicalUnion(all=[true])\n" +
+                          "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                          "        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                          "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                          "        VoltLogicalTableScan(table=[[public, R2]])\n")
                .test();
     }
 
     public void testSetOpsOrderBy() {
         m_tester.sql("select si*2 as msi from R1 union ALL select si from R2 order by msi")
                 .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                           "  VoltLogicalCalc(expr#0=[{inputs}], MSI=[$t0])\n" +
-                           "    VoltLogicalUnion(all=[true])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], MSI=[$t7])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R2]])\n")
+                           "  VoltLogicalUnion(all=[true])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], MSI=[$t7])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
         m_tester.sql("select si*2 as si2, si as si1 from R1 union ALL select i, bi from R2 order by si2 ASC, si1 DESC")
                 .transform("VoltLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC])\n" +
-                           "  VoltLogicalCalc(expr#0..1=[{inputs}], proj#0..1=[{exprs}])\n" +
-                           "    VoltLogicalUnion(all=[true])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], SI2=[$t7], SI1=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R2]])\n")
+                           "  VoltLogicalUnion(all=[true])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], SI2=[$t7], SI1=[$t1])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by si+1")
                 .transform("VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
-                           "  VoltLogicalCalc(expr#0=[{inputs}], expr#1=[1], expr#2=[+($t0, $t1)], SI=[$t0], EXPR$1=[$t2])\n" +
-                           "    VoltLogicalUnion(all=[true])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                           "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
-                           "        VoltLogicalTableScan(table=[[public, R2]])\n")
+                           "  VoltLogicalUnion(all=[true])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[1], expr#7=[+($t1, $t6)], SI=[$t1], EXPR$1=[$t7])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                           "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[1], expr#7=[+($t1, $t6)], SI=[$t1], EXPR$1=[$t7])\n" +
+                           "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .test();
     }
 
