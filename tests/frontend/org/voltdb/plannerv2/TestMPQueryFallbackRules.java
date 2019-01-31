@@ -307,7 +307,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     }
 
     public void testSetOp() {
-        // All tables are replicated. Must pass
+        // All tables are replicated. Pass
         m_tester.sql("select I from R1 union (select I from R2 except select II from R3)").test();
 
         // Only one table is partitioned but it has an equality filter based on its partitioning column. Pass
