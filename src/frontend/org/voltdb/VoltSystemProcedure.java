@@ -124,15 +124,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         public int outputDepId = -1;
         public int inputDepIds[] = null;
         public ParameterSet parameters = null;
-        public boolean multipartition = false;
         /** true if distributes to all executable partitions */
-        /**
-         * Used to tell the DTXN to suppress duplicate results from sites that
-         * replicate a partition. Most system procedures don't want this, but,
-         * for example, adhoc queries actually do want duplicate suppression
-         * like user sysprocs.
-         */
-        public boolean suppressDuplicates = false;
+        public boolean multipartition = false;
 
         /**
          * Most MP sysprocs use this pattern of MP fragment and a non-MP aggregator fragment.
@@ -266,20 +259,18 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 }
             }
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
-            if (pf.suppressDuplicates) {
-                task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
-            }
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
                 txnState.createAllParticipatingFragmentWork(task);
             } else {
                 // create one workunit for the current site
-                if (pf.siteId == -1)
+                if (pf.siteId == -1) {
                     txnState.createLocalFragmentWork(task, false);
-                else
+                } else {
                     txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
+                }
             }
         }
     }
