@@ -143,9 +143,6 @@ public class CompleteTransactionTask extends TransactionTask
         }
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
         resp.m_sourceHSId = m_initiator.getHSId();
-        if (!m_completeMsg.isForReplica()) {
-            resp.setExecutedOnPreviousLeader(true);
-        }
         m_initiator.deliver(resp);
     }
 

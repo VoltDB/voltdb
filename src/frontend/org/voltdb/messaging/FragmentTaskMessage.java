@@ -173,7 +173,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // indicate that the fragment should be handled via original partition leader
     // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_executedOnPreviousLeader = false;
+    boolean m_isForOldLeader = false;
 
     // Use to differentiate fragments and completions from different rounds of restart
     // (same transaction can be restarted multiple times due to multiple leader promotions)
@@ -805,7 +805,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
-        buf.put(m_executedOnPreviousLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -945,7 +945,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
-        m_executedOnPreviousLeader = buf.get() == 1;
+        m_isForOldLeader = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1132,7 +1132,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_isForReplica)
             sb.append("\n  THIS IS SENT TO REPLICA");
 
-        if (m_executedOnPreviousLeader) {
+        if (m_isForOldLeader) {
             sb.append("\n  EXECUTE ON ORIGNAL LEADER");
         }
         if (m_taskType == USER_PROC)
@@ -1167,12 +1167,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_items.isEmpty();
     }
 
-    public void setExecutedOnPreviousLeader(boolean forOldLeader) {
-        m_executedOnPreviousLeader = forOldLeader;
+    public void setForOldLeader(boolean forOldLeader) {
+        m_isForOldLeader = forOldLeader;
     }
 
-    public boolean isExecutedOnPreviousLeader() {
-        return m_executedOnPreviousLeader;
+    public boolean isForOldLeader() {
+        return m_isForOldLeader;
     }
 
     public void setTimestamp(long timestamp) {
