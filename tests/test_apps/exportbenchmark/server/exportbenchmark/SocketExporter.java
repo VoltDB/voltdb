@@ -54,8 +54,8 @@ import java.util.Properties;
  * Export class for performance measuring.
  * Export statistics are checked for timestamps, and performance metrics are
  * periodically pushed to a UDP socket for collection.
- * 
- * Note: due to the way timerStart is managed, the statistics are only 
+ *
+ * Note: due to the way timerStart is managed, the statistics are only
  * valid for the first execution of the test client. If the system is not
  * restarted between executions of the test client, then the first interval
  * reported will be much longer and will skew the test results.
