@@ -445,6 +445,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
             assert(dependencies.size() > 0);
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreDigestScan));
+            if (TRACE_LOG.isTraceEnabled()){
+                TRACE_LOG.trace(result.toFormattedString());
+            }
             return new DependencyPair.TableDependencyPair(DEP_restoreDigestScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreHashinatorScan)
@@ -543,7 +546,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // distribution fragments, so two sites on the same node
                 // can't be attempting to set and clear this HashSet simultaneously
                 m_initializedTableSaveFileNames.clear();
-                m_saveFiles.clear();//Tests will reused a VoltDB process that fails a restore
+                m_saveFiles.clear();// Tests will reuse a VoltDB process that fails a restore
 
                 m_filePath = (String) params.toArray()[0];
                 m_filePathType = (String) params.toArray()[1];
@@ -645,11 +648,14 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreScanResults)
         {
-            if(TRACE_LOG.isTraceEnabled()){
+            if (TRACE_LOG.isTraceEnabled()){
                 TRACE_LOG.trace("Aggregating saved table state");
             }
             assert(dependencies.size() > 0);
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreScan));
+            if (TRACE_LOG.isTraceEnabled()){
+                TRACE_LOG.trace(result.toFormattedString());
+            }
             return new DependencyPair.TableDependencyPair(DEP_restoreScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoop)
@@ -660,7 +666,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long coordinatorHSId = (Long)paramsArray[0];
             Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
             m_mbox = m;
-            if(TRACE_LOG.isTraceEnabled()){
+            if (TRACE_LOG.isTraceEnabled()){
                 TRACE_LOG.trace(
                         "Entering async run loop at " + CoreUtils.hsIdToString(context.getSiteId()) +
                         " listening on mbox " + CoreUtils.hsIdToString(m.getHSId()));
@@ -685,7 +691,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
              */
             while (true) {
                 bpm = (BinaryPayloadMessage)m.recvBlocking();
-                if (bpm == null) continue;
+                if (bpm == null) {
+                    continue;
+                }
                 ByteBuffer wrappedMap = ByteBuffer.wrap(bpm.m_payload);
 
                 while (wrappedMap.hasRemaining()) {
@@ -707,7 +715,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
              */
             while (true) {
                 VoltMessage vm = m.recvBlocking(1000);
-                if (vm == null) continue;
+                if (vm == null) {
+                    continue;
+                }
 
                 if (vm instanceof FragmentTaskMessage) {
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
@@ -853,9 +863,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
             if (result == null) {
                 return new DependencyPair.TableDependencyPair(dependency_id, null);
-            }
-            else
+            } else {
                 return new DependencyPair.TableDependencyPair(dependency_id, result);
+            }
         }
 
         else if (fragmentId == SysProcFragmentId.PF_restoreLoadReplicatedTable)
@@ -1128,6 +1138,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                            String json) throws Exception
     {
         JSONObject jsObj = new JSONObject(json);
+        TRACE_LOG.debug(jsObj.toString(2));
         String path = jsObj.getString(SnapshotUtil.JSON_PATH);
         String pathType = jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString());
         JSONArray tableNames = jsObj.optJSONArray(SnapshotUtil.JSON_TABLES);
@@ -1284,8 +1295,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
                 results[0].addRow( "FAILURE", "Save data contains no information for table " + tableName);
             }
-            else if (!saveFileState.isConsistent())
-            {
+            else if (!saveFileState.isConsistent()) {
                 // Also pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
@@ -1296,6 +1306,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     results = new VoltTable[] { new VoltTable(result_columns) };
                 }
                 results[0].addRow( "FAILURE", saveFileState.getConsistencyResult());
+            } else if (TRACE_LOG.isTraceEnabled()) {
+                TRACE_LOG.trace(saveFileState.debug());
             }
         }
         if (results != null) {
@@ -1553,8 +1565,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         //Iterate the export tables
         for (Table t : db.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(db, t))
+            if (!CatalogUtil.isTableExportOnly(db, t)) {
                 continue;
+            }
 
             String signature = t.getSignature();
             String name = t.getTypeName();
@@ -2202,7 +2215,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Map<Long, Long> actualToGenerated = new HashMap<Long, Long>();
                 while (discoveredMailboxes < totalMailboxes) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)m.recvBlocking();
-                    if (bpm == null) continue;
+                    if (bpm == null) {
+                        continue;
+                    }
                     discoveredMailboxes++;
                     ByteBuffer payload = ByteBuffer.wrap(bpm.m_payload);
 
@@ -2235,7 +2250,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 int acksReceived = 0;
                 while (acksReceived < totalMailboxes) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)m.recvBlocking();
-                    if (bpm == null) continue;
+                    if (bpm == null) {
+                        continue;
+                    }
                     acksReceived++;
                 }
 
@@ -2948,7 +2965,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
             //Lightly spinning makes debugging easier by allowing inspection
             //of stuff on the stack
             VoltMessage vm = m.recvBlocking(1000);
-            if (vm == null) continue;
+            if (vm == null) {
+                continue;
+            }
 
             if (vm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
@@ -3042,7 +3061,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private void validateIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
-        if(include == null || include.size() == 0) return;
+        if(include == null || include.size() == 0) {
+            return;
+        }
         Set<String> savedTableNames = savefileState.getSavedTableNames();
         for(String s : include) {
             if(!savedTableNames.contains(s)) {

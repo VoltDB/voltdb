@@ -102,6 +102,8 @@ public abstract class TableSaveFileState
         return m_isRecover ? "true" : "false";
     }
 
+    public abstract String debug();
+
     int m_rootDependencyId;
     protected String m_consistencyResult;
     private final String m_tableName;
