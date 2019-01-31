@@ -1551,7 +1551,7 @@ public class ProcedureRunner {
             if (state.m_depsForLocalTask[i] < 0) {
                 continue;
             }
-            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
+            state.m_localTask.setInputDepId(i, state.m_depsForLocalTask[i]);
         }
 
         // note: non-transactional work only helps us if it's final work
