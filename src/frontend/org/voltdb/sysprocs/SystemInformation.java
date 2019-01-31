@@ -274,7 +274,6 @@ public class SystemInformation extends VoltSystemProcedure
         spf[0] = new SynthesizedPlanFragment();
         spf[0].fragmentId = SysProcFragmentId.PF_systemInformationOverview;
         spf[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].inputDepIds = new int[] {};
         spf[0].multipartition = true;
         spf[0].parameters = ParameterSet.emptyParameterSet();
 
@@ -282,7 +281,6 @@ public class SystemInformation extends VoltSystemProcedure
         spf[1] = new SynthesizedPlanFragment();
         spf[1].fragmentId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
         spf[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_systemInformationOverview };
         spf[1].multipartition = false;
         spf[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -296,7 +294,6 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_systemInformationDeployment;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -304,7 +301,6 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_systemInformationAggregate;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].inputDepIds = new int[]{(int) SysProcFragmentId.PF_systemInformationDeployment};
         pfs[0].multipartition = false;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
@@ -405,14 +401,16 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "VERSION", VoltDB.instance().getVersionString());
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
-        if (path != null && !path.startsWith("http"))
+        if (path != null && !path.startsWith("http")) {
             path = (new File(path)).getAbsolutePath();
+        }
         vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
-        if (path != null && !path.startsWith("http"))
+        if (path != null && !path.startsWith("http")) {
             path = (new File(path)).getAbsolutePath();
+        }
         vt.addRow(hostId, "DEPLOYMENT", path);
 
         String cluster_state = VoltDB.instance().getMode().toString();
@@ -441,8 +439,9 @@ public class SystemInformation extends VoltSystemProcedure
         SocketHubAppender hubAppender =
             (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
         int port = 0;
-        if (hubAppender != null)
+        if (hubAppender != null) {
             port = hubAppender.getPort();
+        }
         vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
         //Add license information
         if (MiscUtils.isPro()) {

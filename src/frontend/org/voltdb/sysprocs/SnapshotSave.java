@@ -329,7 +329,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_createSnapshotTargets;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data,
@@ -340,7 +339,6 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_createSnapshotTargetsResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_createSnapshotTargetsResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_createSnapshotTargets };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
@@ -109,9 +108,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                     modifiedTuples[partitionId] = rowsModified;
                 }
                 else {
-                    if (modifiedTuples[partitionId] != rowsModified)
+                    if (modifiedTuples[partitionId] != rowsModified) {
                         throw new RuntimeException(
                                 "@LoadMultipartitionTable received different tuple mod counts from two replicas.");
+                    }
                 }
             }
 
@@ -172,7 +172,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             pfs[0] = new SynthesizedPlanFragment();
             pfs[0].fragmentId = SysProcFragmentId.PF_distribute;
             pfs[0].outputDepId = (int) SysProcFragmentId.PF_distribute;
-            pfs[0].inputDepIds = new int[] {};
             pfs[0].multipartition = true;
             pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, table);
 
@@ -181,7 +180,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = SysProcFragmentId.PF_aggregate;
             pfs[1].outputDepId = (int) SysProcFragmentId.PF_aggregate;
-            pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_distribute };
             pfs[1].multipartition = false;
             pfs[1].parameters = ParameterSet.emptyParameterSet();
 

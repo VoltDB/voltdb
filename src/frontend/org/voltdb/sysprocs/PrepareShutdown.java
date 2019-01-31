@@ -99,14 +99,12 @@ public class PrepareShutdown extends Pause {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = PF_prepareShutdown;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_prepareShutdown;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = PF_prepareShutdownAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_prepareShutdownAggregate;
-        pfs[1].inputDepIds = new int[] {(int) SysProcFragmentId.PF_prepareShutdown};
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

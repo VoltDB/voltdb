@@ -132,7 +132,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.multipartition = false;
         plan_fragment.siteId = siteId;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
@@ -199,7 +198,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             SysProcFragmentId.PF_restoreLoadReplicatedTable;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
@@ -219,7 +217,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.multipartition = false;
         plan_fragment.siteId = sourceSiteId;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
@@ -238,7 +235,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             SysProcFragmentId.PF_restoreReceiveResultTables;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id,
                 (asPartitioned ? "Aggregating replicated-to-partitioned table restore results"

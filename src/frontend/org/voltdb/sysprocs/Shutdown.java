@@ -128,14 +128,12 @@ public class Shutdown extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownSync;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_shutdownSync;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_shutdownSyncDone;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_shutdownSync };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -145,7 +143,6 @@ public class Shutdown extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 

@@ -332,7 +332,6 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         plan_fragment.multipartition = false;
         plan_fragment.siteId = distributorSiteId;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
@@ -352,7 +351,6 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             SysProcFragmentId.PF_restoreReceiveResultTables;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
-        plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 result_dependency_id,
