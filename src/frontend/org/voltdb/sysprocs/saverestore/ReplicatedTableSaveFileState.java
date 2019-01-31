@@ -132,7 +132,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.multipartition = false;
         plan_fragment.siteId = siteId;
         plan_fragment.outputDepId = result_dependency_id;
-        addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
                 result_dependency_id,
@@ -198,7 +197,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             SysProcFragmentId.PF_restoreLoadReplicatedTable;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
-        addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
                 result_dependency_id,
@@ -217,7 +215,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.multipartition = false;
         plan_fragment.siteId = sourceSiteId;
         plan_fragment.outputDepId = result_dependency_id;
-        addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
                 destinationSiteId,
