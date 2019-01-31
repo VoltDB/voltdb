@@ -30,7 +30,6 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
  * Rules that fallback a query with SetOp operator if it is multi-partitioned.
@@ -50,20 +49,13 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
         super(operand, desc);
     }
 
-    private RelDistribution getDistribution(RelNode node) {
-        if (node instanceof VoltLogicalTableScan) {
-            return node.getTable().getDistribution();
-        }
-        return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-    }
-
     @Override
     public void onMatch(RelOptRuleCall call) {
         SetOp setOp = call.rel(0);
         List<RelDistribution> distributions =
                 setOp.getInputs()
                      .stream()
-                     .map(node -> getDistribution(node))
+                     .map(node -> node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE))
                      .collect(Collectors.toList());
 
         // @TODO For now allow no more than one HASH distribution. Everything else - reject

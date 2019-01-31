@@ -81,9 +81,12 @@ public class MPQueryFallBackRule extends RelOptRule {
                             || ! isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
                     throw new PlannerFallbackException("MP query not supported in Calcite planner.");
             }
-            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
+            RelNode newTableScan = tableScan.copy(tableScan.getTraitSet().replace(tableDist), tableScan.getInputs());
+            // @TODO Need to adjust indexes from the table distribution for a possible Calc projection
+            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), newTableScan, calc.getProgram()));
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
+            // @TODO Still need to adjust distribution's indexes with each transformation if a top node has a projection
             RelNode child = call.rel(1);
             RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
             if (childDist != RelDistributions.ANY) {
