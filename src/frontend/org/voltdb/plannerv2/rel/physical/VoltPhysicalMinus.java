@@ -27,7 +27,7 @@ import org.apache.calcite.rel.core.Minus;
 import com.google.common.base.Preconditions;
 
 /**
- * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical calling convention.
+ * Sub-class of {@link org.apache.calcite.rel.core.Minus} targeted at the VoltDB physical calling convention.
  *
  * @author Mike Alexeev
  * @since 9.0
