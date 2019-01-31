@@ -262,7 +262,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             task.setBatch(fragmentIndex++);
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
-                    task.addInputDepId(0, depId);
+                    task.setInputDepId(0, depId);
                 }
             }
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
