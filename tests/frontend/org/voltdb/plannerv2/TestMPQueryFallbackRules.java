@@ -305,4 +305,42 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select * from P1 where NOT i <> si").testFail();
     }
+
+    public void testSetOp() {
+        // All tables are replicated. Must pass
+        m_tester.sql("select I from R1 union (select I from R2 except select II from R3)").test();
+
+        // Only one table is partitioned but it has an equality filter based on its partitioning column. Pass
+        m_tester.sql("select I from R1 union (select I from P1 where I = 1 except select II from R3)").test();
+
+        // Only one table is partitioned but it has an equality filter based on its partitioning column. Pass
+        m_tester.sql("select I from R1 union select I from P1 where I = 1 union select II from R3").test();
+
+        // Only one table is partitioned without an equality filter based on its partitioning column. Fail
+        m_tester.sql("select I from R1 union (select I from P1 except select II from R3)").testFail();
+
+        // Two partitioned tables, one has an equality filter based on its partitioning column.
+        // Only one SetOp with three children. Fail
+        m_tester.sql("select I from P1  where I = 1 union " +
+                     "select I from R1 union " +
+                     "select I from P2").testFail();
+
+        // Two partitioned tables, one has an equality filter based on its partitioning column.
+        // Two SetOps. Fail.
+        m_tester.sql("select I from P1  where I = 1 except " +
+                     "(select I from R1 intersect select I from P2)").testFail();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns.
+        // Only one SetOp with three children. Fail
+        m_tester.sql("select I from P1  where I = 1 union " +
+                     "select I from R1 union " +
+                     "select I from P2   where I = 1").testFail();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns.
+        // Two SetOps. Fail.
+        m_tester.sql("select I from P1  where I = 1 except " +
+                     "(select I from R1 intersect select I from P2  where I = 1)").testFail();
+
+    }
+
 }

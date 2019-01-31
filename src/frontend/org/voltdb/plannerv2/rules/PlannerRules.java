@@ -36,6 +36,7 @@ import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
@@ -156,7 +157,8 @@ public class PlannerRules {
 
     private static final RuleSet MP_FALLBACK = RuleSets.ofList(
             MPQueryFallBackRule.INSTANCE,
-            MPJoinQueryFallBackRule.INSTANCE
+            MPJoinQueryFallBackRule.INSTANCE,
+            MPSetOpsQueryFallBackRule.INSTANCE
     );
 
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
