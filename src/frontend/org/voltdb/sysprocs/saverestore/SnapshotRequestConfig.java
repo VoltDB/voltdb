@@ -36,8 +36,10 @@ import com.google_voltpatches.common.collect.Sets;
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
+    public final boolean emptyConfig;
     public final Table[] tables;
-    public final Integer partitionCount;
+    public final Integer newPartitionCount;
+    public final String truncationRequestId;
 
     /**
      * @param tables    Tables to snapshot, cannot be null.
@@ -47,23 +49,37 @@ public class SnapshotRequestConfig {
         this(Preconditions.checkNotNull(tables), null);
     }
 
-    public SnapshotRequestConfig(int partitionCount) {
-        this((Table[]) null, Integer.valueOf(partitionCount));
+    public SnapshotRequestConfig(int newPartitionCount) {
+        this((Table[]) null, Integer.valueOf(newPartitionCount));
     }
 
-    protected SnapshotRequestConfig(List<Table> tables, Integer partitionCount) {
-        this(tables.toArray(new Table[tables.size()]), partitionCount);
+    public SnapshotRequestConfig(int newPartitionCount, Database catalogDatabase) {
+        this(getTablesToInclude(null, catalogDatabase), Integer.valueOf(newPartitionCount));
     }
 
-    private SnapshotRequestConfig(Table[] tables, Integer partitionCount) {
+    protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount) {
+        this(tables.toArray(new Table[tables.size()]), newPartitionCount);
+    }
+
+    private SnapshotRequestConfig(Table[] tables, Integer newPartitionCount) {
+        emptyConfig = false;
         this.tables = tables;
-        this.partitionCount = partitionCount;
+        this.newPartitionCount = newPartitionCount;
+        truncationRequestId = null;
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
     {
         tables = getTablesToInclude(jsData, catalogDatabase);
-        partitionCount = jsData == null ? null : (Integer) jsData.opt("partitionCount");
+        if (jsData == null) {
+            emptyConfig = true;
+            newPartitionCount = null;
+            truncationRequestId = null;
+        } else {
+            emptyConfig = false;
+            newPartitionCount = (Integer) jsData.opt("newPartitionCount");
+            truncationRequestId = (String) jsData.opt("truncReqId");
+        }
     }
 
     private static Table[] getTablesToInclude(JSONObject jsData,
@@ -145,8 +161,8 @@ public class SnapshotRequestConfig {
             }
             stringer.endArray();
         }
-        if (partitionCount != null) {
-            stringer.keySymbolValuePair("partitionCount", partitionCount.longValue());
+        if (newPartitionCount != null) {
+            stringer.keySymbolValuePair("newPartitionCount", newPartitionCount.longValue());
         }
     }
 }

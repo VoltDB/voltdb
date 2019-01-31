@@ -72,41 +72,37 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             long timestamp)
     {
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
-                jsData, context, result, extraSnapshotData, tracker, hashinatorData,
-                timestamp, null);
+                new SnapshotRequestConfig(jsData, context.getDatabase()), context, result, extraSnapshotData, tracker,
+                hashinatorData, timestamp);
     }
 
     Callable<Boolean> createSetupInternal(String file_path, String pathType,
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
-                                                    JSONObject jsData,
+                                                    SnapshotRequestConfig config,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     ExtensibleSnapshotDigestData extraSnapshotData,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
-                                                    long timestamp,
-                                                    Integer newPartitionCountInteger)
+                                                    long timestamp)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
         if (hashinatorData == null) {
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
         // TRAIL [SnapSave:5] - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
         final Table[] tableArray = config.tables;
 
         final int newPartitionCount;
         final int partitionCount;
-        if (config.partitionCount != null) {
-            partitionCount = newPartitionCount = config.partitionCount;
-        } else if (newPartitionCountInteger == null) {
-            partitionCount = newPartitionCount = context.getNumberOfPartitions();
+        if (config.newPartitionCount != null) {
+            newPartitionCount = config.newPartitionCount;
+            partitionCount = Math.min(newPartitionCount, context.getNumberOfPartitions());
         } else {
-            newPartitionCount = newPartitionCountInteger.intValue();
-            partitionCount = context.getNumberOfPartitions();
+            partitionCount = newPartitionCount = context.getNumberOfPartitions();
         }
 
         if (newPartitionCount != context.getNumberOfPartitions()) {
@@ -158,10 +154,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
-        boolean isTruncationSnapshot = true;
-        if (jsData != null && config.partitionCount == null) {
-            isTruncationSnapshot = jsData.has("truncReqId");
-        }
+        /*
+         * Force this to act like a truncation snaphsot when there is no config or the data config has a partition
+         * count. This is primarily used by elastic join and remove for the truncation snapshots which they perform.
+         * This doesn't actually do a full truncation snapshot since that is a different request path which should be
+         * fixed at some point.
+         */
+        boolean isTruncationSnapshot = config.emptyConfig || config.newPartitionCount != null
+                || config.truncationRequestId != null;
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, txnId, partitionTransactionIds,

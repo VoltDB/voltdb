@@ -101,10 +101,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        Integer newPartitionCount = config.partitionCount;
+        Integer newPartitionCount = config.newPartitionCount;
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
+            assert newPartitionCount != null;
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                                            context, result,
                                            extraSnapshotData,
@@ -242,12 +243,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,
-                                                             Integer newPartitionCount)
+                                                             int newPartitionCount)
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, null, context,
-                        result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount);
+                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
+                        new SnapshotRequestConfig(newPartitionCount, context.getDatabase()), context, result,
+                        extraSnapshotData, tracker, hashinatorData, timestamp);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {
