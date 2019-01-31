@@ -100,6 +100,6 @@ public class TestStreamSnapshotRequestConfig {
         assertFalse(config.shouldTruncate);
         assertEquals(Sets.newHashSet(3l, 4l), Sets.newHashSet(config.streams.get(0).streamPairs.get(1l)));
         assertEquals(Sets.newHashSet(3l), Sets.newHashSet(config.streams.get(0).streamPairs.get(2l)));
-        assertEquals(6, config.partitionCount.intValue());
+        assertEquals(6, config.newPartitionCount.intValue());
     }
 }
