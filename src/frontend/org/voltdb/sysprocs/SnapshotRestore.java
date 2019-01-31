@@ -1463,7 +1463,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(exportSequenceNumberBytes, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover? 1 : 0);
 
@@ -1471,7 +1470,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -1646,7 +1644,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoop;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreAsyncRunLoop;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(coordinatorHSId);
 
@@ -1654,7 +1651,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoopResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreAsyncRunLoopResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreAsyncRunLoop };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -1672,7 +1668,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreScan;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreScan;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, pathType, fileNonce, dupsPath);
 
@@ -1680,7 +1675,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreScanResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreScanResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreScan };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -1743,7 +1737,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDigestScan;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
@@ -1751,7 +1744,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDigestScanResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreDigestScan };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -1933,7 +1925,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreHashinatorScan;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreHashinatorScan;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
@@ -1941,7 +1932,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreHashinatorScanResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreHashinatorScanResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreHashinatorScan };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -2014,7 +2004,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinator;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeHashinator;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
 
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[]{hashConfig});
@@ -2023,7 +2012,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeHashinatorResults;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_restoreDistributeHashinator };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -2390,7 +2378,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 loadFragment.siteId = m_actualToGenerated.get(site_id);
                                 loadFragment.multipartition = false;
                                 loadFragment.outputDepId = dependencyIds[pfs_index];
-                                loadFragment.inputDepIds = new int[] {};
                                 loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                         tableName,
                                         dependencyIds[pfs_index],
@@ -2408,7 +2395,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         aggregatorFragment.fragmentId = SysProcFragmentId.PF_restoreReceiveResultTables;
                         aggregatorFragment.multipartition = false;
                         aggregatorFragment.outputDepId = result_dependency_id;
-                        aggregatorFragment.inputDepIds = dependencyIds;
                         aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 result_dependency_id,
                                 "Received confirmation of successful partitioned-to-replicated table load");
@@ -2423,7 +2409,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         pfs[0].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
                         pfs[0].siteId = m_actualToGenerated.get(siteId);
                         pfs[0].outputDepId = result_dependency_id;
-                        pfs[0].inputDepIds = new int[] {};
                         pfs[0].multipartition = false;
                         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                                 tableName, result_dependency_id, compressedTable,
@@ -2434,7 +2419,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         pfs[1].fragmentId =
                                 SysProcFragmentId.PF_restoreReceiveResultTables;
                         pfs[1].outputDepId = final_dependency_id;
-                        pfs[1].inputDepIds = new int[] { result_dependency_id };
                         pfs[1].multipartition = false;
                         pfs[1].parameters = ParameterSet.fromArrayNoCopy(
                                 final_dependency_id,
@@ -2596,7 +2580,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         loadFragment.siteId = m_actualToGenerated.get(site_id);
                         loadFragment.multipartition = false;
                         loadFragment.outputDepId = dependencyIds[pfs_index];
-                        loadFragment.inputDepIds = new int [] {};
                         loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 tableName,
                                 dependencyIds[pfs_index],
@@ -2615,7 +2598,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             loadFragment.siteId = m_actualToGenerated.get(site_id);
                             loadFragment.multipartition = false;
                             loadFragment.outputDepId = dependencyIds[pfs_index];
-                            loadFragment.inputDepIds = new int [] {};
                             loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                     tableName,
                                     dependencyIds[pfs_index],
@@ -2633,7 +2615,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         SysProcFragmentId.PF_restoreReceiveResultTables;
                 aggregatorFragment.multipartition = false;
                 aggregatorFragment.outputDepId = result_dependency_id;
-                aggregatorFragment.inputDepIds = dependencyIds;
                 if(asReplicated) {
                     aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                             result_dependency_id,

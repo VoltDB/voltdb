@@ -143,14 +143,12 @@ public class UpdateSettings extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateSettingsBarrier;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateSettingsBarrier;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsBarrierAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateSettingsBarrierAggregate;
-        pfs[1].inputDepIds = new int[] {(int) SysProcFragmentId.PF_updateSettingsBarrier};
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
 
@@ -164,14 +162,12 @@ public class UpdateSettings extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateSettings;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateSettings;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateSettingsAggregate;
-        pfs[1].inputDepIds = new int[] {(int) SysProcFragmentId.PF_updateSettings};
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

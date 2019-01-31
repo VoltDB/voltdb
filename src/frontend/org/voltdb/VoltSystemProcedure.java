@@ -122,7 +122,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         public long siteId = -1;
         public long fragmentId = -1;
         public int outputDepId = -1;
-        public int inputDepIds[] = null;
         public ParameterSet parameters = null;
         /** true if distributes to all executable partitions */
         public boolean multipartition = false;
@@ -149,14 +148,12 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             pfs[0] = new SynthesizedPlanFragment();
             pfs[0].fragmentId = fragmentId;
-            pfs[0].inputDepIds = ArrayUtils.EMPTY_INT_ARRAY;
             pfs[0].outputDepId = (int) fragmentId;
             pfs[0].multipartition = true;
             pfs[0].parameters = params;
 
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = aggFragmentId;
-            pfs[1].inputDepIds = new int[]{ (int) fragmentId };
             pfs[1].outputDepId = (int) aggFragmentId;
             pfs[1].multipartition = false;
             pfs[1].parameters = ParameterSet.emptyParameterSet();
@@ -253,11 +250,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
             //to determine how the follow-up fragments are processed.
             task.setBatch(fragmentIndex++);
-            if (pf.inputDepIds != null) {
-                for (int depId : pf.inputDepIds) {
-                    task.setInputDepId(0, depId);
-                }
-            }
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
 
             if (pf.multipartition) {

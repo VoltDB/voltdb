@@ -339,8 +339,7 @@ public class UpdateCore extends VoltSystemProcedure {
 
     private final void performCatalogVerifyWork(
             String[] tablesThatMustBeEmpty,
-            String[] reasonsForEmptyTables,
-            byte requiresSnapshotIsolation)
+            String[] reasonsForEmptyTables)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -357,7 +356,6 @@ public class UpdateCore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_updateCatalogPrecheckAndSync };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -394,7 +392,6 @@ public class UpdateCore extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateCatalogAggregate;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_updateCatalog };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -475,8 +472,7 @@ public class UpdateCore extends VoltSystemProcedure {
         try {
             performCatalogVerifyWork(
                     tablesThatMustBeEmpty,
-                    reasonsForEmptyTables,
-                    requiresSnapshotIsolation);
+                    reasonsForEmptyTables);
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());

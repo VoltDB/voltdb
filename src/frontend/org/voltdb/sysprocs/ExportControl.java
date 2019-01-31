@@ -32,8 +32,8 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
@@ -121,7 +121,6 @@ public class ExportControl extends VoltSystemProcedure {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_exportControl;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_exportControl;
-        pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 exportSource, exportTargets, operationMode);
@@ -130,7 +129,6 @@ public class ExportControl extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_exportControlAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_exportControlAggregate;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_exportControl };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

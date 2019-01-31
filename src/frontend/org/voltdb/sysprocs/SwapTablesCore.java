@@ -91,14 +91,12 @@ public class SwapTablesCore extends AdHocBase {
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_swapTables;
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_swapTables;
-        pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(oneTable, otherTable);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_swapTablesAggregate;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_swapTablesAggregate;
-        pfs[1].inputDepIds = new int[]{(int) SysProcFragmentId.PF_swapTables};
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

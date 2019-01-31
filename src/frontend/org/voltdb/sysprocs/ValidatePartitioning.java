@@ -162,7 +162,6 @@ public class ValidatePartitioning extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_validatePartitioningResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_validatePartitioningResults;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_validatePartitioning };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -180,7 +179,6 @@ public class ValidatePartitioning extends VoltSystemProcedure {
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_matchesHashinatorResults;
         pfs[1].outputDepId = (int) SysProcFragmentId.PF_matchesHashinatorResults;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_matchesHashinator };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 

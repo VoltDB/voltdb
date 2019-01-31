@@ -79,14 +79,12 @@ public class Quiesce extends VoltSystemProcedure {
             pfs1[0] = new SynthesizedPlanFragment();
             pfs1[0].fragmentId = SysProcFragmentId.PF_quiesce_sites;
             pfs1[0].outputDepId = (int) SysProcFragmentId.PF_quiesce_sites;
-            pfs1[0].inputDepIds = new int[]{};
             pfs1[0].multipartition = true;
             pfs1[0].parameters = ParameterSet.emptyParameterSet();
 
             pfs1[1] = new SynthesizedPlanFragment();
             pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
             pfs1[1].outputDepId = (int) SysProcFragmentId.PF_quiesce_processed_sites;
-            pfs1[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_quiesce_sites };
             pfs1[1].multipartition = false;
             pfs1[1].parameters = ParameterSet.emptyParameterSet();
 
