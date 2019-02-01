@@ -542,6 +542,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void disableExternalStreams();
 
+        bool externalStreamsEnabled();
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 

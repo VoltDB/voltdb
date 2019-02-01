@@ -51,7 +51,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -133,7 +132,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , ApplyBinaryLog(29)
         , ShutDown(30)
         , SetViewsEnabled(31)
-        , DisableExternalStreams(32);
+        , DisableExternalStreams(32)
+        , ExternalStreamsEnabled(33);
 
         Commands(final int id) {
             m_id = id;
@@ -1788,9 +1788,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             return  retval.array();
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        throw new RuntimeException("Failed to executeTask in IPC client");
     }
 
     @Override
@@ -1857,6 +1856,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.flip();
         try {
             m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        m_data.clear();
+        m_data.putInt(Commands.ExternalStreamsEnabled.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            return m_connection.readByte() == 1 ? true : false;
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException();

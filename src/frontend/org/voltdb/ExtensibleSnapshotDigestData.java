@@ -19,10 +19,13 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -41,6 +44,8 @@ public class ExtensibleSnapshotDigestData {
     public static final String EXPORT_SEQUENCE_NUMBER = "exportSequenceNumber";
     public static final String EXPORT_USO = "exportUso";
 
+    public static final String DISABLED_EXTERNAL_STREAMS = "disabledExternalStreams";
+
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
      * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
@@ -54,6 +59,11 @@ public class ExtensibleSnapshotDigestData {
      * Same as m_exportSequenceNumbersToLogOnCompletion, but for m_drTupleStreamInfo
      */
     private final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo;
+
+    /**
+     * Set of partitions where external streams are disabled.
+     */
+    private Set<Integer> m_disabledExternalStreams;
 
     /**
      * Used to pass the last seen unique ids from remote datacenters into the snapshot
@@ -80,6 +90,10 @@ public class ExtensibleSnapshotDigestData {
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
         m_elasticOperationMetadata = elasticOperationMetadata;
+    }
+
+    void setDisabledExternalStreams(Set<Integer> disabledStreams) {
+        m_disabledExternalStreams = disabledStreams;
     }
 
     private void writeExportSequencesToSnapshot(JSONStringer stringer) throws JSONException {
@@ -156,6 +170,26 @@ public class ExtensibleSnapshotDigestData {
                     newObj.put("ackOffset", ackOffset);
                     sequenceNumbers.put(partitionIdString, newObj);
                 }
+            }
+        }
+    }
+
+    private void mergeExternalStreamStatesToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
+        JSONArray jsonPartitions;
+        Set<Integer> disabledStreamsInJson = new HashSet<>();
+        if (jsonObj.has(DISABLED_EXTERNAL_STREAMS)) {
+            jsonPartitions = jsonObj.getJSONArray(DISABLED_EXTERNAL_STREAMS);
+            for (int i=0; i<jsonPartitions.length(); i++) {
+                disabledStreamsInJson.add(jsonPartitions.getInt(i));
+            }
+        } else {
+            jsonPartitions = new JSONArray();
+            jsonObj.put(DISABLED_EXTERNAL_STREAMS, jsonPartitions);
+        }
+
+        for (Integer partition : m_disabledExternalStreams) {
+            if (!disabledStreamsInJson.contains(partition)) {
+                jsonPartitions.put(partition);
             }
         }
     }
@@ -317,6 +351,7 @@ public class ExtensibleSnapshotDigestData {
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
         try {
             writeExportSequencesToSnapshot(stringer);
+            writeExternalStreamStates(stringer);
             writeDRStateToSnapshot(stringer);
             stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(m_elasticOperationMetadata);
         } catch (JSONException e) {
@@ -324,8 +359,20 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
+    /**
+     * Writes external streams state for partitions into snapshot digest.
+     */
+    private void writeExternalStreamStates(JSONStringer stringer) throws JSONException {
+            stringer.key(DISABLED_EXTERNAL_STREAMS).array();
+            for (int partition : m_disabledExternalStreams) {
+                stringer.value(partition);
+            }
+            stringer.endArray();
+    }
+
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
         mergeExportSequenceNumbersToZK(jsonObj, log);
+        mergeExternalStreamStatesToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
         mergeTerminusToZK(jsonObj);
