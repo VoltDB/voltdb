@@ -416,7 +416,6 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
     // the transaction is still open.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
     int64_t seqNo = m_wrapper->getSequenceNumber();
-    std::cout << " seqNo = " << seqNo << std::endl;
 }
 
 /**
