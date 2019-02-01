@@ -42,9 +42,20 @@
        <fileset dir="${external.jars}">
            <include name="json-simple-1.1.1.jar"/>
        </fileset>
+       <fileset dir="../utils">
+         <include name="testutils.jar"/>
+       </fileset>
+
     </path>
 
-    <target name="client-compile">
+    <target name="testutils-compile">
+        <ant dir="../utils" />
+        <!--
+        <ant antfile="../utils/build.xml" target="testutils" />
+        -->
+    </target>
+
+    <target name="client-compile" depends="testutils-compile">
         <mkdir dir="${clientclasses.dir}"/>
         <javac debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
             <classpath refid="build-classpath"/>
