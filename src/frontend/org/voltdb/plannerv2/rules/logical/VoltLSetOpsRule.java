@@ -70,9 +70,9 @@ public class VoltLSetOpsRule extends RelOptRule {
         public abstract RelNode convertToVoltLogical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs);
     }
 
-    private MatchType m_matchType;
+    final private MatchType m_matchType;
 
-    VoltLSetOpsRule(RelOptRuleOperand operand, MatchType matchType) {
+    private VoltLSetOpsRule(RelOptRuleOperand operand, MatchType matchType) {
         super(operand, "VoltLSetOpsRule_" + matchType.name());
         m_matchType = matchType;
     }

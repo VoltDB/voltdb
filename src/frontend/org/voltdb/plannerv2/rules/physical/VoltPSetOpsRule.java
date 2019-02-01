@@ -70,9 +70,9 @@ public class VoltPSetOpsRule extends RelOptRule {
         public abstract RelNode convertToVoltPhysical(SetOp setOp, RelTraitSet convertedTraits, List<RelNode> convertedInputs, int splitCount);
     }
 
-    private MatchType m_matchType;
+    private final MatchType m_matchType;
 
-    VoltPSetOpsRule(RelOptRuleOperand operand, MatchType matchType) {
+    private VoltPSetOpsRule(RelOptRuleOperand operand, MatchType matchType) {
         super(operand, "VoltPSetOpsRule_" + matchType.name());
         m_matchType = matchType;
     }

@@ -58,7 +58,8 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
                      .map(node -> node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE))
                      .collect(Collectors.toList());
 
-        // @TODO For now allow no more than one HASH distribution. Everything else - reject
+        // @TODO For now allow no more than one HASH distribution which should have passed the MPQueryFallBackRule validation.
+        // Everything else - reject
         List<RelDistribution> hashDistributions =
                 distributions.stream()
                              .filter(distribution -> Type.HASH_DISTRIBUTED == distribution.getType())
