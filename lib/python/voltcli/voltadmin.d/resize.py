@@ -26,7 +26,7 @@ class Option:
     TEST = 0
     START = 1
     STATUS = 2
-    RESET = 3
+    RESTART = 3
 
 
 def test(runner):
@@ -38,8 +38,8 @@ def start(runner):
 def status(runner):
     procedureCaller(runner, Option.STATUS)
 
-def reset(runner):
-    procedureCaller(runner, Option.RESET)
+def restart(runner):
+    procedureCaller(runner, Option.RESTART)
 
 def procedureCaller(runner, type):
     response = runner.call_proc('@SystemInformation',
@@ -63,7 +63,7 @@ def procedureCaller(runner, type):
         runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
 
     result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [type, runner.opts.hostOrPartition]).table(0)
+                              [type, '']).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
     if status == 0:
@@ -79,7 +79,7 @@ def procedureCaller(runner, type):
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('reset', reset, 'Reset the previous failed resizing operation.'),
+            VOLT.Modifier('restart', restart, 'Restart the previous failed resizing operation.'),
     )
 )
 
