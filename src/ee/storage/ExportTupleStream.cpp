@@ -113,6 +113,10 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         //If we can not fit the data get a new block with size that includes schemaSize as well.
         extendBufferChain(tupleMaxLength);
     }
+    // Mark the start sequence number of current block, starts from 1.
+    if (m_currBlock->startExportSequenceNumber() == 0) {
+        m_currBlock->recordStartExportSequenceNumber(m_exportSequenceNumber);
+    }
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
         ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+s_EXPORT_BUFFER_HEADER_SIZE,
@@ -155,11 +159,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
-    m_uncommittedTupleCount++;
-    std::cout << "Append tuple m_uncommittedTupleCount=" << m_uncommittedTupleCount
-              << " start exportSequenceNumber=" << m_currBlock->startExportSequenceNumber()
-              << " row count=" << m_currBlock->getRowCountforExport()
-              << std::endl;
+    m_stashedTupleCount++;
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -175,7 +175,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
-    m_exportSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
 //    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " sequence number " << seqNo

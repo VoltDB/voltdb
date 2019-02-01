@@ -53,8 +53,8 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-      m_uncommittedTupleCount(0),
-      m_exportSequenceNumber(1) // sequence number starts from 1
+      m_stashedTupleCount(0),
+      m_exportSequenceNumber(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -153,8 +153,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
         m_openUniqueId = uniqueId;
-        m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
-        m_uncommittedTupleCount = 0;
+        m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+        m_stashedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -170,8 +170,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
         m_committedUniqueId = m_openUniqueId;
-        m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
-        m_uncommittedTupleCount = 0;
+        m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+        m_stashedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -223,18 +223,10 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
 
     // back up the universal stream counter
     m_uso = mark;
-    // make the stream of tuples contiguous outside of actual system failures
-    std::cout << "exportSeqNo before: m_uncommittedTupleCount=" << m_uncommittedTupleCount << std::endl;
-    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
 
-    // TODO:
-    // Because right now every appendTuple in export stream incorporates a commit,
-    // most of time uncommitted tuple count will be 1, if there are multiple stream table inserts
-    // in a transaction and it is rolled back, uncommitted tuple count may be negative.
-    // The real fix would be stream table commits at end of transaction or flush.
-    if (m_uncommittedTupleCount < 0) {
-        m_uncommittedTupleCount = 0;
-    }
+    // Simply reset stashedTupleCount because row count of all previous blocks have already
+    // been updated. Row count of the last non-empty block is handled by truncateTo().
+    m_stashedTupleCount = 0;
     m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
@@ -296,6 +288,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
+            m_currBlock->updateRowCountForExport(m_stashedTupleCount);
+            m_stashedTupleCount = 0;
             m_pendingBlocks.push_back(m_currBlock);
             oldBlock = m_currBlock;
             m_currBlock = NULL;
@@ -322,8 +316,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
-
-    m_currBlock->recordStartExportSequenceNumber(m_exportSequenceNumber);
 
     if (openTransaction) {
         handleOpenTransaction(oldBlock);

@@ -61,7 +61,7 @@ public:
         assert(m_uso == 0);
         m_uso = count;
         // this is for start sequence number of stream block
-        m_exportSequenceNumber = seqNo + 1;
+        m_exportSequenceNumber = seqNo;
         //Extend the buffer chain to replace any existing stream blocks with a new one
         //with the correct sequence number
         extendBufferChain(0);

@@ -118,10 +118,10 @@ public:
     size_t m_headerSpace;
 
     /**
-     * The number of Export Tuples applied to the Export Stream Block in the current txn;
-     * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
-     */
-    int64_t m_uncommittedTupleCount;
+    * The number of Export Tuples applied to the Export Stream Block in the current txn;
+    * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
+    */
+    int64_t m_stashedTupleCount;
 
     int64_t m_exportSequenceNumber;
 };
