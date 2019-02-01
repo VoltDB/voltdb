@@ -162,8 +162,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (limit != null) {
             if (limit instanceof RexDynamicParam) {
                 lpn.setLimit(-1);
-                lpn.setLimitParameterIndex(RexConverter.getParameterIndex());
-                RexConverter.setParameterIndex(RexConverter.getParameterIndex() + 1);
+                lpn.setLimitParameterIndex(RexConverter.getAndIncrementParameterIndex());
             } else {
                 lpn.setLimit(RexLiteral.intValue(limit));
             }
@@ -171,8 +170,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         if (offset != null) {
             if (offset instanceof RexDynamicParam) {
                 lpn.setOffset(0);
-                lpn.setOffsetParameterIndex(RexConverter.getParameterIndex());
-                RexConverter.setParameterIndex(RexConverter.getParameterIndex() + 1);
+                lpn.setOffsetParameterIndex(RexConverter.getAndIncrementParameterIndex());
             } else {
                 lpn.setOffset(RexLiteral.intValue(offset));
             }

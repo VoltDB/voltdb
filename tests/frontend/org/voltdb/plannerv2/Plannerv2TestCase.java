@@ -194,7 +194,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
     public class MPFallbackTester extends LogicalRulesTester {
         @Override public void test() throws AssertionError {
             super.test();
-            m_transformedNode = VoltRelUtil.addTraitRecurcively(m_transformedNode, RelDistributions.ANY);
+            m_transformedNode = VoltRelUtil.addTraitRecursively(m_transformedNode, RelDistributions.ANY);
             m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK, m_transformedNode);
         }

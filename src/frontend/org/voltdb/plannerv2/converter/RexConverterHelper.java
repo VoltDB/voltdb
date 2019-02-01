@@ -61,7 +61,7 @@ public class RexConverterHelper {
         FunctionExpression fe = new FunctionExpression();
         fe.setAttributes(funcName, impliedArg, funcId);
         fe.setArgs(operands);
-        TypeConverter.setType(fe, relDataType);
+        RexConverter.setType(fe, relDataType);
         return fe;
     }
 
@@ -74,7 +74,7 @@ public class RexConverterHelper {
         FunctionExpression fe = new FunctionExpression();
         fe.setAttributes(funcName, impliedArg, funcId);
         fe.setArgs(operands);
-        TypeConverter.setType(fe, voltType, voltType.getMaxLengthInBytes());
+        RexConverter.setType(fe, voltType, voltType.getMaxLengthInBytes());
         return fe;
     }
 
@@ -100,8 +100,8 @@ public class RexConverterHelper {
         if (timestamp == null || interval == null) {
             throw new CalcitePlanningException("Invalid arguments for VoltDB TO_TIMESTAMP function");
         }
-        TypeConverter.setType(timestamp, VoltType.TIMESTAMP, VoltType.TIMESTAMP.getLengthInBytesForFixedTypes());
-        TypeConverter.setType(interval, VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        RexConverter.setType(timestamp, VoltType.TIMESTAMP, VoltType.TIMESTAMP.getLengthInBytesForFixedTypes());
+        RexConverter.setType(interval, VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 
         // SINCE_EPOCH
         List<AbstractExpression> epochOperands = new ArrayList<>();
@@ -116,7 +116,7 @@ public class RexConverterHelper {
 
         // Plus/Minus interval
         AbstractExpression plusExpr = new OperatorExpression(intervalOperatorType, sinceEpochExpr, interval);
-        TypeConverter.setType(plusExpr, VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        RexConverter.setType(plusExpr, VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 
         // TO_TIMESTAMP
         List<AbstractExpression> timestampOperands = new ArrayList<>();
@@ -127,7 +127,7 @@ public class RexConverterHelper {
                 FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
                 timestampOperands,
                 impliedArgMicrosecond);
-        TypeConverter.setType(timestampExpr, relDataType);
+        RexConverter.setType(timestampExpr, relDataType);
 
         return timestampExpr;
     }
@@ -151,7 +151,7 @@ public class RexConverterHelper {
         inExpr.setRight(rightInExpr);
         inExpr.setQuantifier(QuantifierType.ANY);
         inExpr.finalizeValueTypes();
-        TypeConverter.setType(inExpr, relDataType);
+        RexConverter.setType(inExpr, relDataType);
         return inExpr;
     }
 }

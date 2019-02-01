@@ -34,13 +34,16 @@ import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannerv2.ColumnTypes;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
@@ -51,43 +54,284 @@ import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
 
+/**
+ * The utility class that covert Calcite row expression node to Volt AbstractExpression.
+ */
 public class RexConverter {
+    private RexConverter() {}
 
-    private static int NEXT_PARAMETER_ID = 0;
+    // used to keep track of a RexDynamicParam's index.
+    private static ThreadLocal<Integer> NEXT_PARAMETER_ID = ThreadLocal.withInitial(() -> 0);
 
     public static void resetParameterIndex() {
-        NEXT_PARAMETER_ID = 0;
+        NEXT_PARAMETER_ID.set(0);
     }
 
     public static int getParameterIndex() {
-        return NEXT_PARAMETER_ID;
+        return NEXT_PARAMETER_ID.get();
     }
 
     public static void setParameterIndex(int index) {
-        NEXT_PARAMETER_ID = index;
+        NEXT_PARAMETER_ID.set(index);
     }
 
+    public static int getAndIncrementParameterIndex() {
+        int val = NEXT_PARAMETER_ID.get();
+        setParameterIndex(val + 1);
+        return val;
+    }
+
+    public static void setType(AbstractExpression ae, RelDataType rdt) {
+        VoltType vt = ColumnTypes.getVoltType(rdt.getSqlTypeName());
+        Preconditions.checkNotNull(vt);
+        setType(ae, vt, rdt.getPrecision());
+    }
+
+    public static void setType(AbstractExpression ae, VoltType vt, int precision) {
+
+        ae.setValueType(vt);
+
+        if (vt.isVariableLength()) {
+            int size;
+            if ((ae instanceof ConstantValueExpression ||
+                    ae instanceof FunctionExpression)
+                    &&
+                    (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
+                size = vt.getMaxLengthInBytes();
+            } else {
+                size = precision;
+            }
+            if (!(ae instanceof ParameterValueExpression)) {
+                ae.setValueSize(size);
+            }
+        }
+    }
+
+    /**
+     * Build binary conjunction expression tree out of flat list of operands
+     *
+     * @param exprType
+     * @param aeOperands
+     * @return
+     */
+    private static AbstractExpression buildExprTree(ExpressionType exprType, List<AbstractExpression> aeOperands) {
+        Preconditions.checkArgument(aeOperands.size() > 1);
+        return aeOperands.stream().skip(2)
+                .reduce(new ConjunctionExpression(exprType, aeOperands.get(0), aeOperands.get(1)),
+                        (left, right) -> new ConjunctionExpression(exprType, left, right));
+    }
+
+    /**
+     * Convert a Calcite RexCall to Volt AbstractExpression.
+     *
+     * @param call
+     * @param aeOperands
+     * @return The converted AbstractExpression.
+     */
+    public static AbstractExpression rexCallToAbstractExpression(RexCall call, List<AbstractExpression> aeOperands) {
+        AbstractExpression ae;
+        switch (call.op.kind) {
+            // Conjunction
+            case AND:
+                ae = buildExprTree(ExpressionType.CONJUNCTION_AND, aeOperands);
+                break;
+            case OR:
+                if (aeOperands.size() == 2) {
+                    // Binary OR
+                    ae = new ConjunctionExpression(
+                            ExpressionType.CONJUNCTION_OR,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                } else {
+                    // COMPARE_IN
+                    ae = RexConverterHelper.createInComparisonExpression(call.getType(), aeOperands);
+                }
+                break;
+
+            // Binary Comparison
+            case EQUALS:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_EQUAL,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case NOT_EQUALS:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_NOTEQUAL,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LESS_THAN:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LESSTHAN,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case GREATER_THAN:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_GREATERTHAN,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LESS_THAN_OR_EQUAL:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LESSTHANOREQUALTO,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case GREATER_THAN_OR_EQUAL:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LIKE:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LIKE,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+//            COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
+
+            // Arthimetic Operators
+            case PLUS:
+                // Check for DATETIME + INTERVAL expression first
+                if (call.op instanceof SqlDatetimePlusOperator) {
+                    // At this point left and right operands are converted to MICROSECONDS
+                    ae = RexConverterHelper.createToTimestampFunctionExpression(
+                            call.getType(),
+                            ExpressionType.OPERATOR_PLUS,
+                            aeOperands);
+                } else {
+                    ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_PLUS,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                }
+                break;
+            case MINUS:
+                // Check for DATETIME - INTERVAL expression first
+                // For whatever reason Calcite treats + and - DATETIME operation differently
+                if (call.op instanceof SqlDatetimeSubtractionOperator) {
+                    ae = RexConverterHelper.createToTimestampFunctionExpression(
+                            call.getType(),
+                            ExpressionType.OPERATOR_MINUS,
+                            aeOperands);
+                } else {
+                    ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_MINUS,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                }
+                break;
+            case TIMES:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_MULTIPLY,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case DIVIDE:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_DIVIDE,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case CAST:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_CAST,
+                        aeOperands.get(0),
+                        null);
+                RexConverter.setType(ae, call.getType());
+                break;
+            case NOT:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_NOT,
+                        aeOperands.get(0),
+                        null);
+                RexConverter.setType(ae, call.getType());
+                break;
+            case IS_NULL:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_IS_NULL,
+                        aeOperands.get(0),
+                        null);
+                RexConverter.setType(ae, call.getType());
+                break;
+            case IS_NOT_NULL:
+                AbstractExpression isnullexpr = new OperatorExpression(
+                        ExpressionType.OPERATOR_IS_NULL,
+                        aeOperands.get(0),
+                        null);
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_NOT,
+                        isnullexpr,
+                        null);
+                RexConverter.setType(ae, call.getType());
+                break;
+            case EXISTS:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_EXISTS,
+                        aeOperands.get(0),
+                        null);
+                RexConverter.setType(ae, call.getType());
+                break;
+
+//            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
+//                // left || right (both must be char/varchar)
+//            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
+//                // left % right (both must be integer)
+
+            case OTHER:
+                if ("||".equals(call.op.getName())) {
+                    // CONCAT
+                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null);
+                    RexConverter.setType(ae, call.getType());
+                } else {
+                    throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                            call.op.kind.toString());
+                }
+                break;
+            case OTHER_FUNCTION:
+                ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName().toLowerCase(), aeOperands, null);
+                RexConverter.setType(ae, call.getType());
+                break;
+            default:
+                throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                        call.op.kind.toString());
+        }
+
+        Preconditions.checkNotNull(ae);
+        RexConverter.setType(ae, call.getType());
+        return ae;
+    }
+
+    /**
+     * A visitor that covert Calcite row expression node to Volt AbstractExpression.
+     */
     private static class ConvertingVisitor extends RexVisitorImpl<AbstractExpression> {
 
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
 
-        protected int m_numLhsFieldsForJoin = -1;
+        // the number of the outer table column in the select query.
+        // For example "SELECT foo.a, bar.b, bar.c FROM foo, bar" gets 1
+        // because only one column of outer table gets selected.
+        int m_numOuterFieldsForJoin = -1;
 
-        protected ConvertingVisitor() {
+        ConvertingVisitor() {
             super(false);
         }
 
         public ConvertingVisitor(int numLhsFields) {
             super(false);
-            m_numLhsFieldsForJoin = numLhsFields;
+            m_numOuterFieldsForJoin = numLhsFields;
         }
 
-        protected boolean isFromRHSTable(int columnIndex) {
-            return m_numLhsFieldsForJoin >= 0 && columnIndex >= m_numLhsFieldsForJoin;
+        boolean isFromInnerTable(int columnIndex) {
+            return m_numOuterFieldsForJoin >= 0 && columnIndex >= m_numOuterFieldsForJoin;
         }
 
-        protected TupleValueExpression visitInputRef(int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
-
+        TupleValueExpression visitInputRef(int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
+            // null if the column comes from RexInputRef
             if (tableName == null) {
                 tableName = "";
             }
@@ -98,7 +342,7 @@ public class RexConverter {
 
             TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, inputColumnIdx, inputColumnIdx);
             tve.setTableIndex(tableIndex);
-            TypeConverter.setType(tve, inputType);
+            RexConverter.setType(tve, inputType);
             return tve;
         }
 
@@ -107,8 +351,8 @@ public class RexConverter {
             int inputRefIdx = inputRef.getIndex();
             int tableIndex = 0;
 
-            if (isFromRHSTable(inputRefIdx)) {
-                inputRefIdx -= m_numLhsFieldsForJoin;
+            if (isFromInnerTable(inputRefIdx)) {
+                inputRefIdx -= m_numOuterFieldsForJoin;
                 tableIndex = 1;
             }
             return visitInputRef(tableIndex, inputRefIdx, inputRef.getType(), null, null);
@@ -117,8 +361,8 @@ public class RexConverter {
         @Override
         public ParameterValueExpression visitDynamicParam(RexDynamicParam inputParam) {
             ParameterValueExpression pve = new ParameterValueExpression();
-            pve.setParameterIndex(NEXT_PARAMETER_ID++);
-            TypeConverter.setType(pve, inputParam.getType());
+            pve.setParameterIndex(getAndIncrementParameterIndex());
+            RexConverter.setType(pve, inputParam.getType());
             return pve;
         }
 
@@ -126,7 +370,7 @@ public class RexConverter {
         public ConstantValueExpression visitLiteral(RexLiteral literal) {
             ConstantValueExpression cve = new ConstantValueExpression();
 
-            String value = null;
+            final String value;
             if (literal.getValue() instanceof NlsString) {
                 NlsString nlsString = (NlsString) literal.getValue();
                 value = nlsString.getValue();
@@ -147,225 +391,21 @@ public class RexConverter {
                 value = literal.getValue().toString();
             }
 
-            Preconditions.checkNotNull(value);
-
             cve.setValue(value);
-            TypeConverter.setType(cve, literal.getType());
+            RexConverter.setType(cve, literal.getType());
 
             return cve;
         }
 
         @Override
         public AbstractExpression visitCall(RexCall call) {
-
             List<AbstractExpression> aeOperands = new ArrayList<>();
             for (RexNode operand : call.operands) {
                 AbstractExpression ae = operand.accept(this);
                 Preconditions.checkNotNull(ae);
                 aeOperands.add(ae);
             }
-
-            AbstractExpression ae = null;
-            switch (call.op.kind) {
-                // Conjunction
-                case AND:
-                    ae = buildExprTree(ExpressionType.CONJUNCTION_AND, aeOperands);
-                    break;
-                case OR:
-                    if (aeOperands.size() == 2) {
-                        // Binary OR
-                        ae = new ConjunctionExpression(
-                                ExpressionType.CONJUNCTION_OR,
-                                aeOperands.get(0),
-                                aeOperands.get(1));
-                    } else {
-                        // COMPARE_IN
-                        ae = RexConverterHelper.createInComparisonExpression(call.getType(), aeOperands);
-                    }
-                    break;
-
-                // Binary Comparison
-                case EQUALS:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_EQUAL,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case NOT_EQUALS:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_NOTEQUAL,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case LESS_THAN:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_LESSTHAN,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case GREATER_THAN:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_GREATERTHAN,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case LESS_THAN_OR_EQUAL:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case GREATER_THAN_OR_EQUAL:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case LIKE:
-                    ae = new ComparisonExpression(
-                            ExpressionType.COMPARE_LIKE,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-//            COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
-
-                // Arthimetic Operators
-                case PLUS:
-                    // Check for DATETIME + INTERVAL expression first
-                    if (call.op instanceof SqlDatetimePlusOperator) {
-                        // At this point left and right operands are converted to MICROSECONDS
-                        ae = RexConverterHelper.createToTimestampFunctionExpression(
-                                call.getType(),
-                                ExpressionType.OPERATOR_PLUS,
-                                aeOperands);
-                    } else {
-                        ae = new OperatorExpression(
-                                ExpressionType.OPERATOR_PLUS,
-                                aeOperands.get(0),
-                                aeOperands.get(1));
-                    }
-                    break;
-                case MINUS:
-                    // Check for DATETIME - INTERVAL expression first
-                    // For whatever reason Calcite treats + and - DATETIME operation differently
-                    if (call.op instanceof SqlDatetimeSubtractionOperator) {
-                        ae = RexConverterHelper.createToTimestampFunctionExpression(
-                                call.getType(),
-                                ExpressionType.OPERATOR_MINUS,
-                                aeOperands);
-                    } else {
-                        ae = new OperatorExpression(
-                                ExpressionType.OPERATOR_MINUS,
-                                aeOperands.get(0),
-                                aeOperands.get(1));
-                    }
-                    break;
-                case TIMES:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_MULTIPLY,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case DIVIDE:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_DIVIDE,
-                            aeOperands.get(0),
-                            aeOperands.get(1));
-                    break;
-                case CAST:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_CAST,
-                            aeOperands.get(0),
-                            null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-                case NOT:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_NOT,
-                            aeOperands.get(0),
-                            null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-                case IS_NULL:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_IS_NULL,
-                            aeOperands.get(0),
-                            null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-                case IS_NOT_NULL:
-                    AbstractExpression isnullexpr = new OperatorExpression(
-                            ExpressionType.OPERATOR_IS_NULL,
-                            aeOperands.get(0),
-                            null);
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_NOT,
-                            isnullexpr,
-                            null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-                case EXISTS:
-                    ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_EXISTS,
-                            aeOperands.get(0),
-                            null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-
-//            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
-//                // left || right (both must be char/varchar)
-//            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
-//                // left % right (both must be integer)
-
-                case OTHER:
-                    if ("||".equals(call.op.getName())) {
-                        // CONCAT
-                        ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null);
-                        TypeConverter.setType(ae, call.getType());
-                    } else {
-                        throw new CalcitePlanningException("Unsupported Calcite expression type: " +
-                                call.op.kind.toString());
-                    }
-                    break;
-                case OTHER_FUNCTION:
-                    ae = RexConverterHelper.createFunctionExpression(call.getType(), call.op.getName().toLowerCase(), aeOperands, null);
-                    TypeConverter.setType(ae, call.getType());
-                    break;
-                default:
-                    throw new CalcitePlanningException("Unsupported Calcite expression type: " +
-                            call.op.kind.toString());
-            }
-
-            Preconditions.checkNotNull(ae);
-            TypeConverter.setType(ae, call.getType());
-            return ae;
-        }
-
-        /**
-         * Build binary expression tree out of flat list of operands
-         *
-         * @param exprType
-         * @param aeOperands
-         * @return
-         */
-        private AbstractExpression buildExprTree(ExpressionType exprType, List<AbstractExpression> aeOperands) {
-            Preconditions.checkArgument(aeOperands.size() > 1);
-            AbstractExpression ae = new ConjunctionExpression(exprType);
-            int idx = 0;
-            for (AbstractExpression operand : aeOperands) {
-                if (idx == 0) {
-                    ae.setLeft(operand);
-                } else if (idx == 1) {
-                    ae.setRight(operand);
-                } else {
-                    AbstractExpression andExpr = new ConjunctionExpression(exprType);
-                    andExpr.setLeft(ae);
-                    andExpr.setRight(operand);
-                    ae = andExpr;
-                }
-                ++idx;
-            }
-            return ae;
+            return RexConverter.rexCallToAbstractExpression(call, aeOperands);
         }
     }
 
@@ -383,7 +423,7 @@ public class RexConverter {
         int i = 0;
         for (RelDataTypeField item : ty.getFieldList()) {
             TupleValueExpression tve = new TupleValueExpression("", "", "", names.get(i), i, i);
-            TypeConverter.setType(tve, item.getType());
+            RexConverter.setType(tve, item.getType());
             nodeSchema.addColumn(new SchemaColumn("", "", "", names.get(i), tve, i));
             ++i;
         }
@@ -413,7 +453,7 @@ public class RexConverter {
 
         TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
         tve.setTableIndex(tableIndex);
-        TypeConverter.setType(tve, dataTypeField.getType());
+        RexConverter.setType(tve, dataTypeField.getType());
         return tve;
     }
 }

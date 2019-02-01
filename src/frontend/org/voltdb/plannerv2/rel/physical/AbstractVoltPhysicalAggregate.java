@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -197,7 +198,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
 
             List<Integer> aggrExprIndexes = aggrCall.getArgList();
             // VoltDB supports aggregates with only one parameter
-            assert(aggrExprIndexes.size() < 2);
+            Preconditions.checkState(aggrExprIndexes.size() < 2);
             AbstractExpression aggrExpr = null;
             if (!aggrExprIndexes.isEmpty()) {
                 RelDataTypeField field = fields.get(aggrExprIndexes.get(0));

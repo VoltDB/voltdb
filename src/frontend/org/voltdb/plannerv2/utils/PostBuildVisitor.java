@@ -21,7 +21,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannerv2.ColumnTypes;
-import org.voltdb.plannerv2.converter.TypeConverter;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -47,7 +47,7 @@ public class PostBuildVisitor extends AbstractPlanNodeVisitor {
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex((int) ((LimitPlanNode) node).getLimitParameterIndex());
                 // we don't care about precision for ParameterValueExpression
-                TypeConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
+                RexConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
                 m_pveSet.add(pve);
             }
             // add the Offset Parameter
@@ -55,7 +55,7 @@ public class PostBuildVisitor extends AbstractPlanNodeVisitor {
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex((int) ((LimitPlanNode) node).getOffsetParameterIndex());
                 // we don't care about precision for ParameterValueExpression
-                TypeConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
+                RexConverter.setType(pve, ColumnTypes.getVoltType(SqlTypeName.INTEGER), 0);
                 m_pveSet.add(pve);
             }
         }

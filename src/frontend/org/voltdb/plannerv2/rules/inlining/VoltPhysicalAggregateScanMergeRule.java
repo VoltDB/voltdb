@@ -42,7 +42,7 @@ public class VoltPhysicalAggregateScanMergeRule extends RelOptRule {
         AbstractVoltPhysicalAggregate aggregate = call.rel(0);
         VoltPhysicalTableScan scan = call.rel(1);
 
-        RelNode newScan = scan.copyWithAggregate(scan.getTraitSet(), aggregate);
+        RelNode newScan = scan.copyWithAggregate(scan.getTraitSet().merge(aggregate.getTraitSet()), aggregate);
         call.transformTo(newScan);
     }
 }

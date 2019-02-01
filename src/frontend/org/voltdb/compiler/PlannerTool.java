@@ -247,7 +247,7 @@ public class PlannerTool {
         planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Add RelDistributions.ANY trait to the rel tree.
-        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
+        transformed = VoltRelUtil.addTraitRecursively(transformed, RelDistributions.ANY);
 
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.

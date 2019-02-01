@@ -36,7 +36,7 @@ public class VoltRelUtil {
      * @param newTrait
      * @return
      */
-    public static RelNode addTraitRecurcively(RelNode rel, RelTrait newTrait) {
+    public static RelNode addTraitRecursively(RelNode rel, RelTrait newTrait) {
         Preconditions.checkNotNull(rel);
         RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);

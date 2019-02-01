@@ -17,7 +17,9 @@
 
 package org.voltdb.plannerv2.guards;
 
-public class CalcitePlanningException extends RuntimeException {
+import org.voltdb.planner.PlanningErrorException;
+
+public class CalcitePlanningException extends PlanningErrorException {
 
     public CalcitePlanningException(String msg) {
         super(msg);

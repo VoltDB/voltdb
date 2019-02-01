@@ -202,7 +202,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     protected int getLimit() {
         if (m_limit != null) {
-            if (m_limit instanceof RexDynamicParam) {
+            if (m_limit instanceof RexDynamicParam) { // when LIMIT ?
                 return -1;
             } else {
                 return RexLiteral.intValue(m_limit);
