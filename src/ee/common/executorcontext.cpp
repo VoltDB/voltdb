@@ -403,7 +403,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
 bool ExecutorContext::checkTransactionForDR() {
     bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream && m_drStream->drStreamStarted()) {
+        if (m_externalStreamsEnabled && m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
                     m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(

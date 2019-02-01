@@ -332,11 +332,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 }
 
 bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
-    //TODO: See if we can set drStream to NULL when streams are disabled
-    // to avoid adding another if check here.
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
-    return m_drEnabled && drStream && drStream->drStreamStarted() &&
-          (isReplicatedTable() || ec->externalStreamsEnabled());
+    return m_drEnabled && drStream && drStream->drStreamStarted();
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,

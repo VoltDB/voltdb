@@ -45,8 +45,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
-import com.google_voltpatches.common.base.Throwables;
-
 /**
  * Wrapper for native Execution Engine library.
  * All native methods are private to make it simple
@@ -901,9 +899,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             checkErrorCode(errorCode);
             return (byte[])m_nextDeserializer.readArray(byte.class);
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     @Override
@@ -930,5 +927,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void disableExternalStreams() {
         nativeDisableExternalStreams(pointer);
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return nativeExternalStreamsEnabled(pointer);
     }
 }

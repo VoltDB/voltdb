@@ -272,4 +272,11 @@ public interface SiteProcedureConnection {
      * <p> By default this is enabled in all sites.
      */
     public void disableExternalStreams();
+
+    /**
+     * Returns value showing whether external streams (DR and export) are enabled for this Site.
+     *
+     * @return true if external streams are enabled for this site, false otherwise.
+     */
+    public boolean externalStreamsEnabled();
 }

@@ -182,6 +182,8 @@ public class SnapshotSaveAPI
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
                             remoteDataCenterLastIds, es == null ? null : es.getResumeMetadata(),
                             finalJsData);
+                    m_allLocalSiteSnapshotDigestData.setDisabledExternalStreams(
+                            SnapshotSiteProcessor.getDisabledExternalStreams());
                     createSetupIv2(
                             file_path,
                             pathType,
@@ -206,7 +208,7 @@ public class SnapshotSaveAPI
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
-            SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
+            SnapshotSiteProcessor.populateExternalStreamsStatesFromSites(context);
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
             if (SNAP_LOG.isDebugEnabled()) {
                 SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId) + " SP Txn:" +

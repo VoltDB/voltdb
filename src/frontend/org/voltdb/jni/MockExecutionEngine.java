@@ -262,4 +262,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public void disableExternalStreams() {
     }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return true;
+    }
 }
