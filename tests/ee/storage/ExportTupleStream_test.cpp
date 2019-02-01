@@ -205,167 +205,167 @@ protected:
 /**
  * Get one tuple
  */
-TEST_F(ExportTupleStreamTest, DoOneTuple) {
-
-    // write a new tuple and then flush the buffer
-    appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 2);
-
-    // we should only have one tuple in the buffer
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    EXPECT_EQ(results->uso(), 0);
-    std::ostringstream os;
-    os << "Offset mismatch. Expected: " << m_tupleSize << ", actual: " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE(results->offset() == m_tupleSize, os.str().c_str());
-}
-
-/**
- * Test the really basic operation order
- */
-TEST_F(ExportTupleStreamTest, BasicOps) {
-
-    // verify the block count statistic.
-    size_t allocatedByteCount = m_wrapper->debugAllocatedBytesInEE();
-
-    EXPECT_TRUE(allocatedByteCount == 0);
-    std::ostringstream os;
-    int cnt = 0;
-    // Push 2 rows to fill the block less thn half
-    for (cnt = 1; cnt < 3; cnt++) {
-        appendTuple(cnt-1, cnt);
-    }
-
-    m_wrapper->periodicFlush(-1, 2);
-    allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE;
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
-    os.str(""); os << "Blocks on top-end expected: " << 1 << ", actual: " << m_topend.blocks.size();
-    ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 1, os.str().c_str());
-    boost::shared_ptr<StreamBlock> results2 = m_topend.blocks.front();
-    EXPECT_EQ(results2->uso(), 0);
-
-    // Push 3 rows
-    for (cnt = 3; cnt < 6; cnt++) {
-        appendTuple(cnt-1, cnt);
-    }
-    m_wrapper->periodicFlush(-1, 5);
-
-    // 3 rows - 2 blocks (2, 3)
-    allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
-    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
-    os.str(""); os << "Blocks on top-end expected: " << 2 << ", actual: " << m_topend.blocks.size();
-    ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 2, os.str().c_str());
-
-    // get the first buffer flushed
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * 2));
-
-    // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    os.str(""); os << "Second block uso - expected: " << (m_tupleSize * 2) << ", actual: " << results->uso();
-    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
-    os.str(""); os << "Second block offset - expected: " << (m_tupleSize * 2) << ", actual: " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
-
-    // ack all of the data and re-verify block count
-    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    EXPECT_TRUE(m_wrapper->debugAllocatedBytesInEE()== 0);
-}
-
-/**
- * Verify that a periodicFlush with distant TXN IDs works properly
- */
-TEST_F(ExportTupleStreamTest, FarFutureFlush) {
-    std::ostringstream os;
-    for (int i = 1; i < 3; i++) {
-        appendTuple(i-1, i);
-    }
-    m_wrapper->periodicFlush(-1, 99);
-
-    for (int i = 100; i < 103; i++) {
-        appendTuple(i-1, i);
-    }
-    m_wrapper->periodicFlush(-1, 130);
-
-    // get the first buffer flushed
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    os << "USO in first block - expected: " << 0 << ", actual " << results->uso();
-    ASSERT_TRUE_WITH_MESSAGE(results->uso() == 0, os.str().c_str());
-    os.str(""); os << "Offset expected: " << (m_tupleSize * 2) << ", actual " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 2), os.str().c_str());
-
-    // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    os << "uso in second block - expected: " << (m_tupleSize * 2) << ", actual " << results->uso();
-    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
-    os << "Offset expected: " << (m_tupleSize * 3) << ", actual " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 3), os.str().c_str());
-}
-
-/**
- * Fill a buffer by appending tuples that advance the last committed TXN
- */
-TEST_F(ExportTupleStreamTest, Fill) {
-
-    // fill with just enough tuples to avoid exceeding buffer
-    for (int i = 1; i <= m_tuplesToFill; i++) {
-        appendTuple(i-1, i);
-    }
-    // We shouldn't yet get a buffer because we haven't forced the
-    // generation of a new one by exceeding the current one.
-    ASSERT_FALSE(m_topend.receivedExportBuffer);
-
-    // now, drop in one more
-    appendTuple(m_tuplesToFill, m_tuplesToFill + 1);
-
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
-}
-
-/**
- * Fill a buffer with a single TXN, and then finally close it in the next
- * buffer.
- */
-TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
-
-    // fill with just enough tuples to avoid exceeding buffer
-    for (int i = 1; i <= m_tuplesToFill; i++) {
-        appendTuple(0, 1);
-    }
-    // We shouldn't yet get a buffer because we haven't forced the
-    // generation of a new one by exceeding the current one.
-    ASSERT_FALSE(m_topend.receivedExportBuffer);
-
-    // now, drop in one more on the same TXN ID
-    appendTuple(0, 1);
-
-    // We shouldn't yet get a buffer because we haven't closed the current
-    // transaction
-    ASSERT_FALSE(m_topend.receivedExportBuffer);
-
-    // now, finally drop in a tuple that closes the first TXN
-    appendTuple(1, 2);
-
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
-}
+//TEST_F(ExportTupleStreamTest, DoOneTuple) {
+//
+//    // write a new tuple and then flush the buffer
+//    appendTuple(1, 2);
+//    m_wrapper->periodicFlush(-1, 2);
+//
+//    // we should only have one tuple in the buffer
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    EXPECT_EQ(results->uso(), 0);
+//    std::ostringstream os;
+//    os << "Offset mismatch. Expected: " << m_tupleSize << ", actual: " << results->offset();
+//    ASSERT_TRUE_WITH_MESSAGE(results->offset() == m_tupleSize, os.str().c_str());
+//}
+//
+///**
+// * Test the really basic operation order
+// */
+//TEST_F(ExportTupleStreamTest, BasicOps) {
+//
+//    // verify the block count statistic.
+//    size_t allocatedByteCount = m_wrapper->debugAllocatedBytesInEE();
+//
+//    EXPECT_TRUE(allocatedByteCount == 0);
+//    std::ostringstream os;
+//    int cnt = 0;
+//    // Push 2 rows to fill the block less thn half
+//    for (cnt = 1; cnt < 3; cnt++) {
+//        appendTuple(cnt-1, cnt);
+//    }
+//
+//    m_wrapper->periodicFlush(-1, 2);
+//    allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE;
+//    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+//    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+//    os.str(""); os << "Blocks on top-end expected: " << 1 << ", actual: " << m_topend.blocks.size();
+//    ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 1, os.str().c_str());
+//    boost::shared_ptr<StreamBlock> results2 = m_topend.blocks.front();
+//    EXPECT_EQ(results2->uso(), 0);
+//
+//    // Push 3 rows
+//    for (cnt = 3; cnt < 6; cnt++) {
+//        appendTuple(cnt-1, cnt);
+//    }
+//    m_wrapper->periodicFlush(-1, 5);
+//
+//    // 3 rows - 2 blocks (2, 3)
+//    allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
+//    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+//    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+//    os.str(""); os << "Blocks on top-end expected: " << 2 << ", actual: " << m_topend.blocks.size();
+//    ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 2, os.str().c_str());
+//
+//    // get the first buffer flushed
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), (m_tupleSize * 2));
+//
+//    // now get the second
+//    ASSERT_FALSE(m_topend.blocks.empty());
+//    results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    os.str(""); os << "Second block uso - expected: " << (m_tupleSize * 2) << ", actual: " << results->uso();
+//    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
+//    os.str(""); os << "Second block offset - expected: " << (m_tupleSize * 2) << ", actual: " << results->offset();
+//    ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
+//
+//    // ack all of the data and re-verify block count
+//    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+//    EXPECT_TRUE(m_wrapper->debugAllocatedBytesInEE()== 0);
+//}
+//
+///**
+// * Verify that a periodicFlush with distant TXN IDs works properly
+// */
+//TEST_F(ExportTupleStreamTest, FarFutureFlush) {
+//    std::ostringstream os;
+//    for (int i = 1; i < 3; i++) {
+//        appendTuple(i-1, i);
+//    }
+//    m_wrapper->periodicFlush(-1, 99);
+//
+//    for (int i = 100; i < 103; i++) {
+//        appendTuple(i-1, i);
+//    }
+//    m_wrapper->periodicFlush(-1, 130);
+//
+//    // get the first buffer flushed
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    os << "USO in first block - expected: " << 0 << ", actual " << results->uso();
+//    ASSERT_TRUE_WITH_MESSAGE(results->uso() == 0, os.str().c_str());
+//    os.str(""); os << "Offset expected: " << (m_tupleSize * 2) << ", actual " << results->offset();
+//    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 2), os.str().c_str());
+//
+//    // now get the second
+//    ASSERT_FALSE(m_topend.blocks.empty());
+//    results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    os << "uso in second block - expected: " << (m_tupleSize * 2) << ", actual " << results->uso();
+//    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
+//    os << "Offset expected: " << (m_tupleSize * 3) << ", actual " << results->offset();
+//    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 3), os.str().c_str());
+//}
+//
+///**
+// * Fill a buffer by appending tuples that advance the last committed TXN
+// */
+//TEST_F(ExportTupleStreamTest, Fill) {
+//
+//    // fill with just enough tuples to avoid exceeding buffer
+//    for (int i = 1; i <= m_tuplesToFill; i++) {
+//        appendTuple(i-1, i);
+//    }
+//    // We shouldn't yet get a buffer because we haven't forced the
+//    // generation of a new one by exceeding the current one.
+//    ASSERT_FALSE(m_topend.receivedExportBuffer);
+//
+//    // now, drop in one more
+//    appendTuple(m_tuplesToFill, m_tuplesToFill + 1);
+//
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
+//}
+//
+///**
+// * Fill a buffer with a single TXN, and then finally close it in the next
+// * buffer.
+// */
+//TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
+//
+//    // fill with just enough tuples to avoid exceeding buffer
+//    for (int i = 1; i <= m_tuplesToFill; i++) {
+//        appendTuple(0, 1);
+//    }
+//    // We shouldn't yet get a buffer because we haven't forced the
+//    // generation of a new one by exceeding the current one.
+//    ASSERT_FALSE(m_topend.receivedExportBuffer);
+//
+//    // now, drop in one more on the same TXN ID
+//    appendTuple(0, 1);
+//
+//    // We shouldn't yet get a buffer because we haven't closed the current
+//    // transaction
+//    ASSERT_FALSE(m_topend.receivedExportBuffer);
+//
+//    // now, finally drop in a tuple that closes the first TXN
+//    appendTuple(1, 2);
+//
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
+//}
 
 
 /**
@@ -400,99 +400,99 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
 }
-
-/**
- * Verify that several filled buffers all with one open transaction returns
- * nada.
- */
-TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
-
-    // fill several buffers
-    for (int i = 0; i <= (m_tuplesToFill + 10) * 3; i++)
-    {
-        appendTuple(1, 2);
-    }
-    // We shouldn't yet get a buffer even though we've filled a bunch because
-    // the transaction is still open.
-    ASSERT_FALSE(m_topend.receivedExportBuffer);
-}
-
-/**
- * Simple rollback test, verify that we can rollback the first tuple,
- * append another tuple, and only get one tuple in the output buffer.
- */
-TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
-
-    appendTuple(1, 2);
-    // rollback the first tuple
-    m_wrapper->rollbackTo(0, 0, 1);
-
-    // write a new tuple and then flush the buffer
-    appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 2);
-
-    // we should only have one tuple in the buffer
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), m_tupleSize);
-}
-
-
-/**
- * Another simple rollback test, verify that a tuple in the middle of
- * a buffer can get rolled back and leave the committed transaction
- * untouched.
- */
-TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
-
-    // append a bunch of tuples
-    for (int i = 1; i <= m_tuplesToFill - 1; i++) {
-        appendTuple(i-1, i);
-    }
-
-    // add another and roll it back and flush
-    size_t mark = m_wrapper->bytesUsed();
-    int64_t seqNo = m_wrapper->getSequenceNumber();
-    appendTuple(m_tuplesToFill - 1, m_tuplesToFill);
-    m_wrapper->rollbackTo(mark, 0, seqNo);
-    m_wrapper->periodicFlush(-1, m_tuplesToFill - 1);
-
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize));
-}
-
-/**
- * Verify that a transaction can generate entire buffers, they can all
- * be rolled back, and the original committed bytes are untouched.
- */
-TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
-{
-    // append a bunch of tuples
-    for (int i = 1; i <= 3; i++) {
-        appendTuple(i-1, i);
-    }
-
-    // now, fill a couple of buffers with tuples from a single transaction
-    size_t mark = m_wrapper->bytesUsed();
-    int64_t seqNo = m_wrapper->getSequenceNumber();
-    for (int i = 0; i < (m_tuplesToFill + 10) * 2; i++)
-    {
-        appendTuple(10, 11);
-    }
-    m_wrapper->rollbackTo(mark, 0, seqNo);
-    m_wrapper->periodicFlush(-1, 3);
-
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * 3));
-}
+//
+///**
+// * Verify that several filled buffers all with one open transaction returns
+// * nada.
+// */
+//TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
+//
+//    // fill several buffers
+//    for (int i = 0; i <= (m_tuplesToFill + 10) * 3; i++)
+//    {
+//        appendTuple(1, 2);
+//    }
+//    // We shouldn't yet get a buffer even though we've filled a bunch because
+//    // the transaction is still open.
+//    ASSERT_FALSE(m_topend.receivedExportBuffer);
+//}
+//
+///**
+// * Simple rollback test, verify that we can rollback the first tuple,
+// * append another tuple, and only get one tuple in the output buffer.
+// */
+//TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
+//
+//    appendTuple(1, 2);
+//    // rollback the first tuple
+//    m_wrapper->rollbackTo(0, 0, 1);
+//
+//    // write a new tuple and then flush the buffer
+//    appendTuple(1, 2);
+//    m_wrapper->periodicFlush(-1, 2);
+//
+//    // we should only have one tuple in the buffer
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), m_tupleSize);
+//}
+//
+//
+///**
+// * Another simple rollback test, verify that a tuple in the middle of
+// * a buffer can get rolled back and leave the committed transaction
+// * untouched.
+// */
+//TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
+//
+//    // append a bunch of tuples
+//    for (int i = 1; i <= m_tuplesToFill - 1; i++) {
+//        appendTuple(i-1, i);
+//    }
+//
+//    // add another and roll it back and flush
+//    size_t mark = m_wrapper->bytesUsed();
+//    int64_t seqNo = m_wrapper->getSequenceNumber();
+//    appendTuple(m_tuplesToFill - 1, m_tuplesToFill);
+//    m_wrapper->rollbackTo(mark, 0, seqNo);
+//    m_wrapper->periodicFlush(-1, m_tuplesToFill - 1);
+//
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize));
+//}
+//
+///**
+// * Verify that a transaction can generate entire buffers, they can all
+// * be rolled back, and the original committed bytes are untouched.
+// */
+//TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
+//{
+//    // append a bunch of tuples
+//    for (int i = 1; i <= 3; i++) {
+//        appendTuple(i-1, i);
+//    }
+//
+//    // now, fill a couple of buffers with tuples from a single transaction
+//    size_t mark = m_wrapper->bytesUsed();
+//    int64_t seqNo = m_wrapper->getSequenceNumber();
+//    for (int i = 0; i < (m_tuplesToFill + 10) * 2; i++)
+//    {
+//        appendTuple(10, 11);
+//    }
+//    m_wrapper->rollbackTo(mark, 0, seqNo);
+//    m_wrapper->periodicFlush(-1, 3);
+//
+//    ASSERT_TRUE(m_topend.receivedExportBuffer);
+//    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+//    m_topend.blocks.pop_front();
+//    EXPECT_EQ(results->uso(), 0);
+//    EXPECT_EQ(results->offset(), (m_tupleSize * 3));
+//}
 
 
 int main() {

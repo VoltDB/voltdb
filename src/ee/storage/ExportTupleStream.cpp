@@ -156,6 +156,10 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
     m_uncommittedTupleCount++;
+    std::cout << "Append tuple m_uncommittedTupleCount=" << m_uncommittedTupleCount
+              << " start exportSequenceNumber=" << m_currBlock->startExportSequenceNumber()
+              << " row count=" << m_currBlock->getRowCountforExport()
+              << std::endl;
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);

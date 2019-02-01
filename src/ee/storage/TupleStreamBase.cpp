@@ -133,9 +133,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         return;
     }
 
-    m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
-    m_uncommittedTupleCount = 0;
-
     // If the current TXN ID has advanced, then we know that:
     // - The old open transaction has been committed
     // - The current transaction is now our open transaction
@@ -156,6 +153,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
         m_openUniqueId = uniqueId;
+        m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
+        m_uncommittedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -171,6 +170,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
         m_committedUniqueId = m_openUniqueId;
+        m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
+        m_uncommittedTupleCount = 0;
 
         if (flush) {
             extendBufferChain(0);
@@ -210,7 +211,7 @@ void TupleStreamBase::pushPendingBlocks()
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t rollbackTo)
+void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future: mark %jd, current USO %jd.",
@@ -223,22 +224,24 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t rollbackTo)
     // back up the universal stream counter
     m_uso = mark;
     // make the stream of tuples contiguous outside of actual system failures
+    std::cout << "exportSeqNo before: m_uncommittedTupleCount=" << m_uncommittedTupleCount << std::endl;
+    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
+
     // TODO:
     // Because right now every appendTuple in export stream incorporates a commit,
     // most of time uncommitted tuple count will be 1, if there are multiple stream table inserts
     // in a transaction and it is rolled back, uncommitted tuple count may be negative.
     // The real fix would be stream table commits at end of transaction or flush.
-    m_uncommittedTupleCount -= m_exportSequenceNumber - rollbackTo;
     if (m_uncommittedTupleCount < 0) {
         m_uncommittedTupleCount = 0;
     }
-    m_exportSequenceNumber = rollbackTo;
+    m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
     // the block that contains mark.
-    if (m_currBlock != NULL && !(m_currBlock->uso() >= mark)) {
-        m_currBlock->truncateTo(mark);
+    if (m_currBlock != NULL && m_currBlock->uso() < mark) {
+        m_currBlock->truncateTo(mark, exportSeqNo);
     }
     else {
         StreamBlock *sb = NULL;
@@ -251,7 +254,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t rollbackTo)
                 discardBlock(sb);
             }
             else {
-                sb->truncateTo(mark);
+                sb->truncateTo(mark, exportSeqNo);
                 m_currBlock = sb;
                 break;
             }
