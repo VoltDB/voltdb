@@ -17,8 +17,8 @@ import sys
 from voltcli.hostinfo import Hosts
 
 # TODO: change to specific version when feature branch merge into master
-RELEASE_MAJOR_VERSION = 8
-RELEASE_MINOR_VERSION = 4
+RELEASE_MAJOR_VERSION = 9
+RELEASE_MINOR_VERSION = 0
 
 # elastic remove procedure call option
 # Need to be update once ElasticRemoveNT.java add/remove/change option coding
@@ -26,7 +26,7 @@ class Option:
     TEST = 0
     START = 1
     STATUS = 2
-    COMPLETE = 3
+    RESET = 3
 
 
 def test(runner):
@@ -38,8 +38,8 @@ def start(runner):
 def status(runner):
     procedureCaller(runner, Option.STATUS)
 
-def complete(runner):
-    procedureCaller(runner, Option.COMPLETE)
+def reset(runner):
+    procedureCaller(runner, Option.RESET)
 
 def procedureCaller(runner, type):
     response = runner.call_proc('@SystemInformation',
@@ -75,16 +75,11 @@ def procedureCaller(runner, type):
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Elastic resizing cluster command.',
-    options = (
-            VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
-            VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default = 0),
-            VOLT.StringOption(None, '--hostOrPartition', 'hostOrPartition', 'Specified hosts or partitions to be removed.', default = ''), # TODO: use StringListOptition if hostOrPartition format changes
-    ),
     modifiers = (
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('complete', complete, 'Complete the previous removal.'),
+            VOLT.Modifier('reset', reset, 'Reset the previous failed resizing operation.'),
     )
 )
 
