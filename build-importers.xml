@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, voltcsvformatter, kinesisstream, kafkastream10"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -61,7 +61,7 @@
             <param name="include.classpattern" value="log4j/*.class"/>
         </antcall>
     </target>
-
+<!--
     <target name="kafkastream">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
@@ -86,7 +86,7 @@
             </manifest>
         </jar>
     </target>
-
+-->
     <target name="kinesisstream">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kinesisstream.jar" basedir="${build.prod.dir}">
