@@ -79,6 +79,21 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
     }
 
     @Override
+    public String debug() {
+        StringBuilder builder = new StringBuilder("Partitioned table ");
+        builder.append(getTableName()).append("\n");
+        for (Entry<Integer, Set<Pair<Integer, Integer>>> entry : m_partitionsAtHost.entrySet()) {
+            int hostId = entry.getKey();
+            builder.append("Host ").append(hostId).append(" got (originalPartitionId, originalHostId): ");
+            for (Pair<Integer, Integer> pair : entry.getValue()) {
+                builder.append("(").append(pair.getFirst()).append(",")
+                .append(pair.getSecond()).append(") ");
+            }
+        }
+        return builder.toString();
+    }
+
+    @Override
     public boolean isConsistent()
     {
         boolean consistent =
@@ -269,8 +284,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
             int originalHostsArray[] = new int[originalHosts.size()];
             int qq = 0;
-            for (int originalHostId : originalHosts)
+            for (int originalHostId : originalHosts) {
                 originalHostsArray[qq++] = originalHostId;
+            }
             int uncoveredPartitionsAtHost[] = new int[uncoveredPartitionsAtHostList
                     .size()];
             for (int ii = 0; ii < uncoveredPartitionsAtHostList.size(); ii++) {

@@ -48,6 +48,17 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     @Override
+    public String debug() {
+        StringBuilder builder = new StringBuilder("Replicated table ");
+        builder.append(getTableName()).append(" exists on host ");
+        for (Integer host : m_hostsWithThisTable) {
+            builder.append(host).append(", ");
+        }
+        builder.setLength(builder.length() - 2);
+        return builder.toString();
+    }
+
+    @Override
     public boolean isConsistent()
     {
         // right now there is nothing to check across all rows
