@@ -1048,11 +1048,12 @@ public class AbstractTopology {
         }
 
         ImmutableMap<Integer, Partition> partitionsById = partitionsByIdBuilder.build();
-
+        liveHosts.add(Integer.valueOf(localHostId));
         ImmutableMap.Builder<Integer, Host> hostsByIdBuilder = ImmutableMap.builder();
         for (Map.Entry<Integer, Host> entry : topology.hostsById.entrySet()) {
             Integer id = entry.getKey().intValue() == replaceHostId ? localHostId : entry.getKey();
-            hostsByIdBuilder.put(id, new Host(entry.getValue(), id, partitionsById,!liveHosts.contains(id)));
+            hostsByIdBuilder.put(id, new Host(entry.getValue(), id, partitionsById,
+                            !liveHosts.contains(id)));
         }
 
         return new AbstractTopology(topology, hostsByIdBuilder.build(), partitionsById);
