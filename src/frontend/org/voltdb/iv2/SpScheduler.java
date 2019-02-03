@@ -1355,29 +1355,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         if (counter != null) {
-            CompleteTransactionResponseMessage resp = (CompleteTransactionResponseMessage)(counter.m_lastResponse);
-            if (resp != null && resp.isExecutedOnPreviousLeader()) {
-                msg.setExecutedOnPreviousLeader(true);
-            }
             txnDone = counter.offer(msg) == DuplicateCounter.DONE;
         }
 
-        if (txnDone) {
+        if (txnDone && counter != null) {
             final TransactionState txn = m_outstandingTxns.remove(msg.getTxnId());
-            boolean needTruncate = msg.isExecutedOnPreviousLeader();
-            if (counter != null) {
-                CompleteTransactionResponseMessage resp = (CompleteTransactionResponseMessage)(counter.m_lastResponse);
-                needTruncate = (resp != null && resp.isExecutedOnPreviousLeader());
-            }
-
             m_duplicateCounters.remove(duplicateCounterKey);
-
             if (txn != null && !txn.isReadOnly()) {
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
-                setRepairLogTruncationHandle(txn.m_spHandle, needTruncate);
+                setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
             }
         }
 

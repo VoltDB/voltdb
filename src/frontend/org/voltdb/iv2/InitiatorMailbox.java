@@ -473,6 +473,7 @@ public class InitiatorMailbox implements Mailbox
         // processed, the follow-up batches or fragments should also be processed on this site.
         if (!m_scheduler.isLeader() && !message.isForReplica()) {
             message.setExecutedOnPreviousLeader(true);
+            txnState.setLeaderMigrationInvolved();
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
