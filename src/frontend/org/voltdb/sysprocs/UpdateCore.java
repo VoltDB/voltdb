@@ -249,7 +249,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // the actual work on the second round-trip below
 
             // Don't actually care about the returned table, just need to send something back to the MPI
-            DependencyPair success = new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
             if (log.isDebugEnabled()) {
@@ -263,7 +263,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // back to the MPI scoreboard
             log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                     " acknowledged data and catalog prechecks.");
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
@@ -322,11 +322,11 @@ public class UpdateCore extends VoltSystemProcedure {
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateCatalog, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalog, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_updateCatalog));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateCatalogAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateCatalog));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateCatalogAggregate, result);
         }
         else {
             VoltDB.crashLocalVoltDB(
@@ -349,17 +349,17 @@ public class UpdateCore extends VoltSystemProcedure {
 
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
+        pfs[0].outputDepId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(tablesThatMustBeEmpty, reasonsForEmptyTables);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-        executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
+        executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
     }
 
     private final VoltTable[] performCatalogUpdateWork(
@@ -377,7 +377,7 @@ public class UpdateCore extends VoltSystemProcedure {
         // Now do the real work
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalog;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateCatalog;
+        pfs[0].outputDepId = SysProcFragmentId.PF_updateCatalog;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 catalogDiffCommands,
@@ -391,13 +391,13 @@ public class UpdateCore extends VoltSystemProcedure {
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateCatalogAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_updateCatalogAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_updateCatalogAggregate);
+        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_updateCatalogAggregate);
         return results;
     }
 

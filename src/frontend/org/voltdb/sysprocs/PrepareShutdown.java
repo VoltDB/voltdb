@@ -65,12 +65,12 @@ public class PrepareShutdown extends Pause {
                     LOG.debug("@PrepareShutdown returning sigil " + ll(m_stat.getMzxid()));
                 }
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_prepareShutdown, t);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_prepareShutdown, t);
 
         } else if (fragmentId == PF_prepareShutdownAggregate) {
 
             NavigableSet<Long> uniqueTxnIds = new TreeSet<>();
-            for (VoltTable t: dependencies.get((int) SysProcFragmentId.PF_prepareShutdown)) {
+            for (VoltTable t: dependencies.get(SysProcFragmentId.PF_prepareShutdown)) {
                 while (t.advanceRow()) {
                     uniqueTxnIds.add(t.getLong(0));
                 }
@@ -81,7 +81,7 @@ public class PrepareShutdown extends Pause {
                 t.addRow(zktxnid);
             }
 
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_prepareShutdownAggregate, t);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_prepareShutdownAggregate, t);
 
         } else {
 
@@ -98,13 +98,13 @@ public class PrepareShutdown extends Pause {
 
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = PF_prepareShutdown;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_prepareShutdown;
+        pfs[0].outputDepId = SysProcFragmentId.PF_prepareShutdown;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = PF_prepareShutdownAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_prepareShutdownAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_prepareShutdownAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -114,6 +114,6 @@ public class PrepareShutdown extends Pause {
 
     @Override
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        return executeSysProcPlanFragments(createPrepareFragments(), (int) SysProcFragmentId.PF_prepareShutdownAggregate);
+        return executeSysProcPlanFragments(createPrepareFragments(), SysProcFragmentId.PF_prepareShutdownAggregate);
     }
 }

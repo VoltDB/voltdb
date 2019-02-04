@@ -53,12 +53,12 @@ public class Quiesce extends VoltSystemProcedure {
                 context.getSiteProcedureConnection().quiesce();
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
-                return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_quiesce_sites, results);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_quiesce_sites, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_sites) {
                 VoltTable dummy = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
                 dummy.addRow(VoltSystemProcedure.STATUS_OK);
-                return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_quiesce_processed_sites, dummy);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_quiesce_processed_sites, dummy);
             }
         }
         catch (Exception ex) {
@@ -78,18 +78,18 @@ public class Quiesce extends VoltSystemProcedure {
             SynthesizedPlanFragment pfs1[] = new SynthesizedPlanFragment[2];
             pfs1[0] = new SynthesizedPlanFragment();
             pfs1[0].fragmentId = SysProcFragmentId.PF_quiesce_sites;
-            pfs1[0].outputDepId = (int) SysProcFragmentId.PF_quiesce_sites;
+            pfs1[0].outputDepId = SysProcFragmentId.PF_quiesce_sites;
             pfs1[0].multipartition = true;
             pfs1[0].parameters = ParameterSet.emptyParameterSet();
 
             pfs1[1] = new SynthesizedPlanFragment();
             pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
-            pfs1[1].outputDepId = (int) SysProcFragmentId.PF_quiesce_processed_sites;
+            pfs1[1].outputDepId = SysProcFragmentId.PF_quiesce_processed_sites;
             pfs1[1].multipartition = false;
             pfs1[1].parameters = ParameterSet.emptyParameterSet();
 
             try {
-                result = executeSysProcPlanFragments(pfs1, (int) SysProcFragmentId.PF_quiesce_processed_sites);
+                result = executeSysProcPlanFragments(pfs1, SysProcFragmentId.PF_quiesce_processed_sites);
             }
             catch (Exception ex) {
                 ex.printStackTrace();

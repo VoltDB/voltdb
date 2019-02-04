@@ -79,10 +79,10 @@ public class ExportControl extends VoltSystemProcedure {
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
 
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_exportControl, results);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControl, results);
         } else if (fragmentId == SysProcFragmentId.PF_exportControlAggregate) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_exportControl));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_exportControlAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_exportControl));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControlAggregate, result);
         }
         return null;
     }
@@ -120,7 +120,7 @@ public class ExportControl extends VoltSystemProcedure {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_exportControl;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_exportControl;
+        pfs[0].outputDepId = SysProcFragmentId.PF_exportControl;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 exportSource, exportTargets, operationMode);
@@ -128,10 +128,10 @@ public class ExportControl extends VoltSystemProcedure {
         // This fragment aggregates the results of creating those files
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_exportControlAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_exportControlAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_exportControlAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-        return executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_exportControlAggregate);
+        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_exportControlAggregate);
     }
 }

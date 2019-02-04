@@ -136,25 +136,25 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
          * @param params Parameters for the first fragment.
          * @return Array of fragments in the correct order
          */
-        public static SynthesizedPlanFragment[] createFragmentAndAggregator(long fragmentId, long aggFragmentId, Object... params) {
+        public static SynthesizedPlanFragment[] createFragmentAndAggregator(int fragmentId, int aggFragmentId, Object... params) {
             return createFragmentAndAggregatorFromParameterSet(fragmentId, aggFragmentId, ParameterSet.fromArrayNoCopy(params));
         }
 
         /**
          * Similar to {@link #createFragmentAndAggregator(long, long, Object...)}, but takes in ParameterSet as input for first fragment.
          */
-        public static SynthesizedPlanFragment[] createFragmentAndAggregatorFromParameterSet(long fragmentId, long aggFragmentId, ParameterSet params) {
+        public static SynthesizedPlanFragment[] createFragmentAndAggregatorFromParameterSet(int fragmentId, int aggFragmentId, ParameterSet params) {
             SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
             pfs[0] = new SynthesizedPlanFragment();
             pfs[0].fragmentId = fragmentId;
-            pfs[0].outputDepId = (int) fragmentId;
+            pfs[0].outputDepId = fragmentId;
             pfs[0].multipartition = true;
             pfs[0].parameters = params;
 
             pfs[1] = new SynthesizedPlanFragment();
             pfs[1].fragmentId = aggFragmentId;
-            pfs[1].outputDepId = (int) aggFragmentId;
+            pfs[1].outputDepId = aggFragmentId;
             pfs[1].multipartition = false;
             pfs[1].parameters = ParameterSet.emptyParameterSet();
 
