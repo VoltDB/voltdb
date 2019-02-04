@@ -204,7 +204,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         restorePlan.add(constructDistributePartitionedTableAggregatorFragment(true));
         assert(coveredPartitions.size() == m_partitionsSeen.size());
-        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
+        return restorePlan.toArray(new SynthesizedPlanFragment[restorePlan.size()]);
     }
 
     private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
@@ -314,7 +314,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         restorePlan
                 .add(constructDistributePartitionedTableAggregatorFragment(false));
-        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
+        return restorePlan.toArray(new SynthesizedPlanFragment[restorePlan.size()]);
     }
 
     private SynthesizedPlanFragment

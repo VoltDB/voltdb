@@ -140,20 +140,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         }
 
         /**
-         * Most MP sysprocs use this pattern of MP fragment and a non-MP aggregator fragment.
-         * Utility method to create that.
-         * @param fragmentId Id of the MP fragment distributed to sites. This will be the fragment id of the first
-         *        SynthesizedPlanFragment, its output dependency id and input dependency id of the aggregator fragment.
-         * @param aggFragmentId Id of the aggregator fragment. This will be the fragment id of the second SynthesizedPlanFragment
-         *        and its output dependency id.
-         * @param params Parameters for the first fragment.
-         * @return Array of fragments in the correct order
-         */
-        public static SynthesizedPlanFragment[] createFragmentAndAggregator(int fragmentId, int aggFragmentId, Object... params) {
-            return createFragmentAndAggregatorFromParameterSet(fragmentId, aggFragmentId, ParameterSet.fromArrayNoCopy(params));
-        }
-
-        /**
          * Most MP sysprocs use this pattern of MP fragment and a non-MP aggregator fragment. Utility method to create
          * that.
          *

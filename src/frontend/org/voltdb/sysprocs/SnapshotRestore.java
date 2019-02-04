@@ -310,8 +310,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 performRestoreDigeststate(context, isRecover, snapshotTxnId, perPartitionTxnIds, exportSequenceNumbers);
 
                 if (isRecover) {
-                    performRecoverDigestState(context, snapshotTxnId, perPartitionTxnIds, clusterCreateTime,
-                            drVersion, drSequenceNumbers, drMixedClusterSizeConsumerState);
+                    performRecoverDigestState(context, clusterCreateTime, drVersion, drSequenceNumbers,
+                            drMixedClusterSizeConsumerState);
                 }
             } catch (Exception e) {
                 e.printStackTrace();//l4j doesn't print the stack trace
@@ -1456,26 +1456,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long clusterCreateTime,
             long drVersion,
             boolean isRecover) {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // This fragment causes each execution site to confirm the likely
         // success of writing tables to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(exportSequenceNumberBytes, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover? 1 : 0);
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers,
+                SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults,
+                exportSequenceNumberBytes, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover ? 1 : 0);
     }
 
     private void performRestoreDigeststate(
@@ -1546,8 +1531,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private void performRecoverDigestState(
             SystemProcedureExecutionContext context,
-            long snapshotTxnId,
-            long perPartitionTxnIds[],
             long clusterCreateTime,
             long drVersion,
             Map<Integer, Long> drSequenceNumbers,
@@ -1637,50 +1620,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
      * that pops into the EE to do stats periodically and that relies on thread locals
      */
     private final VoltTable[] distributeAsyncMailboxFragment(final long coordinatorHSId) {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        //This fragment causes every ES to generate a mailbox and
-        //enter an async run loop to do restore work out of that mailbox
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoop;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreAsyncRunLoop;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(coordinatorHSId);
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoopResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreAsyncRunLoopResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreAsyncRunLoopResults);
+        // This fragment causes every ES to generate a mailbox and
+        // enter an async run loop to do restore work out of that mailbox
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreAsyncRunLoop,
+                SysProcFragmentId.PF_restoreAsyncRunLoopResults, coordinatorHSId);
     }
 
     private final VoltTable[] performRestoreScanWork(String filePath, String pathType,
             String fileNonce,
             String dupsPath)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // This fragment causes each execution site to confirm the likely
         // success of writing tables to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreScan;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreScan;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, pathType, fileNonce, dupsPath);
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreScanResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreScanResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreScanResults);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreScan, SysProcFragmentId.PF_restoreScanResults,
+                filePath, pathType, fileNonce, dupsPath);
     }
 
     //Keep track of count per table and if replicated take value from first partition result that arrives.
@@ -1730,25 +1683,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final DigestScanResult performRestoreDigestScanWork(boolean isRecover)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // This fragment causes each execution site to confirm the likely
         // success of writing tables to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDigestScan;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDigestScanResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDigestScanResults);
+        VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDigestScan,
+                SysProcFragmentId.PF_restoreDigestScanResults);
 
         HashMap<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers =
                 new HashMap<String, Map<Integer, Pair<Long, Long>>>();
@@ -1918,31 +1856,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final byte[] performRestoreHashinatorScanWork(InstanceId iid)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        // This fragment causes each execution site to confirm the likely
-        // success of writing tables to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreHashinatorScan;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreHashinatorScan;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreHashinatorScanResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreHashinatorScanResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
         /*
+         *  This fragment causes each execution site to confirm the likely success of writing tables to disk
          *  Use the first one.
          *  Sanity checks:
          *      - The CRC matches - done by restoreFromBuffer() call.
          *      - All versions are identical.
          *      - The instance IDs match the digest.
          */
-        VoltTable[] results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreHashinatorScanResults);
+        VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreHashinatorScan,
+                SysProcFragmentId.PF_restoreHashinatorScanResults);
         byte[] result = null;
         int ioErrors = 0;
         int iidErrors = 0;
@@ -1997,25 +1920,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final VoltTable[]  performRestoreHashinatorDistributeWork(byte[] hashConfig)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // This fragment causes each execution site to confirm the likely
         // success of writing tables to disk
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinator;
-        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDistributeHashinator;
-        pfs[0].multipartition = true;
-
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[]{hashConfig});
-
-        // This fragment aggregates the save-to-disk sanity check results
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDistributeHashinatorResults);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDistributeHashinator,
+                SysProcFragmentId.PF_restoreDistributeHashinatorResults, hashConfig);
     }
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,

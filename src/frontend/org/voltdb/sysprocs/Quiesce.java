@@ -73,28 +73,15 @@ public class Quiesce extends VoltSystemProcedure {
      * @return {@link org.voltdb.VoltSystemProcedure#STATUS_SCHEMA}
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-            VoltTable[] result = null;
+        VoltTable[] result = null;
 
-            SynthesizedPlanFragment pfs1[] = new SynthesizedPlanFragment[2];
-            pfs1[0] = new SynthesizedPlanFragment();
-            pfs1[0].fragmentId = SysProcFragmentId.PF_quiesce_sites;
-            pfs1[0].outputDepId = SysProcFragmentId.PF_quiesce_sites;
-            pfs1[0].multipartition = true;
-            pfs1[0].parameters = ParameterSet.emptyParameterSet();
-
-            pfs1[1] = new SynthesizedPlanFragment();
-            pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
-            pfs1[1].outputDepId = SysProcFragmentId.PF_quiesce_processed_sites;
-            pfs1[1].multipartition = false;
-            pfs1[1].parameters = ParameterSet.emptyParameterSet();
-
-            try {
-                result = executeSysProcPlanFragments(pfs1, SysProcFragmentId.PF_quiesce_processed_sites);
-            }
-            catch (Exception ex) {
-                ex.printStackTrace();
-            }
-            return result;
+        try {
+            result = createAndExecuteSysProcPlan(SysProcFragmentId.PF_quiesce_sites,
+                    SysProcFragmentId.PF_quiesce_processed_sites);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return result;
     }
 
 }

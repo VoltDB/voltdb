@@ -191,10 +191,8 @@ public class ExecuteTask extends VoltSystemProcedure
             return new VoltTable[] { result };
         }
 
-        SynthesizedPlanFragment pfs[] = SynthesizedPlanFragment.createFragmentAndAggregator(
-                SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate, params);
-        VoltTable[] results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_executeTaskAggregate);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate,
+                params);
     }
 
 }

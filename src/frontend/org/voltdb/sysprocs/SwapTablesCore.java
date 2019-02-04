@@ -86,20 +86,7 @@ public class SwapTablesCore extends AdHocBase {
 
     private VoltTable[] performSwapTablesCallback(String oneTable, String otherTable)
     {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_swapTables;
-        pfs[0].outputDepId = SysProcFragmentId.PF_swapTables;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(oneTable, otherTable);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_swapTablesAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_swapTablesAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_swapTablesAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_swapTables, SysProcFragmentId.PF_swapTablesAggregate,
+                oneTable, otherTable);
     }
 }

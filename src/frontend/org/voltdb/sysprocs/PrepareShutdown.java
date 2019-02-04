@@ -93,27 +93,8 @@ public class PrepareShutdown extends Pause {
         throw new RuntimeException("Should not reach this code");
     }
 
-    private SynthesizedPlanFragment[] createPrepareFragments() {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = PF_prepareShutdown;
-        pfs[0].outputDepId = SysProcFragmentId.PF_prepareShutdown;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = PF_prepareShutdownAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_prepareShutdownAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return pfs;
-
-    }
-
     @Override
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        return executeSysProcPlanFragments(createPrepareFragments(), SysProcFragmentId.PF_prepareShutdownAggregate);
+        return createAndExecuteSysProcPlan(PF_prepareShutdown, PF_prepareShutdownAggregate);
     }
 }

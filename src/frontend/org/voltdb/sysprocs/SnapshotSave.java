@@ -320,30 +320,13 @@ public class SnapshotSave extends VoltSystemProcedure
             String data,
             HashinatorSnapshotData hashinatorData)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
         // TRAIL [SnapSave:2] 2 [MPI] Build & send create snapshot targets requests to all SP sites.
         // This fragment causes each execution node to create the files
         // that will be written to during the snapshot
         byte[] hashinatorBytes = (hashinatorData != null ? hashinatorData.m_serData : null);
         long hashinatorVersion = (hashinatorData != null ? hashinatorData.m_version : 0);
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
-        pfs[0].outputDepId = SysProcFragmentId.PF_createSnapshotTargets;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_createSnapshotTargets,  SysProcFragmentId.PF_createSnapshotTargetsResults,
                 filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data,
-                hashinatorBytes, hashinatorVersion,
-                System.currentTimeMillis(), pathType);
-
-        // This fragment aggregates the results of creating those files
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_createSnapshotTargetsResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_createSnapshotTargetsResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_createSnapshotTargetsResults);
-        return results;
+                hashinatorBytes, hashinatorVersion, System.currentTimeMillis(), pathType);
     }
 }

@@ -124,27 +124,10 @@ public class Shutdown extends VoltSystemProcedure {
      * @return Never returned, no he never returned...
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_shutdownSync;
-        pfs[0].outputDepId = SysProcFragmentId.PF_shutdownSync;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_shutdownSync, SysProcFragmentId.PF_shutdownSyncDone);
 
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].outputDepId = SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_shutdownSyncDone);
-
-        pfs = new SynthesizedPlanFragment[1];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
-        pfs[0].outputDepId = SysProcFragmentId.PF_procedureDone;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[] {
+                new SynthesizedPlanFragment(SysProcFragmentId.PF_shutdownCommand, true) };
 
         executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_procedureDone);
         return new VoltTable[0];

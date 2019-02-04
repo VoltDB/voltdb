@@ -270,44 +270,14 @@ public class SystemInformation extends VoltSystemProcedure
      */
     private VoltTable[] getOverviewInfo()
     {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].outputDepId = SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].outputDepId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(spf, SysProcFragmentId.PF_systemInformationOverviewAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationOverview,
+                SysProcFragmentId.PF_systemInformationOverviewAggregate);
     }
 
     private VoltTable[] getDeploymentInfo() {
-        VoltTable[] results;
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         // create a work fragment to gather deployment data from each of the sites.
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].outputDepId = SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].multipartition = true;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        // create a work fragment to aggregate the results.
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].outputDepId = SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].multipartition = false;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        // distribute and execute these fragments providing pfs and id of the
-        // aggregator's output dependency table.
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_systemInformationAggregate);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_systemInformationDeployment,
+                SysProcFragmentId.PF_systemInformationAggregate);
     }
 
     public static VoltTable constructOverviewTable() {

@@ -117,21 +117,7 @@ public class ExportControl extends VoltSystemProcedure {
 
     private final VoltTable[] performExportControl(String exportSource,
             String[] exportTargets, String operationMode) {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_exportControl;
-        pfs[0].outputDepId = SysProcFragmentId.PF_exportControl;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                exportSource, exportTargets, operationMode);
-
-        // This fragment aggregates the results of creating those files
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_exportControlAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_exportControlAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_exportControlAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_exportControl,
+                SysProcFragmentId.PF_exportControlAggregate, exportSource, exportTargets, operationMode);
     }
 }
