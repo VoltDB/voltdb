@@ -39,8 +39,12 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.tools.ant.util.FileUtils;
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -60,6 +64,9 @@ import kafka.producer.ProducerConfig;
  * End to end Import tests using the Kafka importer.
  */
 public class TestKafkaImportSuite extends RegressionSuite {
+
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     public TestKafkaImportSuite(String name) {
         super(name);
@@ -106,6 +113,8 @@ public class TestKafkaImportSuite extends RegressionSuite {
         producer.send(data);
     }
 
+    @Test
+    @Flaky(description="TestKafkaImportSuite.testImportSimpleData: very flaky test")
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
 

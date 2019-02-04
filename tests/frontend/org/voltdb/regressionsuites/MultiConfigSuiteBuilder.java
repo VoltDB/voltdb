@@ -24,13 +24,18 @@
 package org.voltdb.regressionsuites;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import junit.framework.Test;
+import org.junit.Test;
+import org.voltdb.FlakyTestRule.Flaky;
+import org.voltdb.FlakyTestRule.FlakyTestRunner;
+
+//import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
@@ -57,6 +62,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @return A list of the names of each JUnit test method.
      */
     List<String> getTestMethodNames() {
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.getTestMethodNames");
+
         ArrayList<String> retval = new ArrayList<>();
 
         for (Method m : m_testClass.getMethods()) {
@@ -67,12 +75,44 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                 continue;
             }
             String name = m.getName();
-            if (!name.startsWith("test") || m_ignoredTests.contains(name)) {
+            // TODO: once all tests are converted to JUnit4, we can remove the
+            // '!name.startsWith("test") &&' part (and could also remove checking
+            // getReturnType and getParameterCount, above)
+            if ((!name.startsWith("test") && m.getAnnotation(Test.class) == null)
+                    || m_ignoredTests.contains(name)) {
                 continue;
+            }
+            // TODO: temp debug?? Modify??
+            Flaky flakyAnnotation = m.getAnnotation(Flaky.class);
+            if (flakyAnnotation != null) {
+                Method runFlakyTestMethod = null;
+                boolean runFlakyTest = true;
+                Class<? extends FlakyTestRunner> flakyTestRunner = flakyAnnotation.runCondition();
+                try {
+                    runFlakyTestMethod = flakyTestRunner.getMethod( "runFlakyTest",
+                                          Boolean.TYPE, String.class );
+                    runFlakyTest = (boolean) runFlakyTestMethod.invoke(
+                                          flakyTestRunner.getDeclaredConstructor().newInstance(),
+                                          flakyAnnotation.isFlaky(), flakyAnnotation.description() );
+                } catch (Exception e) {
+                    System.out.println("WARNING: in MultiConfigSuiteBuilder.getTestMethodNames, caught exception:");
+                    e.printStackTrace(System.out);
+                }
+                // TODO: temp debug
+                System.out.println("DEBUG:   flakyAnnotation   : "+flakyAnnotation);
+                System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
+                System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
+                System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                if (!runFlakyTest) {
+                    continue;
+                }
             }
             retval.add(name);
         }
 
+
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.getTestMethodNames");
         return retval;
     }
 
@@ -83,6 +123,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
         this(testClass, Collections.emptySet());
+
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Leaving MultiConfigSuiteBuilder constructor(1): "+testClass);
     }
 
     /**
@@ -93,8 +136,14 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      *                  {@code skipTest.contains(methodName)} returns {@code true}
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Collection<String> ignoredTests) {
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder constructor(2): "+testClass+", "+ignoredTests);
+
         m_testClass = testClass;
         m_ignoredTests = ignoredTests;
+
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Leaving MultiConfigSuiteBuilder constructor(2)");
     }
 
     /**
@@ -104,10 +153,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (1): "+config);
+
         return addServerConfig(config, true);
     }
 
     public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
+
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (2): "+config+", "+reuseServer);
 
         if (config.isValgrind()) {
             reuseServer = false;
@@ -156,6 +211,13 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         // get the set of test methods
         List<String> methods = getTestMethodNames();
 
+        // TODO: temp. debug:
+        if (methods.size() < 10) {
+            System.out.println("DEBUG:    methods: "+methods);
+        } else {
+            System.out.println("DEBUG:    methods: ["+methods.get(0)+", ..., "+methods.get(methods.size()-1)+"]");
+        }
+
         // add a test case instance for each method for the specified
         // server config
         for (int i = 0; i < methods.size(); i++) {
@@ -171,14 +233,24 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             // The last test method for the current cluster configuration will need to
             // shutdown the cluster completely after finishing the test.
             rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
+
+            // TODO: temp. debug:
+            if (i < 3 || i > 145) {
+                System.out.println("DEBUG:    i, mname, rs: "+i+", "+mname+", "+rs);
+            } else if (i == 3) {
+                System.out.println("DEBUG:      ...");
+            }
             super.addTest(rs);
         }
+
+        // TODO: temp. debug:
+        System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.addServerConfig (2), true");
 
         return true;
     }
 
     @Override
-    public void addTest(Test test) {
+    public void addTest(junit.framework.Test test) {
         // don't let users do this
         throw new RuntimeException("Unsupported Usage");
     }

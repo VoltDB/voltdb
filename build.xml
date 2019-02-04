@@ -1729,6 +1729,8 @@ TEST CASES
 
             <jvmarg value="-Dtestindex=${testindex}" />
             <jvmarg value="-Dtestcount=${testcount}" />
+            <jvmarg value="-Drun.flaky.tests=${run.flaky.tests}" />
+            <jvmarg value="-Drun.flaky.tests.debug=${run.flaky.tests.debug}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>
