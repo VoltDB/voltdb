@@ -19,7 +19,6 @@ package org.voltcore.zk;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -35,8 +34,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
-
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
     // then it's changed to INITIALIZED.
@@ -49,7 +46,6 @@ public class LeaderElector {
     private final byte[] data;
     private final LeaderNoticeHandler cb;
     private String node = null;
-    private Set<String> knownChildren = null;
 
     private volatile boolean isLeader = false;
     private final ExecutorService es;
@@ -76,38 +72,6 @@ public class LeaderElector {
             }
         }
     };
-
-    private final Runnable childrenEventHandler = new Runnable() {
-        @Override
-        public void run() {
-            try {
-                updateChildren();
-            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdoown without the elector being
-                // shutdown; ignore.
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unexepected failure in LeaderElector.", true, e);
-            }
-        }
-    };
-
-    private class ChildrenWatcher implements Watcher {
-
-        @Override
-        public void process(WatchedEvent event) {
-            try {
-                if (!m_shutdown) {
-                    es.submit(childrenEventHandler);
-                }
-            } catch (RejectedExecutionException e) {
-            }
-        }
-    }
-    private final ChildrenWatcher childWatcher = new ChildrenWatcher();
 
     private class ElectionWatcher implements Watcher {
 
@@ -245,14 +209,6 @@ public class LeaderElector {
             }
         }
         return true;
-    }
-
-
-    /*
-     * Check for a change in present nodes
-     */
-    private void updateChildren() throws KeeperException, InterruptedException {
-        knownChildren = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
     }
 
     public static String electionDirForPartition(String path, int partition) {
