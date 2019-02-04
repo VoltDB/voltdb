@@ -168,7 +168,7 @@ public class LeaderAppointer implements Promotable
 
                 // A cluster may be started or recovered with missing hosts.
                 // find all missing hosts, exclude the replica on this missing hosts
-                for (Integer peer : m_topo.partitionsById.get(m_partitionId).hostIds) {
+                for (Integer peer : m_topo.partitionsById.get(m_partitionId).getHostIds()) {
                     if (m_topo.hostsById.get(peer).isMissing) {
                         --replicaCount;
                     }
@@ -236,7 +236,7 @@ public class LeaderAppointer implements Promotable
             // which has successfully overridden it.
             int masterHostId = -1;
             if (m_state.get() == AppointerState.CLUSTER_START) {
-                masterHostId = m_topo.partitionsById.get(partitionId).leaderHostId;
+                masterHostId = m_topo.partitionsById.get(partitionId).getLeaderHostId();
             } else {
                 // promote new partition leader when nodes are down
                 masterHostId = newLeaderHostId;

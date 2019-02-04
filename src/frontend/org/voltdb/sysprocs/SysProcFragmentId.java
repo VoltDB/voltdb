@@ -21,14 +21,14 @@ import org.voltdb.VoltSystemProcedure;
 
 public class SysProcFragmentId
 {
-    // @LastCommittedTransaction
+    // @LastCommittedTransaction -- UNUSED
     public static final long PF_lastCommittedScan = 1;
     public static final long PF_lastCommittedResults = 2;
 
-    // @UpdateLogging
+    // @UpdateLogging -- UNUSED
     public static final long PF_updateLoggers = 3;
 
-    // @Statistics
+    // @Statistics -- UNUSED
     public static final long PF_starvationData = 4;
     public static final long PF_starvationDataAggregator = 5;
     public static final long PF_tableData = 6;
@@ -55,7 +55,7 @@ public class SysProcFragmentId
     public static final long PF_shutdownCommand = 28;
     public static final long PF_procedureDone = 29;
 
-    // @AdHoc
+    // @AdHoc -- UNUSED
     public static final long PF_runAdHocFragment = 31;
 
     // @SnapshotSave
@@ -96,10 +96,29 @@ public class SysProcFragmentId
     // @SnapshotRestore
     public static final long PF_restoreScan = 60;
     public static final long PF_restoreScanResults = 61;
+    /*
+     * Plan fragments for retrieving the digests
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
     public static final long PF_restoreDigestScan = 62;
     public static final long PF_restoreDigestScanResults = 63;
+    /*
+     * Plan fragments for distributing the full set of export sequence numbers
+     * to every partition where the relevant ones can be selected
+     * and forwarded to the EE. Also distributes the txnId of the snapshot
+     * which is used to truncate export data on disk from after the snapshot
+     */
     public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 64;
     public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 65;
+    /*
+     * Plan fragment for entering an asynchronous run loop that generates a mailbox
+     * and sends the generated mailbox id to the MP coordinator which then propagates the info.
+     * The MP coordinator then sends plan fragments through this async mailbox,
+     * bypassing the master/slave replication system that doesn't understand plan fragments
+     * directed at individual executions sites.
+     */
     public static final long PF_restoreAsyncRunLoop = 66;
     public static final long PF_restoreAsyncRunLoopResults = 67;
     public static final long PF_restoreLoadTable = 70;                                  // called by 4 distribute cases, to load received table
@@ -109,19 +128,31 @@ public class SysProcFragmentId
     public static final long PF_restoreDistributePartitionedTableAsPartitioned = 74;    // partitioned to partitioned
     public static final long PF_restoreDistributePartitionedTableAsReplicated = 75;     // partitioned to replicated
     public static final long PF_restoreDistributeReplicatedTableAsPartitioned = 76;     // replicated to replicated
+    /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
     public static final long PF_restoreHashinatorScan = 77;
     public static final long PF_restoreHashinatorScanResults = 78;
+    /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
     public static final long PF_restoreDistributeHashinator = 79;
     public static final long PF_restoreDistributeHashinatorResults = 80;
 
-    // @StartSampler
+    // @StartSampler -- UNUSED
     public static final long PF_startSampler = 90;
 
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
     public static final long PF_quiesce_processed_sites = 101;
 
-    // @SnapshotScan
+    // @SnapshotScan -- UNUSED
     public static final long PF_snapshotDigestScan = 124;
     public static final long PF_snapshotDigestScanResults = 125;
     public static final long PF_snapshotScan = 120;
@@ -133,13 +164,13 @@ public class SysProcFragmentId
     public static final long PF_snapshotDelete = 130;
     public static final long PF_snapshotDeleteResults = 131;
 
-    // @InstanceId
+    // @InstanceId -- UNUSED
     public static final long PF_retrieveInstanceId = 160;
     public static final long PF_retrieveInstanceIdAggregator = 161;
     public static final long PF_setInstanceId = 162;
     public static final long PF_setInstanceIdAggregator = 163;
 
-    // @Rejoin
+    // @Rejoin -- UNUSED
     public static final long PF_rejoinBlock = 170;
     public static final long PF_rejoinPrepare = 171;
     public static final long PF_rejoinCommit = 172;
