@@ -1500,7 +1500,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter == null) {
             // this will be on SPI without k-safety or replica only with k-safety
-            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
+            setRepairLogTruncationHandle(spHandle, false);
             if (!m_isLeader) {
                 m_mailbox.send(message.getSPIHSId(), message);
             }
@@ -1511,7 +1511,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (result == DuplicateCounter.DONE) {
             // DummyTransactionResponseMessage ends on SPI
             m_duplicateCounters.remove(dcKey);
-            setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
+            setRepairLogTruncationHandle(spHandle, false);
         }
     }
 
