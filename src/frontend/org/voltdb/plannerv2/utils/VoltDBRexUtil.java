@@ -33,7 +33,7 @@ import java.util.List;
 
 public class VoltDBRexUtil {
     private VoltDBRexUtil() {}
-    
+
     /**
      * Convert a collation into an OrderByPlanNode.
      *

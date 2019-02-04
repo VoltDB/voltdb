@@ -268,13 +268,17 @@ public class PlannerTool {
         transformed = VoltPlanner.transformHep(Phase.INLINE,
                 HepMatchOrder.ARBITRARY, transformed, true);
 
-        // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);
-        calciteToVoltDBPlan((VoltPhysicalRel) transformed, compiledPlan);
+        try {
+            // assume not large query
+            calciteToVoltDBPlan((VoltPhysicalRel) transformed, compiledPlan);
 
-        compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
-        // Renumber the plan node ids to start with 1
-        compiledPlan.resetPlanNodeIds(1);
+            compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
+            // Renumber the plan node ids to start with 1
+            compiledPlan.resetPlanNodeIds(1);
+        } catch (Exception e){
+            throw new PlanningErrorException(e.getMessage());
+        }
 
         return compiledPlan;
     }
@@ -286,7 +290,7 @@ public class PlannerTool {
      * @return a planned statement.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
-            throws ValidationException, RelConversionException {
+            throws ValidationException, RelConversionException, PlannerFallbackException {
         CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
 
         CorePlan core = new CorePlan(plan, m_catalogHash);
