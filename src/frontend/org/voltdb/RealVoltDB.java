@@ -4526,6 +4526,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+
+        if (m_elasticService != null) {
+            try {
+                m_elasticService.start();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to start elastic services", false, e);
+            }
+        }
     }
 
     private void databaseIsRunning() {
