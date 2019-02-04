@@ -821,16 +821,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                                       "hash", message.getClientResponseData().getHashes()[0]));
             }
 
-            InitiateResponseMessage resp = (InitiateResponseMessage)(counter.m_lastResponse);
-            if (resp != null && resp.isExecutedOnPreviousLeader()) {
-                message.setExecutedOnPreviousLeader(true);
-            }
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
-                resp = (InitiateResponseMessage)(counter.m_lastResponse);
-                setRepairLogTruncationHandle(spHandle, resp.isExecutedOnPreviousLeader());
-                m_mailbox.send(counter.m_destinationId, resp);
+                final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+                setRepairLogTruncationHandle(spHandle, (txn != null && txn.isLeaderMigrationInvolved()));
+                m_mailbox.send(counter.m_destinationId, counter.m_lastResponse);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 if (m_isLeader && m_sendToHSIds.length > 0) {
@@ -865,7 +861,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
-            setRepairLogTruncationHandle(spHandle, message.isExecutedOnPreviousLeader());
+            setRepairLogTruncationHandle(spHandle, false);
 
             //BabySitter's thread (updateReplicas) could clean up a duplicate counter and send a transaction response to ClientInterface
             //if the duplicate counter contains only the replica's HSIDs from failed hosts. That is, a response from a replica could get here
@@ -1213,19 +1209,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
                                                       "status", message.getStatusCode()));
             }
-            FragmentResponseMessage resp = (FragmentResponseMessage)(counter.m_lastResponse);
-            if (resp != null && resp.isExecutedOnPreviousLeader()) {
-                message.setExecutedOnPreviousLeader(true);
-            }
-
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                resp = (FragmentResponseMessage)(counter.m_lastResponse);
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle, resp.isExecutedOnPreviousLeader());
+                    setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
+                FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
                 resp.setExecutorSiteId(m_mailbox.getHSId());
@@ -1358,7 +1349,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             txnDone = counter.offer(msg) == DuplicateCounter.DONE;
         }
 
-        if (txnDone && counter != null) {
+        if (txnDone) {
             final TransactionState txn = m_outstandingTxns.remove(msg.getTxnId());
             m_duplicateCounters.remove(duplicateCounterKey);
             if (txn != null && !txn.isReadOnly()) {
@@ -1659,13 +1650,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
             // ENG-14553: release buffered reads regardless of leadership status
-            m_bufferedReadLog.releaseBufferedReads(m_mailbox, newHandle);
+            m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isExecutedOnOldLeader) {
-                scheduleRepairLogTruncateMsg(newHandle);
+                scheduleRepairLogTruncateMsg(m_repairLogTruncationHandle);
             }
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
