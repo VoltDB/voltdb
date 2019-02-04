@@ -591,7 +591,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreScan));
             if (TRACE_LOG.isTraceEnabled()) {
                 TRACE_LOG.trace(result.toFormattedString());
-            }  
+            }
             return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoop)
