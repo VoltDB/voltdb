@@ -79,7 +79,7 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
 
-            DependencyPair success = new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateSettingsBarrier,
+            DependencyPair success = new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
             if (log.isInfoEnabled()) {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
@@ -103,7 +103,7 @@ public class UpdateSettings extends VoltSystemProcedure {
                 throw new SettingsException(msg, e);
             }
             log.info("Saved new cluster settings state");
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateSettingsBarrierAggregate,
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsBarrierAggregate,
                     getVersionResponse(stat.getVersion()));
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettings) {
@@ -120,12 +120,12 @@ public class UpdateSettings extends VoltSystemProcedure {
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateSettings, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
 
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_updateSettings));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_updateSettingsAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_updateSettings));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_updateSettingsAggregate, result);
 
         } else {
             VoltDB.crashLocalVoltDB(
@@ -142,13 +142,13 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateSettingsBarrier;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateSettingsBarrier;
+        pfs[0].outputDepId = SysProcFragmentId.PF_updateSettingsBarrier;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsBarrierAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateSettingsBarrierAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_updateSettingsBarrierAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
 
@@ -161,13 +161,13 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_updateSettings;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_updateSettings;
+        pfs[0].outputDepId = SysProcFragmentId.PF_updateSettings;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsAggregate;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_updateSettingsAggregate;
+        pfs[1].outputDepId = SysProcFragmentId.PF_updateSettingsAggregate;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -187,8 +187,8 @@ public class UpdateSettings extends VoltSystemProcedure {
         final int version = stat.getVersion();
 
         executeSysProcPlanFragments(
-                createBarrierFragment(settingsBytes, version), (int) SysProcFragmentId.PF_updateSettingsBarrierAggregate);
+                createBarrierFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsBarrierAggregate);
         return executeSysProcPlanFragments(
-                createUpdateFragment(settingsBytes, version), (int) SysProcFragmentId.PF_updateSettingsAggregate);
+                createUpdateFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsAggregate);
     }
 }

@@ -111,12 +111,12 @@ public class SystemInformation extends VoltSystemProcedure
                                        new ColumnInfo("KEY", VoltType.STRING),
                                        new ColumnInfo("VALUE", VoltType.STRING));
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationOverview, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationOverview, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_systemInformationOverview));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationOverviewAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_systemInformationOverview));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationOverviewAggregate, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
         {
@@ -132,14 +132,14 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 result = new VoltTable(clusterInfoSchema);
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationDeployment, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationDeployment, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationAggregate)
         {
             VoltTable result = null;
             // Check for KEY/VALUE consistency
             List<VoltTable> answers =
-                dependencies.get((int) SysProcFragmentId.PF_systemInformationDeployment);
+                dependencies.get(SysProcFragmentId.PF_systemInformationDeployment);
             for (VoltTable answer : answers)
             {
                 // if we got an empty table from a non-lowest execution site ID,
@@ -171,7 +171,7 @@ public class SystemInformation extends VoltSystemProcedure
                     }
                 }
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationAggregate, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_systemInformationAggregate, result);
         }
         assert(false);
         return null;
@@ -273,18 +273,18 @@ public class SystemInformation extends VoltSystemProcedure
         SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
         spf[0] = new SynthesizedPlanFragment();
         spf[0].fragmentId = SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverview;
+        spf[0].outputDepId = SysProcFragmentId.PF_systemInformationOverview;
         spf[0].multipartition = true;
         spf[0].parameters = ParameterSet.emptyParameterSet();
 
         spf[1] = new SynthesizedPlanFragment();
         spf[1] = new SynthesizedPlanFragment();
         spf[1].fragmentId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverviewAggregate;
+        spf[1].outputDepId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
         spf[1].multipartition = false;
         spf[1].parameters = ParameterSet.emptyParameterSet();
 
-        return executeSysProcPlanFragments(spf, (int) SysProcFragmentId.PF_systemInformationOverviewAggregate);
+        return executeSysProcPlanFragments(spf, SysProcFragmentId.PF_systemInformationOverviewAggregate);
     }
 
     private VoltTable[] getDeploymentInfo() {
@@ -293,20 +293,20 @@ public class SystemInformation extends VoltSystemProcedure
         // create a work fragment to gather deployment data from each of the sites.
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationDeployment;
+        pfs[1].outputDepId = SysProcFragmentId.PF_systemInformationDeployment;
         pfs[1].multipartition = true;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         // create a work fragment to aggregate the results.
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationAggregate;
+        pfs[0].outputDepId = SysProcFragmentId.PF_systemInformationAggregate;
         pfs[0].multipartition = false;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_systemInformationAggregate);
+        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_systemInformationAggregate);
         return results;
     }
 

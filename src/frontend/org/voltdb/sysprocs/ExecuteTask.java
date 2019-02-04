@@ -171,10 +171,10 @@ public class ExecuteTask extends VoltSystemProcedure
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_executeTask, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_executeTask, result);
         } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
-            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_executeTask));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_executeTaskAggregate, unionTable);
+            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_executeTask));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_executeTaskAggregate, unionTable);
         }
         assert false;
         return null;
@@ -193,7 +193,7 @@ public class ExecuteTask extends VoltSystemProcedure
 
         SynthesizedPlanFragment pfs[] = SynthesizedPlanFragment.createFragmentAndAggregator(
                 SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate, params);
-        VoltTable[] results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_executeTaskAggregate);
+        VoltTable[] results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_executeTaskAggregate);
         return results;
     }
 

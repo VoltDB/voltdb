@@ -318,7 +318,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 SNAP_LOG.error(e);
                 result.addRow("FAILURE");
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults)
         {
@@ -326,8 +326,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Aggregating digest scan state");
             }
             assert(dependencies.size() > 0);
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDigestScan)
         {
@@ -369,10 +369,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     e.printStackTrace();//l4j doesn't print stack traces
                     SNAP_LOG.error(e);
                     result.addRow(null, "FAILURE", sw.toString());
-                    return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDigestScan, result);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDigestScan, result);
                 }
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDigestScan, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDigestScan, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDigestScanResults)
         {
@@ -380,11 +380,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Aggregating digest scan state");
             }
             assert(dependencies.size() > 0);
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreDigestScan));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_restoreDigestScan));
             if (TRACE_LOG.isTraceEnabled()){
                 TRACE_LOG.trace(result.toFormattedString());
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDigestScanResults, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDigestScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreHashinatorScan)
         {
@@ -416,7 +416,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     result.addRow(null, "FAILURE", errMsg);
                 }
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreHashinatorScan, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreHashinatorScan, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreHashinatorScanResults)
         {
@@ -424,8 +424,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Aggregating hashinator state");
             }
             assert(dependencies.size() > 0);
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreHashinatorScan));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreHashinatorScanResults, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_restoreHashinatorScan));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreHashinatorScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDistributeHashinator)
         {
@@ -453,7 +453,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 SNAP_LOG.error("Error updating hashinator in snapshot restore", e);
                 result.addRow("FAILURE", CoreUtils.throwableToString(e));
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDistributeHashinator, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDistributeHashinator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDistributeHashinatorResults)
         {
@@ -461,8 +461,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Aggregating hashinator distribution state");
             }
             assert(dependencies.size() > 0);
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreDistributeHashinator));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreDistributeHashinatorResults, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_restoreDistributeHashinator));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreDistributeHashinatorResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreScan)
         {
@@ -510,7 +510,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     if (errorMsg != null) {
                         result.addRow(m_hostId, hostname, ClusterSaveFileState.ERROR_CODE, errorMsg,
                                 null, null, null, null, null, null, null);
-                        return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreScan, result);
+                        return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScan, result);
                     }
 
                     m_duplicateRowHandler = new DuplicateRowHandler(dupPath, getTransactionTime());
@@ -522,7 +522,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
                 File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_fileNonce);
                 if (savefiles == null) {
-                    return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreScan, result);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScan, result);
                 }
                 for (File file : savefiles)
                 {
@@ -580,7 +580,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
             }
 
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreScan, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScan, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreScanResults)
         {
@@ -588,11 +588,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Aggregating saved table state");
             }
             assert(dependencies.size() > 0);
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_restoreScan));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_restoreScan));
             if (TRACE_LOG.isTraceEnabled()) {
                 TRACE_LOG.trace(result.toFormattedString());
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreScanResults, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScanResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoop)
         {
@@ -687,12 +687,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     //Null result table is intentional
                     //The results of the process are propagated through a future in performTableRestoreWork
                     VoltTable emptyResult = constructResultsTable();
-                    return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreAsyncRunLoop, emptyResult);
+                    return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreAsyncRunLoop, emptyResult);
                 }
             }
         } else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoopResults) {
             VoltTable emptyResult = constructResultsTable();
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_restoreAsyncRunLoopResults, emptyResult);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreAsyncRunLoopResults, emptyResult);
         }
 
         // called by: performDistributeReplicatedTable() and performDistributePartitionedTable
@@ -1462,19 +1462,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(exportSequenceNumberBytes, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover? 1 : 0);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults);
+        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults);
         return results;
     }
 
@@ -1643,18 +1643,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
         //enter an async run loop to do restore work out of that mailbox
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoop;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreAsyncRunLoop;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreAsyncRunLoop;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(coordinatorHSId);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreAsyncRunLoopResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreAsyncRunLoopResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreAsyncRunLoopResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-        return executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreAsyncRunLoopResults);
+        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreAsyncRunLoopResults);
     }
 
     private final VoltTable[] performRestoreScanWork(String filePath, String pathType,
@@ -1667,19 +1667,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreScan;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreScan;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreScan;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, pathType, fileNonce, dupsPath);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreScanResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreScanResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreScanResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreScanResults);
+        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreScanResults);
         return results;
     }
 
@@ -1736,19 +1736,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDigestScan;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDigestScan;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDigestScan;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDigestScanResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDigestScanResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDigestScanResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreDigestScanResults);
+        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDigestScanResults);
 
         HashMap<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers =
                 new HashMap<String, Map<Integer, Pair<Long, Long>>>();
@@ -1924,14 +1924,14 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreHashinatorScan;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreHashinatorScan;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreHashinatorScan;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreHashinatorScanResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreHashinatorScanResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreHashinatorScanResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
@@ -1942,7 +1942,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
          *      - All versions are identical.
          *      - The instance IDs match the digest.
          */
-        VoltTable[] results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreHashinatorScanResults);
+        VoltTable[] results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreHashinatorScanResults);
         byte[] result = null;
         int ioErrors = 0;
         int iidErrors = 0;
@@ -2003,7 +2003,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinator;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeHashinator;
+        pfs[0].outputDepId = SysProcFragmentId.PF_restoreDistributeHashinator;
         pfs[0].multipartition = true;
 
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[]{hashConfig});
@@ -2011,11 +2011,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_restoreDistributeHashinatorResults;
+        pfs[1].outputDepId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-        return executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_restoreDistributeHashinatorResults);
+        return executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_restoreDistributeHashinatorResults);
     }
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,
@@ -2084,7 +2084,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         0,            // uniqueId
                         false,        // isReadOnly
                         fragIdToHash(SysProcFragmentId.PF_setViewEnabled), //planHash
-                        (int) SysProcFragmentId.PF_setViewEnabled,
+                        SysProcFragmentId.PF_setViewEnabled,
                         ParameterSet.fromArrayNoCopy(enabledAsInt, commaSeparatedViewNames),
                         false,        // isFinal
                         m_runner.getTxnState().isForReplay(),
