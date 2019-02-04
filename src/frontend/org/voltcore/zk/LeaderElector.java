@@ -34,6 +34,13 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 
+/**
+ * Uses an ephemeral sequential node under a given zookeeper node and check if this instance has the lowest sequence id
+ *
+ * For details about the leader election algorithm,
+ * <a href="https://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection" >Zookeeper Leader Election</a>
+ *
+ */
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
     // then it's changed to INITIALIZED.
@@ -129,32 +136,29 @@ public class LeaderElector {
     }
 
     /**
-     * Start leader election.
-     *
-     * Creates an ephemeral sequential node under the given directory and check
-     * if we are the first one who created it.
-     *
-     * For details about the leader election algorithm, @see <a href=
-     * "http://zookeeper.apache.org/doc/trunk/recipes.html#sc_leaderElection"
-     * >Zookeeper Leader Election</a>
+     * Start participation in a leader election.
      *
      * @param block true for blocking operation, false for nonblocking
      * @throws Exception
      */
     public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
     {
-        node = createParticipantNode(zk, dir, prefix, data);
-        Future<?> task = es.submit(electionEventHandler);
+        Future<?> task = start();
         if (block) {
             task.get();
         }
-        //Only do the extra work for watching children if a callback is registered
-        if (cb != null) {
-            task = es.submit(childrenEventHandler);
-            if (block) {
-                task.get();
-            }
-        }
+    }
+
+    /**
+     * Start participation in a leader election.
+     *
+     * @return {@link Future} which is completed after the leader election has been performed
+     * @throws KeeperException      If there is an error creating election nodes
+     * @throws InterruptedException If this thread was interrupted
+     */
+    public Future<?> start() throws KeeperException, InterruptedException {
+        node = createParticipantNode(zk, dir, prefix, data);
+        return es.submit(electionEventHandler);
     }
 
     public boolean isLeader() {
