@@ -120,21 +120,30 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public long siteId = -1;
-        public long fragmentId = -1;
-        public int outputDepId = -1;
-        public ParameterSet parameters = null;
+        public final long fragmentId;
+        public final int outputDepId;
+        public final ParameterSet parameters;
         /** true if distributes to all executable partitions */
-        public boolean multipartition = false;
-
-        public SynthesizedPlanFragment() {}
+        public final boolean multipartition;
 
         public SynthesizedPlanFragment(int fragmentId, boolean multipartition) {
             this(fragmentId, multipartition, ParameterSet.emptyParameterSet());
         }
 
         public SynthesizedPlanFragment(int fragmentId, boolean multipartition, ParameterSet parameters) {
+            this(fragmentId, fragmentId, multipartition, parameters);
+        }
+
+        public SynthesizedPlanFragment(int fragmentId, int outputDepId, boolean multipartition,
+                ParameterSet parameters) {
+            this(-1, fragmentId, outputDepId, multipartition, parameters);
+        }
+
+        public SynthesizedPlanFragment(long siteId, int fragmentId, int outputDepId, boolean multipartition,
+                ParameterSet parameters) {
+            this.siteId = siteId;
             this.fragmentId = fragmentId;
-            this.outputDepId = fragmentId;
+            this.outputDepId = outputDepId;
             this.parameters = parameters;
             this.multipartition = multipartition;
         }
