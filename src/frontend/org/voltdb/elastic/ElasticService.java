@@ -19,10 +19,19 @@ package org.voltdb.elastic;
 
 import java.util.Collection;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.CatalogContext;
 
 public interface ElasticService {
+    /**
+     * Start the elastic service so that it can begin or resume elastic operations
+     *
+     * @throws KeeperException      If there was an error with the leader election in {@link ZooKeeper}
+     * @throws InterruptedException If this thread was interrupted
+     */
+    void start() throws KeeperException, InterruptedException;
     void shutdown();
     void updateConfig(CatalogContext context);
 
