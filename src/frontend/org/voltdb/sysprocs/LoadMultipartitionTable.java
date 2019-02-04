@@ -50,7 +50,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     }
 
 
-    @SuppressWarnings("deprecation")
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -167,25 +166,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
         // use loadTable path for bulk insert
         if (!isUpsert && table.getRowCount() > 1) {
-            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-            // create a work unit to invoke super.loadTable() on each site.
-            pfs[0] = new SynthesizedPlanFragment();
-            pfs[0].fragmentId = SysProcFragmentId.PF_distribute;
-            pfs[0].outputDepId = SysProcFragmentId.PF_distribute;
-            pfs[0].multipartition = true;
-            pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, table);
-
-            // create a work unit to aggregate the results.
-            // MULTIPARTION_DEPENDENCY bit set, requiring result from each site
-            pfs[1] = new SynthesizedPlanFragment();
-            pfs[1].fragmentId = SysProcFragmentId.PF_aggregate;
-            pfs[1].outputDepId = SysProcFragmentId.PF_aggregate;
-            pfs[1].multipartition = false;
-            pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-            // distribute and execute the fragments providing pfs and id
-            // of the aggregator's output dependency table.
-            VoltTable[] results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_aggregate);
+            VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_distribute,
+                    SysProcFragmentId.PF_aggregate, tableName, table);
             return results[0].asScalarLong();
         }
 

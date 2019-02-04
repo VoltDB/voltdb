@@ -151,38 +151,14 @@ public class ValidatePartitioning extends VoltSystemProcedure {
 
     private final VoltTable[] performValidatePartitioningWork(byte[] config)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_validatePartitioning;
-        pfs[0].outputDepId = SysProcFragmentId.PF_validatePartitioning;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(config);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_validatePartitioningResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_validatePartitioningResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
         ArrayList<VoltTable> results = new ArrayList<VoltTable>();
-        for (VoltTable t: executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_validatePartitioningResults)) {
+        for (VoltTable t : createAndExecuteSysProcPlan(SysProcFragmentId.PF_validatePartitioning,
+                SysProcFragmentId.PF_validatePartitioningResults, config)) {
             results.add(t);
         }
 
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_matchesHashinator;
-        pfs[0].outputDepId = SysProcFragmentId.PF_matchesHashinator;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(config);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_matchesHashinatorResults;
-        pfs[1].outputDepId = SysProcFragmentId.PF_matchesHashinatorResults;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        for (VoltTable t: executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_matchesHashinatorResults)) {
+        for (VoltTable t : createAndExecuteSysProcPlan(SysProcFragmentId.PF_matchesHashinator,
+                SysProcFragmentId.PF_matchesHashinatorResults, config)) {
             results.add(t);
         }
 

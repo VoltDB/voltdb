@@ -341,25 +341,12 @@ public class UpdateCore extends VoltSystemProcedure {
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
         // Do a null round of work to sync up all the sites.  Avoids the possibility that
         // skew between nodes and/or partitions could result in cases where a catalog update
         // affects global state before transactions expecting the old catalog run
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
-        pfs[0].outputDepId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(tablesThatMustBeEmpty, reasonsForEmptyTables);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+                SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate, tablesThatMustBeEmpty,
+                reasonsForEmptyTables);
     }
 
     private final VoltTable[] performCatalogUpdateWork(
@@ -372,33 +359,10 @@ public class UpdateCore extends VoltSystemProcedure {
             long genId,
             byte hasSecurityUserChange)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        // Now do the real work
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalog;
-        pfs[0].outputDepId = SysProcFragmentId.PF_updateCatalog;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                catalogDiffCommands,
-                expectedCatalogVersion,
-                requiresSnapshotIsolation,
-                requireCatalogDiffCmdsApplyToEE,
-                hasSchemaChange,
-                requiresNewExportGeneration,
-                genId,
-                hasSecurityUserChange);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_updateCatalogAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_updateCatalogAggregate);
-        return results;
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateCatalog,
+                SysProcFragmentId.PF_updateCatalogAggregate, catalogDiffCommands, expectedCatalogVersion,
+                requiresSnapshotIsolation, requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
+                requiresNewExportGeneration, genId, hasSecurityUserChange);
     }
 
     /**

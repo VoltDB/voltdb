@@ -140,36 +140,11 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateSettingsBarrier;
-        pfs[0].outputDepId = SysProcFragmentId.PF_updateSettingsBarrier;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
+        pfs[0] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateSettingsBarrier, true,
+                ParameterSet.emptyParameterSet());
 
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsBarrierAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_updateSettingsBarrierAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
-
-        return pfs;
-    }
-
-    private SynthesizedPlanFragment[] createUpdateFragment(byte[] settingsBytes, int version) {
-
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateSettings;
-        pfs[0].outputDepId = SysProcFragmentId.PF_updateSettings;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[] { settingsBytes, version });
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateSettingsAggregate;
-        pfs[1].outputDepId = SysProcFragmentId.PF_updateSettingsAggregate;
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
+        pfs[1] = new SynthesizedPlanFragment(SysProcFragmentId.PF_updateSettingsBarrierAggregate, false,
+                ParameterSet.fromArrayNoCopy(settingsBytes, version));
 
         return pfs;
     }
@@ -188,7 +163,6 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         executeSysProcPlanFragments(
                 createBarrierFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsBarrierAggregate);
-        return executeSysProcPlanFragments(
-                createUpdateFragment(settingsBytes, version), SysProcFragmentId.PF_updateSettingsAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_updateSettings,  SysProcFragmentId.PF_updateSettingsAggregate, settingsBytes, version);
     }
 }

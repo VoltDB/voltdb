@@ -72,35 +72,13 @@ public class PingPartitions extends VoltSystemProcedure {
     }
 
     private VoltTable[] runDummyPings() {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_pingPartitions;
-        spf[0].outputDepId = SysProcFragmentId.PF_pingPartitions;
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_pingPartitionsAggregate;
-        spf[1].outputDepId = SysProcFragmentId.PF_pingPartitionsAggregate;
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-        return executeSysProcPlanFragments(spf, SysProcFragmentId.PF_pingPartitionsAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_pingPartitions,
+                SysProcFragmentId.PF_pingPartitionsAggregate);
     }
 
     private VoltTable[] runPingAndEnableScoreboard() {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_enableScoreboard;
-        spf[0].outputDepId = SysProcFragmentId.PF_enableScoreboard;
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_enableScoreboardAggregate;
-        spf[1].outputDepId = SysProcFragmentId.PF_enableScoreboardAggregate;
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-        return executeSysProcPlanFragments(spf, SysProcFragmentId.PF_enableScoreboardAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_enableScoreboard,
+                SysProcFragmentId.PF_enableScoreboardAggregate);
     }
 
 }
