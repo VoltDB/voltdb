@@ -32,7 +32,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.dtxn.DtxnConstants;
 
 /**
  * A wholly improper shutdown. No promise is given to return a result to a client,
@@ -42,10 +41,6 @@ import org.voltdb.dtxn.DtxnConstants;
  * Invoking this procedure immediately attempts to terminate each node in the cluster.
  */
 public class Shutdown extends VoltSystemProcedure {
-
-    private static final int DEP_shutdownSync = (int) SysProcFragmentId.PF_shutdownSync
-            | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_shutdownSyncDone = (int) SysProcFragmentId.PF_shutdownSyncDone;
 
     private static AtomicBoolean m_failsafeArmed = new AtomicBoolean(false);
     private static Thread m_failsafe = new Thread() {
@@ -86,11 +81,11 @@ public class Shutdown extends VoltSystemProcedure {
                 CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair(DEP_shutdownSync, rslt);
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_shutdownSync, rslt);
         }
         else if (fragmentId == SysProcFragmentId.PF_shutdownSyncDone) {
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair(DEP_shutdownSyncDone, rslt);
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_shutdownSyncDone, rslt);
         }
         else if (fragmentId == SysProcFragmentId.PF_shutdownCommand) {
             Thread shutdownThread = new Thread() {
@@ -132,24 +127,24 @@ public class Shutdown extends VoltSystemProcedure {
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownSync;
-        pfs[0].outputDepId = DEP_shutdownSync;
+        pfs[0].outputDepId = (int) SysProcFragmentId.PF_shutdownSync;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].outputDepId = DEP_shutdownSyncDone;
-        pfs[1].inputDepIds = new int[] { DEP_shutdownSync };
+        pfs[1].outputDepId = (int) SysProcFragmentId.PF_shutdownSyncDone;
+        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_shutdownSync };
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-        executeSysProcPlanFragments(pfs, DEP_shutdownSyncDone);
+        executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_shutdownSyncDone);
 
         pfs = new SynthesizedPlanFragment[1];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.emptyParameterSet();

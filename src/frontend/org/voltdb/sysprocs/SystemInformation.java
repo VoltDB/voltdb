@@ -56,7 +56,6 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
@@ -72,15 +71,6 @@ public class SystemInformation extends VoltSystemProcedure
     public static final String DR_PUBLIC_INTF_COL = "DRPUBLICINTERFACE";
     public static final String DR_PUBLIC_PORT_COL = "DRPUBLICPORT";
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    static final int DEP_DISTRIBUTE = (int)
-        SysProcFragmentId.PF_systemInformationOverview | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_AGGREGATE = (int) SysProcFragmentId.PF_systemInformationOverviewAggregate;
-
-    static final int DEP_systemInformationDeployment = (int)
-        SysProcFragmentId.PF_systemInformationDeployment | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_systemInformationAggregate = (int)
-        SysProcFragmentId.PF_systemInformationAggregate;
 
     public static final ColumnInfo clusterInfoSchema[] = new ColumnInfo[]
     {
@@ -121,12 +111,12 @@ public class SystemInformation extends VoltSystemProcedure
                                        new ColumnInfo("KEY", VoltType.STRING),
                                        new ColumnInfo("VALUE", VoltType.STRING));
             }
-            return new DependencyPair.TableDependencyPair(DEP_DISTRIBUTE, result);
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationOverview, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
-            return new DependencyPair.TableDependencyPair(DEP_AGGREGATE, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_systemInformationOverview));
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationOverviewAggregate, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
         {
@@ -142,14 +132,14 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 result = new VoltTable(clusterInfoSchema);
             }
-            return new DependencyPair.TableDependencyPair(DEP_systemInformationDeployment, result);
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationDeployment, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationAggregate)
         {
             VoltTable result = null;
             // Check for KEY/VALUE consistency
             List<VoltTable> answers =
-                dependencies.get(DEP_systemInformationDeployment);
+                dependencies.get((int) SysProcFragmentId.PF_systemInformationDeployment);
             for (VoltTable answer : answers)
             {
                 // if we got an empty table from a non-lowest execution site ID,
@@ -181,7 +171,7 @@ public class SystemInformation extends VoltSystemProcedure
                     }
                 }
             }
-            return new DependencyPair.TableDependencyPair(DEP_systemInformationAggregate, result);
+            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_systemInformationAggregate, result);
         }
         assert(false);
         return null;
@@ -283,7 +273,7 @@ public class SystemInformation extends VoltSystemProcedure
         SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
         spf[0] = new SynthesizedPlanFragment();
         spf[0].fragmentId = SysProcFragmentId.PF_systemInformationOverview;
-        spf[0].outputDepId = DEP_DISTRIBUTE;
+        spf[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverview;
         spf[0].inputDepIds = new int[] {};
         spf[0].multipartition = true;
         spf[0].parameters = ParameterSet.emptyParameterSet();
@@ -291,12 +281,12 @@ public class SystemInformation extends VoltSystemProcedure
         spf[1] = new SynthesizedPlanFragment();
         spf[1] = new SynthesizedPlanFragment();
         spf[1].fragmentId = SysProcFragmentId.PF_systemInformationOverviewAggregate;
-        spf[1].outputDepId = DEP_AGGREGATE;
-        spf[1].inputDepIds = new int[] { DEP_DISTRIBUTE };
+        spf[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationOverviewAggregate;
+        spf[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_systemInformationOverview };
         spf[1].multipartition = false;
         spf[1].parameters = ParameterSet.emptyParameterSet();
 
-        return executeSysProcPlanFragments(spf, DEP_AGGREGATE);
+        return executeSysProcPlanFragments(spf, (int) SysProcFragmentId.PF_systemInformationOverviewAggregate);
     }
 
     private VoltTable[] getDeploymentInfo() {
@@ -305,7 +295,7 @@ public class SystemInformation extends VoltSystemProcedure
         // create a work fragment to gather deployment data from each of the sites.
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_systemInformationDeployment;
-        pfs[1].outputDepId = DEP_systemInformationDeployment;
+        pfs[1].outputDepId = (int) SysProcFragmentId.PF_systemInformationDeployment;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
@@ -313,14 +303,14 @@ public class SystemInformation extends VoltSystemProcedure
         // create a work fragment to aggregate the results.
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_systemInformationAggregate;
-        pfs[0].outputDepId = DEP_systemInformationAggregate;
-        pfs[0].inputDepIds = new int[]{DEP_systemInformationDeployment};
+        pfs[0].outputDepId = (int) SysProcFragmentId.PF_systemInformationAggregate;
+        pfs[0].inputDepIds = new int[]{(int) SysProcFragmentId.PF_systemInformationDeployment};
         pfs[0].multipartition = false;
         pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
-        results = executeSysProcPlanFragments(pfs, DEP_systemInformationAggregate);
+        results = executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_systemInformationAggregate);
         return results;
     }
 

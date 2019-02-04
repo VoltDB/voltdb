@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.iv2.MpTransactionState;
@@ -134,6 +133,43 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
          * like user sysprocs.
          */
         public boolean suppressDuplicates = false;
+
+        /**
+         * Most MP sysprocs use this pattern of MP fragment and a non-MP aggregator fragment.
+         * Utility method to create that.
+         * @param fragmentId Id of the MP fragment distributed to sites. This will be the fragment id of the first
+         *        SynthesizedPlanFragment, its output dependency id and input dependency id of the aggregator fragment.
+         * @param aggFragmentId Id of the aggregator fragment. This will be the fragment id of the second SynthesizedPlanFragment
+         *        and its output dependency id.
+         * @param params Parameters for the first fragment.
+         * @return Array of fragments in the correct order
+         */
+        public static SynthesizedPlanFragment[] createFragmentAndAggregator(long fragmentId, long aggFragmentId, Object... params) {
+            return createFragmentAndAggregatorFromParameterSet(fragmentId, aggFragmentId, ParameterSet.fromArrayNoCopy(params));
+        }
+
+        /**
+         * Similar to {@link #createFragmentAndAggregator(long, long, Object...)}, but takes in ParameterSet as input for first fragment.
+         */
+        public static SynthesizedPlanFragment[] createFragmentAndAggregatorFromParameterSet(long fragmentId, long aggFragmentId, ParameterSet params) {
+            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+
+            pfs[0] = new SynthesizedPlanFragment();
+            pfs[0].fragmentId = fragmentId;
+            pfs[0].inputDepIds = ArrayUtils.EMPTY_INT_ARRAY;
+            pfs[0].outputDepId = (int) fragmentId;
+            pfs[0].multipartition = true;
+            pfs[0].parameters = params;
+
+            pfs[1] = new SynthesizedPlanFragment();
+            pfs[1].fragmentId = aggFragmentId;
+            pfs[1].inputDepIds = new int[]{ (int) fragmentId };
+            pfs[1].outputDepId = (int) aggFragmentId;
+            pfs[1].multipartition = false;
+            pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+            return pfs;
+        }
     }
 
     abstract public DependencyPair executePlanFragment(
@@ -206,12 +242,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         int fragmentIndex = 0;
         for (SynthesizedPlanFragment pf : pfs) {
             assert (pf.parameters != null);
-
-            // check the output dep id makes sense given the number of sites to
-            // run this on
-            if (pf.multipartition) {
-                assert ((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
-            }
 
             FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
                     txnState.initiatorHSId,
