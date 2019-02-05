@@ -513,6 +513,24 @@ public class QueryPlanner implements AutoCloseable {
         return bestPlan;
     }
 
+    public static int fragmentizePlan(CompiledPlan plan) {
+        // split up the plan everywhere we see send/receive into multiple plan fragments
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
+        int receiveCount = receives.size();
+        if (receiveCount < 2) {
+            /*/ enable for debug ...
+            if (receives.size() > 1) {
+                System.out.println(plan.rootPlanGraph.toExplainPlanString());
+            }
+            // ... enable for debug */
+            if (receives.size() == 1) {
+                AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
+                fragmentize(plan, recvNode);
+            }
+        }
+        return receiveCount;
+    }
+
     /**
      * Make sure that schemas in base and recursive plans
      * in common table scans have identical schemas.  This

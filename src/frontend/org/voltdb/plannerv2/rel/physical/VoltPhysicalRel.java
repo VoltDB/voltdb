@@ -22,6 +22,7 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 import java.util.Objects;
@@ -36,7 +37,7 @@ public interface VoltPhysicalRel extends RelNode {
      * @return AbstractPlanNode
      */
     default AbstractPlanNode toPlanNode() {
-        throw new UnsupportedOperationException("Not implemented!");
+        throw new CalcitePlanningException("Not implemented!");
     }
 
     /**

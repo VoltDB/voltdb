@@ -48,6 +48,7 @@ import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -57,6 +58,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 
+import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
 import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
@@ -277,8 +279,10 @@ public class PlannerTool {
             // Renumber the plan node ids to start with 1
             compiledPlan.resetPlanNodeIds(1);
         } catch (Exception e){
-            throw new PlanningErrorException(e.getMessage());
+            throw new PlannerFallbackException(e.getMessage());
         }
+        planner.close();
+        fragmentizePlan(compiledPlan);
 
         return compiledPlan;
     }
@@ -292,9 +296,10 @@ public class PlannerTool {
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException, PlannerFallbackException {
         CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
-
+        plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
-        return new AdHocPlannedStatement(plan, core);
+        throw new PlannerFallbackException();
+//        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
