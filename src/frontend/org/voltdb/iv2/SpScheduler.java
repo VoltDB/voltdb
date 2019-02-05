@@ -1479,7 +1479,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             setMaxSeenTxnId(msg.getSpHandle());
         }
         Iv2Trace.logDummyTransactionTaskMessage(msg, m_mailbox.getHSId());
-
+        logRepair(msg);
         DummyTransactionTask task = new DummyTransactionTask(m_mailbox,
                 new SpTransactionState(msg), m_pendingTasks);
         // This read only DummyTransactionTask is to help flushing the task queue,
