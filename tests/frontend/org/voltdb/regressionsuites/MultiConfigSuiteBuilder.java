@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.junit.Test;
+import org.voltdb.FlakyTestStandardRunner;
 import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.FlakyTestRule.FlakyTestRunner;
 
@@ -51,9 +52,11 @@ import junit.framework.TestSuite;
 public class MultiConfigSuiteBuilder extends TestSuite {
 
     /** The class that contains the JUnit test methods to run */
-    final Class<? extends TestCase> m_testClass;
+    private final Class<? extends TestCase> m_testClass;
     // Collection of test method names to be ignored and not executed
-    final Collection<String> m_ignoredTests;
+    private final Collection<String> m_ignoredTests;
+    // Print debug statements only if FlakyTestStandardRunner indicates to
+    private final boolean DEBUG = FlakyTestStandardRunner.debug();
 
     /**
      * Get the JUnit test methods for a given class. These methods have no
@@ -62,8 +65,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @return A list of the names of each JUnit test method.
      */
     List<String> getTestMethodNames() {
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.getTestMethodNames");
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.getTestMethodNames");
+        }
 
         ArrayList<String> retval = new ArrayList<>();
 
@@ -98,11 +102,12 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                     System.out.println("WARNING: in MultiConfigSuiteBuilder.getTestMethodNames, caught exception:");
                     e.printStackTrace(System.out);
                 }
-                // TODO: temp debug
-                System.out.println("DEBUG:   flakyAnnotation   : "+flakyAnnotation);
-                System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
-                System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
-                System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                if (DEBUG) {
+                    System.out.println("DEBUG:   flakyAnnotation   : "+flakyAnnotation);
+                    System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
+                    System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
+                    System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                }
                 if (!runFlakyTest) {
                     continue;
                 }
@@ -110,9 +115,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             retval.add(name);
         }
 
-
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.getTestMethodNames");
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.getTestMethodNames");
+        }
         return retval;
     }
 
@@ -123,9 +128,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
         this(testClass, Collections.emptySet());
-
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Leaving MultiConfigSuiteBuilder constructor(1): "+testClass);
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder constructor(1): "+testClass);
+        }
     }
 
     /**
@@ -136,14 +141,14 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      *                  {@code skipTest.contains(methodName)} returns {@code true}
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Collection<String> ignoredTests) {
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder constructor(2): "+testClass+", "+ignoredTests);
-
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder constructor(2): "+testClass+", "+ignoredTests);
+        }
         m_testClass = testClass;
         m_ignoredTests = ignoredTests;
-
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Leaving MultiConfigSuiteBuilder constructor(2)");
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder constructor(2)");
+        }
     }
 
     /**
@@ -153,16 +158,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (1): "+config);
-
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (1): "+config);
+        }
         return addServerConfig(config, true);
     }
 
     public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
-
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (2): "+config+", "+reuseServer);
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (2): "+config+", "+reuseServer);
+        }
 
         if (config.isValgrind()) {
             reuseServer = false;
@@ -211,11 +216,13 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         // get the set of test methods
         List<String> methods = getTestMethodNames();
 
-        // TODO: temp. debug:
-        if (methods.size() < 10) {
-            System.out.println("DEBUG:    methods: "+methods);
-        } else {
-            System.out.println("DEBUG:    methods: ["+methods.get(0)+", ..., "+methods.get(methods.size()-1)+"]");
+        if (DEBUG) {
+            if (methods.size() < 10) {
+                System.out.println("DEBUG:    methods: "+methods);
+            } else {
+                System.out.println("DEBUG:    methods: ["+methods.get(0)
+                        +", ..., "+methods.get(methods.size()-1)+"]");
+            }
         }
 
         // add a test case instance for each method for the specified
@@ -234,18 +241,19 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             // shutdown the cluster completely after finishing the test.
             rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
 
-            // TODO: temp. debug:
-            if (i < 3 || i > 145) {
-                System.out.println("DEBUG:    i, mname, rs: "+i+", "+mname+", "+rs);
-            } else if (i == 3) {
-                System.out.println("DEBUG:      ...");
+            if (DEBUG) {
+                if (i < 3 || i > 145) {
+                    System.out.println("DEBUG:    i, mname, rs: "+i+", "+mname+", "+rs);
+                } else if (i == 3) {
+                    System.out.println("DEBUG:      ...");
+                }
             }
             super.addTest(rs);
         }
 
-        // TODO: temp. debug:
-        System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.addServerConfig (2), true");
-
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.addServerConfig (2), true");
+        }
         return true;
     }
 
