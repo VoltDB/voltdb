@@ -30,7 +30,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,13 +55,11 @@ import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.utils.Pair;
 import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.Partition;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ContiguousSet;
 import com.google_voltpatches.common.collect.DiscreteDomain;
 import com.google_voltpatches.common.collect.HashMultimap;
@@ -74,7 +71,6 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeMap;
-import com.google_voltpatches.common.collect.TreeRangeMap;
 
 public class TestAbstractTopology {
 
@@ -757,42 +753,27 @@ public class TestAbstractTopology {
 
     @Test
     public void testRestorePlacementOnRecovery() throws Exception {
-        if (!MiscUtils.isPro()) {
-            return;
+        Joiner joiner = Joiner.on(',');
+        ImmutableMap<Integer, Set<Integer>> hostPartitions = ImmutableMap.of(0, ImmutableSortedSet.of(0, 1, 2), 1,
+                ImmutableSortedSet.of(6, 7, 8), 2, ImmutableSortedSet.of(9, 10, 11), 3, ImmutableSortedSet.of(3, 4, 5));
+        Map<Integer, HostInfo> hostInfos = new HashMap<>();
+        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+            hostInfos.put(entry.getKey(), new HostInfo("", "g0", 3, joiner.join(entry.getValue())));
         }
-        VoltFile.resetSubrootForThisProcess();
-        LocalCluster cluster = null;
-        try{
-            cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 6, 3, 1);
-            cluster.startUp();
-            cluster.shutDown();
-            // host ids in LocalCluster will be assigned async. So when a local host is recovered, it may be assigned
-            // with different host id.  The property is used for placement restore test.
-            List<String> restoredMsg = new ArrayList<String> (Arrays.asList("Partition placement has been restored"));
-            cluster.setLogSearchPatterns(restoredMsg);
-            cluster.startUp(false);
-            assert(cluster.verifyLogMessages(restoredMsg));
-        } finally {
-            if (cluster != null){
-                cluster.shutDown();
+
+        AbstractTopology topology = AbstractTopology.getTopology(hostInfos, Collections.emptySet(), 0, true);
+
+        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+            assertEquals(entry.getValue(), topology.getPartitionIdList(entry.getKey()));
+        }
+
+        topology = AbstractTopology.getTopology(hostInfos, Collections.emptySet(), 0, false);
+
+        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+            if (!entry.getValue().equals(topology.getPartitionIdList(entry.getKey()))) {
+                return;
             }
         }
-    }
-
-    private LocalCluster createLocalCluster(String jarName, int sph, int hostCount, int kfactor) throws IOException {
-        final String schema = "CREATE TABLE P1 (ID BIGINT DEFAULT '0' NOT NULL," +
-                        " VIOLATION BIGINT DEFAULT '0' NOT NULL," +
-                        " CONSTRAINT VIOC ASSUMEUNIQUE ( VIOLATION )," +
-                        " PRIMARY KEY (ID)); PARTITION TABLE P1 ON COLUMN ID;";
-        LocalCluster cluster = new LocalCluster(jarName, sph, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
-        cluster.setNewCli(true);
-        cluster.overrideAnyRequestForValgrind();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schema);
-        builder.configureLogging(null, null, false, true, 200, Integer.MAX_VALUE, 300);
-        cluster.setHasLocalServer(false);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        return cluster;
+        fail("Partitions restored when they shouldn't have been");
     }
 }
