@@ -74,6 +74,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -3545,7 +3546,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
 
-                if (m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
+                if (m_catalogContext != null && m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
                     hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
                             m_catalogContext.m_ptool.getAdHocLargeFallbackCount()));
                 }
