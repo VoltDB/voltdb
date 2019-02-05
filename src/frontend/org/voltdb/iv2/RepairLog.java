@@ -229,6 +229,11 @@ public class RepairLog
         } else if (msg instanceof RepairLogTruncationMessage) {
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
             truncate(truncateMsg.getHandle(), IS_SP);
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(" Site "+  CoreUtils.hsIdToString(m_HSId) + " receive truncation from " +
+                        CoreUtils.hsIdToString(truncateMsg.m_sourceHSId) + " Truncation handle:" + TxnEgo.txnIdToString(truncateMsg.getHandle()) +
+                                " isLeader:" + m_isLeader);
+            }
         }
     }
 

@@ -1356,6 +1356,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
+                if (!txn.isDone() && tmLog.isDebugEnabled()) {
+                    tmLog.debug("Transaction " + TxnEgo.txnIdToString(msg.getTxnId()) + " is not completed.");
+                }
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
                 setRepairLogTruncationHandle(txn.m_spHandle, txn.isLeaderMigrationInvolved());
             }
@@ -1648,6 +1651,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void setRepairLogTruncationHandle(long newHandle, boolean isExecutedOnOldLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Trucation handle update from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                        "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isExecutedOnOldLeader:" + isExecutedOnOldLeader);
+            }
+
             m_repairLogTruncationHandle = newHandle;
             // ENG-14553: release buffered reads regardless of leadership status
             m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
@@ -1706,8 +1714,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(newHandle);
                         // Also keep the local repair log's truncation point up-to-date
                         // so that it can trigger the callbacks.
+                        truncMsg.m_sourceHSId = m_mailbox.getHSId();
                         m_mailbox.deliver(truncMsg);
                         m_mailbox.send(m_sendToHSIds, truncMsg);
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Sending truncation " + TxnEgo.txnIdToString(newHandle) + " from " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                                    " to " + CoreUtils.hsIdCollectionToString(Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList())));
+                        }
                     }
                 }
             }
