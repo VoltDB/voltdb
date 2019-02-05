@@ -21,7 +21,7 @@ import numpy as np
 import time
 import re
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 
 COLORS = ['b','g','c','m','k']
 

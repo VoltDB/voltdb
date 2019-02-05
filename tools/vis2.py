@@ -22,7 +22,7 @@ import csv
 import time
 import datetime
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 NaN = float("nan")
 REFERENCE_BRANCH = 'master'  # this is global but can be modified by the 4th parameter if any
 

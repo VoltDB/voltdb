@@ -417,24 +417,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
                      PF_restoreReceiveResultTables,
                      plan[plan.length - 1].fragmentId);
         assertFalse(plan[plan.length - 1].multipartition);
-        checkPlanDependencies(plan);
         assertEquals(m_state.getRootDependencyId(),
                      plan[plan.length - 1].parameters.toArray()[0]);
-    }
-
-    private void checkPlanDependencies(SynthesizedPlanFragment[] plan)
-    {
-        Set<Integer> aggregate_deps = new HashSet<Integer>();
-        for (int dependency_id : plan[plan.length - 1].inputDepIds)
-        {
-            aggregate_deps.add(dependency_id);
-        }
-        Set<Integer> plan_deps = new HashSet<Integer>();
-        for (int i = 0; i < plan.length - 1; ++i)
-        {
-            plan_deps.add((Integer) plan[i].parameters.toArray()[3]);
-        }
-        assertTrue(aggregate_deps.equals(plan_deps));
     }
 
     private PartitionedTableSaveFileState m_state;

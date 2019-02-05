@@ -73,7 +73,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         byte[] m_planHash = null;
         ByteBuffer m_parameterSet = null;
         Integer m_outputDepId = null;
-        ArrayList<Integer> m_inputDepIds = null;
+        int m_inputDepId = -1;
         byte[] m_stmtName = null;
         // For unplanned item
         byte[] m_fragmentPlan = null;
@@ -104,11 +104,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 sb.append("\n  OUTPUT_DEPENDENCY_ID ");
                 sb.append(m_outputDepId);
             }
-            if (m_inputDepIds != null && m_inputDepIds.size() > 0) {
-                sb.append("\n  INPUT_DEPENDENCY_IDS ");
-                for (long id : m_inputDepIds)
-                    sb.append(id).append(", ");
-                sb.setLength(sb.lastIndexOf(", "));
+            if (m_inputDepId != -1) {
+                sb.append("\n  INPUT_DEPENDENCY_ID ");
+                sb.append(m_inputDepId);
             }
             if (m_fragmentPlan != null && m_fragmentPlan.length != 0) {
                 sb.append("\n  FRAGMENT_PLAN ");
@@ -151,7 +149,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     boolean m_perFragmentStatsRecording = false;
     boolean m_coordinatorTask = false;
 
-    int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
     // Partitions involved in this multipart, set in the first fragment
@@ -246,7 +243,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;
         m_nPartTxn = ftask.m_nPartTxn;
-        m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
@@ -376,45 +372,20 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return true;
     }
 
-    public void addInputDepId(int index, int depId) {
-        assert(index >= 0 && index < m_items.size());
+    public void setInputDepId(int index, int depId) {
+        assert (index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
-        assert(item != null);
-        if (item.m_inputDepIds == null)
-            item.m_inputDepIds = new ArrayList<Integer>();
-        item.m_inputDepIds.add(depId);
-        m_inputDepCount++;
-    }
+        assert (item != null);
+        assert item.m_inputDepId == -1;
 
-    public ArrayList<Integer> getInputDepIds(int index) {
-        assert(index >= 0 && index < m_items.size());
-        FragmentData item = m_items.get(index);
-        assert(item != null);
-        return item.m_inputDepIds;
+        item.m_inputDepId = depId;
     }
 
     public int getOnlyInputDepId(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
         assert(item != null);
-        if (item.m_inputDepIds == null)
-            return -1;
-        assert(item.m_inputDepIds.size() == 1);
-        return item.m_inputDepIds.get(0);
-    }
-
-    public int[] getAllUnorderedInputDepIds() {
-        int[] retval = new int[m_inputDepCount];
-        int i = 0;
-        for (FragmentData item : m_items) {
-            if (item.m_inputDepIds != null) {
-                for (int depId : item.m_inputDepIds) {
-                    retval[i++] = depId;
-                }
-            }
-        }
-        assert(i == m_inputDepCount);
-        return retval;
+        return item.m_inputDepId;
     }
 
     public void setFragmentTaskType(byte value) {
@@ -733,7 +704,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
 
             // Account for the optional input dependency block, if needed.
-            if (item.m_inputDepIds != null) {
+            if (item.m_inputDepId != -1) {
                 if (!foundInputDepIds) {
                     // Account for the size short for each item now that we know
                     // that the optional block is needed.
@@ -741,7 +712,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                     foundInputDepIds = true;
                 }
                 // Account for the input dependency IDs themselves, if any.
-                msgsize += 4 * item.m_inputDepIds.size();
+                msgsize += 4;
             }
 
             // Each unplanned item gets:
@@ -787,7 +758,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         short nOutputDepIds = 0;
         short nUnplanned = 0;
         for (FragmentData item : m_items) {
-            if (item.m_inputDepIds != null) {
+            if (item.m_inputDepId != -1) {
                 // Supporting only one input dep id for now.
                 nInputDepIds++;
             }
@@ -855,13 +826,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Optional input dependency ID block
         if (nInputDepIds > 0) {
             for (FragmentData item : m_items) {
-                if (item.m_inputDepIds == null || item.m_inputDepIds.size() == 0) {
+                if (item.m_inputDepId == -1) {
                     buf.putShort((short) 0);
                 } else {
-                    buf.putShort((short) item.m_inputDepIds.size());
-                    for (Integer inputDepId : item.m_inputDepIds) {
-                        buf.putInt(inputDepId);
-                    }
+                    buf.putShort((short) 1);
+                    buf.putInt(item.m_inputDepId);
                 }
             }
         }
@@ -1005,11 +974,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             for (FragmentData item : m_items) {
                 short count = buf.getShort();
                 if (count > 0) {
-                    item.m_inputDepIds = new ArrayList<Integer>(count);
-                    for (int j = 0; j < count; j++) {
-                        item.m_inputDepIds.add(buf.getInt());
-                        m_inputDepCount++;
-                    }
+                    assert count == 1;
+                    item.m_inputDepId = buf.getInt();
                 }
             }
         }
@@ -1107,13 +1073,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_perFragmentStatsRecording) {
             sb.append("PER FRAGMENT STATS RECORDING\n");
         }
-        if (m_isReadOnly)
+        if (m_isReadOnly) {
             sb.append("  READ, COORD ");
-        else
-        if (m_nPartTxn)
+        } else
+        if (m_nPartTxn) {
             sb.append("  ").append(" N part WRITE, COORD ");
-        else
+        } else {
             sb.append("  WRITE, COORD ");
+        }
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
         if (!m_emptyForRestart) {
@@ -1127,10 +1094,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  FRAGMENT EMPTY FOR RESTART SERIALIZATION");
         }
 
-        if (m_isFinal)
+        if (m_isFinal) {
             sb.append("\n  THIS IS THE FINAL TASK");
-        if (m_isForReplica)
+        }
+        if (m_isForReplica) {
             sb.append("\n  THIS IS SENT TO REPLICA");
+        }
 
         if (m_isForOldLeader) {
             sb.append("\n  EXECUTE ON ORIGNAL LEADER");
@@ -1151,10 +1120,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         {
             sb.append("\n  UNKNOWN FRAGMENT TASK TYPE");
         }
-        sb.append("\nBatch index:" + m_currentBatchIndex + " Dep count:" + m_inputDepCount);
+        sb.append("\nBatch index:").append(m_currentBatchIndex).append(" Dep count: ")
+                .append(m_items.stream().mapToInt(i -> i.m_inputDepId == -1 ? 0 : 1).sum());
 
-        if (m_emptyForRestart)
+        if (m_emptyForRestart) {
             sb.append("\n  THIS IS A NULL FRAGMENT TASK USED FOR RESTART");
+        }
 
         String procName = getProcedureName();
         if (procName != null) {
