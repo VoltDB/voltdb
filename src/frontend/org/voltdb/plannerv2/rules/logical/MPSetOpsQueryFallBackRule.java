@@ -52,25 +52,21 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         SetOp setOp = call.rel(0);
+        // @TODO For now allow no more than one distributed distributions
+        // Everything else - reject
         List<RelDistribution> distributions =
                 setOp.getInputs()
                      .stream()
                      .map(node -> node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE))
+                     .filter(distribution -> Type.SINGLETON != distribution.getType())
                      .collect(Collectors.toList());
 
-        // @TODO For now allow no more than one HASH distribution which should have passed the MPQueryFallBackRule validation.
-        // Everything else - reject
-        List<RelDistribution> hashDistributions =
-                distributions.stream()
-                             .filter(distribution -> Type.HASH_DISTRIBUTED == distribution.getType())
-                             .collect(Collectors.toList());
-
-        if (hashDistributions.size() > 1) {
+        if (distributions.size() > 1) {
             throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
-        RelDistribution newDistribution = (hashDistributions.isEmpty()) ?
-                RelDistributions.SINGLETON : hashDistributions.get(0);
+        RelDistribution newDistribution = (distributions.isEmpty()) ?
+                RelDistributions.SINGLETON : distributions.get(0);
         call.transformTo(setOp.copy(setOp.getTraitSet().replace(newDistribution), setOp.getInputs()));
 
     }
