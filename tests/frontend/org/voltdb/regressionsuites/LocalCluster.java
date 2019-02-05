@@ -58,6 +58,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
@@ -181,7 +182,8 @@ public class LocalCluster extends VoltServerConfig {
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
     //NEW_CLI can be picked up from env var or -D to JVM.
-    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? System.getProperty("NEW_CLI", "true") : System.getenv("NEW_CLI"));
+    private boolean isNewCli = Boolean
+            .parseBoolean(System.getProperty("NEW_CLI", MoreObjects.firstNonNull(System.getenv("NEW_CLI"), "true")));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
@@ -189,7 +191,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
-    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+    private boolean isEnableSSL = Boolean.parseBoolean(System.getProperty("ENABLE_SSL", System.getenv("ENABLE_SSL")));
     public boolean isEnableSSL() { return isEnableSSL; };
     public void setEnableSSL(boolean flag) {
         isEnableSSL = flag;
