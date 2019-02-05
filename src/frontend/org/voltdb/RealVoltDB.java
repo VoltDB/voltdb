@@ -2179,6 +2179,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
+            if (m_config.m_restorePlacement && m_config.m_startAction.doesRecover() && topology.version > 1) {
+                consoleLog.info("Partition placement has been restored.");
+            }
             topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }
         return topology;

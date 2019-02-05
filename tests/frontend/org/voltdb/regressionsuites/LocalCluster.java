@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -223,8 +224,7 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        for (int i = 0; i < regexes.size(); i++) {
-            String s = regexes.get(i);
+        for (String s : regexes) {
             Pattern p = Pattern.compile(s);
             m_logMessageMatchPatterns.put(s, p);
         }
@@ -2464,7 +2464,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // Reset the message match result
     public void resetLogMessageMatchResult(int hostNum, String regex) {
-        assert(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assert(m_logMessageMatchResults.containsKey(hostNum));
         assert(m_logMessageMatchPatterns.containsKey(regex));
         m_logMessageMatchResults.get(hostNum).remove(regex);
@@ -2477,7 +2477,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // verify the presence of message in the log from specified host
     public boolean verifyLogMessage(int hostNum, String regex) {
-        assertTrue(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assertTrue(m_logMessageMatchResults.containsKey(hostNum));
         assertTrue(m_logMessageMatchPatterns.containsKey(regex));
         return m_logMessageMatchResults.get(hostNum).contains(regex);
@@ -2522,6 +2522,10 @@ public class LocalCluster extends VoltServerConfig {
     // verify the message does not exist in all the logs
     public boolean verifyLogMessageNotExist(String regex) {
         return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
+    }
+
+    public boolean anyHostHasLogMessage(String regex) {
+        return m_logMessageMatchResults.values().stream().anyMatch(s -> s.contains(regex));
     }
 
     private void resetLogMessageMatchResults(int hostId) {
