@@ -52,8 +52,11 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         SetOp setOp = call.rel(0);
-        // @TODO For now allow no more than one distributed distributions
-        // Everything else - reject
+        // TODO ENG-15347 For now allow only one distributed distributions.
+        // Once the ENG-15347 will be resolved, the RelDistribution trait will provide an an optional attribute,
+        // which gets populated if the table is partitioned, with information of partition column, and equal-key value.
+        // Using this attribute, a SetOp with more than one partitioned tables partitioned on the same column value,
+        // using equality of the partitioning column in the WHERE clause can be allowed.
         List<RelDistribution> distributions =
                 setOp.getInputs()
                      .stream()

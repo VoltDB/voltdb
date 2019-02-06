@@ -38,6 +38,7 @@ import org.apache.calcite.util.Util;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
+import org.voltdb.plannerv2.utils.VoltRexUtil;
 
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
@@ -82,15 +83,22 @@ public class MPQueryFallBackRule extends RelOptRule {
                     throw new PlannerFallbackException("MP query not supported in Calcite planner.");
             }
             RelNode newTableScan = tableScan.copy(tableScan.getTraitSet().replace(tableDist), tableScan.getInputs());
-            // @TODO Need to adjust indexes from the table distribution for a possible Calc projection
-            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), newTableScan, calc.getProgram()));
+            // Need to adjust the existing table distribution for Calc's projection
+            // Keep in mind, if a partitioning column is not part of the Calc's projection the adjusted distribution
+            // will be empty
+            RelDistribution newTableDist = VoltRexUtil.adjustRelDistributionForProgram(calc.getCluster().getRexBuilder(), calc.getProgram(), tableDist);
+            call.transformTo(calc.copy(calc.getTraitSet().replace(newTableDist), newTableScan, calc.getProgram()));
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
-            // @TODO Still need to adjust distribution's indexes with each transformation if a top node has a projection
             RelNode child = call.rel(1);
             RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
             if (childDist != RelDistributions.ANY) {
                 SingleRel node = call.rel(0);
+                // Need to adjust distribution's indexes with each transformation if a top node has a projection
+                if (node instanceof VoltLogicalCalc) {
+                    VoltLogicalCalc calc = (VoltLogicalCalc) node;
+                    childDist = VoltRexUtil.adjustRelDistributionForProgram(calc.getCluster().getRexBuilder(), calc.getProgram(), childDist);
+                }
                 call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
             }
         }

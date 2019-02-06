@@ -169,6 +169,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // if the join condition can filter the partitioned table in SP, then the query is SP
         m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
                 "on P2.si = R1.i and P2.i =3").test();
+        // same as above but the initial partitioning column index is 2.
+        // Outer Calc's distribution will differ from the P4 Scan's distribution
+        m_tester.sql("SELECT P4.si FROM P4 join R2 on P4.ti = R2.i where P4.ti = 5").test();
 
         m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
                 "on P2.si = R1.i and P2.i =3 where P2.v = 'bar'").test();
