@@ -1366,10 +1366,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // The CompleteTransactionResponseMessage ends at the SPI. It is not
         // sent to the MPI because it doesn't care about it.
-        //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader && msg.requireAck()) {
+
+        // During partition leader migration, the response from replicas could come before
+        // the transaction on local (old leader) is completed. The response ends here.
+        if (!m_isLeader && msg.requireAck() && msg.getSPIHSId() != m_mailbox.getHSId()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
