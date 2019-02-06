@@ -42,12 +42,6 @@ public class DummyTransactionTask extends TransactionTask {
         doCommonSPICompleteActions();
         DummyTransactionResponseMessage response = new DummyTransactionResponseMessage(this);
         response.m_sourceHSId = m_initiator.getHSId();
-        if (m_txnState instanceof SpTransactionState) {
-            SpTransactionState st = (SpTransactionState)m_txnState;
-            if (st.m_initiationMsg != null && !(st.m_initiationMsg.isForReplica())) {
-                response.setForOldLeader(true);
-            }
-        }
         m_initiator.deliver(response);
     }
 
