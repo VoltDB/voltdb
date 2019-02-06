@@ -32,11 +32,11 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
-
-import junit.framework.Assert;
 
 import org.junit.After;
 import org.junit.Before;
@@ -49,6 +49,8 @@ import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 
 import com.google_voltpatches.common.collect.Sets;
+
+import junit.framework.Assert;
 
 public class TestPersistentBinaryDeque {
 
@@ -88,11 +90,50 @@ public class TestPersistentBinaryDeque {
         return buf;
     }
 
-    public static TreeSet<String> getSortedDirectoryListing() {
+    public static TreeSet<String> getSortedDirectoryListing() throws IOException {
+        return getSortedDirectoryListing(false);
+    }
+
+    public static TreeSet<String> getSortedDirectoryListing(boolean isPBDClosed) throws IOException {
         TreeSet<String> names = new TreeSet<String>();
+        TreeMap<String, File> files = new TreeMap<>();
         for (File f : TEST_DIR.listFiles()) {
             if (f.length() > 0) {
                 names.add(f.getName());
+                files.put(f.getName(), f);
+            }
+        }
+
+        // Verify the PBD segment finalization
+        Map.Entry<String, File> lastEntry = files.pollLastEntry();
+        if (lastEntry != null) {
+            if (isPBDClosed) {
+                // When PBD is closed, last entry SHOULD be final
+                assertTrue(PBDSegment.isFinal(lastEntry.getValue()));
+            }
+            else {
+                // When PBD is open, last entry SHOULD NOT be final
+                assertFalse(PBDSegment.isFinal(lastEntry.getValue()));
+            }
+        }
+        Map.Entry<String, File> penultimateEntry = files.pollLastEntry();
+        if (penultimateEntry != null) {
+            if (isPBDClosed) {
+                // When PBD is closed, penultimate entry SHOULD be final
+                assertTrue(PBDSegment.isFinal(penultimateEntry.getValue()));
+            }
+            else {
+                // When PBD is open, penultimateEntry entry MAY be final or not, depending on recovery scenario
+                // FIXME: we could test this
+                if (!PBDSegment.isFinal(penultimateEntry.getValue())) {
+                    System.out.println("Penultimate segment not final: " + penultimateEntry.getKey());
+                }
+            }
+        }
+        for (Map.Entry<String, File> otherEntry = files.pollLastEntry(); otherEntry != null;
+                otherEntry = files.pollLastEntry()) {
+            if (!PBDSegment.isFinal(otherEntry.getValue())) {
+                System.out.println("XXX OTHER SHOULD BE FINAL: " + otherEntry.getKey());
             }
         }
         return names;
@@ -113,7 +154,8 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.close();
 
-        listing = getSortedDirectoryListing();
+        // Get directory listing with PBD closed
+        listing = getSortedDirectoryListing(true);
         assertEquals(listing.size(), 4);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
@@ -142,7 +184,8 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 1);
         m_pbd.close();
 
-        listing = getSortedDirectoryListing();
+        // Test directlry listing on closed PBD
+        listing = getSortedDirectoryListing(true);
         assertEquals(listing.size(), 1);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
@@ -961,7 +1004,7 @@ public class TestPersistentBinaryDeque {
         System.runFinalization();
 
         //Expect just the current write segment
-        TreeSet<String> names = getSortedDirectoryListing();
+        TreeSet<String> names = getSortedDirectoryListing(true);
         assertEquals(3, names.size());
         assertTrue(names.first().equals("pbd_nonce.3.pbd"));
 

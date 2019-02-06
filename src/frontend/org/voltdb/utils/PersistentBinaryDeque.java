@@ -840,7 +840,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_readCursors.clear();
 
         for (PBDSegment segment : m_segments.values()) {
+
+            // When closing a PBD, all segments may be finalized because on
+            // recover a new segment will be opened for writing
             segment.close();
+            segment.setFinal(true);
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Closed segment " + segment.file()
+                    + " (final: " + segment.isFinal() + "), on PBD close");
+            }
         }
         m_closed = true;
     }
