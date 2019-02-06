@@ -1369,8 +1369,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
 
-        // During partition leader migration, the response from replicas could come before
-        // the transaction on local (old leader) is completed. The response ends here.
+        // During partition leader migration, the leadership of the site is being moved away. The site
+        // has been marked as not a leader and then receives the responses from replicas.
+        // These responses from replicas end here---do not send the message to itself
         if (!m_isLeader && msg.requireAck() && msg.getSPIHSId() != m_mailbox.getHSId()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
