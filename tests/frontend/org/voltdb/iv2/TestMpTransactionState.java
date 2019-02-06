@@ -170,7 +170,7 @@ public class TestMpTransactionState extends TestCase
 
         for (int i = 0; i < depsForLocalTask.size(); i++) {
             if (depsForLocalTask.get(i) < 0) continue;
-            plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
+            plan.localWork.setInputDepId(i, depsForLocalTask.get(i));
         }
         // create the FragmentResponse for the BorrowTask
         FragmentResponseMessage resp =

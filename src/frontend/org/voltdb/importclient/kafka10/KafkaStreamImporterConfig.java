@@ -112,6 +112,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
     //The total number of consumers for the importer, which are distributed among the hosts.
     private int m_consumerCount;
 
+    private String m_securityProtocol;
+    private String m_saslKerberosServiceName;
     /**
      * Importer configuration constructor.
      * @param properties Properties read from the deployment XML.
@@ -125,6 +127,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
         String commitPolicy = properties.getProperty("commit.policy");
         m_commitPolicy = KafkaCommitPolicy.fromString(commitPolicy);
         m_triggerValue = KafkaCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+        m_securityProtocol = properties.getProperty("security.protocol", null);
+        m_saslKerberosServiceName = properties.getProperty("sasl.kerberos.service.name", null);
 
         m_consumerRequestTimeout = parseProperty(properties, ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 305000);
 
@@ -366,5 +370,13 @@ public class KafkaStreamImporterConfig implements ImporterConfig {
 
     public String getProcedures() {
         return m_procedureMap.toString();
+    }
+
+    public String getSecurityProtocol() {
+        return m_securityProtocol;
+    }
+
+    public String getSaslKerberosServiceName() {
+        return m_saslKerberosServiceName;
     }
 }
