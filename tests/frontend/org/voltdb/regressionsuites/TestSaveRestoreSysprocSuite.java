@@ -3846,6 +3846,67 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    public void testReplicatedTableCSVSnapshotStatus()
+    throws Exception
+    {
+        m_config.shutDown();
+
+        int host_count = 2;
+        int site_count = 1;
+        int k_factor = 0;
+        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
+                                           BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project =
+            new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String replicatedTableName = "REPLICATED_TESTER";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(100, 0, null);
+                loadTable(client, replicatedTableName, true, repl_table);
+                VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, null, null, true, true);
+                assertEquals("Wrong host/site count from @SnapshotSave.",
+                             host_count * site_count, results[0].getRowCount());
+            }
+            finally {
+                client.close();
+            }
+
+            // Connect to each host and check @SnapshotStatus.
+            // Only one host should say it saved the replicated table we're watching.
+            Set<Long> hostIds = new HashSet<>();
+            for (int iclient = 0; iclient < host_count; iclient++) {
+                client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(iclient));
+                try {
+                    SnapshotResult[] results =
+                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
+                    for (SnapshotResult result : results) {
+                        if (result.table.equals(replicatedTableName)) {
+                            hostIds.add(result.hostID);
+                        }
+                    }
+                }
+                finally {
+                    client.close();
+                }
+            }
+            assertEquals("Replicated table CSV is not saved on exactly one host.", 1, hostIds.size());
+        }
+        catch (Exception e) {
+            fail(String.format("Caught %s: %s", e.getClass().getName(), e.getMessage()));
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
+
     public static class SnapshotResult {
         Long hostID;
         String table;

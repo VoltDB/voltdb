@@ -81,11 +81,11 @@ public class Shutdown extends VoltSystemProcedure {
                 CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_shutdownSync, rslt);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_shutdownSync, rslt);
         }
         else if (fragmentId == SysProcFragmentId.PF_shutdownSyncDone) {
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_shutdownSyncDone, rslt);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_shutdownSyncDone, rslt);
         }
         else if (fragmentId == SysProcFragmentId.PF_shutdownCommand) {
             Thread shutdownThread = new Thread() {
@@ -124,32 +124,12 @@ public class Shutdown extends VoltSystemProcedure {
      * @return Never returned, no he never returned...
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_shutdownSync;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_shutdownSync;
-        pfs[0].inputDepIds = new int[]{};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
+        createAndExecuteSysProcPlan(SysProcFragmentId.PF_shutdownSync, SysProcFragmentId.PF_shutdownSyncDone);
 
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_shutdownSyncDone;
-        pfs[1].inputDepIds = new int[] { (int) SysProcFragmentId.PF_shutdownSync };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[] {
+                new SynthesizedPlanFragment(SysProcFragmentId.PF_shutdownCommand, true) };
 
-        executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_shutdownSyncDone);
-
-        pfs = new SynthesizedPlanFragment[1];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_shutdownCommand;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone;
-        pfs[0].inputDepIds = new int[]{};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
-
-        executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_procedureDone);
+        executeSysProcPlanFragments(pfs, SysProcFragmentId.PF_procedureDone);
         return new VoltTable[0];
     }
 }

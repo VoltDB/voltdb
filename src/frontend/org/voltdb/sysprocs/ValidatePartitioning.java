@@ -77,13 +77,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             for (int ii = 0; ii < tableNames.size(); ii++) {
                 results.addRow(context.getHostId(), CoreUtils.getSiteIdFromHSId(context.getSiteId()), context.getPartitionId(), tableNames.get(ii), mispartitionedCounts[ii]);
             }
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_validatePartitioning, results);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_validatePartitioning, results);
 
         } else if (fragmentId == SysProcFragmentId.PF_validatePartitioningResults) {
 
             assert (dependencies.size() > 0);
-            final VoltTable results = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_validatePartitioning));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_validatePartitioningResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_validatePartitioning));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_validatePartitioningResults, results);
 
         } else if (fragmentId == SysProcFragmentId.PF_matchesHashinator) {
 
@@ -99,13 +99,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
                     context.getPartitionId(),
                     givenConfigurationSignature == TheHashinator.getConfigurationSignature() ? (byte)1 : (byte)0);
 
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_matchesHashinator, matchesHashinator);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_matchesHashinator, matchesHashinator);
 
         } else if (fragmentId == SysProcFragmentId.PF_matchesHashinatorResults) {
 
             assert (dependencies.size() > 0);
-            final VoltTable results = VoltTableUtil.unionTables(dependencies.get((int) SysProcFragmentId.PF_matchesHashinator));
-            return new DependencyPair.TableDependencyPair((int) SysProcFragmentId.PF_matchesHashinatorResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_matchesHashinator));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_matchesHashinatorResults, results);
 
         }
         assert (false);
@@ -151,40 +151,14 @@ public class ValidatePartitioning extends VoltSystemProcedure {
 
     private final VoltTable[] performValidatePartitioningWork(byte[] config)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_validatePartitioning;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_validatePartitioning;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(config);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_validatePartitioningResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_validatePartitioningResults;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_validatePartitioning };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
         ArrayList<VoltTable> results = new ArrayList<VoltTable>();
-        for (VoltTable t: executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_validatePartitioningResults)) {
+        for (VoltTable t : createAndExecuteSysProcPlan(SysProcFragmentId.PF_validatePartitioning,
+                SysProcFragmentId.PF_validatePartitioningResults, config)) {
             results.add(t);
         }
 
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_matchesHashinator;
-        pfs[0].outputDepId = (int) SysProcFragmentId.PF_matchesHashinator;
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(config);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_matchesHashinatorResults;
-        pfs[1].outputDepId = (int) SysProcFragmentId.PF_matchesHashinatorResults;
-        pfs[1].inputDepIds  = new int[] { (int) SysProcFragmentId.PF_matchesHashinator };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        for (VoltTable t: executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_matchesHashinatorResults)) {
+        for (VoltTable t : createAndExecuteSysProcPlan(SysProcFragmentId.PF_matchesHashinator,
+                SysProcFragmentId.PF_matchesHashinatorResults, config)) {
             results.add(t);
         }
 

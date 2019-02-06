@@ -18,8 +18,6 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
@@ -42,7 +40,6 @@ public abstract class TableSaveFileState
         m_tableName = tableName;
         m_txnId = txnId;
         m_consistencyResult = "Table: " + m_tableName + " not yet processed";
-        m_planDependencyIds = new HashSet<Integer>();
     }
 
     abstract public SynthesizedPlanFragment[]
@@ -66,23 +63,6 @@ public abstract class TableSaveFileState
     abstract void addHostData(VoltTableRow row) throws IOException;
 
     public abstract boolean isConsistent();
-
-    void addPlanDependencyId(int dependencyId)
-    {
-        m_planDependencyIds.add(dependencyId);
-    }
-
-    int[] getPlanDependencyIds()
-    {
-        int[] unboxed_ids = new int[m_planDependencyIds.size()];
-        int id_index = 0;
-        for (int id : m_planDependencyIds)
-        {
-            unboxed_ids[id_index] = id;
-            id_index++;
-        }
-        return unboxed_ids;
-    }
 
     void setRootDependencyId(int dependencyId)
     {
@@ -108,6 +88,5 @@ public abstract class TableSaveFileState
     protected String m_consistencyResult;
     private final String m_tableName;
     private final long m_txnId;
-    private final Set<Integer> m_planDependencyIds;
     private boolean m_isRecover;
 }
