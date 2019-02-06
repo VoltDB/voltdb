@@ -574,8 +574,23 @@ public class ExportManager implements ExportManagerInterface
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManagerInterface instance = ExportManagerInterface.instance();
+        instance.pushBuffer(partitionId, signature, startSequenceNumber,
+                tupleCount, uniqueId, bufferPtr, buffer, sync);
+    }
+
+    @Override
+    public void pushBuffer(
+            int partitionId,
+            String signature,
+            long startSequenceNumber,
+            long tupleCount,
+            long uniqueId,
+            long bufferPtr,
+            ByteBuffer buffer,
+            boolean sync) {
+
         try {
-            Generation generation = instance.getGeneration();
+            Generation generation = getGeneration();
             if (generation == null) {
                 if (buffer != null) {
                     DBBPool.wrapBB(buffer).discard();
@@ -589,6 +604,7 @@ public class ExportManager implements ExportManagerInterface
             exportLog.error("Error pushing export buffer", e);
         }
     }
+
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
@@ -605,10 +621,16 @@ public class ExportManager implements ExportManagerInterface
         }
     }
 
-    public static synchronized void sync(final boolean nofsync) {
+    @Override
+    public synchronized void sync(final boolean nofsync) {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
+        syncSources(nofsync);
+    }
+
+    private void syncSources(final boolean nofsync) {
+
         Generation generation = ExportManagerInterface.instance().getGeneration();
         if (generation != null) {
             generation.sync(nofsync);

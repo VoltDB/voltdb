@@ -19,6 +19,7 @@ package org.voltdb.export;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -131,4 +132,16 @@ public interface ExportManagerInterface {
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
             VoltTable results);
+
+    public void pushBuffer(
+            int partitionId,
+            String signature,
+            long startSequenceNumber,
+            long tupleCount,
+            long uniqueId,
+            long bufferPtr,
+            ByteBuffer buffer,
+            boolean sync);
+
+    public void sync(final boolean nofsync);
 }
