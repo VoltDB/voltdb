@@ -415,7 +415,6 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
     // We shouldn't yet get a buffer even though we've filled a bunch because
     // the transaction is still open.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
-    int64_t seqNo = m_wrapper->getSequenceNumber();
 }
 
 /**
