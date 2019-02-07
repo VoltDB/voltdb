@@ -35,7 +35,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -60,8 +59,7 @@ public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
 
-        cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.overrideAnyRequestForValgrind();
+        cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
 
         cluster.setHasLocalServer(false);
 

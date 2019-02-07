@@ -145,7 +145,7 @@ public class ScanPerfTest extends JUnit4LocalClusterTest {
         builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
                 "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");
-        cluster = new LocalCluster("scanperf.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster = new LocalCluster("scanperf.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         //cluster.setMaxHeap(10);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -154,7 +154,6 @@ public class ScanPerfTest extends JUnit4LocalClusterTest {
 
         System.out.println("Starting cluster.");
         cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
         cluster.startUp(true);
 
         System.out.println("Getting client connected.");

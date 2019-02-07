@@ -94,12 +94,11 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             props.put("skipinternals", "true");
             builder.addExport(true, ServerExportEnum.CUSTOM, props, "utopia");
 
-            cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
             cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");
             cluster.setNewCli(true);
             cluster.setHasLocalServer(false);
             cluster.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
-            cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
             assertTrue(success);
             cluster.startUp(true);

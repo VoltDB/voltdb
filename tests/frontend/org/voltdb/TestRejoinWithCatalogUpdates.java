@@ -81,11 +81,10 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         //TODO: Do this in new cli when snapshot is updated.
         cluster.setNewCli(false);
         cluster.setMaxHeap(256);
-        cluster.overrideAnyRequestForValgrind();
         ServerThread localServer = null;
         try {
             boolean success = cluster.compileWithAdminMode(builder, -1, false); // note, this admin port is ignored
@@ -160,9 +159,8 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI);
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(256);
-        cluster.overrideAnyRequestForValgrind();
         cluster.setHasLocalServer(false);
         boolean success = cluster.compile(builder);
         assertTrue(success);

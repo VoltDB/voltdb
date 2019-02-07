@@ -104,7 +104,7 @@ public class LiveRejoinFailureTests extends JUnit4LocalClusterTest {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.setSnapshotSettings("1s", 5, "/tmp/", "auto");
-        cluster = new LocalCluster("liverejoinoverflow.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster = new LocalCluster("liverejoinoverflow.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(4096);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -113,7 +113,6 @@ public class LiveRejoinFailureTests extends JUnit4LocalClusterTest {
 
         System.out.println("Starting cluster.");
         cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
         cluster.startUp(true);
 
         System.out.println("Getting client connected.");

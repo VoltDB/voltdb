@@ -277,11 +277,10 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
 
 
         cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 LocalCluster.FailureState.ALL_RUNNING,
                 false, null);
         cluster.setMaxHeap(1300);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -476,11 +475,10 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
             builder.setSecurityEnabled(false, true);
 
             cluster = new LocalCluster("rejoin.jar", 4, 3, 1,
-                    BackendTarget.NATIVE_EE_JNI,
+                    BackendTarget.NATIVE_EE_JNI_NO_VG,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, null);
             cluster.setMaxHeap(1300);
-            cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));

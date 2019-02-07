@@ -131,14 +131,13 @@ public class LiveRejoinOverflowTests extends JUnit4LocalClusterTest {
         System.out.println("Compiling catalog.");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
-        cluster = new LocalCluster("liverejoinoverflow.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster = new LocalCluster("liverejoinoverflow.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(4096);
         boolean success = cluster.compile(builder);
         assertTrue(success);
 
         System.out.println("Starting cluster.");
         cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
         cluster.startUp(true);
 
         System.out.println("Getting client connected.");

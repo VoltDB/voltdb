@@ -196,7 +196,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     }
 
     static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort, boolean reuseServer) throws IOException {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
 
         MultiConfigSuiteBuilder builder
                 = new MultiConfigSuiteBuilder(classzz);
@@ -247,20 +247,19 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
          */
         config = new LocalCluster(jarName, StatisticsTestSuiteBase.SITES,
                 StatisticsTestSuiteBase.HOSTS, StatisticsTestSuiteBase.KFACTOR,
-                BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
+        config.setHasLocalServer(hasLocalServer);
 
         if (MiscUtils.isPro() && isCommandLogTest) {
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+            config.setJavaProperty("LOG_SEGMENT_SIZE", "1");
+            config.setJavaProperty("LOG_SEGMENTS", "1");
         }
 
         if (replicationPort > 0) {
             // cluster id is default to 0
             project.addLiteralSchema(drSchema);
             project.setDrProducerEnabled();
-            ((LocalCluster) config).setReplicationPort(replicationPort);
-            ((LocalCluster) config).overrideAnyRequestForValgrind();
+            config.setReplicationPort(replicationPort);
         }
 
         boolean success = config.compile(project);

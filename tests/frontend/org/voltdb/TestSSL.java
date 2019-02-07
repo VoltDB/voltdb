@@ -216,9 +216,9 @@ public class TestSSL extends TestCase {
         int sitesPerHost = 2;
         int hostCount = 3;
         int kFactor = 2;
-        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor,
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
         m_cluster.setMaxHeap(1400);
-        m_cluster.overrideAnyRequestForValgrind();
         m_cluster.setHasLocalServer(false);
         boolean success = m_cluster.compile(builder);
         assertTrue(success);

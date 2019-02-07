@@ -67,10 +67,9 @@ final public class TestStartWithClassesOnly {
                 hostCount,
                 kfactor,
                 clusterID,
-                BackendTarget.NATIVE_EE_JNI,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 FailureState.ALL_RUNNING, false, null);
         cluster.setHasLocalServer(true);
-        cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(true);
         cluster.compileDeploymentOnly(builder);

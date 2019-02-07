@@ -69,11 +69,10 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true, true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 LocalCluster.FailureState.ALL_RUNNING,
                 false, null);
         cluster.setMaxHeap(768);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -252,10 +251,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 LocalCluster.FailureState.ONE_FAILURE,
                 false, null);
-        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(768);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -268,11 +266,10 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
 
         cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 LocalCluster.FailureState.ONE_RECOVERING,
                 false, null);
         cluster.setMaxHeap(768);
-        cluster.overrideAnyRequestForValgrind();
         success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -288,9 +285,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     public void testRejoinInlineStringBug() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(768);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -353,9 +349,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         int kFactor = 2;
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", sitesPerHost,
-                hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
+                hostCount, kFactor, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(1400);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -471,8 +466,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.overrideAnyRequestForValgrind();
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(768);
         boolean success = cluster.compileWithAdminMode(builder, -1, false); // note this admin port is ignored
         assertTrue(success);
@@ -537,9 +531,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
 
-        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(768);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -712,10 +705,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
 
         cluster.setMaxHeap(768);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -796,9 +788,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         int kFactor = 2;
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", sitesPerHost,
-                hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
+                hostCount, kFactor, BackendTarget.NATIVE_EE_JNI_NO_VG);
         cluster.setMaxHeap(1400);
-        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -918,9 +909,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
 
-        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(768);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -1011,9 +1001,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, false, additionalEnv);
 
-        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(768);
         boolean success = cluster.compile(builder);
         assertTrue(success);
