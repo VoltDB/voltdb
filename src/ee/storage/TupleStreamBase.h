@@ -118,8 +118,11 @@ public:
     size_t m_headerSpace;
 
     /**
-    * The number of Export Tuples applied to the Export Stream Block in the current txn;
-    * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
+    * The number of Export tuples hasn't added to row count header of Export Stream Block in the current txn;
+    * Note that before the stashed tuple count is reset (and row count of stream block is updated) when
+    * 1) transaction is committed by the *next* txn,
+    * 2) remaining space of current stream block is not enough, new stream block is created,
+    * 3) transaction rolls back which affects one or more stream blocks.
     */
     int64_t m_stashedTupleCount;
 

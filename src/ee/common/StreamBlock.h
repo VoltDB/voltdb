@@ -230,7 +230,7 @@ namespace voltdb
         }
 
         void truncateTo(size_t mark, int64_t exportSeqNo) {
-            // just move offset and row count (only export block cares). pretty easy.
+            // just move offset and update export row count. pretty easy.
             if (((m_uso + offset()) >= mark ) && (m_uso <= mark)) {
                 m_offset = mark - m_uso;
                 if (lastExportSequenceNumber() >= exportSeqNo && startExportSequenceNumber() <= exportSeqNo) {

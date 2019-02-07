@@ -288,6 +288,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
+            // Update tuple count in current block with the number of tuples
+            // inserted so far by the current transaction
             m_currBlock->updateRowCountForExport(m_stashedTupleCount);
             m_stashedTupleCount = 0;
             m_pendingBlocks.push_back(m_currBlock);
