@@ -114,8 +114,15 @@ public class TestValidation extends Plannerv2TestCase {
         m_tester.sql("select i from R1 where i != 3").test();
     }
 
-    public void testNull() {
+    // ENG-15222 allow null to appear as function parameter
+    public void testNullAsFunctionParameter() {
         m_tester.sql("select abs(null) from R1").test();
+    }
+
+    // TODO ENG-15353: allow null to appear in operands
+    public void testNullAsOperand() {
+        //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").test();
+        //m_tester.sql("create table foo(i int, unique (1 + null));").test();
     }
 
     public void testFullJoinWithoutColumnScope() {
