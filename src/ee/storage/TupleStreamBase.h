@@ -118,12 +118,12 @@ public:
     size_t m_headerSpace;
 
     /**
-    * The number of Export tuples hasn't added to row count header of Export Stream Block in the current txn;
-    * Note that before the stashed tuple count is reset (and row count of stream block is updated) when
-    * 1) transaction is committed by the *next* txn,
-    * 2) remaining space of current stream block is not enough, new stream block is created,
-    * 3) transaction rolls back which affects one or more stream blocks.
-    */
+     * Count of exported tuples not yet counted in the row count header of the Export Stream Block for the current transaction;
+     * this count will be added to the row count header (and this count reset to 0) on the following conditions:
+     * 1) current transaction appears "committed" when we start handling the _next_ transaction
+     * 2) when the current transaction needs a new Stream Block
+     * 3) current transaction is rolled back (with the rollback affecting one or more Stream blocks)
+     */
     int64_t m_stashedTupleCount;
 
     int64_t m_exportSequenceNumber;
