@@ -323,8 +323,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             // Ensure it's marked as non-final before deletion
                             try {
                                 PBDSegment.setFinal(pathname, false);
-                            }
-                            catch (IOException ioe) {
+                            } catch (IOException ioe) {
                                 LOG.warn("Failed to clear final attribute in " + pathname + ": " + ioe);
                             }
                             pathname.delete();
@@ -351,8 +350,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             if (!qs.isFinal()) {
                                 LOG.warn("Segment " + qs.file()
                                 + " (final: " + qs.isFinal() + "), has been recovered but is not in a final state");
-                            }
-                            else if (m_usageSpecificLog.isDebugEnabled()) {
+                            } else if (m_usageSpecificLog.isDebugEnabled()) {
                                 m_usageSpecificLog.debug("Segment " + qs.file()
                                     + " (final: " + qs.isFinal() + "), has been recovered");
                             }
@@ -538,8 +536,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (last != null) {
             if (!last.isBeingPolled()) {
                 last.close();
-            }
-            else {
+            } else {
                 last.sync();
             }
             last.setFinal(true);
