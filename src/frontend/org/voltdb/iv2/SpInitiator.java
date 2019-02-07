@@ -42,6 +42,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -345,11 +346,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     //This will be called from Snapshot in elastic joining or rejoining cases.
-    public void updateReplicasForJoin(long snapshotSaveTxnId) {
+    public void updateReplicasForJoin(TransactionState snapshotTransactionState) {
         long[] replicasAdded = new long[0];
         if (m_term != null) {
-            replicasAdded = ((SpTerm)m_term).updateReplicas(snapshotSaveTxnId);
+            replicasAdded = ((SpTerm) m_term).updateReplicas(snapshotTransactionState);
         }
-        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotSaveTxnId);
+        ((SpScheduler) m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
     }
 }

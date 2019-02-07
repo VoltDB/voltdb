@@ -75,6 +75,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -145,6 +146,7 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -5101,9 +5103,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_iv2Initiators.firstKey();
     }
 
-    public void updateReplicaForJoin(long siteId, long txnId) {
+    public void updateReplicaForJoin(long siteId, TransactionState transactionState) {
         m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
-            .forEach(s->((SpInitiator)s).updateReplicasForJoin(txnId));
+                .forEach(s -> ((SpInitiator) s).updateReplicasForJoin(transactionState));
     }
 
     @Override
