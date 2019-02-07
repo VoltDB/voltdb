@@ -116,11 +116,6 @@ public class TestCompactingViewsSuite extends RegressionSuite {
     }
 
     public void testPartitionedCompactingViews() throws Exception {
-        // hard to test compaction in valgrind via java (at the moment)
-        if (isValgrind()) {
-            return;
-        }
-
         runCompactingViewsForTable("PP.insert", "PP.delete", "selectPP");
         runCompactingViewsForTable("PR.insert", "deletePR", "selectPR");
     }
@@ -170,7 +165,7 @@ public class TestCompactingViewsSuite extends RegressionSuite {
         }
 
         // JNI local with 1 site
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);

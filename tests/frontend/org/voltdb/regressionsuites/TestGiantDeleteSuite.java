@@ -37,12 +37,6 @@ public class TestGiantDeleteSuite extends RegressionSuite {
 
     public void testGiantDelete() throws IOException, ProcCallException
     {
-        /*
-         * Times out with valgrind
-         */
-        if (isValgrind()) {
-            return;
-        }
         Client client = getClient(1000 * 60 * 10);
         for (int i = 0; i < 100; i++) {
             client.callProcedure("InsertBatch", 200000, 0, i * 200000);
@@ -85,7 +79,10 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         project.addProcedure(InsertBatch.class, "ASSET.OBJECT_DETAIL_ID: 1");
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
-        config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        /*
+         * Times out with valgrind
+         */
+        config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         config.compile(project);
         builder.addServerConfig(config);
 

@@ -50,8 +50,6 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
     // but in this case we bump up the temp table limit so that it doesn't
     // throw a proc call exception.
     public void testPerPlanFragmentMemoryKnob() throws IOException, ProcCallException {
-        if (isHSQL() || isValgrind()) return;
-
         System.out.println("STARTING testPerPlanFragmentMemoryKnob");
         Client client = getClient();
 
@@ -92,7 +90,7 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -103,8 +101,9 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         // Give ourselves a little leeway for slop over 300 MB
         project.setMaxTempTableMemory(320);
         // build the jarfile
-        if (!config.compile(project))
+        if (!config.compile(project)) {
             fail();
+        }
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);

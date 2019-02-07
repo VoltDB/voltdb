@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -45,8 +44,6 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
     }
 
     public void testSaveAndPartialRestoreExcludetables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSaveAndPartialRestoreExcludetables");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -87,8 +84,6 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
     }
 
     public void testSaveAndPartialRestoreIncludeTables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSaveAndPartialRestoreIncludeTables");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -130,8 +125,6 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
     }
 
     public void testSaveAndPartialRestoreWithNonExistingIncludeTables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSaveAndPartialRestoreWithNonExistingIncludeTables");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -163,8 +156,6 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
     }
 
     public void testSaveAndPartialRestoreWithNonExistingExcludeTables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSaveAndPartialRestoreWithNonExistingExcludeTables");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -328,8 +319,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         project.addAllDefaults();
 
         config =
-            new CatalogChangeSingleProcessServer(JAR_NAME, 3,
-                                                 BackendTarget.NATIVE_EE_JNI);
+            new CatalogChangeSingleProcessServer(JAR_NAME, 3, BackendTarget.NATIVE_EE_JNI_NO_VG);
         boolean success = config.compile(project);
         assert(success);
         builder.addServerConfig(config, false);

@@ -46,8 +46,6 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
     }
 
     public void testPartialRestoreWithViewsIncludetables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testPartialRestoreWithViewsIncludetables");
         LocalCluster cluster = null;
         Client client = null;
@@ -144,8 +142,6 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
     }
 
     public void testPartialRestoreWithViewsIncludeViews() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testPartialRestoreWithViewsIncludeViews");
         LocalCluster cluster = null;
         Client client = null;
@@ -318,8 +314,7 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
         project.addAllDefaults();
 
         config =
-            new CatalogChangeSingleProcessServer(JAR_NAME, 3,
-                                                 BackendTarget.NATIVE_EE_JNI);
+                new CatalogChangeSingleProcessServer(JAR_NAME, 3, BackendTarget.NATIVE_EE_JNI_NO_VG);
         boolean success = config.compile(project);
         assert(success);
         builder.addServerConfig(config, false);

@@ -359,8 +359,6 @@ public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;

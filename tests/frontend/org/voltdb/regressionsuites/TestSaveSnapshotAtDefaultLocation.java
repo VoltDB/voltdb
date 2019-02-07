@@ -53,8 +53,6 @@ public class TestSaveSnapshotAtDefaultLocation extends RegressionSuite {
     //
     public void testSnapshotSaveForBackup() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("Starting testSnapshotSaveForBackup");
         Client client = getClient();
 
@@ -69,7 +67,9 @@ public class TestSaveSnapshotAtDefaultLocation extends RegressionSuite {
         //Now scan and make sure we have magic marker in snapshot. Since its non-blocking wait for 2 min.
         while (System.currentTimeMillis() < endTime) {
             scanResults = client.callProcedure("@SnapshotScan", VoltDB.instance().getSnapshotPath()).getResults()[0];
-            if (scanResults.getRowCount() != 0) break;
+            if (scanResults.getRowCount() != 0) {
+                break;
+            }
             Thread.sleep(5000);
         }
         assertNotNull(scanResults);
@@ -98,7 +98,8 @@ public class TestSaveSnapshotAtDefaultLocation extends RegressionSuite {
         project.addLiteralSchema("CREATE TABLE foo (bar BIGINT NOT NULL);");
         project.addPartitionInfo("foo", "bar");
         // get a server config for the native backend with one sites/partitions
-        m_config = new LocalCluster("base-cluster-with-inprocess.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        m_config = new LocalCluster("base-cluster-with-inprocess.jar", SITES_PER_HOST, HOSTS, K,
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
         // build the jarfile
         boolean basecompile = m_config.compile(project);
         assertTrue(basecompile);

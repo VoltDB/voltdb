@@ -108,8 +108,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
     public void testEmptySnapshotSaveRestore() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("testEmptySnapshotSaveRestore");
         m_nonEmptyConfig.shutDown();
         m_emptyConfig.startUp();
@@ -150,8 +148,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
     public void testSaveAndRestoreFromEmptyDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("testSaveAndRestoreFromEmptyDatabase");
         setConfig(m_nonEmptyConfig);
         Client client = getClient();
@@ -207,8 +203,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
     public void testSaveAndRestoreFromNonEmptyDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("testSaveAndRestoreFromNonEmptyDatabase");
         setConfig(m_nonEmptyConfig);
         Client client = getClient();
@@ -264,8 +258,6 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
     public void testSaveAndRestoreFromCatalogDatabase() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         System.out.println("testSaveAndRestoreFromCatalogDatabase");
         setConfig(m_nonEmptyConfig);
         Client client = getClient();
@@ -322,7 +314,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
 
-        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         //TODO: Migrate to new cli
         m_nonEmptyConfig.setNewCli(false);
         boolean compile = m_nonEmptyConfig.compile(project);
@@ -330,7 +322,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         builder.addServerConfig(m_nonEmptyConfig, false);
 
 
-        m_emptyConfig = new LocalCluster("empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyConfig = new LocalCluster("empty-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         //TODO: Migrate to new cli
         m_emptyConfig.setNewCli(false);
         project = new VoltProjectBuilder();
@@ -339,7 +331,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         assertTrue(compile);
 
 
-        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", 4, 3, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         //TODO: Migrate to new cli
         m_emptyCatalogConfig.setNewCli(false);
         project = new VoltProjectBuilder();

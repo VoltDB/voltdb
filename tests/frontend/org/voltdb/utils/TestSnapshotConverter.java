@@ -52,8 +52,6 @@ public class TestSnapshotConverter extends SaveRestoreBase
     // Regression test for ENG-8609
     public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
     {
-        if (isValgrind()) return;
-
         Client client = getClient();
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
@@ -125,7 +123,7 @@ public class TestSnapshotConverter extends SaveRestoreBase
         project.addPartitionInfo("T_SP", "A1");
 
         LocalCluster lcconfig = new LocalCluster("testsnapshotstatus.jar", 8, 1, 0,
-                                               BackendTarget.NATIVE_EE_JNI);
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
         assertTrue(lcconfig.compile(project));
         builder.addServerConfig(lcconfig);
 
@@ -136,13 +134,14 @@ public class TestSnapshotConverter extends SaveRestoreBase
         LineNumberReader reader = null;
         try {
             reader = new LineNumberReader(new FileReader(aFile));
-            while ((reader.readLine()) != null);
+            while ((reader.readLine()) != null) {}
             return reader.getLineNumber();
         } catch (Exception ex) {
             return -1;
         } finally {
-            if(reader != null)
+            if (reader != null) {
                 reader.close();
+            }
         }
     }
 }

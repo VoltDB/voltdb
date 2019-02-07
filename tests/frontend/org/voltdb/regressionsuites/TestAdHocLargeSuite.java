@@ -33,11 +33,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestAdHocLargeSuite extends RegressionSuite {
 
     public void testBasic() throws Exception {
-        if (isValgrind()) {
-            // don't run this test under valgrind, as it needs IPC support.
-            return;
-        }
-
         Client client = getClient();
         ClientResponse cr;
 
@@ -210,7 +205,7 @@ public class TestAdHocLargeSuite extends RegressionSuite {
         //                                        -->    145 bytes per tuple (not counting non-inlined data)
 
         project.setQueryTimeout(1000 * 60 * 5); // five minutes
-        config = new LocalCluster("adhoclarge-voltdbBackend.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("adhoclarge-voltdbBackend.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         System.setProperty("TEMP_TABLE_MAX_SIZE", "25"); // in MB
         success = config.compile(project);
         assertTrue(success);

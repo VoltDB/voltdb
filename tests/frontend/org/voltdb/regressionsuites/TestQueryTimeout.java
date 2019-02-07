@@ -106,10 +106,6 @@ public class TestQueryTimeout extends RegressionSuite {
         // Feel free to reset it later on.
         m_username = "adminUser";
         m_password = "password";
-        if (isValgrind() || isDebug()) {
-            // Disable the memcheck/debug for this test, it takes too long
-            return;
-        }
         System.out.println("test replicated table procedures timeout...");
 
         m_username = "userWithAllProc";
@@ -158,10 +154,6 @@ public class TestQueryTimeout extends RegressionSuite {
         // Feel free to reset it later on.
         m_username = "adminUser";
         m_password = "password";
-        if (isValgrind() || isDebug()) {
-            // Disable the memcheck/debug for this test, it takes too long
-            return;
-        }
         System.out.println("test partitioned table procedures timeout...");
 
         m_username = "userWithAllProc";
@@ -433,10 +425,6 @@ public class TestQueryTimeout extends RegressionSuite {
         // Feel free to reset it later on.
         m_username="adminUser";
         m_password="password";
-        if (isValgrind() || isDebug()) {
-            // Disable the memcheck/debug for this test, it takes too long
-            return;
-        }
         Client client;
 
         client = getClient();
@@ -525,6 +513,9 @@ public class TestQueryTimeout extends RegressionSuite {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestQueryTimeout.class);
+        if (LocalCluster.isDebugDefined()) {
+            return builder;
+        }
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
@@ -567,7 +558,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
         boolean success;
 
-        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI_NO_VG);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -578,7 +569,7 @@ public class TestQueryTimeout extends RegressionSuite {
         builder.addServerConfig(config);
 */
         // Cluster
-        config = new LocalCluster("querytimeout-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("querytimeout-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI_NO_VG);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

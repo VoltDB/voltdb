@@ -92,9 +92,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
     }
 
     public void testExportDataAfterCatalogUpdateDropAndAdd() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         int numOfStreams = 2;
         if (MiscUtils.isPro()) {
             numOfStreams += 2;
@@ -216,9 +213,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
     //This tests if catalog changes are not applied in EE export continues to function with current generation.
     public void testExportDataAfterNonEEUpdate() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         System.out.println("testExportDataAfterNonEEUpdate");
         Client client = getClient();
         ClientResponse response;
@@ -267,9 +261,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
     }
 
     public void testInsertDataBeforeCatalogUpdate() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         System.out.println("testInsertDataBeforeCatalogUpdate");
         Client client = getClient();
 
@@ -293,9 +284,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
     }
 
     public void testCatalogUpdateNonEmptyExport() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         System.out.println("testCatalogUpdateNonEmptyExport");
         Client client = getClient();
         closeSocketExporterClientAndServer();
@@ -321,9 +309,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
     }
 
     public void testLongTableSignature() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         System.out.println("testLongTableSignature");
         Client client = getClient();
         closeSocketExporterClientAndServer();
@@ -450,9 +435,6 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
     }
 
     public void testExportTableWithGeoTypes() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         System.out.println("testExportTableWithGeoTypes");
         Client client = getClient();
         client.callProcedure("@AdHoc", "create stream foo ( id integer not null," +
@@ -510,7 +492,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 4, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);

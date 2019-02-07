@@ -49,8 +49,6 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
     }
 
     public void testShutdownSave() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
         Client client2 = this.getClient();
         for (int i = 0; i < 256; ++i) {
             client2.callProcedure("KV.INSERT", i);
@@ -186,7 +184,8 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
 
-        LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
+        LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0,
+                BackendTarget.NATIVE_EE_JNI_NO_VG,
                 LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compileWithAdminMode(project, -1, false);

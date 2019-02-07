@@ -93,9 +93,6 @@ public class TestExportOverflow extends RegressionSuite {
     }
 
     public void testExportOverflowAutomoticDeletion() throws Exception {
-        if (isValgrind()) {
-            return;
-        }
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
@@ -139,8 +136,8 @@ public class TestExportOverflow extends RegressionSuite {
         String fileName;
         FileTime newer;
         FileTime older;
-        for (int i = 0; i < oldOverflowFiles.length; i++) {
-            fileName = oldOverflowFiles[i];
+        for (String oldOverflowFile : oldOverflowFiles) {
+            fileName = oldOverflowFile;
             newer = newFileTimes.get(fileName);
             older = fileTimes.get(fileName);
             assertTrue(newer != null);
@@ -165,7 +162,7 @@ public class TestExportOverflow extends RegressionSuite {
         project.addExport(true, ServerExportEnum.CUSTOM, null, "rejecting1");
 
         LocalCluster config = new LocalCluster("export-overflow-test.jar", 1, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI_NO_VG, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         // This is only for testing create --force.
         config.setNewCli(false);
