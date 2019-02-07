@@ -37,6 +37,7 @@ public enum BackendTarget {
     NATIVE_EE_JNI(         "jni",          false, true,     false, false, true),
     NATIVE_EE_LARGE_JNI(   "jni_large",    false, true,     false, true,  true),
     NATIVE_EE_SPY_JNI(     "jni_spy",      false, false,    false, false, false),
+    NATIVE_EE_JNI_NO_VG(   "jni_no_vg",    false, false,    false, false, true),
     NATIVE_EE_IPC(         "ipc",          true,  false,    false, false, false),
     NATIVE_EE_VALGRIND_IPC("valgrind_ipc", true,  false,    true,  false, false),
     HSQLDB_BACKEND(        "hsqldb",       false, false,    false, false, false),

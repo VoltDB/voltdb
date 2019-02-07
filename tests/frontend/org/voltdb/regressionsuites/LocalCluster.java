@@ -487,10 +487,13 @@ public class LocalCluster extends VoltServerConfig {
     public void setToStartPaused() {
        m_isPaused = true;
     }
+
     /**
-     * Override the Valgrind backend with a JNI backend.
-     * Called after a constructor but before startup.
+     * Override the Valgrind backend with a JNI backend. Called after a constructor but before startup.
+     *
+     * @deprecated Use {@link BackendTarget#NATIVE_EE_JNI_NO_VG} instead
      */
+    @Deprecated
     public void overrideAnyRequestForValgrind() {
         if (templateCmdLine.m_backend.isValgrindTarget) {
             m_target = BackendTarget.NATIVE_EE_JNI;
@@ -2324,7 +2327,6 @@ public class LocalCluster extends VoltServerConfig {
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
                 replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null, null);
         lc.setHasLocalServer(hasLocalServer);
-        lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
         lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
         if (!lc.isNewCli()) {
@@ -2390,7 +2392,6 @@ public class LocalCluster extends VoltServerConfig {
 
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
-        lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
         lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
         // temporary, until we always enable SPI migration
@@ -2439,7 +2440,8 @@ public class LocalCluster extends VoltServerConfig {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);
         }
         builder.setUseDDLSchema(true);
-        LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId,
+                BackendTarget.NATIVE_EE_JNI_NO_VG);
         lc.setReplicationPort(replicationPort);
         if (callingClassName != null) {
             lc.setCallingClassName(callingClassName);
