@@ -134,6 +134,10 @@
                   org/voltcore/utils/ssl/SSLBufferDecrypter.java
                   org/voltcore/utils/ssl/SSLBufferEncrypter.java
                   org/voltcore/utils/ssl/SSLConfiguration.java
+                  org/voltcore/utils/VoltUnsafe.java
+                  org/voltcore/utils/DirectBufferCleaner.java
+                  org/voltcore/utils/ReflectiveDirectBufferCleaner.java
+                  org/voltcore/utils/UnsafeDirectBufferCleaner.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java
