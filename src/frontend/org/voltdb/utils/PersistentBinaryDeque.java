@@ -497,7 +497,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
                 if (!fname.startsWith(m_nonce)) {
-                    if (logMe) LOG.info("XXX Ignore other PBD: " + fname);
+                    continue;
+                }
+
+                if (file.length() == 0) {
+                    // Old PBD file that was truncated to 0 instead of being deleted.
+                    // Gluster FS bug required to leave those files around, but the
+                    // new file naming scheme always create unique file names so
+                    // now we can delete those files.
+                    deleteStalePbdFile(file);
                     continue;
                 }
 
@@ -526,7 +534,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             // Handle common cases: no PBD files or just one
             if (filesByCreation.size() == 0) {
-                if (logMe) LOG.info("XXX No PBD segments for " + m_nonce);
+                LOG.info("No PBD segments for " + m_nonce);
                 return;
 
             }
@@ -552,6 +560,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 LinkedList<Instant> sequence = sequences.getFirst();
                 Long index = 1L;
                 for (Instant instant : sequence) {
+                    File file = filesByCreation.get(instant);
+                    if (file == null) {
+                        // This is an Instant in the sequence referring to a previous file that
+                        // was deleted, so move on.
+                        continue;
+                    }
                     PBDSegment seg = newSegment(index++, instant, filesByCreation.get(instant));
                     recoverSegment(seg, deleteEmpty);
                 }
@@ -566,7 +580,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void deleteStalePbdFile(File file) {
-        LOG.info("XXX delete old pbd file " + file.getName());
+        LOG.info("XXX delete old pbd file " + file.getName() + ", length " + file.length());
         try {
             PBDSegment.setFinal(file, false);
         } catch (IOException ioe) {
@@ -579,12 +593,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         if (deleteEmpty) {
             if (qs.getNumEntries() == 0) {
+                qs.setFinal(false);
                 LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
                 if (m_usageSpecificLog.isDebugEnabled()) {
-                    m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted during init");
+                    m_usageSpecificLog.debug("Segment " + qs.file()
+                        + " (final: " + qs.isFinal() + "), will be closed and deleted during init");
                 }
-                qs.setFinal(false);
-                qs.closeAndTruncate();
+                qs.closeAndDelete();
                 return;
             }
         }
@@ -681,7 +696,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             // Ensure the file is not final before closing and truncating
             segment.setFinal(false);
-            segment.closeAndTruncate();
+            segment.closeAndDelete();
 
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug("Segment " + segment.file()
