@@ -555,7 +555,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xloggc:"+ volt_root + "/" + VEM_GC_ROLLOVER_FILE_NAME+" -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles="+VEM_GC_ROLLOVER_FILE_COUNT+" -XX:GCLogFileSize="+VEM_GC_ROLLOVER_FILE_SIZE);
         }
         cmdline.add(maxHeap);
-        cmdline.add("-XX:+UseParNewGC");
+//        cmdline.add("-XX:+UseParNewGC");
         cmdline.add("-XX:+UseConcMarkSweepGC");
         cmdline.add("-XX:+CMSParallelRemarkEnabled");
         cmdline.add("-XX:+UseTLAB");
