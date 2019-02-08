@@ -49,6 +49,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
@@ -448,7 +449,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         Properties props = new Properties();
         props.put("procedure", procedure);
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, streamName);
     }
 
     public static void wireupExportTableToSocketExport(String streamName) {
@@ -464,7 +465,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, streamName);
     }
 
     private static Integer getNextPort() {

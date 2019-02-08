@@ -36,6 +36,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
@@ -151,7 +152,7 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
                 "with-schema", "true",
                 "complain", "true",
                 "outdir", "/tmp/" + System.getProperty("user.name")));
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("NO_NULLS_GRP", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");

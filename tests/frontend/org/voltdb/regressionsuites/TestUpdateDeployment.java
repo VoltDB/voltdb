@@ -45,6 +45,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.MiscUtils;
 
@@ -368,7 +369,7 @@ public class TestUpdateDeployment extends RegressionSuite {
                 "with-schema", "true",
                 "complain", "true",
                 "outdir", "/tmp/" + System.getProperty("user.name"));
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
         // build the jarfile
         boolean compile = config.compile(project);
         assertTrue(compile);

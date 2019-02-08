@@ -33,6 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
@@ -72,7 +73,6 @@ public class TestExportGroups extends TestExportBase {
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
         super.setUp();
-
     }
 
     @Override
@@ -206,7 +206,7 @@ public class TestExportGroups extends TestExportBase {
                 "with-schema", "true",
                 "nonce", "zorag1",
                 "outdir", "/tmp/" + System.getProperty("user.name")));
-        project.addExport(true /* enabled */, "custom", props, "NO_NULLS");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "NO_NULLS");
 
         // Foo tables for testing export groups
         Properties propsGrp = new Properties();
@@ -216,7 +216,7 @@ public class TestExportGroups extends TestExportBase {
                 "with-schema", "true",
                 "nonce", "grpnonce",
                 "outdir", "/tmp/" + System.getProperty("user.name")));
-        project.addExport(true /* enabled */, "file", propsGrp, "grp");
+        project.addExport(true, ServerExportEnum.FILE, propsGrp, "grp");
         project.addProcedures(PROCEDURES);
 
         // JNI, single server
@@ -237,6 +237,7 @@ public class TestExportGroups extends TestExportBase {
         config.setMaxHeap(1024);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
+        ((LocalCluster )config).setHasLocalServer(false);
         boolean compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),
                 Configuration.getPathToCatalogForTest("export-ddl.xml"));
@@ -251,14 +252,15 @@ public class TestExportGroups extends TestExportBase {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
+        ((LocalCluster )config).setHasLocalServer(false);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();
         project.addRoles(GROUPS);
         project.addUsers(USERS);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
-        project.addExport(true /* enabled */, "custom", props, "NO_NULLS");
-        project.addExport(true /* enabled */, "file", propsGrp, "grp");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "NO_NULLS");
+        project.addExport(true, ServerExportEnum.FILE, propsGrp, "grp");
         project.addProcedures(PROCEDURES);
         compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),
@@ -272,14 +274,15 @@ public class TestExportGroups extends TestExportBase {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
+        ((LocalCluster )config).setHasLocalServer(false);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();
         project.addRoles(GROUPS);
         project.addUsers(USERS);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
-        project.addExport(true /* enabled */, "custom", props, "NO_NULLS");
-        project.addExport(true /* enabled */, "file", propsGrp, "grp");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "NO_NULLS");
+        project.addExport(true, ServerExportEnum.FILE, propsGrp, "grp");
         project.addProcedures(PROCEDURES);
         compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),

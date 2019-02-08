@@ -267,9 +267,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers)
         {
             Object[] paramsArr = params.toArray();
-            assert(paramsArr[0] != null);
             assert(paramsArr.length == 6);
             assert(paramsArr[0] instanceof byte[]);
+            assert(paramsArr[1] instanceof Long);
             assert(paramsArr[2] instanceof long[]);
             assert(paramsArr[3] instanceof Long);
             assert(paramsArr[4] instanceof Long);
