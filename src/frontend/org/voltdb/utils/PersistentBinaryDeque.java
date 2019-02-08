@@ -398,11 +398,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Find the first and last segment for polling and writing (after); ensure the
         // writing segment is not final
+        Instant now = Instant.now();
+
         Map.Entry<Long, PBDSegment> lastEntry = m_segments.lastEntry();
-        Instant tsLast = lastEntry == null ? Instant.MIN : lastEntry.getValue().created();
+        Instant tsLast = lastEntry == null ? now.minusMillis(1) : lastEntry.getValue().created();
         Long writeSegmentIndex = lastEntry == null ? 0L : lastEntry.getKey();
 
-        Instant now = Instant.now();
         String fname = getSegmentFileName(now, tsLast);
         PBDSegment writeSegment =
             newSegment(
@@ -508,8 +509,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
 
                 // Parse the timestamps
-                Instant prevTs = Instant.MIN;
-                Instant curTs = Instant.MIN;
+                Instant prevTs = null;
+                Instant curTs = null;
                 try {
                     prevTs = Instant.parse(parts[parts.length - 1]);
                     curTs = Instant.parse(parts[parts.length - 2]);
@@ -691,12 +692,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         /*
          * Reset the poll and write segments
          */
-        //Find the first and last segment for polling and writing (after)
+        Instant now = Instant.now();
+
         PBDSegment lastSegment = peekLastSegment();
         Long newSegmentIndex = lastSegment == null ? 1 : lastSegment.segmentId() + 1;
-        Instant tsLast = lastSegment == null ? Instant.MIN : lastSegment.created();
+        Instant tsLast = lastSegment == null ? now.minusMillis(1) : lastSegment.created();
 
-        Instant now = Instant.now();
         String fname = getSegmentFileName(now, tsLast);
         PBDSegment newSegment = newSegment(newSegmentIndex, now, new VoltFile(m_path, fname));
         newSegment.openForWrite(true);
@@ -890,13 +891,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // The first creation timestamp is either the "previous" of the current head
         // (this avoids having to rename the file of the current head), or now.
-        Instant ts = first == null ? getPreviousTimestamp(first.file()) : Instant.now();
+        Instant ts = first == null ? Instant.now() : getPreviousTimestamp(first.file());
 
         while (segments.peek() != null) {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
 
             // Generate a fake creation time for the next PBD segment to insert
-            Instant prevTs = ts.minusNanos(1L);
+            Instant prevTs = ts.minusMillis(1L);
             String fname = getSegmentFileName(ts, prevTs);
 
             PBDSegment writeSegment =
