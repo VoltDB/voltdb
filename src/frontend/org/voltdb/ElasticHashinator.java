@@ -21,6 +21,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.Thread.State;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -39,9 +42,8 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.VoltUnsafe;
 import org.voltdb.utils.CompressionService;
-
-import sun.misc.Cleaner;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
@@ -79,7 +81,13 @@ public class ElasticHashinator extends TheHashinator {
 
     // Provide a hook for the GC
     @SuppressWarnings("unused")
-    private final Cleaner m_cleaner;
+    private final Object m_cleaner;
+
+    private static final ElasticHashinatorCleaner CLEANER = VoltUnsafe.isJava8
+            ? new ElasticHashinatorCleanerJRE8()
+            : new ElasticHashinatorCleanerJRE9();
+
+
 
     private final Supplier<byte[]> m_configBytes;
     private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
@@ -127,7 +135,7 @@ public class ElasticHashinator extends TheHashinator {
                 : updateRaw(configBytes));
         m_tokens = p.getFirst();
         m_tokenCount = p.getSecond();
-        m_cleaner = Cleaner.create(this, new Deallocator(m_tokens, m_tokenCount * 8));
+        m_cleaner = CLEANER.register(this, new Deallocator(m_tokens, m_tokenCount * 8));
         m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : m_configBytesSupplier;
         m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : m_cookedBytesSupplier;
         m_tokensMap =  Suppliers.memoize(new Supplier<ImmutableSortedMap<Integer, Integer>>() {
@@ -157,7 +165,7 @@ public class ElasticHashinator extends TheHashinator {
         final int bytes = 8 * tokens.size();
         m_tokens = Bits.unsafe.allocateMemory(bytes);
         trackAllocatedHashinatorBytes(bytes);
-        m_cleaner = Cleaner.create(this, new Deallocator(m_tokens, bytes));
+        m_cleaner = CLEANER.register(this, new Deallocator(m_tokens, bytes));
         int ii = 0;
         for (Map.Entry<Integer, Integer> e : tokens.entrySet()) {
             final long ptr = m_tokens + (ii * 8);
@@ -784,5 +792,60 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public int getPartitionFromHashedToken(int hashedToken) {
         return partitionForToken(hashedToken);
+    }
+
+    public interface ElasticHashinatorCleaner {
+        public Object register(Object obj, Runnable action);
+    }
+
+    public static class ElasticHashinatorCleanerJRE8 implements ElasticHashinatorCleaner {
+        /** create method. */
+        private final Method createMtd;
+
+        public ElasticHashinatorCleanerJRE8() {
+            try {
+                createMtd = Class.forName("sun.misc.Cleaner").getMethod("create", Object.class, Runnable.class);
+            } catch (ClassNotFoundException | NoSuchMethodException e) {
+                throw new RuntimeException("Reflection failure: no sun.misc.Cleaner.create method found", e);
+            }
+        }
+
+        @Override
+        public Object register(Object obj, Runnable action) {
+            try {
+                return createMtd.invoke(null, obj, action);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                e.printStackTrace();
+                throw new RuntimeException("Reflection failure: invoke sun.misc.Cleaner.create method failed", e);
+            }
+        }
+    }
+
+    public static class ElasticHashinatorCleanerJRE9 implements ElasticHashinatorCleaner {
+        /** create method. */
+        private final Method createMtd;
+        private final Method registerMtd;
+
+        public ElasticHashinatorCleanerJRE9() {
+            System.out.println("JAVA version " + ManagementFactory.getRuntimeMXBean().getSpecVersion());
+            try {
+                createMtd = Class.forName("java.lang.ref.Cleaner").getMethod("create");
+                registerMtd = Class.forName("java.lang.ref.Cleaner").getMethod("register", Object.class, Runnable.class);
+            } catch (ClassNotFoundException | NoSuchMethodException e) {
+                throw new RuntimeException("Reflection failure: no java.lang.ref.Cleaner found", e);
+            }
+        }
+
+        @Override
+        public Object register(Object obj, Runnable action) {
+            try {
+                Object cleaner = createMtd.invoke(null);
+                registerMtd.invoke(cleaner, obj, action);
+                return cleaner;
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                e.printStackTrace();
+                throw new RuntimeException("Reflection failure: invoke java.lang.ref.Cleaner method failed", e);
+            }
+        }
     }
 }
