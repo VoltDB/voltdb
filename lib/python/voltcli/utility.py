@@ -840,7 +840,12 @@ def get_java_version(javaHome="java", verbose=False):
         version.stdout.close()
         out, err = grep.communicate()
         version.wait()
-        if "1.8" in out:
+        if "11.0" in out:
+            if verbose:
+                return out
+            else:
+                return "11.0"
+        elif "1.8" in out:
             if verbose:
                 return out
             else:
