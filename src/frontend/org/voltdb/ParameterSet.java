@@ -42,7 +42,7 @@ import org.voltdb.utils.SerializationHelper;
  *
  */
 public class ParameterSet implements JSONString {
-    private static final ParameterSet EMPTY = fromArray(ArrayUtils.EMPTY_OBJECT_ARRAY);
+    private static final ParameterSet EMPTY = fromArray(new Object[0]);
 
     static final byte ARRAY = -99;
 
