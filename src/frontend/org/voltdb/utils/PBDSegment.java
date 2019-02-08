@@ -25,6 +25,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
+import java.time.Instant;
 import java.util.List;
 
 import org.voltcore.utils.DBBPool;
@@ -130,6 +131,7 @@ public abstract class PBDSegment {
     }
 
     abstract long segmentId();
+    abstract Instant created();
     abstract File file();
 
     abstract void reset();
