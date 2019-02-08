@@ -21,22 +21,22 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.hep.HepRelVertex;
+import org.apache.calcite.prepare.RelOptTableImpl;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalCalc;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLocalRef;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Util;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
@@ -78,10 +78,61 @@ public class MPQueryFallBackRule extends RelOptRule {
             // For partitioned tables, the distribution type will be HASH_DISTRIBUTED.
             if (tableDist.getType() != RelDistribution.Type.SINGLETON
                     && (calc.getProgram().getCondition() == null // SELECT ... FROM t (no filter)
-                            || ! isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
-                    throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+                    || !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
+                throw new PlannerFallbackException("MP query not supported in Calcite planner.");
             }
             call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
+        } else if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalJoin) {
+            final VoltLogicalCalc calc = call.rel(0);
+            final VoltLogicalJoin join = call.rel(1);
+            final RelOptTable outer = ((HepRelVertex) join.getLeft()).getCurrentRel().getTable();
+            final RelOptTable inner = ((HepRelVertex) join.getRight()).getCurrentRel().getTable();
+            if (outer != null && inner != null) {
+                final boolean outerIsReplicated = outer.getDistribution().getType() == RelDistribution.Type.SINGLETON,
+                        innerIsReplicated = inner.getDistribution().getType() == RelDistribution.Type.SINGLETON;
+                final RelDistribution joinDist;
+                if (!(outerIsReplicated && innerIsReplicated)) {
+                    final int outerColumns = outer.getRowType().getFieldCount();
+                    final Integer outerPartCol = ((RelOptTableImpl) outer).getTable().getPartitionColumn();
+                    final Integer innerPartCol = ((RelOptTableImpl) inner).getTable().getPartitionColumn();
+                    if (join.getJoinType() != JoinRelType.INNER) {
+                        throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+                    } else if (!outerIsReplicated && !innerIsReplicated) { // has to be inner join with equal-condition on partition column to be SP
+                        final RexLiteral joinValue = getInnerJoin2PEqualValue(join.getCondition(),
+                                outerColumns, outerPartCol, innerPartCol);
+                        if (joinValue == null) {
+                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+                        } else {
+                            outer.getDistribution().setPartitionEqualValue(joinValue);
+                            inner.getDistribution().setPartitionEqualValue(joinValue);
+                            joinDist = outer.getDistribution(); // TODO
+                        }
+                    } else if (outerIsReplicated) {     // replicated inner join partitioned
+                        final RexLiteral literal = getInnerJoinPREqualValue(join.getCondition(), innerPartCol, outerColumns);
+                        if (literal == null) {
+                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+                        } else {
+                            inner.getDistribution().setPartitionEqualValue(literal);
+                            joinDist = inner.getDistribution();
+                        }
+                    } else {                            // partitioned inner join replicated
+                        final RexLiteral literal = getInnerJoinPREqualValue(join.getCondition(), outerPartCol, outerColumns);
+                        if (literal == null) {
+                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+                        } else {
+                            outer.getDistribution().setPartitionEqualValue(literal);
+                            joinDist = outer.getDistribution();
+                        }
+                    }
+                } else {
+                    joinDist = outer.getDistribution();
+                }
+                if (join.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) == null) {
+                    join.getTraitSet().replace(joinDist);       // XXX: why join's traitset does not include distribution trait?
+                }
+                call.transformTo(calc.copy(calc.getTraitSet().replace(joinDist), calc.getInputs()));
+                //call.transformTo(join.copy(join.getTraitSet().replace(joinDist), join.getInputs()));
+            }
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);
@@ -89,6 +140,101 @@ public class MPQueryFallBackRule extends RelOptRule {
             if (childDist != RelDistributions.ANY) {
                 SingleRel node = call.rel(0);
                 call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
+            }
+        }
+    }
+
+    private static RexLiteral getInnerJoinPREqualValue(RexNode joinCondition, int partitionColumn, int outerColumns) {
+        if (! (joinCondition.isA(SqlKind.AND))) {
+            return null;
+        } else {
+            final RexCall cond = (RexCall) joinCondition;
+            final RexNode leftConj = cond.getOperands().get(0), rightConj = cond.getOperands().get(1);
+            // First condition must be in the form of T1.c1 = T2.c2
+            if (! leftConj.isA(SqlKind.EQUALS)) {
+                return null;
+            } else {
+                final RexCall col2 = (RexCall) leftConj;
+                final RexNode leftColRef = col2.getOperands().get(0),
+                        rightColRef = col2.getOperands().get(1);
+                assert leftColRef instanceof RexInputRef && rightColRef instanceof RexInputRef;
+                final int leftColIndex = ((RexInputRef) leftColRef).getIndex(),
+                        rightColIndex = ((RexInputRef) rightColRef).getIndex(),
+                        adjustedPartitionColumn = partitionColumn < outerColumns ?
+                                partitionColumn : partitionColumn + outerColumns;
+                if (leftColIndex != adjustedPartitionColumn && rightColIndex != adjustedPartitionColumn) {
+                    return null;
+                } else if (! rightConj.isA(SqlKind.EQUALS)) {
+                    return null;
+                } else {
+                    final RexCall eq = (RexCall) rightConj;
+                    final RexNode colRef, literal;
+                    if (eq.getOperands().get(0).isA(SqlKind.LITERAL) == eq.getOperands().get(1).isA(SqlKind.LITERAL)) {
+                        return null;
+                    } else if (eq.getOperands().get(0).isA(SqlKind.LITERAL)){
+                        colRef = eq.getOperands().get(1);
+                        literal = eq.getOperands().get(0);
+                    } else {
+                        colRef = eq.getOperands().get(0);
+                        literal = eq.getOperands().get(1);
+                    }
+                    if (! (colRef instanceof RexInputRef)) {
+                        return null;
+                    } else {
+                        final int colIndex = ((RexInputRef) colRef).getIndex();
+                        return colIndex == adjustedPartitionColumn ? (RexLiteral) literal : null;
+                    }
+                }
+            }
+        }
+    }
+
+    private static RexLiteral getInnerJoin2PEqualValue(
+            RexNode joinCondition, int outerColumns, int outerPartColIndex, int innerPartColIndex) {
+        if (! (joinCondition.isA(SqlKind.AND))) {
+            return null;
+        } else {
+            final RexCall cond = (RexCall) joinCondition;
+            final RexNode leftConj = cond.getOperands().get(0), rightConj = cond.getOperands().get(1);
+            // First condition must be in the form of T1.c1 = T2.c2
+            if (! leftConj.isA(SqlKind.EQUALS)) {
+                return null;
+            } else {
+                final RexCall col2 = (RexCall) leftConj;
+                final RexNode leftColRef = col2.getOperands().get(0),
+                        rightColRef = col2.getOperands().get(1);
+                assert leftColRef instanceof RexInputRef && rightColRef instanceof RexInputRef;
+                final int leftColIndex = ((RexInputRef) leftColRef).getIndex(),
+                        rightColIndex = ((RexInputRef) rightColRef).getIndex();
+                if (! (leftColIndex == outerPartColIndex && rightColIndex == innerPartColIndex + outerColumns ||
+                        leftColIndex == innerPartColIndex + outerColumns && rightColIndex ==outerPartColIndex)) {
+                    return null;       // not joining on two partition columns
+                } else if (! rightConj.isA(SqlKind.EQUALS)){    // check other conditions: must be in the form of PartitionColumRed = LITERAL
+                    return null;
+                } else {
+                    final RexCall eqValue = (RexCall) rightConj;
+                    final RexNode colRef, literal;
+                    if (eqValue.getOperands().get(0).isA(SqlKind.LITERAL) ==
+                            eqValue.getOperands().get(1).isA(SqlKind.LITERAL)) {
+                        return null;
+                    } else if (eqValue.getOperands().get(0).isA(SqlKind.LITERAL)) {
+                        colRef = eqValue.getOperands().get(1);
+                        literal = eqValue.getOperands().get(0);
+                    } else {
+                        colRef = eqValue.getOperands().get(0);
+                        literal = eqValue.getOperands().get(1);
+                    }
+                    if (! (colRef instanceof RexInputRef)) {
+                        return null;
+                    } else {
+                        final int colRefIndex = ((RexInputRef) colRef).getIndex();
+                        if (colRefIndex == outerPartColIndex || colRefIndex == outerColumns + innerPartColIndex) {
+                            return  (RexLiteral) literal;
+                        } else {
+                            return null;
+                        }
+                    }
+                }
             }
         }
     }

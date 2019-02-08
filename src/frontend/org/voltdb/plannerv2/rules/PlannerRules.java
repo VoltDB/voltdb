@@ -18,6 +18,11 @@
 package org.voltdb.plannerv2.rules;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.volcano.RelSubset;
+import org.apache.calcite.prepare.RelOptTableImpl;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
@@ -28,6 +33,11 @@ import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.rel.rules.ReduceExpressionsRule;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.schema.Table;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -90,6 +100,45 @@ public class PlannerRules {
         public abstract RuleSet getRules();
     }
 
+    private static final FilterJoinRule.Predicate MOVEABLE_TO_JOIN_COND = (join, joinType, expr) -> {     // moveableToOn
+        if (joinType != JoinRelType.INNER || ! (expr instanceof RexCall)
+                || ! expr.isA(SqlKind.EQUALS)) {
+            return false;
+        }
+        final RexNode leftExpression = ((RexCall) expr).getOperands().get(0);
+        final RexNode rightExpression = ((RexCall) expr).getOperands().get(1);
+        if (leftExpression.isA(SqlKind.INPUT_REF) && rightExpression.isA(SqlKind.LITERAL)
+                || rightExpression.isA(SqlKind.INPUT_REF) && leftExpression.isA(SqlKind.LITERAL)) {
+            final RelOptTable outerRel = ((RelSubset) join.getLeft()).getOriginal().getTable(),
+                    innerRel = ((RelSubset) join.getRight()).getOriginal().getTable();
+            final Table outer = ((RelOptTableImpl) outerRel).getTable(),
+                    inner = ((RelOptTableImpl) innerRel).getTable();
+            final Integer outerPartitionColumn = outer.getPartitionColumn(),
+                    innerPartitionColumn = inner.getPartitionColumn();
+            if (outerPartitionColumn == null || innerPartitionColumn == null) {
+                return false;       // one of the table is replicated.
+            }
+            final RexCall joinCondition = (RexCall) join.getCondition();
+            final int outerTableColumnCount = join.getLeft().getRowType().getFieldCount();
+            assert joinCondition.isA(SqlKind.EQUALS);
+            final int outerJoinColumnIndex =
+                    ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
+            final int innerJoinColumnIndex =
+                    ((RexInputRef) joinCondition.getOperands().get(1)).getIndex() -
+                            outerTableColumnCount;
+            if (outerJoinColumnIndex != outerPartitionColumn ||
+                    innerJoinColumnIndex != innerPartitionColumn) {
+                return false;       // The columns to be joined are not both partition columns
+            }
+            final int eqColRef = ((RexInputRef) (leftExpression.isA(SqlKind.INPUT_REF) ?
+                    leftExpression : rightExpression)).getIndex();
+            return eqColRef == outerPartitionColumn ||
+                    eqColRef == outerTableColumnCount + innerPartitionColumn;
+        } else {
+            return false;
+        }
+    };
+
     /**
      * Look for suitable Calcite built-in logical rules and add them.
      * Add VoltDB logical rules - they are mostly for giving RelNodes a convention.
@@ -110,7 +159,10 @@ public class PlannerRules {
             // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
             FilterProjectTransposeRule.INSTANCE,
-            FilterJoinRule.FILTER_ON_JOIN,
+            //FilterJoinRule.FILTER_ON_JOIN,
+            new FilterJoinRule.FilterIntoJoinRule(true, RelFactories.LOGICAL_BUILDER,
+                    FilterJoinRule.TRUE_PREDICATE,
+                    MOVEABLE_TO_JOIN_COND),
             FilterJoinRule.JOIN,
 
             // Reduces constants inside a LogicalCalc.
