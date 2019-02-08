@@ -30,6 +30,7 @@ from voltcli import utility
         VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default=120),
     )
 )
+
 def shutdown(runner):
     if runner.opts.forcing and runner.opts.save:
        runner.abort_with_help('You cannot specify both --force and --save options.')
@@ -38,8 +39,6 @@ def shutdown(runner):
     shutdown_params = []
     columns = []
     zk_pause_txnid = 0
-
-    communityVersion = isCommunityVersion(runner)
 
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
@@ -61,9 +60,9 @@ def shutdown(runner):
             checkstats.check_clients(runner)
             checkstats.check_importer(runner)
 
-            if not communityVersion:
-                checkstats.check_command_log(runner)
-                runner.info('All transactions have been made durable.')
+            # Checking command log regardless of whether we're community or enterprise
+            checkstats.check_command_log(runner)
+            runner.info('If running Enterprise Edition, all transactions have been made durable.')
 
             if runner.opts.save:
                actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
@@ -90,10 +89,3 @@ def shutdown(runner):
     response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status=False)
     print response
 
-
-def isCommunityVersion(runner):
-    response = runner.call_proc('@SystemInformation', [VOLT.FastSerializer.VOLTTYPE_STRING], ['OVERVIEW'])
-    for tuple in response.table(0).tuples():
-        if tuple[1] == "LICENSE":
-            return False
-    return True

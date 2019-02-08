@@ -42,6 +42,7 @@ import org.voltdb.utils.SerializationHelper;
  *
  */
 public class ParameterSet implements JSONString {
+    private static final ParameterSet EMPTY = fromArray(new Object[0]);
 
     static final byte ARRAY = -99;
 
@@ -67,14 +68,24 @@ public class ParameterSet implements JSONString {
     private final int m_serializedSize;
 
     public static ParameterSet emptyParameterSet() {
-        return fromArrayNoCopy();
+        return EMPTY;
     }
 
     public static ParameterSet fromArrayWithCopy(Object... params) {
-        return fromArrayNoCopy(params.clone());
+        if (params.length == 0) {
+            return EMPTY;
+        }
+        return fromArray(params.clone());
     }
 
     public static ParameterSet fromArrayNoCopy(Object... params) {
+        if (params.length == 0) {
+            return EMPTY;
+        }
+        return fromArray(params);
+    }
+
+    private static ParameterSet fromArray(Object[] params) {
         byte[][][] encodedStringArrays = new byte[params.length][][];
         byte[][] encodedStrings = new byte[params.length][];
 

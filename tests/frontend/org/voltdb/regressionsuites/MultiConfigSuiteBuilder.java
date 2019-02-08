@@ -26,9 +26,10 @@ package org.voltdb.regressionsuites;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Predicates;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -48,7 +49,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
     /** The class that contains the JUnit test methods to run */
     final Class<? extends TestCase> m_testClass;
     // Collection of test method names to be ignored and not executed
-    final Collection<String> m_ignoredTests;
+    final Predicate<String> m_testPredicate;
 
     /**
      * Get the JUnit test methods for a given class. These methods have no
@@ -67,7 +68,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                 continue;
             }
             String name = m.getName();
-            if (!name.startsWith("test") || m_ignoredTests.contains(name)) {
+            if (!name.startsWith("test") || !m_testPredicate.apply(name)) {
                 continue;
             }
             retval.add(name);
@@ -82,19 +83,19 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param testClass The class that contains the JUnit test methods to run.
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
-        this(testClass, Collections.emptySet());
+        this(testClass, Predicates.alwaysTrue());
     }
 
     /**
      * Initialize by passing in a class that contains JUnit test methods to run.
      *
-     * @param testClass The class that contains the JUnit test methods to run.
-     * @param ignoredTests {@link Collection} of test names to be skipped. A test will be skipped if
-     *                  {@code skipTest.contains(methodName)} returns {@code true}
+     * @param testClass     The class that contains the JUnit test methods to run.
+     * @param testPredicate {@link Predicate} which will test the test names. If {@code testPredicate} returns
+     *                      {@code false} the test will not be executed.
      */
-    public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Collection<String> ignoredTests) {
+    public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Predicate<String> testPredicate) {
         m_testClass = testClass;
-        m_ignoredTests = ignoredTests;
+        m_testPredicate = testPredicate;
     }
 
     /**
