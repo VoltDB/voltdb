@@ -489,9 +489,11 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
         appendTuple(10, 11);
     }
     m_wrapper->rollbackTo(mark, 0, seqNo);
+    EXPECT_GE(m_wrapper->m_stashedTupleCount, 0);
     m_wrapper->periodicFlush(-1, 3);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
+    EXPECT_EQ(m_wrapper->m_stashedTupleCount, 0);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
@@ -527,6 +529,7 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
         }
     }
     m_wrapper->rollbackTo(mark, 0, seqNo);
+    EXPECT_GE(m_wrapper->m_stashedTupleCount, 0);
     m_wrapper->periodicFlush(-1, 11);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
