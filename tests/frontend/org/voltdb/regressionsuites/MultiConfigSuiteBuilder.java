@@ -55,7 +55,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
     private final Class<? extends TestCase> m_testClass;
     // Collection of test method names to be ignored and not executed
     private final Collection<String> m_ignoredTests;
-    // Print debug statements only if FlakyTestStandardRunner indicates to
+    // Print debug statements only if -Drun.flaky.tests.debug=TRUE
     private final boolean DEBUG = FlakyTestStandardRunner.debug();
 
     /**
@@ -86,7 +86,6 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                     || m_ignoredTests.contains(name)) {
                 continue;
             }
-            // TODO: temp debug?? Modify??
             Flaky flakyAnnotation = m.getAnnotation(Flaky.class);
             if (flakyAnnotation != null) {
                 Method runFlakyTestMethod = null;

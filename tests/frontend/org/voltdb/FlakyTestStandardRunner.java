@@ -33,25 +33,11 @@ import org.voltdb.FlakyTestRule.FlakyTestRunner;
  */
 public class FlakyTestStandardRunner implements FlakyTestRunner {
 
-    private static String run_flaky_tests = null;
-    private static Boolean debug = null;
-
-    private static String runFlakyTests() {
-        // Just once, get the value (if any) of the '-Drun.flaky.tests=...'
-        // system property, specified on the command line
-        if (run_flaky_tests == null) {
-            run_flaky_tests = System.getProperty("run.flaky.tests", "DEFAULT");
-        }
-        return run_flaky_tests;
-    }
+    private static final String RUN_FLAKY_TESTS = System.getProperty("run.flaky.tests", "DEFAULT");
+    private static final Boolean DEBUG = Boolean.getBoolean("run.flaky.tests");
 
     public static boolean debug() {
-        // Just once, get the value (if any) of the '-Drun.flaky.tests.debug=...'
-        // system property, specified on the command line
-        if (debug == null) {
-            debug = "TRUE".equalsIgnoreCase(System.getProperty("run.flaky.tests.debug", "FALSE"));
-        }
-        return debug;
+        return DEBUG;
     }
 
     /**
@@ -62,6 +48,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
      * @param testIsFlaky boolean: the value of the current test's @Flaky
      * annotation's 'isFlaky' parameter
      */
+    @Override
     public boolean runFlakyTest(boolean testIsFlaky) {
         return runFlakyTest(testIsFlaky, null);
     }
@@ -76,12 +63,13 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
      * @param description String: the value of the current test's @Flaky
      * annotation's 'description' parameter
      */
+    @Override
     public boolean runFlakyTest(boolean testIsFlaky, String description) {
 
         // Optional debug print
-        if (debug()) {
+        if (DEBUG) {
             System.out.println("DEBUG: run.flaky.tests.debug: "+debug());
-            System.out.println("DEBUG: run.flaky.tests: "+runFlakyTests());
+            System.out.println("DEBUG: run.flaky.tests: "+RUN_FLAKY_TESTS);
             System.out.println("DEBUG: testIsFlaky    : "+testIsFlaky);
             System.out.println("DEBUG: description    : "+description);
         }
@@ -89,8 +77,8 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // When '-Drun.flaky.tests=FALSE' (or ='false', case insensitive),
         // run only those @Flaky tests that have been marked not (or no longer)
         // @Flaky, e.g., '@Flaky(isFlaky = false)'
-        if ("FALSE".equalsIgnoreCase(runFlakyTests())) {
-            if (debug()) {
+        if ("FALSE".equalsIgnoreCase(RUN_FLAKY_TESTS)) {
+            if (DEBUG) {
                 System.out.println("DEBUG: test will run: "+!testIsFlaky);
             }
             return !testIsFlaky;
@@ -98,8 +86,8 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // When '-Drun.flaky.tests=NONE' (or 'none', case insensitive), don't
         // run any @Flaky test, not even if it has been marked as not (or no
         // longer) @Flaky, e.g., '@Flaky(isFlaky = false)'
-        } else if ("NONE".equalsIgnoreCase(runFlakyTests())) {
-            if (debug()) {
+        } else if ("NONE".equalsIgnoreCase(RUN_FLAKY_TESTS)) {
+            if (DEBUG) {
                 System.out.println("DEBUG: test will NOT be run!");
             }
             return false;
@@ -107,7 +95,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // By default, including when '-Drun.flaky.tests=TRUE' (or 'true',
         // or 'ALL', or 'DEFAULT', or anything else), run all @Flaky tests
         } else {
-            if (debug()) {
+            if (DEBUG) {
                 System.out.println("DEBUG: test WILL be run!");
             }
             return true;

@@ -39,19 +39,25 @@ import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
 public class FlakyTestRule implements TestRule {
+    // Print debug statements only if -Drun.flaky.tests.debug=TRUE
+    private final boolean DEBUG = FlakyTestStandardRunner.debug();
 
     /**
      * The @Flaky annotation is intended to be used for JUnit tests that do not
      * pass reliably, failing either intermittently or consistently; such tests
-     * may or may not be skipped, depending on several factors:
-     *     o The value of the system property FOO, when running the tests
-     *     o
-     * but may be run by specifying a system property. Once they pass
-     * reliably again, the @Flaky annotation may be removed.
-     * <p>
-     * Optionally, you may specify a string giving a description of the test's
-     * flakiness. ???
-     * TODO
+     * may or may not be skipped, depending on several factors:<br>
+     *     o The value of the system property run.flaky.tests (set on the command
+     *       line via '-Drun.flaky.tests=...'), when running the tests.<br>
+     *     o The value of the <i>isFlaky</i> parameter, e.g. @Flaky(isFlaky=true), which
+     *       is the default value.<br>
+     *     o If you choose, rather than using <i>FlakyTestStandardRunner</i>,
+     *       which is the the default runCondition parameter, to write your own
+     *       implementation of FlakyTestRunner, then it could depend on whatever
+     *       other factors you choose.<br>
+     * Once a test passes reliably again, the @Flaky annotation may be removed,
+     * or changed to use @Flaky(isFlaky=false). There is also an optional
+     * <i>description</i> parameter, which may be used to describe the test or
+     * the ways and circumstances in which it is flaky.
      */
     @Documented
     @Target(ElementType.METHOD)
@@ -92,13 +98,20 @@ public class FlakyTestRule implements TestRule {
     }
 
     /**
-     * TODO
+     * Implements TestRule.apply: modifies the method-running Statement per this
+     * test-running rule, which determines whether or not this particular JUnit
+     * test with an @Flaky annotation should be Ignored (i.e., not run).
+     * @param base The Statement to (perhaps) be modified
+     * @param desc A Description of the test implemented in <i>base</i>
      */
     @Override
     public Statement apply(Statement base, Description desc) {
-        System.out.println("\nDEBUG: In FlakyTestRule.apply:");
-        System.out.println("DEBUG:   base: "+base);
-        System.out.println("DEBUG:   desc: "+desc);
+        if (DEBUG) {
+            System.out.println("DEBUG: In FlakyTestRule.apply:");
+            System.out.println("DEBUG:   base: "+base);
+            System.out.println("DEBUG:   desc: "+desc);
+        }
+
         Statement result = base;
         Flaky flakyAnnotation = desc.getAnnotation(Flaky.class);
         if (flakyAnnotation != null) {
@@ -111,19 +124,23 @@ public class FlakyTestRule implements TestRule {
     }
 
     private static class FlakyTestRunnerCreator {
-//        private final Object target;
         private final Description description;
         private final Class<? extends FlakyTestRunner> runCondition;
+        // Print debug statements only if -Drun.flaky.tests.debug=TRUE
+        private final boolean DEBUG = FlakyTestStandardRunner.debug();
 
         FlakyTestRunnerCreator(Description description, Flaky flakyAnnotation) {
-            System.out.println("DEBUG: In FlakyTestRule.FTRCreator constructor");
+            if (DEBUG) {
+                System.out.println("DEBUG: In FlakyTestRule.FTRCreator constructor");
+            }
             this.description = description;
             this.runCondition = flakyAnnotation.runCondition();
-//            this.target = flakyAnnotation.runCondition();
         }
 
         FlakyTestRunner create() {
-            System.out.println("DEBUG: In FlakyTestRule.FTRCreator.create");
+            if (DEBUG) {
+                System.out.println("DEBUG: In FlakyTestRule.FTRCreator.create");
+            }
             checkConditionType();
             try {
                 return createRunCondition();
@@ -135,33 +152,40 @@ public class FlakyTestRule implements TestRule {
         }
 
         private FlakyTestRunner createRunCondition() throws Exception {
-            System.out.println("DEBUG: In FlakyTestRule.FTRCreator.createRunCondition");
+            if (DEBUG) {
+                System.out.println("DEBUG: In FlakyTestRule.FTRCreator.createRunCondition");
+            }
             FlakyTestRunner result;
             if (isConditionTypeStandalone()) {
-                System.out.println("DEBUG:   isConditionTypeStandalone true");
+                if (DEBUG) {
+                    System.out.println("DEBUG:   isConditionTypeStandalone true");
+                }
                 result = runCondition.newInstance();
             } else {
-                System.out.println("DEBUG:   isConditionTypeStandalone false");
-                System.out.println("DEBUG:     runCondition : "+runCondition);
-                System.out.println("DEBUG:     getAnnotation: "+runCondition.getAnnotation(Flaky.class));
-                System.out.println("DEBUG:     description  : "+description);
-                System.out.println("DEBUG:     getAnnotation: "+description.getAnnotation(Flaky.class));
-                System.out.println("DEBUG:     getTestClass : "+description.getTestClass());
-//                System.out.println("DEBUG:     getDeclaredConstructor: "+runCondition.getDeclaredConstructor(description.getTestClass()));
-//                result = runCondition.getDeclaredConstructor(target.getClass()).newInstance(target);
-//                result = runCondition.getDeclaredConstructor(runCondition.getClass()).newInstance();
                 Constructor<? extends FlakyTestRunner> declaredConstructor = runCondition.getDeclaredConstructor(description.getTestClass());
-                System.out.println("DEBUG:     declaredConstructor: "+declaredConstructor);
-                System.out.println("DEBUG:     runCondition : "+runCondition);
-                System.out.println("DEBUG:     runCondition : "+runCondition);
+                if (DEBUG) {
+                    System.out.println("DEBUG:   isConditionTypeStandalone false");
+                    System.out.println("DEBUG:     runCondition : "+runCondition);
+                    System.out.println("DEBUG:     getAnnotation: "+runCondition.getAnnotation(Flaky.class));
+                    System.out.println("DEBUG:     description  : "+description);
+                    System.out.println("DEBUG:     getAnnotation: "+description.getAnnotation(Flaky.class));
+                    System.out.println("DEBUG:     getTestClass : "+description.getTestClass());
+                    System.out.println("DEBUG:     declaredConstructor: "+declaredConstructor);
+                    System.out.println("DEBUG:     runCondition : "+runCondition);
+                    System.out.println("DEBUG:     runCondition : "+runCondition);
+                }
                 result = declaredConstructor.newInstance(description);
             }
-            System.out.println("DEBUG:   result: "+result);
+            if (DEBUG) {
+                System.out.println("DEBUG:   result: "+result);
+            }
             return result;
         }
 
         private void checkConditionType() {
-            System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.checkConditionType");
+            if (DEBUG) {
+                System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.checkConditionType");
+            }
             if( !isConditionTypeStandalone() && !isConditionTypeDeclaredInTarget() ) {
                 System.out.println("DEBUG:     condidition type not good!");
                 String msg
@@ -175,22 +199,26 @@ public class FlakyTestRule implements TestRule {
         }
 
       private boolean isConditionTypeStandalone() {
-          System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.isConditionTypeStandalone");
-          System.out.println("DEBUG:     runCondition : "+runCondition);
-          System.out.println("DEBUG:     isMemberClass: "+runCondition.isMemberClass());
-          System.out.println("DEBUG:     getModifiers : "+runCondition.getModifiers());
-          System.out.println("DEBUG:     isStatic     : "+Modifier.isStatic(runCondition.getModifiers()));
-          System.out.println("DEBUG:     returns      : "+(!runCondition.isMemberClass() || Modifier.isStatic(runCondition.getModifiers())));
+          if (DEBUG) {
+              System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.isConditionTypeStandalone");
+              System.out.println("DEBUG:     runCondition : "+runCondition);
+              System.out.println("DEBUG:     isMemberClass: "+runCondition.isMemberClass());
+              System.out.println("DEBUG:     getModifiers : "+runCondition.getModifiers());
+              System.out.println("DEBUG:     isStatic     : "+Modifier.isStatic(runCondition.getModifiers()));
+              System.out.println("DEBUG:     returns      : "+(!runCondition.isMemberClass() || Modifier.isStatic(runCondition.getModifiers())));
+          }
           return !runCondition.isMemberClass() || Modifier.isStatic(runCondition.getModifiers());
       }
 
       private boolean isConditionTypeDeclaredInTarget() {
-          System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.isConditionTypeDeclaredInTarget");
-          System.out.println("DEBUG:     description  : "+description);
-          System.out.println("DEBUG:     getTestClass : "+description.getTestClass());
-          System.out.println("DEBUG:     runCondition : "+runCondition);
-          System.out.println("DEBUG:     getDeclaringClass: "+runCondition.getDeclaringClass());
-          System.out.println("DEBUG:     returns      : "+(description.getTestClass().isAssignableFrom(runCondition.getDeclaringClass())));
+          if (DEBUG) {
+              System.out.println("DEBUG:   In FlakyTestRule.FTRCreator.isConditionTypeDeclaredInTarget");
+              System.out.println("DEBUG:     description  : "+description);
+              System.out.println("DEBUG:     getTestClass : "+description.getTestClass());
+              System.out.println("DEBUG:     runCondition : "+runCondition);
+              System.out.println("DEBUG:     getDeclaringClass: "+runCondition.getDeclaringClass());
+              System.out.println("DEBUG:     returns      : "+(description.getTestClass().isAssignableFrom(runCondition.getDeclaringClass())));
+          }
           return description.getTestClass().isAssignableFrom(runCondition.getDeclaringClass());
       }
     }
@@ -200,7 +228,9 @@ public class FlakyTestRule implements TestRule {
     private static class IgnoreThisTest extends Statement {
         @Override
         public void evaluate() {
-            System.out.println("DEBUG:   In FlakyTestRule.IgnoreThisTest.evaluate");
+            if (FlakyTestStandardRunner.debug()) {
+                System.out.println("DEBUG: In FlakyTestRule.IgnoreThisTest.evaluate");
+            }
             assumeTrue(false);
         }
     }
