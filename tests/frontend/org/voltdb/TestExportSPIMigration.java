@@ -49,6 +49,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -97,7 +98,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             Properties props = new Properties();
             //props.put("replicated", "true");
             props.put("skipinternals", "true");
-            builder.addExport(true, "custom", props);
+            builder.addExport(true, ServerExportEnum.CUSTOM, props);
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");

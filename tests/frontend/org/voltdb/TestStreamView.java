@@ -37,6 +37,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.utils.MiscUtils;
@@ -344,7 +345,7 @@ public class TestStreamView
            "CREATE INDEX bidask_minmax_idx on bidask_minmax ( ABS(min_ask) );");
 
         Properties props = new Properties();
-        project.addExport(true, "custom", props, "noop");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "noop");
 
         boolean compiled = project.compile(Configuration.getPathToCatalogForTest("test-stream-view.jar"), 1, 1, 0);
         assertTrue(compiled);

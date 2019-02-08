@@ -36,6 +36,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -63,7 +64,7 @@ public class TestExportRecoverWithView extends JUnit4LocalClusterTest {
         }
         project.setUseDDLSchema(true);
         Properties props = new Properties();
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
         LocalCluster db = new LocalCluster("exportview.jar", 2, 1, 0, 2, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         boolean compile = db.compile(project);

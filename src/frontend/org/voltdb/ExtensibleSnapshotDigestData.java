@@ -92,7 +92,7 @@ public class ExtensibleSnapshotDigestData {
         m_elasticOperationMetadata = elasticOperationMetadata;
     }
 
-    void setDisabledExternalStreams(Set<Integer> disabledStreams) {
+    public void setDisabledExternalStreams(Set<Integer> disabledStreams) {
         m_disabledExternalStreams = disabledStreams;
     }
 
