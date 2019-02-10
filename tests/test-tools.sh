@@ -68,13 +68,17 @@ function test-tools-find-directories-if-needed() {
     fi
 }
 
-# Echo environment variables that are commonly used in Jenkins jobs
+# Echo environment variables that are commonly used in Jenkins jobs, either as
+# arguments to a Jenkins build, or within a Jenkins build, as arguments to a
+# VoltDB build or to test code, such as JUnit tests
 function tt-echo-build-args() {
     echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME"
     echo "VOLTDB_REV: $VOLTDB_REV"
     echo "PRO_REV   : $PRO_REV"
     echo "BUILD_OPTS: $BUILD_OPTS"
     echo "BUILD_ARGS: $BUILD_ARGS"
+    echo "TEST_OPTS : $TEST_OPTS"
+    echo "TEST_ARGS : $TEST_ARGS"
     echo "SEED      : $SEED"
     echo "SETSEED   : $SETSEED"
     BUILD_ARGS_WERE_ECHOED="true"
@@ -113,7 +117,7 @@ function tt-set-build-args() {
 
         IFS=',' read -r -a build_options <<< "$1"
         for option in "${build_options[@]}"; do
-            # Check for standard BUILD_ARGS abbreviations
+            # Check for standard build options
             if [[ "$option" == "reset" || "$option" == "release" ]]; then
                 BUILD_ARGS=
             elif [[ "$option" == "debug" ]]; then
@@ -142,6 +146,57 @@ function tt-set-build-args() {
         SHIFT_BY=$((SHIFT_BY+1))
     done
     echo -e "\nBUILD_ARGS: $BUILD_ARGS"
+}
+
+# Set test arguments to be passed to tests of VoltDB (community or pro), e.g.,
+# JUnit tests, based on simpler arguments passed to this function, such as
+# 'flaky', 'nonflaky', 'flakydebug', etc.
+function tt-set-test-args() {
+    tt-echo-build-args-if-needed
+    echo -e "\n${BASH_SOURCE[0]} performing: $FUNCNAME $@"
+
+    if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+        echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without 'source' or '.':"
+        echo -e "    will have no external effect!\n"
+    fi
+
+    if [[ -z "$1" || "$1" == tt-* || "$1" == test-tools* ]]; then
+        echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without an argument:"
+        echo -e "    will have no effect!\n"
+    fi
+
+    while [[ -n "$1" ]]; do
+        # Stop if we encounter other "test-tools" functions as args
+        if [[ "$1" == tt-* || "$1" == test-tools* ]]; then
+            break
+        fi
+
+        IFS=',' read -r -a test_options <<< "$1"
+        for option in "${test_options[@]}"; do
+            # Check for standard test options
+            if [[ "$option" == "reset" ]]; then
+                TEST_ARGS=
+            elif [[ "$option" == "flakytrue" || "$option" == "flaky" ]]; then
+                TEST_ARGS="$TEST_ARGS -Drun.flaky.tests=true"
+            elif [[ "$option" == "flakyfalse" || "$option" == "nonflaky" ]]; then
+                TEST_ARGS="$TEST_ARGS -Drun.flaky.tests=false"
+            elif [[ "$option" == "flakynone" ]]; then
+                TEST_ARGS="$TEST_ARGS -Drun.flaky.tests=none"
+            elif [[ "$option" == "flakydebug" ]]; then
+                TEST_ARGS="$TEST_ARGS -Drun.flaky.tests.debug=true"
+            # User is allowed to specify their own -D... option(s)
+            elif [[ "$option" == -D* ]]; then
+                TEST_ARGS="$TEST_ARGS $option"
+            else
+                echo -e "\nERROR: Unrecognized arg / test option in ${BASH_SOURCE[0]} function $FUNCNAME:"
+                echo -e "    $1 / $option"
+                exit -5
+            fi
+        done
+        shift
+        SHIFT_BY=$((SHIFT_BY+1))
+    done
+    echo -e "\nTEST_ARGS: $TEST_ARGS"
 }
 
 # Sets the SETSEED variable, typically to be used by SqlCoverage, based on
@@ -540,8 +595,9 @@ function tt-help() {
     echo -e "    test-tools-all        : runs (almost) all of the above, except the '-pro' options"
     echo -e "    test-tools-all-pro    : runs (almost) all of the above, using the '-pro' options"
     echo -e "    test-tools-shutdown   : stops a VoltDB server that is currently running"
-    echo -e "    tt-echo-build-args    : echoes build args commonly used in Jenkins"
+    echo -e "    tt-echo-build-args    : echoes build (& test) args commonly used in Jenkins"
     echo -e "    tt-set-build-args     : sets the BUILD_ARGS environment variable"
+    echo -e "    tt-set-test-args      : sets the TEST_ARGS environment variable"
     echo -e "    tt-set-setseed        : sets the SETSEED environment variable"
     echo -e "    tt-killstragglers     : calls the 'killstragglers' script, passing"
     echo -e "                                it the standard PostgreSQL port number"
