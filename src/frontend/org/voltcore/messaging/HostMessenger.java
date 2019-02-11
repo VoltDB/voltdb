@@ -914,7 +914,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 synchronized(HostMessenger.this) {
                     removeForeignHost(hostId);
                 }
-                m_acceptor.detract(hostId);
+                m_acceptor.detract(m_zk, hostId);
                 socket.close();
                 return;
             }

@@ -71,9 +71,11 @@ public interface JoinAcceptor extends JSONString {
 
     /**
      * notifies the acceptor when a host is removed from the mesh
-     * @param hostId
+     *
+     * @param zooKeeper {@link ZooKeeper} instance to use for zookeeper operations
+     * @param hostId    ID of host which was removed
      */
-    public void detract(int hostId);
+    public void detract(ZooKeeper zooKeeper, int hostId);
 
     /**
      * notifies the acceptor when a {@link Set&lt;Integer&gt;} hostIds
