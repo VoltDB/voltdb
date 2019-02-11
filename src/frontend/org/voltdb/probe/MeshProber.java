@@ -349,7 +349,7 @@ public class MeshProber implements JoinAcceptor {
     }
 
     @Override
-    public void detract(int hostId) {
+    public void detract(ZooKeeper zooKeeper, int hostId) {
         checkArgument(hostId >= 0, "host id %s is not greater or equal to 0", hostId);
         Map<Integer,HostCriteria> expect;
         Map<Integer,HostCriteria> update;
@@ -360,6 +360,7 @@ public class MeshProber implements JoinAcceptor {
                 .putAll(Maps.filterKeys(expect, not(equalTo(hostId))))
                 .build();
         } while (!m_hostCriteria.compareAndSet(expect, update));
+        CoreZK.removeRejoinNodeIndicatorForHost(zooKeeper, hostId);
     }
 
     @Override
