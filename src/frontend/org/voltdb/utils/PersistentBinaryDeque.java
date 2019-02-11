@@ -270,8 +270,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     /**
      * Create a persistent binary deque with the specified nonce and storage back at the specified path.
-     * This is convenient method for test so that
-     * poll with delete can be tested.
+     * This is a convenience method for testing so that poll with delete can be tested.
      *
      * @param nonce
      * @param path
@@ -289,111 +288,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     "|| !writable || !executable || !directory)");
         }
 
-        // FIXME: start parseFiles() here
-        /*
-        final TreeMap<Long, PBDSegment> segments = new TreeMap<Long, PBDSegment>();
-        //Parse the files in the directory by name to find files
-        //that are part of this deque
-        try {
-            path.listFiles(new FileFilter() {
-
-                @Override
-                public boolean accept(File pathname) {
-                    // PBD file names have three parts: nonce.seq.pbd
-                    // nonce may contain '.', seq is a sequence number.
-                    String[] parts = pathname.getName().split("\\.");
-                    String parsedNonce = null;
-                    String seqNum = null;
-                    String extension = null;
-
-                    // If more than 3 parts, it means nonce contains '.', assemble them.
-                    if (parts.length > 3) {
-                        Joiner joiner = Joiner.on('.').skipNulls();
-                        parsedNonce = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
-                        seqNum = parts[parts.length - 2];
-                        extension = parts[parts.length - 1];
-                    } else if (parts.length == 3) {
-                        parsedNonce = parts[0];
-                        seqNum = parts[1];
-                        extension = parts[2];
-                    }
-
-                    if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
-                        if (pathname.length() == 4) {
-                            //Doesn't have any objects, just the object count
-                            // Ensure it's marked as non-final before deletion
-                            try {
-                                PBDSegment.setFinal(pathname, false);
-                            } catch (IOException ioe) {
-                                LOG.warn("Failed to clear final attribute in " + pathname + ": " + ioe);
-                            }
-                            pathname.delete();
-                            return false;
-                        }
-                        Long index = Long.valueOf(seqNum);
-                        PBDSegment qs = newSegment( index, pathname );
-                        try {
-                            m_initializedFromExistingFiles = true;
-                            if (deleteEmpty) {
-                                if (qs.getNumEntries() == 0) {
-                                    LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
-                                    if (m_usageSpecificLog.isDebugEnabled()) {
-                                        m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted during init");
-                                    }
-                                    qs.setFinal(false);
-                                    qs.closeAndTruncate();
-                                    return false;
-                                }
-                            }
-
-                            // Any recovered segment that is not final should be checked
-                            // for internal consistency.
-                            if (!qs.isFinal()) {
-                                LOG.warn("Segment " + qs.file()
-                                + " (final: " + qs.isFinal() + "), has been recovered but is not in a final state");
-                            } else if (m_usageSpecificLog.isDebugEnabled()) {
-                                m_usageSpecificLog.debug("Segment " + qs.file()
-                                    + " (final: " + qs.isFinal() + "), has been recovered");
-                            }
-                            qs.close();
-                            segments.put(index, qs);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                    return false;
-                }
-
-            });
-        } catch (RuntimeException e) {
-            if (e.getCause() instanceof IOException) {
-                throw new IOException(e);
-            }
-            Throwables.propagate(e);
-        }
-
-        Long lastKey = null;
-        for (Map.Entry<Long, PBDSegment> e : segments.entrySet()) {
-            final Long key = e.getKey();
-            if (lastKey == null) {
-                lastKey = key;
-            } else {
-                if (lastKey + 1 != key) {
-                    try {
-                        for (PBDSegment pbds : segments.values()) {
-                            pbds.close();
-                        }
-                    } catch (Exception ex) {}
-                    throw new IOException("Missing " + nonce +
-                            " pbd segments between " + lastKey + " and " + key + " in directory " + path +
-                            ". The data files found in the export overflow directory were inconsistent.");
-                }
-                lastKey = key;
-            }
-            m_segments.put(e.getKey(), e.getValue());
-        }
-        */
-        // FIXME: end parseFiles() here
         parseFiles(deleteEmpty);
 
         // Find the first and last segment for polling and writing (after); ensure the
@@ -425,13 +319,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     /**
-     * Return a segment file name from m_nonce and current, previous timestamps.
+     * Return a segment file name from m_nonce and current + previous timestamps.
      *
      * @see parseFiles for file name structure
-     *
-     * @param current
-     * @param previous
-     * @return
+     * @param current   current timestamp
+     * @param previous  previous timestamp
+     * @return  segment file name
      */
     private String getSegmentFileName(Instant current, Instant previous) {
         return m_nonce + "_" + current + "_" + previous + ".pbd";
@@ -442,6 +335,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      *
      * Note that the filename is assumed valid at this point.
      *
+     * @see parseFiles for file name structure
      * @param file
      * @return
      */
@@ -455,7 +349,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IllegalStateException("Invalid file name: " + fname);
         }
 
-        // Parse the timestamps
+        // Parse the previous timestamp
         try {
             ret = Instant.parse(parts[parts.length - 1]);
         } catch (DateTimeParseException ex) {
@@ -477,10 +371,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
      */
     private void parseFiles(boolean deleteEmpty) throws IOException {
 
-        // FIXME: remove the logs
-        boolean logMe = m_nonce.endsWith("0");
-        if (logMe) LOG.info("XXX enter parseFiles for " + m_nonce);
-
         HashMap<Instant, File> filesByCreation = new HashMap<>();
         PairSequencer<Instant> sequencer = new PairSequencer<>();
         try {
@@ -491,8 +381,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
 
                 String fname = file.getName();
-                if (logMe) LOG.info("XXX parsing file " + fname);
-
                 if (!fname.endsWith(".pbd")) {
                     continue;
                 }
@@ -542,7 +430,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_initializedFromExistingFiles = true;
             if (filesByCreation.size() == 1) {
                 // Common case, only 1 PBD segment
-                if (logMe) LOG.info("XXX 1 PBD segments for " + m_nonce);
                 for (Map.Entry<Instant, File> entry: filesByCreation.entrySet()) {
                     PBDSegment seg = newSegment(1, entry.getKey(), entry.getValue());
                     recoverSegment(seg, deleteEmpty);
@@ -576,26 +463,41 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
             throw(e);
         }
-        LOG.info("XXX exit parseFiles for " + m_nonce);
     }
 
-    private void deleteStalePbdFile(File file) {
-        LOG.info("XXX delete old pbd file " + file.getName() + ", length " + file.length());
+    /**
+     * Delete a PBD segment that was identified as 'stale' i.e. produced by earlier VoltDB releases
+     *
+     * @param file
+     * @throws IOException
+     */
+    private void deleteStalePbdFile(File file) throws IOException {
         try {
             PBDSegment.setFinal(file, false);
         } catch (IOException ioe) {
             LOG.warn("Failed to clear final attribute in " + file.getName() + ": " + ioe);
         }
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug("Segment " + file.getName()
+                + " (final: " + PBDSegment.isFinal(file) + "), will be closed and deleted during init");
+        }
         file.delete();
     }
 
+    /**
+     * Recover a PBD segment and add it to m_segments
+     *
+     * @param qs
+     * @param deleteEmpty
+     * @throws IOException
+     */
     private void recoverSegment(PBDSegment qs, boolean deleteEmpty) throws IOException {
 
         if (deleteEmpty) {
             if (qs.getNumEntries() == 0) {
                 qs.setFinal(false);
-                LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
                 if (m_usageSpecificLog.isDebugEnabled()) {
+                    m_usageSpecificLog.debug("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
                     m_usageSpecificLog.debug("Segment " + qs.file()
                         + " (final: " + qs.isFinal() + "), will be closed and deleted during init");
                 }

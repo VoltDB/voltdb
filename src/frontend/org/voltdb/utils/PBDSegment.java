@@ -302,7 +302,6 @@ public abstract class PBDSegment {
      *
      * Must be called with 'false' whenever opening segment for writing new data.
      *
-     * FIXME: true?
      * Note that all calls to 'setFinal' are done by the class owning the segment because the segment
      * itself generally lacks context to decide whether it's final or not.
      *
