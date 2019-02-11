@@ -717,24 +717,32 @@ public class MeshProber implements JoinAcceptor {
 
         @Override @Generated("by eclipse's equals and hashCode source generators")
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             Determination other = (Determination) obj;
-            if (hostCount != other.hostCount)
+            if (hostCount != other.hostCount) {
                 return false;
-            if (paused != other.paused)
+            }
+            if (paused != other.paused) {
                 return false;
-            if (startAction != other.startAction)
+            }
+            if (startAction != other.startAction) {
                 return false;
+            }
             if (terminusNonce == null) {
-                if (other.terminusNonce != null)
+                if (other.terminusNonce != null) {
                     return false;
-            } else if (!terminusNonce.equals(other.terminusNonce))
+                }
+            } else if (!terminusNonce.equals(other.terminusNonce)) {
                 return false;
+            }
             return true;
         }
 
