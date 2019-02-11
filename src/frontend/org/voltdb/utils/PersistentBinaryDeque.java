@@ -19,8 +19,6 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -105,14 +103,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }
-                long lastSegmentId = peekLastSegment().segmentId();
+                long lastSegmentId = peekLastSegment().segmentIndex();
                 while (!segmentReader.hasMoreEntries()) {
-                    if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
+                    if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
                         return null;
                     }
 
                     segmentReader.close();
-                    m_segment = m_segments.higherEntry(m_segment.segmentId()).getValue();
+                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
                     // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
                     if (segmentReader == null) segmentReader = m_segment.openForRead(m_cursorId);
@@ -129,7 +127,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         private void moveToValidSegment() {
             PBDSegment firstSegment = peekFirstSegment();
             // It is possible that m_segment got closed and removed
-            if (m_segment == null || m_segment.segmentId() < firstSegment.segmentId()) {
+            if (m_segment == null || m_segment.segmentIndex() < firstSegment.segmentIndex()) {
                 m_segment = firstSegment;
             }
         }
@@ -166,7 +164,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     inclusive = false;
                 }
                 // Get the size of all unread segments
-                for (PBDSegment currSegment : m_segments.tailMap(m_segment.segmentId(), inclusive).values()) {
+                for (PBDSegment currSegment : m_segments.tailMap(m_segment.segmentIndex(), inclusive).values()) {
                     size += currSegment.size();
                 }
                 return size;
@@ -189,7 +187,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     inclusive = false;
                 }
 
-                for (PBDSegment currSegment : m_segments.tailMap(m_segment.segmentId(), inclusive).values()) {
+                for (PBDSegment currSegment : m_segments.tailMap(m_segment.segmentIndex(), inclusive).values()) {
                     if (currSegment.getNumEntries() > 0)  return false;
                 }
 
@@ -204,7 +202,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     synchronized(PersistentBinaryDeque.this) {
                         checkDoubleFree();
                         retcont.discard();
-                        assert(m_closed || m_segments.containsKey(segment.segmentId()));
+                        assert(m_closed || m_segments.containsKey(segment.segmentIndex()));
 
                         //Don't do anything else if we are closed
                         if (m_closed) {
@@ -220,7 +218,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 return;
                             }
                             if (canDeleteSegment(segment)) {
-                                m_segments.remove(segment.segmentId());
+                                m_segments.remove(segment.segmentIndex());
                                 if (m_usageSpecificLog.isDebugEnabled()) {
                                     m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
                                 }
@@ -254,6 +252,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
     private int m_numObjects;
     private int m_numDeleted;
+
+    // Monotonic segment counter: note that this counter always *increases* even when
+    // used for a *previous* segment (or inserting a segment *before* the others.
+    private long m_segmentCounter = 0L;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage
@@ -292,17 +294,19 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Find the first and last segment for polling and writing (after); ensure the
         // writing segment is not final
-        Instant now = Instant.now();
 
+        long curId = getNextSegmentId();
         Map.Entry<Long, PBDSegment> lastEntry = m_segments.lastEntry();
-        Instant tsLast = lastEntry == null ? now.minusMillis(1) : lastEntry.getValue().created();
+
+        // Note: the "previous" id value may be > "current" id value
+        long prevId = lastEntry == null ? getNextSegmentId() : lastEntry.getValue().segmentId();
         Long writeSegmentIndex = lastEntry == null ? 0L : lastEntry.getKey() + 1;
 
-        String fname = getSegmentFileName(now, tsLast);
+        String fname = getSegmentFileName(curId, prevId);
         PBDSegment writeSegment =
             newSegment(
                     writeSegmentIndex,
-                    now,
+                    curId,
                     new VoltFile(m_path, fname));
 
         PBDSegment check = m_segments.put(writeSegmentIndex, writeSegment);
@@ -323,19 +327,34 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     /**
-     * Return a segment file name from m_nonce and current + previous timestamps.
-     *
-     * @see parseFiles for file name structure
-     * @param current   current timestamp
-     * @param previous  previous timestamp
-     * @return  segment file name
+     * @return the next segment id
      */
-    private String getSegmentFileName(Instant current, Instant previous) {
-        return m_nonce + "_" + current + "_" + previous + ".pbd";
+    private synchronized long getNextSegmentId() {
+        return ++m_segmentCounter;
     }
 
     /**
-     * Extract the previous timestamp from a file name.
+     * Return a segment file name from m_nonce and current + previous segment ids.
+     *
+     * @see parseFiles for file name structure
+     * @param currentId   current segment id
+     * @param previousId  previous segment id
+     * @return  segment file name
+     */
+    private String getSegmentFileName(long currentId, long previousId) {
+
+        StringBuilder sb = new StringBuilder(m_nonce)
+                .append("_")
+                .append(String.format("%010d", currentId))
+                .append("_")
+                .append(String.format("%010d", previousId))
+                .append(".pbd");
+
+        return sb.toString();
+    }
+
+    /**
+     * Extract the previous segment id from a file name.
      *
      * Note that the filename is assumed valid at this point.
      *
@@ -343,8 +362,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @param file
      * @return
      */
-    private Instant getPreviousTimestamp(File file) {
-        Instant ret;
+    private long getPreviousSegmentId(File file) {
+        long ret;
         String fname = file.getName();
 
         String rootname = fname.substring(0, fname.lastIndexOf("."));
@@ -355,8 +374,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Parse the previous timestamp
         try {
-            ret = Instant.parse(parts[parts.length - 1]);
-        } catch (DateTimeParseException ex) {
+            ret = Long.parseLong(parts[parts.length - 1]);
+        } catch (NumberFormatException ex) {
             throw new IllegalStateException("Failed to parse timestamps in: " + fname + ", " + ex);
         }
 
@@ -366,17 +385,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
     /**
      * Parse files in m_path and build m_segments
      *
-     * File name structure = "nonce_currentTimeStamp_previousTimeStamp.pbd"
+     * File name structure = "nonce_currentCounter_previousCounter.pbd"
      * Where:
-     * - currentTimeStamp = String representation of Java Instant of PBD segment creation
-     * - previousTimeStamp = String representation of Java Instant of previous PBD segment creation
+     * - currentCounter = Value of monotonic counter at PBD segment creation
+     * - previousCounter = Value of monotonic counter at previous PBD segment creation
      *
      * @throws IOException
      */
     private void parseFiles(boolean deleteEmpty) throws IOException {
 
-        HashMap<Instant, File> filesByCreation = new HashMap<>();
-        PairSequencer<Instant> sequencer = new PairSequencer<>();
+        HashMap<Long, File> filesById = new HashMap<>();
+        PairSequencer<Long> sequencer = new PairSequencer<>();
         try {
             for (File file : m_path.listFiles()) {
 
@@ -407,56 +426,58 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
 
-                // Parse the timestamps
-                Instant prevTs = null;
-                Instant curTs = null;
+                // Parse the counters
+                long prevCnt = 0L;
+                long curCnt = 0L;
                 try {
-                    prevTs = Instant.parse(parts[parts.length - 1]);
-                    curTs = Instant.parse(parts[parts.length - 2]);
-                } catch (DateTimeParseException ex) {
-                    LOG.warn("Failed to parse timestamps in " + fname);
+                    prevCnt = Long.parseLong(parts[parts.length - 1]);
+                    curCnt = Long.parseLong(parts[parts.length - 2]);
+                } catch (NumberFormatException ex) {
+                    LOG.warn("Failed to parse counters in " + fname);
                     deleteStalePbdFile(file);
                     continue;
                 }
 
-                filesByCreation.put(curTs, file);
-                sequencer.add(new Pair<Instant, Instant>(prevTs, curTs));
+                if (m_segmentCounter < Math.max(prevCnt, curCnt)) {
+                    m_segmentCounter = Math.max(prevCnt, curCnt);
+                }
+                filesById.put(curCnt, file);
+                sequencer.add(new Pair<Long, Long>(prevCnt, curCnt));
             }
 
             // Handle common cases: no PBD files or just one
-            if (filesByCreation.size() == 0) {
+            if (filesById.size() == 0) {
                 LOG.info("No PBD segments for " + m_nonce);
                 return;
-
             }
 
             m_initializedFromExistingFiles = true;
-            if (filesByCreation.size() == 1) {
+            if (filesById.size() == 1) {
                 // Common case, only 1 PBD segment
-                for (Map.Entry<Instant, File> entry: filesByCreation.entrySet()) {
+                for (Map.Entry<Long, File> entry: filesById.entrySet()) {
                     PBDSegment seg = newSegment(1, entry.getKey(), entry.getValue());
                     recoverSegment(seg, deleteEmpty);
                     break;
                 }
             } else {
                 // Handle the uncommon case of more than 1 PBD file, get the sequence of segments
-                Deque<Deque<Instant>> sequences = sequencer.getSequences();
+                Deque<Deque<Long>> sequences = sequencer.getSequences();
                 if (sequences.size() > 1) {
                     // FIXME: reject this case for now
                     // FIXME: we should select the sequence that has the oldest entry and delete
                     // the other files
                     throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
                 }
-                Deque<Instant> sequence = sequences.getFirst();
+                Deque<Long> sequence = sequences.getFirst();
                 Long index = 1L;
-                for (Instant instant : sequence) {
-                    File file = filesByCreation.get(instant);
+                for (Long segmentId : sequence) {
+                    File file = filesById.get(segmentId);
                     if (file == null) {
                         // This is an Instant in the sequence referring to a previous file that
                         // was deleted, so move on.
                         continue;
                     }
-                    PBDSegment seg = newSegment(index++, instant, filesByCreation.get(instant));
+                    PBDSegment seg = newSegment(index++, segmentId, filesById.get(segmentId));
                     recoverSegment(seg, deleteEmpty);
                 }
             }
@@ -519,7 +540,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 + " (final: " + qs.isFinal() + "), has been recovered");
         }
         qs.close();
-        m_segments.put(qs.segmentId(), qs);
+        m_segments.put(qs.segmentIndex(), qs);
     }
 
     private int countNumObjects() throws IOException {
@@ -552,7 +573,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
          */
         Long lastSegmentIndex = null;
         for (PBDSegment segment : m_segments.values()) {
-            final long segmentIndex = segment.segmentId();
+            final long segmentIndex = segment.segmentIndex();
 
             final int truncatedEntries = segment.parseAndTruncate(truncator);
 
@@ -612,14 +633,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         /*
          * Reset the poll and write segments
          */
-        Instant now = Instant.now();
+        long curId = getNextSegmentId();
 
         PBDSegment lastSegment = peekLastSegment();
-        Long newSegmentIndex = lastSegment == null ? 1 : lastSegment.segmentId() + 1;
-        Instant tsLast = lastSegment == null ? now.minusMillis(1) : lastSegment.created();
+        Long newSegmentIndex = lastSegment == null ? 1 : lastSegment.segmentIndex() + 1;
+        long prevId = lastSegment == null ? getNextSegmentId() : lastSegment.segmentId();
 
-        String fname = getSegmentFileName(now, tsLast);
-        PBDSegment newSegment = newSegment(newSegmentIndex, now, new VoltFile(m_path, fname));
+        String fname = getSegmentFileName(curId, prevId);
+        PBDSegment newSegment = newSegment(newSegmentIndex, curId, new VoltFile(m_path, fname));
         newSegment.openForWrite(true);
         // Ensure the new segment is not final
         newSegment.setFinal(false);
@@ -628,12 +649,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_usageSpecificLog.debug("Segment " + newSegment.file()
             + " (final: " + newSegment.isFinal() + "), has been created by PBD truncator");
         }
-        m_segments.put(newSegment.segmentId(), newSegment);
+        m_segments.put(newSegment.segmentIndex(), newSegment);
         assertions();
     }
 
-    private PBDSegment newSegment(long segmentId, Instant ts, File file) {
-        return new PBDRegularSegment(segmentId, ts, file);
+    private PBDSegment newSegment(long segmentIndex, long segmentId, File file) {
+        return new PBDRegularSegment(segmentIndex, segmentId, file);
     }
 
     /**
@@ -655,7 +676,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 + " (final: " + last.isFinal() + "), has been closed by offer to PBD");
             }
         }
-        m_segments.put(newSegment.segmentId(), newSegment);
+        m_segments.put(newSegment.segmentIndex(), newSegment);
     }
 
     private PBDSegment peekFirstSegment() {
@@ -747,12 +768,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
             closeAndDeleteSegment(tail);
         }
-        Long nextIndex = tail.segmentId() + 1;
-        Instant tsLast = tail.created();
+        Long nextIndex = tail.segmentIndex() + 1;
+        long lastId = tail.segmentId();
 
-        Instant now = Instant.now();
-        String fname = getSegmentFileName(now, tsLast);
-        tail = newSegment(nextIndex, now, new VoltFile(m_path, fname));
+        long curId = getNextSegmentId();
+        String fname = getSegmentFileName(curId, lastId);
+        tail = newSegment(nextIndex, curId, new VoltFile(m_path, fname));
         tail.openForWrite(true);
         tail.setFinal(false);
         if (m_usageSpecificLog.isDebugEnabled()) {
@@ -807,30 +828,29 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Calculate first index to push
         PBDSegment first = peekFirstSegment();
-        Long nextIndex = first == null ? 0L: first.segmentId() - 1;
+        Long nextIndex = first == null ? 0L: first.segmentIndex() - 1;
 
-        // The first creation timestamp is either the "previous" of the current head
-        // (this avoids having to rename the file of the current head), or now.
-        Instant ts = first == null ? Instant.now() : getPreviousTimestamp(first.file());
+        // The first segment id is either the "previous" of the current head
+        // (this avoids having to rename the file of the current head), or  new id.
+        long curId = first == null ? getNextSegmentId() : getPreviousSegmentId(first.file());
 
         while (segments.peek() != null) {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
 
-            // Generate a fake creation time for the next PBD segment to insert
-            Instant prevTs = ts.minusMillis(1L);
-            String fname = getSegmentFileName(ts, prevTs);
+            long prevId = getNextSegmentId();
+            String fname = getSegmentFileName(curId, prevId);
 
             PBDSegment writeSegment =
                 newSegment(
                         nextIndex,
-                        ts,
+                        curId,
                         new VoltFile(m_path, fname));
             writeSegment.openForWrite(true);
             writeSegment.setFinal(false);
 
             // Prepare for next file
             nextIndex--;
-            ts = prevTs;
+            curId = prevId;
 
             while (currentSegmentContents.peek() != null) {
                 writeSegment.offer(currentSegmentContents.pollFirst(), false);
@@ -849,7 +869,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     + " (final: " + writeSegment.isFinal() + "), has been created because of a push");
             }
 
-            m_segments.put(writeSegment.segmentId(), writeSegment);
+            m_segments.put(writeSegment.segmentIndex(), writeSegment);
         }
         // Because we inserted at the beginning, cursors need to be rewound to the beginning
         rewindCursors();
@@ -910,7 +930,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
                 if (canDeleteSegment(segment)) {
-                    closeAndDeleteSegmentsBefore(segment.segmentId(), "because of close of cursor");
+                    closeAndDeleteSegmentsBefore(segment.segmentIndex(), "because of close of cursor");
                     break;
                 }
             }
@@ -922,10 +942,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private boolean canDeleteSegment(PBDSegment segment) throws IOException {
         for (ReadCursor cursor : m_readCursors.values()) {
-            if (cursor.m_segment != null && (cursor.m_segment.segmentId() >= segment.segmentId())) {
+            if (cursor.m_segment != null && (cursor.m_segment.segmentIndex() >= segment.segmentIndex())) {
                 PBDSegmentReader segmentReader = segment.getReader(cursor.m_cursorId);
                 if (segmentReader == null) {
-                    assert(cursor.m_segment.segmentId() == segment.segmentId());
+                    assert(cursor.m_segment.segmentIndex() == segment.segmentIndex());
                     segmentReader = segment.openForRead(cursor.m_cursorId);
                 }
 

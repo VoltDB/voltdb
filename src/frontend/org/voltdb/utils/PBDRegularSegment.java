@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,31 +45,33 @@ public class PBDRegularSegment extends PBDSegment {
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
-    //ID of this segment
+    // Index of this segment in the in-memory segment map
     private final Long m_index;
-    private final Instant m_tsCreated;
+
+    // Persistent ID of this segment, based on managing a monotonic counter
+    private final Long m_id;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
 
     private DBBPool.BBContainer m_tmpHeaderBuf = null;
 
-    public PBDRegularSegment(Long index, Instant ts, File file) {
+    public PBDRegularSegment(Long index, Long  id, File file) {
         super(file);
         m_index = index;
-        m_tsCreated = ts;
+        m_id = id;
         reset();
     }
 
     @Override
-    public long segmentId()
+    public long segmentIndex()
     {
         return m_index;
     }
 
     @Override
-    public Instant created() {
-        return m_tsCreated;
+    public long segmentId() {
+        return m_id;
     }
 
     @Override
