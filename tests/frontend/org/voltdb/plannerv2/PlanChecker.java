@@ -23,24 +23,66 @@
 
 package org.voltdb.plannerv2;
 
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.voltdb.CLIConfig;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
+import static org.voltdb.plannerv2.SqlBatchImpl.CALCITE_CHECKS;
+
+/**
+ * A command line tool for Calcite planning comparison.
+ * You can use the script at tests/sqlgrammar/plan-checker to run it.
+ *
+ * usage: plan-checker
+ *  -d,--ddl <arg>     File path for the DDLs.
+ *  -f,--file <arg>    The input file path that contains SQL query statements
+ *                     (If -q/--query is used, this option will be ignored).
+ *  -q,--query <arg>   Single SQL query statement string.
+ */
 public class PlanChecker extends CalcitePlannerTestCase {
     private static Pattern EXPR_PATTERN = Pattern.compile("EXPR\\$\\d+");
 
-    private void initWithDDL() throws Exception {
-        setupSchema(TestValidation.class.getResource(
-                "testcalcite-ddl.sql"), "testcalcite", false);
+    /**
+     * Initialize the database catalog with a DDL file.
+     * @param path The path of the DDL file.
+     * @throws Exception
+     */
+    private void initWithDDL(String path) throws Exception {
+        setupSchema(new File(path).toURI().toURL(), "testcalcite", false);
         init();
     }
 
+    /**
+     * Check and compare a single SQL statement.
+     * @param sql
+     */
     private void checkPlan(String sql) {
+        // remove the semi colon at the end of the sql statement
+        sql = sql.replaceAll(";$", "");
+        // we don't want to check DDLs.
+        try {
+            if (VoltFastSqlParser.parse(sql).isA(SqlKind.DDL)) {
+                return;
+            }
+        } catch (SqlParseException e) {
+            return;
+        }
+        if (!CALCITE_CHECKS.check(sql)) {
+            // The query cannot pass the compatibility check, we just ignore it.
+            return;
+        }
         CompiledPlan calcitePlan;
         CompiledPlan voltdbPlan;
         try {
@@ -73,6 +115,18 @@ public class PlanChecker extends CalcitePlannerTestCase {
         }
     }
 
+    /**
+     * Check and compare all SQL statements contains in the file.
+     * @param filePath The path of the sql file to compare.
+     */
+    private void checkPlans(String filePath) {
+        try (Stream<String> stream = Files.lines(Paths.get(filePath))) {
+            stream.forEach(this::checkPlan);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, String sql) {
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlanNode);
         PlanNodeTree voltPlanTree = new PlanNodeTree(voltdbPlanNode);
@@ -90,7 +144,7 @@ public class PlanChecker extends CalcitePlannerTestCase {
     private String normalizeCalcitePlan(String plan) {
         Matcher m = EXPR_PATTERN.matcher(plan);
         StringBuffer sb = new StringBuffer();
-        // Calcite and Volt have difference names for anonymous columns
+        // Calcite and Volt have different names for anonymous columns
         // replace EXPR$0 to C1, EXPR$1 to C2, ...
         while (m.find()) {
             int newIndex = 1 + Integer.parseInt(m.group().replace("EXPR$", ""));
@@ -100,9 +154,47 @@ public class PlanChecker extends CalcitePlannerTestCase {
         return sb.toString();
     }
 
+    public static class PlanCheckerConfig extends CLIConfig {
+        @Option(shortOpt = "d", opt = "ddl", desc = "File path for the DDLs.")
+        String ddlFile = "";
+
+        @Option(shortOpt = "q", opt = "query", desc = "Single SQL query statement string.")
+        String query = "";
+
+        @Option(shortOpt = "f", opt = "file", desc = "The input file path that contains SQL query statements " +
+                "(If -q/--query is used, this option will be ignored).")
+        String file = "";
+
+        @Override
+        public void validate() {
+            if (ddlFile.isEmpty()) {
+                exitWithMessageAndUsage("DDL path must be provided.");
+            }
+            File checkFile = new File(ddlFile);
+            if (!checkFile.isFile()) {
+                exitWithMessageAndUsage("Invalid DDL file path.");
+            }
+            if (query.isEmpty() && file.isEmpty()) {
+                exitWithMessageAndUsage("SQL string or input file must be provided.");
+            }
+            if (!file.isEmpty()) {
+                checkFile = new File(file);
+                if (!checkFile.isFile()) {
+                    exitWithMessageAndUsage("Invalid input file path.");
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
+        final PlanCheckerConfig cfg = new PlanCheckerConfig();
+        cfg.parse("plan-checker", args);
         PlanChecker planChecker = new PlanChecker();
-        planChecker.initWithDDL();
-        planChecker.checkPlan("select i * 5 from R1");
+        planChecker.initWithDDL(cfg.ddlFile);
+        if (!cfg.query.isEmpty()) {
+            planChecker.checkPlan(cfg.query);
+        } else {
+            planChecker.checkPlans(cfg.file);
+        }
     }
 }
