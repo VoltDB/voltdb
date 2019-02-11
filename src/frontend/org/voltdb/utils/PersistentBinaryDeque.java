@@ -296,7 +296,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         Map.Entry<Long, PBDSegment> lastEntry = m_segments.lastEntry();
         Instant tsLast = lastEntry == null ? now.minusMillis(1) : lastEntry.getValue().created();
-        Long writeSegmentIndex = lastEntry == null ? 0L : lastEntry.getKey();
+        Long writeSegmentIndex = lastEntry == null ? 0L : lastEntry.getKey() + 1;
 
         String fname = getSegmentFileName(now, tsLast);
         PBDSegment writeSegment =
@@ -305,7 +305,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     now,
                     new VoltFile(m_path, fname));
 
-        m_segments.put(writeSegmentIndex, writeSegment);
+        PBDSegment check = m_segments.put(writeSegmentIndex, writeSegment);
+        if (check != null) {
+            // Sanity check
+            throw new IllegalStateException("Overwriting segment " + writeSegmentIndex);
+        }
         writeSegment.openForWrite(true);
         writeSegment.setFinal(false);
 
@@ -384,10 +388,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 if (!fname.endsWith(".pbd")) {
                     continue;
                 }
-                if (!fname.startsWith(m_nonce)) {
-                    continue;
-                }
-
                 if (file.length() == 0) {
                     // Old PBD file that was truncated to 0 instead of being deleted.
                     // Gluster FS bug required to leave those files around, but the
@@ -397,6 +397,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
 
+                if (!fname.startsWith(m_nonce + "_")) {
+                    continue;
+                }
                 String rootname = fname.substring(0, fname.lastIndexOf("."));
                 String[] parts = rootname.split("_");
                 if (parts.length < 3) {
@@ -824,8 +827,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         new VoltFile(m_path, fname));
             writeSegment.openForWrite(true);
             writeSegment.setFinal(false);
+
+            // Prepare for next file
             nextIndex--;
-            prevTs = ts;
+            ts = prevTs;
 
             while (currentSegmentContents.peek() != null) {
                 writeSegment.offer(currentSegmentContents.pollFirst(), false);
