@@ -19,6 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -117,46 +118,42 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
     }
 
     private SynthesizedPlanFragment[]
-    generateReplicatedToReplicatedPlan(SiteTracker st) {
-        SynthesizedPlanFragment[] restore_plan = null;
-        Set<Long> execution_site_ids =
-            st.getAllSites();
-        Set<Long> sites_missing_table =
-            getSitesMissingTable(execution_site_ids);
-        // not sure we want to deal with handling expected load failures,
-        // so let's send an individual load to each site with the table
-        // and then pick sites to send the table to those without it
-        restore_plan =
-            new SynthesizedPlanFragment[execution_site_ids.size() + 1];
-        int restore_plan_index = 0;
-        for (Long site_id : m_sitesWithThisTable) {
-            restore_plan[restore_plan_index] =
-                constructLoadReplicatedTableFragment();
-            restore_plan[restore_plan_index].siteId = site_id;
-            ++restore_plan_index;
+    generateReplicatedToReplicatedPlan(SiteTracker siteTracker) {
+        Set<Long> allSiteIds = siteTracker.getAllSites();
+        Set<Integer> hostsMissingTable = getHostsMissingTable(allSiteIds);
+        int planFragmentCount = m_sitesWithThisTable.size() + hostsMissingTable.size() + 1;
+        SynthesizedPlanFragment[] restorePlan = new SynthesizedPlanFragment[planFragmentCount];
+        int planIndex = 0;
+        for (Long siteId : m_sitesWithThisTable) {
+            restorePlan[planIndex] = constructLoadReplicatedTableFragment();
+            restorePlan[planIndex].siteId = siteId;
+            ++planIndex;
         }
-        for (Long site_id : sites_missing_table) {
-            long source_site_id =
-                m_sitesWithThisTable.iterator().next();
-            restore_plan[restore_plan_index] =
-                constructDistributeReplicatedTableAsReplicatedFragment(source_site_id,
-                                                           site_id);
-            ++restore_plan_index;
+        Iterator<Long> sourceSitePicker = m_sitesWithThisTable.iterator();
+        for (Integer hostId : hostsMissingTable) {
+            if (! sourceSitePicker.hasNext()) {
+                sourceSitePicker = m_sitesWithThisTable.iterator();
+            }
+            long sourceSiteId = sourceSitePicker.next();
+            restorePlan[planIndex] =
+                constructDistributeReplicatedTableAsReplicatedFragment(
+                        sourceSiteId, hostId);
+            ++planIndex;
         }
-        assert(restore_plan_index == execution_site_ids.size());
-        restore_plan[restore_plan_index] =
+        assert(planIndex == planFragmentCount - 1);
+        restorePlan[planIndex] =
             constructLoadReplicatedTableAggregatorFragment(false);
-        return restore_plan;
+        return restorePlan;
     }
 
-    private Set<Long> getSitesMissingTable(Set<Long> clusterSiteIds) {
-        Set<Long> sites_missing_table = new HashSet<Long>();
-        for (long site_id : clusterSiteIds) {
-            if (!m_sitesWithThisTable.contains(site_id)) {
-                sites_missing_table.add(site_id);
+    private Set<Integer> getHostsMissingTable(Set<Long> clusterSiteIds) {
+        Set<Integer> hostsMissingTable = new HashSet<Integer>();
+        for (long siteId : clusterSiteIds) {
+            if (! m_sitesWithThisTable.contains(siteId)) {
+                hostsMissingTable.add(SiteTracker.getHostForSite(siteId));
             }
         }
-        return sites_missing_table;
+        return hostsMissingTable;
     }
 
     private SynthesizedPlanFragment
@@ -172,15 +169,15 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
 
     private SynthesizedPlanFragment
     constructDistributeReplicatedTableAsReplicatedFragment(long sourceSiteId,
-                                                           long destinationSiteId) {
-        int resultDependencyId = getNextDependencyId();
+                                                           int destHostId) {
+        int resultDepId = getNextDependencyId();
         ParameterSet parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                destinationSiteId,
-                resultDependencyId,
+                destHostId,
+                resultDepId,
                 getIsRecoverParam());
         return new SynthesizedPlanFragment(sourceSiteId,
-                SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated, resultDependencyId, false,
+                SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated, resultDepId, false,
                 parameters);
     }
 

@@ -60,7 +60,7 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);
         // Must have k-factor here.
-        int sitesPerHost = 2, hostCount = 2, kFactor = 1;
+        int sitesPerHost = 4, hostCount = 4, kFactor = 3;
         LocalCluster cluster = new LocalCluster("eng15174.jar", sitesPerHost,
                 hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
         cluster.overrideAnyRequestForValgrind();
@@ -79,8 +79,9 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
         client.drain();
         assertEquals(30, client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM T;").getResults()[0].asScalarLong());
 
-        m_logger.info("Kill node 1");
+        m_logger.info("Kill node 1 and 2");
         cluster.killSingleHost(1);
+        cluster.killSingleHost(2);
         Thread.sleep(1000);
 
         m_logger.info("Take a snapshot.");
@@ -92,5 +93,8 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
 
         m_logger.info("Recover the cluster.");
         cluster.startUp(false);
+        client = cluster.createClient(new ClientConfig());
+
+        assertEquals(30, client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM T;").getResults()[0].asScalarLong());
     }
 }
