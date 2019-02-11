@@ -22,9 +22,9 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -440,14 +440,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
             } else {
                 // Handle the uncommon case of more than 1 PBD file, get the sequence of segments
-                LinkedList<LinkedList<Instant>> sequences = sequencer.getSequences();
+                Deque<Deque<Instant>> sequences = sequencer.getSequences();
                 if (sequences.size() > 1) {
                     // FIXME: reject this case for now
                     // FIXME: we should select the sequence that has the oldest entry and delete
                     // the other files
                     throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
                 }
-                LinkedList<Instant> sequence = sequences.getFirst();
+                Deque<Instant> sequence = sequences.getFirst();
                 Long index = 1L;
                 for (Instant instant : sequence) {
                     File file = filesByCreation.get(instant);
@@ -838,7 +838,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
 
             // If this segment is to become the writing segment, don't close and
-            // finalize if
+            // finalize it.
             if (!m_segments.isEmpty()) {
                 writeSegment.close();
                 writeSegment.setFinal(true);

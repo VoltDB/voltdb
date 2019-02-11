@@ -17,6 +17,7 @@
 package org.voltdb.utils;
 
 import java.util.Collection;
+import java.util.Deque;
 import java.util.LinkedList;
 
 import org.voltcore.utils.Pair;
@@ -51,9 +52,9 @@ public class PairSequencer<T> {
         m_pairs.addAll(collection);
     }
 
-    public LinkedList<LinkedList<T>> getSequences() {
+    public Deque<Deque<T>> getSequences() {
 
-        LinkedList<LinkedList<T>> result = new LinkedList<>();
+        Deque<Deque<T>> result = new LinkedList<>();
         if (m_pairs.isEmpty()) {
             return result;
         }
@@ -73,13 +74,15 @@ public class PairSequencer<T> {
         // or we can't further aggregate any of the list elements.
         int count = 0;
         do {
-            LinkedList<T> candidate = result.removeFirst();
-            for (LinkedList<T> list : result) {
+            Deque<T> candidate = result.removeFirst();
+            for (Deque<T> list : result) {
                 // try to append the candidate at the front or at the tail
                 if (candidate.peekLast().equals(list.peekFirst())) {
                     // Insert candidate in front
                     candidate.removeLast();
-                    list.addAll(0, candidate);
+                    while(!candidate.isEmpty()) {
+                        list.addFirst(candidate.removeLast());
+                    }
                     candidate = null;
                     count = 0;
                     break;

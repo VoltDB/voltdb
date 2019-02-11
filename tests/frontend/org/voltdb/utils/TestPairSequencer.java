@@ -9,7 +9,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedList;
+import java.util.Deque;
 import java.util.List;
 
 import org.junit.Test;
@@ -38,10 +38,10 @@ public class TestPairSequencer {
             PairSequencer<Integer> sequencer = new PairSequencer<>();
             sequencer.addAll(pairs);
 
-            LinkedList<LinkedList<Integer>> seqs = sequencer.getSequences();
+            Deque<Deque<Integer>> seqs = sequencer.getSequences();
             assertEquals(1, seqs.size());
 
-            List<Integer> finalSequence = seqs.getFirst();
+            Deque<Integer> finalSequence = seqs.getFirst();
             System.out.println("Final sequence: " + finalSequence);
             assertEquals(origSequence, finalSequence);
             System.out.println();
@@ -70,12 +70,12 @@ public class TestPairSequencer {
             PairSequencer<Integer> sequencer = new PairSequencer<>();
             sequencer.addAll(pairs1);
 
-            LinkedList<LinkedList<Integer>> seqs = sequencer.getSequences();
+            Deque<Deque<Integer>> seqs = sequencer.getSequences();
             assertEquals(2, seqs.size());
 
             boolean found1 = false;
             boolean found2 = false;
-            for (List<Integer> result : seqs) {
+            for (Deque<Integer> result : seqs) {
                 System.out.println("Final sequence: " + result);
                 if (origSequence1.equals(result)) {
                     found1 = true;
