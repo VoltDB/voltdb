@@ -51,7 +51,9 @@ DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t 
       m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
-{}
+{
+    extendBufferChain(m_defaultCapacity);
+}
 
 size_t DRTupleStream::truncateTable(char *tableHandle,
                                     std::string tableName,
@@ -601,6 +603,21 @@ bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength, si
     }
     assert(!m_opened);
     return false;
+}
+
+void DRTupleStream::extendBufferChain(size_t minLength) {
+    DrStreamBlock *oldBlock = m_currBlock;
+    size_t uso = m_uso;
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
+    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
+
+    TupleStreamBase::commonExtendBufferChain(blockSize, uso);
+
+    if (openTransaction) {
+        handleOpenTransaction(oldBlock);
+    }
+
+    pushPendingBlocks();
 }
 
 void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,

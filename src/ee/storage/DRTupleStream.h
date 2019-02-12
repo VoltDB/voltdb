@@ -82,7 +82,8 @@ public:
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId);
 
-    virtual bool checkOpenTransaction(DrStreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
+    virtual void extendBufferChain(size_t minLength);
+    bool checkOpenTransaction(DrStreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds()
     {

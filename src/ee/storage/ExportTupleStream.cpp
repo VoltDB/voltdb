@@ -62,6 +62,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
       m_prevFlushStream(NULL)
 
 {
+    extendBufferChain(m_defaultCapacity);
     m_new = true;
 }
 
@@ -435,9 +436,12 @@ bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
 }
 
 void ExportTupleStream::extendBufferChain(size_t minLength) {
-    TupleStreamBase::extendBufferChain(minLength);
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
+    TupleStreamBase::commonExtendBufferChain(blockSize, m_uso);
 
     m_currBlock->recordStartSequenceNumber(m_nextSequenceNumber);
+
+    pushPendingBlocks();
 }
 
 

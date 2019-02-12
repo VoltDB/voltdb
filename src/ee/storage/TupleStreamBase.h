@@ -88,14 +88,11 @@ public:
     virtual bool periodicFlush(int64_t timeInMillis,
                                int64_t lastComittedSpHandle) = 0;
 
-    virtual void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength) = 0;
+    void commonExtendBufferChain(size_t blockSize, size_t startUso);
     virtual void pushStreamBuffer(SB *block, bool sync) = 0;
     void pushPendingBlocks();
     void discardBlock(SB *sb);
-
-    virtual bool checkOpenTransaction(SB *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
-
-    virtual void handleOpenTransaction(SB *oldBlock) {}
 
     const SB* getCurrBlockForTest() const {
         return m_currBlock;
@@ -149,8 +146,8 @@ protected:
 
 template <class SB>
 TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
-                                              size_t extraHeaderSpace /*= 0*/,
-                                              int maxBufferSize /*= -1*/)
+                                     size_t extraHeaderSpace /*= 0*/,
+                                     int maxBufferSize /*= -1*/)
     : m_flushInterval(MAX_BUFFER_AGE),
       m_lastFlush(0),
       m_defaultCapacity(defaultBufferSize),
@@ -167,9 +164,7 @@ TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
       m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
-{
-    extendBufferChain(m_defaultCapacity);
-}
+{}
 
 template <class SB>
 void TupleStreamBase<SB>::setDefaultCapacityForTest(size_t capacity)
@@ -298,19 +293,16 @@ void TupleStreamBase<SB>::discardBlock(SB *sb)
  * the pending queue.
  */
 template <class SB>
-void TupleStreamBase<SB>::extendBufferChain(size_t minLength)
+void TupleStreamBase<SB>::commonExtendBufferChain(size_t blockSize, size_t startUso)
 {
-    if (m_maxCapacity < minLength) {
+    if (m_maxCapacity < blockSize) {
         // exportxxx: rollback instead?
         throwFatalException("Default capacity is less than required buffer size.");
     }
-    SB *oldBlock = NULL;
-    size_t uso = m_uso;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
-            oldBlock = m_currBlock;
             m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
@@ -320,8 +312,6 @@ void TupleStreamBase<SB>::extendBufferChain(size_t minLength)
             m_currBlock = NULL;
         }
     }
-    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
-    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
     if (blockSize == 0) {
         throw TupleStreamException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
@@ -331,16 +321,10 @@ void TupleStreamBase<SB>::extendBufferChain(size_t minLength)
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    m_currBlock = new SB(buffer, m_headerSpace, blockSize, uso);
+    m_currBlock = new SB(buffer, m_headerSpace, blockSize, startUso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
-
-    if (openTransaction) {
-        handleOpenTransaction(oldBlock);
-    }
-
-    pushPendingBlocks();
 }
 
 }

@@ -127,10 +127,7 @@ public:
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId) = 0;
-
-    virtual bool checkOpenTransaction(DrStreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
-
-    void handleOpenTransaction(DrStreamBlock *oldBlock);
+    virtual void extendBufferChain(size_t minLength) = 0;
 
     void fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t uniqueId, const char *format, ...);
 
@@ -157,6 +154,8 @@ public:
     int64_t m_openSequenceNumber;
     int64_t m_committedSequenceNumber;
 protected:
+    void handleOpenTransaction(DrStreamBlock *oldBlock);
+
     virtual void openTransactionCommon(int64_t spHandle, int64_t uniqueId);
 
     virtual void commitTransactionCommon();
