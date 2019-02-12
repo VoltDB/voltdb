@@ -121,7 +121,7 @@ public abstract class PBDSegment {
     protected boolean m_closed = true;
     protected RandomAccessFile m_ras;
     protected FileChannel m_fc;
-    //Avoid unecessary sync with this flag
+    //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
 
     public PBDSegment(File file)

@@ -32,9 +32,11 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.EELibraryLoader;
+import org.voltdb.VoltDB;
 import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PBDSegment.PBDSegmentReader;
+import org.voltdb.utils.PairSequencer.CyclicSequenceException;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -259,7 +261,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     /**
      * Create a persistent binary deque with the specified nonce and storage
-     * back at the specified path. Existing files will
+     * back at the specified path.
      *
      * @param nonce
      * @param path
@@ -330,7 +332,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @return the next segment id
      */
     private synchronized long getNextSegmentId() {
-        return ++m_segmentCounter;
+        long newId = ++m_segmentCounter;
+        if (newId == Long.MAX_VALUE) {
+            // Extremely unlikely
+            VoltDB.crashLocalVoltDB("Unable to allocate segment id for " + m_nonce);
+        }
+        return newId;
     }
 
     /**
@@ -473,7 +480,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 for (Long segmentId : sequence) {
                     File file = filesById.get(segmentId);
                     if (file == null) {
-                        // This is an Instant in the sequence referring to a previous file that
+                        // This is an Id in the sequence referring to a previous file that
                         // was deleted, so move on.
                         continue;
                     }
@@ -481,6 +488,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     recoverSegment(seg, deleteEmpty);
                 }
             }
+        } catch (CyclicSequenceException e) {
+            LOG.error("Failed to parse files: " + e);
+            throw new IOException(e);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException) {
                 throw new IOException(e);

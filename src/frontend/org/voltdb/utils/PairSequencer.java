@@ -18,7 +18,9 @@ package org.voltdb.utils;
 
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Set;
 
 import org.voltcore.utils.Pair;
 
@@ -44,6 +46,12 @@ public class PairSequencer<T> {
 
     private LinkedList<Pair<T,T>> m_pairs = new LinkedList<>();
 
+    public static class CyclicSequenceException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        CyclicSequenceException() { super(); }
+        CyclicSequenceException(String s) { super(s); }
+    }
+
     public void add(Pair<T, T> pair) {
         m_pairs.addLast(pair);
     }
@@ -52,7 +60,7 @@ public class PairSequencer<T> {
         m_pairs.addAll(collection);
     }
 
-    public Deque<Deque<T>> getSequences() {
+    public Deque<Deque<T>> getSequences() throws CyclicSequenceException {
 
         Deque<Deque<T>> result = new LinkedList<>();
         if (m_pairs.isEmpty()) {
@@ -105,7 +113,32 @@ public class PairSequencer<T> {
 
         } while (count != result.size());
 
-        // FIXME: add validation checking for cycles or broken sequences
+        validateResult(result);
         return result;
+    }
+
+    private void validateResult(Deque<Deque<T>> result) throws CyclicSequenceException {
+        Set<T> resultSet = new HashSet<>();
+        Set<T> cyclicSet = new HashSet<>();
+
+        try {
+            for (Deque<T> sequence : result) {
+                for (T item : sequence) {
+                    if (resultSet.contains(item)) {
+                        if (!cyclicSet.contains(item)) {
+                            cyclicSet.add(item);
+                        }
+                    } else {
+                        resultSet.add(item);
+                    }
+                }
+            }
+            if (!cyclicSet.isEmpty()) {
+                throw new CyclicSequenceException("Cyclic sequence with these elements " + cyclicSet);
+            }
+        } finally {
+            resultSet.clear();
+            cyclicSet.clear();
+        }
     }
 }

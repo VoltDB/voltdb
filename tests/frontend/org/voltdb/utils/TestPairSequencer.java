@@ -17,6 +17,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.List;
 
 import org.junit.Test;
 import org.voltcore.utils.Pair;
+import org.voltdb.utils.PairSequencer.CyclicSequenceException;
 
 /**
  * @author rdykiel
@@ -99,6 +101,34 @@ public class TestPairSequencer {
             }
             assertTrue(found1);
             assertTrue(found2);
+            System.out.println();
+        }
+    }
+
+    @Test
+    public void testCyclicSequencing() {
+
+        List<Integer> origSequence = Arrays.asList(new Integer[] { 7, 8, 9, 1, 2, 9, 5, 6, 7, 3, 4 });
+        System.out.println("Original sequence: " + origSequence);
+
+        List<Pair<Integer, Integer>> pairs = makePairs(origSequence);
+        System.out.println("Paired sequence: " + pairs);
+        System.out.println();
+
+        for (int i = 0; i < 10; i++) {
+            Collections.shuffle(pairs);
+            System.out.println("Shuffled pairs: " + pairs);
+
+            PairSequencer<Integer> sequencer = new PairSequencer<>();
+            sequencer.addAll(pairs);
+
+            try {
+                Deque<Deque<Integer>> seqs = sequencer.getSequences();
+                assertFalse(seqs == null);
+            }
+            catch (CyclicSequenceException e) {
+                System.out.println("Got expected error :" + e);
+            }
             System.out.println();
         }
     }
