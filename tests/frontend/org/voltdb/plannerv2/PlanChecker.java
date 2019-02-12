@@ -79,8 +79,12 @@ public class PlanChecker extends CalcitePlannerTestCase {
         } catch (SqlParseException e) {
             return;
         }
-        if (!CALCITE_CHECKS.check(sql)) {
-            // The query cannot pass the compatibility check, we just ignore it.
+        try {
+            if (!CALCITE_CHECKS.check(sql)) {
+                // The query cannot pass the compatibility check, we just ignore it.
+                return;
+            }
+        } catch (SqlParseException e) {
             return;
         }
         CompiledPlan calcitePlan;
