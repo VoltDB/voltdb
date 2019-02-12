@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.VoltType;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
 /**

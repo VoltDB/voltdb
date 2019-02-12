@@ -98,6 +98,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannodes.PlanNodeList;
 import org.w3c.dom.Document;
 

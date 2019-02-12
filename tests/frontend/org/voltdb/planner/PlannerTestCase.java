@@ -33,6 +33,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;

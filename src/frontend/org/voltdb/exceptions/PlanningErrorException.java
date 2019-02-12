@@ -15,13 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.exceptions;
 
 public class PlanningErrorException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public PlanningErrorException(String msg) {
         super(msg);
+    }
+    public PlanningErrorException(Throwable e) {
+        super(e);
+    }
+    public PlanningErrorException(String msg, Throwable e) {
+       super(msg, e);
     }
 
     /**

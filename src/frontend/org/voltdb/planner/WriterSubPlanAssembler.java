@@ -45,14 +45,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     boolean m_generatedPlans = false;
 
     /**
-     *
-     * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
-    {
-        super(db, parsedStmt, partitioning);
+    WriterSubPlanAssembler(AbstractParsedStmt parsedStmt, StatementPartitioning partitioning) {
+        super(parsedStmt, partitioning);
 
         assert(m_parsedStmt.m_tableList.size() == 1);
         m_targetTable = m_parsedStmt.m_tableList.get(0);

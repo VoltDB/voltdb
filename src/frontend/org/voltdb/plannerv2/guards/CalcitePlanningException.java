@@ -17,7 +17,7 @@
 
 package org.voltdb.plannerv2.guards;
 
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.exceptions.PlanningErrorException;
 
 public class CalcitePlanningException extends PlanningErrorException {
 
