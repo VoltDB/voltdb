@@ -77,8 +77,8 @@ public class AdHoc extends AdHocNTBase {
             // Use the legacy planner to run this.
             return runFallback(params);
         } catch (Exception ex) {
-            // Any other exceptions will result in a failure client response.
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
+            // For now, let's just fail the batch if any error happens.
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
         }
     }
 

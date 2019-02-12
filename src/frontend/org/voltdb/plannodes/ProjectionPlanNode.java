@@ -23,11 +23,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {

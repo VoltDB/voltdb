@@ -23,6 +23,7 @@ import java.util.HashSet;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 
 /**
  * Subclass of AbstractParsedStmt for a SWAP TABLES statement.

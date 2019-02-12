@@ -35,6 +35,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;

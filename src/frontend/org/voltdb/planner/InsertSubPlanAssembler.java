@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -40,9 +40,9 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
     private boolean m_bestAndOnlyPlanWasGenerated = false;
     final private boolean m_targetIsExportTable;
 
-    InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
+    InsertSubPlanAssembler(AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning, boolean targetIsExportTable) {
-        super(db, parsedStmt, partitioning);
+        super(parsedStmt, partitioning);
         m_targetIsExportTable = targetIsExportTable;
     }
 
