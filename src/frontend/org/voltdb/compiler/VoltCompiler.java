@@ -527,26 +527,27 @@ public class VoltCompiler {
 
     /** Compiles a catalog from a user provided schema and (optional) jar file. */
     public boolean compileFromSchemaAndClasses(
-            final File schemaPath,
+            final List<File> schemaPaths,
             final File classesJarPath,
             final File catalogOutputPath)
     {
-        if (schemaPath != null && !schemaPath.exists()) {
+        if (schemaPaths != null && !schemaPaths.stream().allMatch(File::exists)) {
             compilerLog.error("Cannot compile nonexistent or missing schema.");
             return false;
         }
 
         List<VoltCompilerReader> ddlReaderList;
         try {
-            if (schemaPath == null) {
+            if (schemaPaths == null || schemaPaths.isEmpty()) {
                 ddlReaderList = new ArrayList<>(1);
                 ddlReaderList.add(new VoltCompilerStringReader(AUTOGEN_DDL_FILE_NAME, m_emptyDDLComment));
             } else {
-                ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+                ddlReaderList = DDLPathsToReaderList(
+                        schemaPaths.stream().map(File::getAbsolutePath).toArray(String[]::new));
             }
         }
         catch (VoltCompilerException e) {
-            compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
+            compilerLog.error("Unable to open schema file \"" + schemaPaths + "\"", e);
             return false;
         }
 
