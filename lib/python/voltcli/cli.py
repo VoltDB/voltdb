@@ -17,7 +17,6 @@
 import sys
 import os
 import optparse
-import shlex
 import copy
 
 from voltcli import utility
@@ -357,8 +356,6 @@ class CLIParser(ExtendedHelpOptionParser):
         """
         Validate the verb options and post-process the values.
         """
-        max_width = 0
-        missing = []
         # Post-process the option values, e.g. convert strings to lists as needed.
         for o in verb.iter_options():
             dest = o.get_dest()
@@ -514,7 +511,7 @@ class CLIParser(ExtendedHelpOptionParser):
             sys.stdout = scraper
             self.print_help()
         finally:
-            sys.stdout = stdout_saves
+            sys.stdout = stdout_save
         return ''.join(scraper.usage)
 
     def on_format_epilog(self):
@@ -556,7 +553,6 @@ class CLIParser(ExtendedHelpOptionParser):
         return '%s\n%s' % (table1, table2)
 
     def _iter_options(self, verb):
-        options = []
         for option in self.base_options:
             yield option
         if verb:
