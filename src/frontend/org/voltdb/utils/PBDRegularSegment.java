@@ -46,10 +46,10 @@ public class PBDRegularSegment extends PBDSegment {
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
     // Index of this segment in the in-memory segment map
-    private final Long m_index;
+    private final long m_index;
 
     // Persistent ID of this segment, based on managing a monotonic counter
-    private final Long m_id;
+    private final long m_id;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;

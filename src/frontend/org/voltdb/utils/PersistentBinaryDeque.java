@@ -527,17 +527,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
      */
     private void recoverSegment(PBDSegment qs, boolean deleteEmpty) throws IOException {
 
-        if (deleteEmpty) {
-            if (qs.getNumEntries() == 0) {
-                qs.setFinal(false);
-                if (m_usageSpecificLog.isDebugEnabled()) {
-                    m_usageSpecificLog.debug("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
-                    m_usageSpecificLog.debug("Segment " + qs.file()
-                        + " (final: " + qs.isFinal() + "), will be closed and deleted during init");
-                }
-                qs.closeAndDelete();
-                return;
+        if (deleteEmpty && qs.getNumEntries() == 0) {
+            qs.setFinal(false);
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
+                m_usageSpecificLog.debug("Segment " + qs.file()
+                + " (final: " + qs.isFinal() + "), will be closed and deleted during init");
             }
+            qs.closeAndDelete();
+            return;
         }
 
         // Any recovered segment that is not final should be checked
