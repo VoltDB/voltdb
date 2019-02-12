@@ -289,14 +289,18 @@ public class VoltCompiler {
 
         public String getStandardFeedbackLine() {
             String retval = "";
-            if (severityLevel == Severity.INFORMATIONAL)
+            if (severityLevel == Severity.INFORMATIONAL) {
                 retval = "INFO";
-            if (severityLevel == Severity.WARNING)
+            }
+            if (severityLevel == Severity.WARNING) {
                 retval = "WARNING";
-            if (severityLevel == Severity.ERROR)
+            }
+            if (severityLevel == Severity.ERROR) {
                 retval = "ERROR";
-            if (severityLevel == Severity.UNEXPECTED)
+            }
+            if (severityLevel == Severity.UNEXPECTED) {
                 retval = "UNEXPECTED ERROR";
+            }
 
             return retval + " " + getLogString();
         }
@@ -305,8 +309,9 @@ public class VoltCompiler {
             String retval = new String();
             if (! fileName.equals(NO_FILENAME)) {
                 retval += "[" + fileName;
-                if (lineNo != NO_LINE_NUMBER)
+                if (lineNo != NO_LINE_NUMBER) {
                     retval += ":" + lineNo;
+                }
                 retval += "]: ";
             }
             retval += message;
@@ -1104,8 +1109,9 @@ public class VoltCompiler {
             for (final VoltCompilerReader schemaReader : schemaReaders) {
                 String origFilename = m_currentFilename;
                 try {
-                    if (m_currentFilename.equals(NO_FILENAME))
+                    if (m_currentFilename.equals(NO_FILENAME)) {
                         m_currentFilename = schemaReader.getName();
+                    }
 
                     // add the file object's path to the list of files for the jar
                     m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
@@ -1749,7 +1755,9 @@ public class VoltCompiler {
                     throw new VoltCompilerException(msg);
                 }
                 finally {
-                    if ( jar != null) try {jar.close();} catch (Exception ignoreIt) {};
+                    if (jar != null) {
+                        try {jar.close();} catch (Exception ignoreIt) {}
+                    }
                 }
             }
             // load directly from a classfile
@@ -1847,7 +1855,9 @@ public class VoltCompiler {
                     org.xml.sax.SAXParseException.class.cast(jxbex.getLinkedException());
             for( DeprecatedProjectElement dpe: DeprecatedProjectElement.values()) {
                 Matcher mtc = dpe.messagePattern.matcher(saxex.getMessage());
-                if( mtc.find()) return dpe;
+                if (mtc.find()) {
+                    return dpe;
+                }
             }
 
             return null;
