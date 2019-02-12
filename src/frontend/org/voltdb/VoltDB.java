@@ -331,7 +331,7 @@ public class VoltDB {
         public List<File> m_userSchemas = null;
 
         /** location of user supplied classes and resources jar file */
-        public File m_stagedClassesPath = null;
+        public List<File> m_stagedClassesPaths = null;
 
         /** Best effort to recover previous partition layout*/
         public boolean m_restorePlacement = !Boolean.valueOf(System.getenv("DISABLE_PLACEMENT_RESTORE") == null ?
@@ -718,18 +718,25 @@ public class VoltDB {
                         m_userSchemas.add(userSchema);
                     }
                 } else if (arg.equalsIgnoreCase("classes")) {
-                    m_stagedClassesPath = new File(args[++i].trim());
-                    if (!m_stagedClassesPath.exists()){
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " does not exist.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.canRead()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " can't be read.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.isFile()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
-                        referToDocAndExit();
+                    for (String jarPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
+                        File stagedJar = new File(jarPath);
+                        if (!stagedJar.exists()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " does not exist.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.canRead()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " can't be read.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.isFile()) {
+                            System.err.println(
+                                    "FATAL: Supplied classes jar file " + stagedJar + " is not an ordinary file.");
+                            referToDocAndExit();
+                        }
+                        if (m_stagedClassesPaths == null) {
+                            m_stagedClassesPaths = new ArrayList<>();
+                        }
+                        m_stagedClassesPaths.add(stagedJar);
                     }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);

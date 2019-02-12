@@ -528,7 +528,7 @@ public class VoltCompiler {
     /** Compiles a catalog from a user provided schema and (optional) jar file. */
     public boolean compileFromSchemaAndClasses(
             final List<File> schemaPaths,
-            final File classesJarPath,
+            final List<File> classesJarPaths,
             final File catalogOutputPath)
     {
         if (schemaPaths != null && !schemaPaths.stream().allMatch(File::exists)) {
@@ -551,16 +551,19 @@ public class VoltCompiler {
             return false;
         }
 
-        InMemoryJarfile inMemoryUserJar = null;
+        InMemoryJarfile inMemoryUserJar = new InMemoryJarfile();
         ClassLoader originalClassLoader = m_classLoader;
         try {
-            if (classesJarPath != null && classesJarPath.exists()) {
+            m_classLoader = inMemoryUserJar.getLoader();
+            if (classesJarPaths != null) {
                 // Make user's classes available to the compiler and add all VoltDB artifacts to theirs (overwriting any existing VoltDB artifacts).
                 // This keeps all their resources because stored procedures may depend on them.
-                inMemoryUserJar = new InMemoryJarfile(classesJarPath);
-                m_classLoader = inMemoryUserJar.getLoader();
-            } else {
-                inMemoryUserJar = new InMemoryJarfile();
+                for (File classesJarPath: classesJarPaths) {
+                    if (classesJarPath.exists()) {
+                        InMemoryJarfile jarFile = new InMemoryJarfile(classesJarPath);
+                        inMemoryUserJar.putAll(jarFile);
+                    }
+                }
             }
             if (compileInternal(null, null, ddlReaderList, inMemoryUserJar) == null) {
                 return false;
