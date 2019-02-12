@@ -403,8 +403,7 @@ bool ExecutorContext::checkTransactionForDR() {
     bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
         if (m_drStream && m_drStream->drStreamStarted()) {
-            if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                                 m_drStream->m_committedUso, 0));
@@ -412,8 +411,7 @@ bool ExecutorContext::checkTransactionForDR() {
             result = true;
         }
         if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
-            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drReplicatedStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,

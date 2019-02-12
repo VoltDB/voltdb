@@ -27,12 +27,11 @@ public:
 DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
     : m_stream(stream), m_mark(mark), m_cost(cost)
     {
+        assert(stream);
     }
 
     void undo() {
-        if (m_stream) {
-            m_stream->rollbackTo(m_mark, m_cost, SIZE_MAX);
-        }
+        m_stream->rollbackDrTo(m_mark, m_cost);
     }
 
 private:

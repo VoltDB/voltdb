@@ -48,15 +48,15 @@ public:
     void pushExportBuffer(
             int32_t partitionId,
             std::string signature,
-            StreamBlock *block,
+            ExportStreamBlock *block,
             bool sync);
     void pushEndOfStream(
             int32_t partitionId,
             std::string signature);
 
-    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,

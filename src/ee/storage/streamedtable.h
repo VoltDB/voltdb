@@ -42,7 +42,7 @@ class MaterializedViewTriggerForStreamInsert;
  * only to support Export.
  */
 
-class StreamedTable : public Table {
+class StreamedTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class StreamedTableStats;
 
@@ -54,6 +54,8 @@ public:
             std::string tableName, std::vector<std::string> & columnNames);
 
     virtual ~StreamedTable();
+
+    void notifyQuantumRelease();
 
     // virtual Table functions
     // Return a table iterator BY VALUE
