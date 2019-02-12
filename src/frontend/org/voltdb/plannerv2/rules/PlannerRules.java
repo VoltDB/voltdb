@@ -45,12 +45,14 @@ import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -121,7 +123,8 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
-            VoltLJoinRule.INSTANCE
+            VoltLJoinRule.INSTANCE,
+            VoltLValuesRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -162,7 +165,8 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
-            VoltPJoinRule.INSTANCE
+            VoltPJoinRule.INSTANCE,
+            VoltPValuesRule.INSTANCE
     );
 
     private static final RuleSet INLINE = RuleSets.ofList(

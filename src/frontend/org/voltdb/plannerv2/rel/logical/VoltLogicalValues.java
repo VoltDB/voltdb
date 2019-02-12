@@ -15,17 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2.rules.physical;
+package org.voltdb.plannerv2.rel.logical;
 
-public final class Constants {
-    private Constants() {
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexLiteral;
+
+public class VoltLogicalValues extends LogicalValues implements VoltLogicalRel {
+    public VoltLogicalValues(RelOptCluster cluster, RelTraitSet traitSet, RelDataType rowType, ImmutableList<ImmutableList<RexLiteral>> tuples) {
+        super(cluster, traitSet, rowType, tuples);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
-
-    static final int JOIN_SPLIT_COUNT = 1;
-    static final int VALUES_SPLIT_COUNT = 1;
-    // TODO: why 30?
-    static public final int DISTRIBUTED_SPLIT_COUNT = 30;
-
-    // TODO: verify this
-    static public final int MAX_TABLE_ROW_COUNT = 1000000;
 }

@@ -474,7 +474,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testLogicalValues() {
         // ENG-15258
-//        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
-//                .transform("foo").test();
+        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+                .transform("foo").test();
     }
 }
