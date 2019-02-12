@@ -2470,7 +2470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config, boolean isXCDR) {
-        if (config.m_userSchema == null && config.m_stagedClassesPath == null) {
+        if (config.m_userSchemas == null && config.m_stagedClassesPath == null) {
             return; // nothing to do
         }
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
@@ -2482,8 +2482,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
 
         compiler.setInitializeDDLWithFiltering(true);
-        if (!compiler.compileFromSchemaAndClasses(config.m_userSchema, config.m_stagedClassesPath, stagedCatalogFH)) {
-            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
+        if (!compiler.compileFromSchemaAndClasses(config.m_userSchemas, config.m_stagedClassesPath, stagedCatalogFH)) {
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchemas);
         }
     }
 
