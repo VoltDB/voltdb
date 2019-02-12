@@ -408,8 +408,8 @@ public class LocalCluster extends VoltServerConfig {
             }
         }
         if (classesJarToStage != null) {
-            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
-            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+            templateCmdLine.m_stagedClassesPaths = Collections.singletonList(new VoltFile(classesJarToStage));
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPaths + "\"");
         }
 
         // if the user wants valgrind and it makes sense, give it to 'em
