@@ -67,6 +67,7 @@
 #define  __USE_GNU
 #endif // __USE_GNU
 #include <sched.h>
+#include <cerrno>
 #endif // LINUX
 #ifdef MACOSX
 #include <mach/task.h>
@@ -1328,15 +1329,26 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
 #endif
 }
 
+/**
+ * Utility used for access file descriptor number from JAVA FileDescriptor class
+ */
+jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject)
+{
+    jclass fdesc = env->GetObjectClass(fdObject);
+    // poke the "fd" field with the file descriptor
+    jfieldID field_fd = env->GetFieldID(fdesc, "fd", "I");
+    return env-> GetIntField(fdesc, field_fd);
+}
+
 /*
  * Class:     org_voltdb_utils_PosixAdvise
- * Method:    fadvise
- * Signature: (JJJI)J
+ * Method:    nativeFadvise
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_nativeFadvise
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
-    return posix_fadvise(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+    return posix_fadvise(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
 #else
     return 0;
 #endif
@@ -1345,20 +1357,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    sync_file_range
- * Signature: (JJJI)J
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
 #error VoltDB server requires that your kernel headers define __NR_sync_file_range.
 #endif
-    return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
+    return syscall(__NR_sync_file_range, getFdFromFileDescriptor(env,fdObject), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
 #elif MACOSX
     return -1;
 #else
-    return fdatasync(static_cast<int>(fd));
+    return fdatasync(getFdFromFileDescriptor(env,fdObject));
 #endif
 }
 
@@ -1366,14 +1378,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    fallocate
- * Signature: (JJJ)J
+ * Signature: (Ljava/io/FileDescriptor;JJ)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length) {
 #ifdef MACOSX
     return -1;
 #else
-    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+    return posix_fallocate(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length));
 #endif
 }
 
