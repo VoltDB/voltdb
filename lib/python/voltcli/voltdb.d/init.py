@@ -27,8 +27,8 @@ VoltDB = 'org.voltdb.VoltDB'
                           default = None),
         VOLT.BooleanOption('-f', '--force', 'force',
                            'Initialize a new, empty database. Any previous session will be overwritten.'),
-        VOLT.StringOption('-s', '--schema', 'schema',
-                           'Specifies a file containing the data definition (as SQL statements) to be loaded when starting the database.'),
+        VOLT.StringOption('-s', '--schema', 'schemas',
+                           'Specifies a list of files, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringOption('-j', '--classes', 'classes_jarfile',
                           'Specifies a .jar file containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.')
     ),
@@ -43,8 +43,8 @@ def init(runner):
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.extend(['force'])
-    if runner.opts.schema:
-        runner.args.extend(['schema', runner.opts.schema])
+    if runner.opts.schemas:
+        runner.args.extend(('schema', runner.opts.schemas))
     if runner.opts.classes_jarfile:
         runner.args.extend(['classes', runner.opts.classes_jarfile])
 
