@@ -222,7 +222,9 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
-        if (!c1.m_isEnterprise) return;
+        if (!c1.m_isEnterprise) {
+            return;
+        }
 
         clearCrash();
 
