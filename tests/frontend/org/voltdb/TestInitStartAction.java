@@ -278,25 +278,25 @@ final public class TestInitStartAction {
         } else {
             success = compiler.compileFromDDL(referenceFile.getAbsolutePath(), schemaFile.getPath());
         }
-        assertEquals(true, success);
+        assertTrue(success);
         InMemoryJarfile referenceCatalogJar = new InMemoryJarfile(referenceFile);
         Catalog referenceCatalog = new Catalog();
         referenceCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(referenceCatalogJar));
 
         // verify that the staged catalog is identical
         File stagedJarFile = new VoltFile(RealVoltDB.getStagedCatalogPath(rootDH.getPath() + File.separator + "voltdbroot"));
-        assertEquals(true, stagedJarFile.isFile());
+        assertTrue(stagedJarFile.isFile());
         InMemoryJarfile stagedCatalogJar = new InMemoryJarfile(stagedJarFile);
         Catalog stagedCatalog = new Catalog();
         stagedCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(stagedCatalogJar));
 
-        assertEquals(true, referenceCatalog.equals(stagedCatalog));
-        assertEquals(true, stagedCatalog.equals(referenceCatalog));
+        assertTrue(referenceCatalog.equals(stagedCatalog));
+        assertTrue(stagedCatalog.equals(referenceCatalog));
 
-        assertEquals(true, referenceFile.delete());
+        assertTrue(referenceFile.delete());
         // If schema is not null we have a real file else we have a dummy reader.
         if (schema != null) {
-            assertEquals(true, schemaFile.delete());
+            assertTrue(schemaFile.delete());
         }
 
         if (proceduresJar != null) {
@@ -343,7 +343,7 @@ final public class TestInitStartAction {
         server.join();
         expectSimulatedExit(0);
         validateStagedCatalog(schema, null);
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that a valid schema with procedures can be used to stage a matching catalog,
@@ -380,7 +380,7 @@ final public class TestInitStartAction {
         } catch (SimulatedExitException e){
             assertEquals(e.getStatus(), -1);
         }
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that a valid schema with no procedures can be used to stage a matching catalog.
@@ -398,7 +398,7 @@ final public class TestInitStartAction {
             assertEquals(e.getStatus(), -1);
         }
 
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Test that init accepts classes without a schema.
@@ -440,7 +440,7 @@ final public class TestInitStartAction {
         assertTrue(serverException.get().getMessage().equals("Faux crash of VoltDB successful."));
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
-        assertEquals(true, schemaFile.delete());
+        assertTrue(schemaFile.delete());
     }
 
     /** Tests that when there are base classes and non-class files in the stored procedures,
