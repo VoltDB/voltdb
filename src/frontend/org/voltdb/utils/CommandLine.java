@@ -102,7 +102,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
         cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
         cl.m_userSchemas = m_userSchemas;
-        cl.m_stagedClassesPath = m_stagedClassesPath;
+        cl.m_stagedClassesPaths = m_stagedClassesPaths;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
