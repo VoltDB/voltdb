@@ -17,11 +17,15 @@
 
 package org.voltdb.plannerv2.utils;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-
-import com.google.common.base.Preconditions;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 
 public class VoltRelUtil {
 
@@ -32,7 +36,7 @@ public class VoltRelUtil {
      * @param newTrait
      * @return
      */
-    public static RelNode addTraitRecurcively(RelNode rel, RelTrait newTrait) {
+    public static RelNode addTraitRecursively(RelNode rel, RelTrait newTrait) {
         Preconditions.checkNotNull(rel);
         RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);
@@ -41,5 +45,30 @@ public class VoltRelUtil {
     public static int decideSplitCount(RelNode rel) {
         return (rel instanceof VoltPhysicalRel) ?
                 ((VoltPhysicalRel) rel).getSplitCount() : 1;
+    }
+
+    public static CompiledPlan calciteToVoltDBPlan(VoltPhysicalRel rel, CompiledPlan compiledPlan) {
+
+        RexConverter.resetParameterIndex();
+
+        AbstractPlanNode root = new SendPlanNode();
+        root.addAndLinkChild(rel.toPlanNode());
+
+        compiledPlan.rootPlanGraph = root;
+
+        PostBuildVisitor postPlannerVisitor = new PostBuildVisitor();
+        root.acceptVisitor(postPlannerVisitor);
+
+        compiledPlan.setReadOnly(true);
+        compiledPlan.statementGuaranteesDeterminism(
+                postPlannerVisitor.hasLimitOffset(), // no limit or offset
+                postPlannerVisitor.isOrderDeterministic(),  // is order deterministic
+                null); // no details on determinism
+
+        compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
+
+        compiledPlan.setParameters(postPlannerVisitor.getParameterValueExpressions());
+
+        return compiledPlan;
     }
 }

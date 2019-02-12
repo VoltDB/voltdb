@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -28,7 +29,6 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
-import org.apache.calcite.util.Util;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -45,12 +45,9 @@ import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannerv2.NonDdlBatch;
 import org.voltdb.plannerv2.SqlTask;
-import org.voltdb.plannerv2.VoltSqlValidator;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
-import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -58,6 +55,10 @@ import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
+
+
+import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
@@ -209,24 +210,16 @@ public class PlannerTool {
         return plan;
     }
 
-    /**
-     * Plan a query with the Calcite planner.
-     * @param task the query to plan.
-     * @return a planned statement.
-     * @throws ValidationException
-     * @throws RelConversionException
-     * @throws PlannerFallbackException
-     */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
-            throws ValidationException, RelConversionException, PlannerFallbackException {
+    public static synchronized CompiledPlan getCompiledPlanCalcite(SchemaPlus schemaPlus, SqlNode sqlNode)
+            throws ValidationException, RelConversionException, PlannerFallbackException{
         // TRAIL [Calcite-AdHoc-DQL/DML:4] PlannerTool.planSqlCalcite()
-        VoltPlanner planner = new VoltPlanner(m_schemaPlus);
+        VoltPlanner planner = new VoltPlanner(schemaPlus);
 
         // Validate the task's SqlNode.
-        SqlNode validatedQuery = planner.validate(task.getParsedQuery());
+        SqlNode validatedNode = planner.validate(sqlNode);
 
         // Convert SqlNode to RelNode.
-        RelNode rel = planner.convert(validatedQuery);
+        RelNode rel = planner.convert(validatedNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
@@ -254,12 +247,11 @@ public class PlannerTool {
         // the LogicalCalc and Calc-related rules to fix this.
         planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
-        // Add RelDistributions.ANY trait to the relational tree.
-        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
+        // Add RelDistributions.ANY trait to the rel tree.
+        transformed = VoltRelUtil.addTraitRecursively(transformed, RelDistributions.ANY);
 
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.
-        // This planning phase will be removed in future versions when we support MP query planning.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
@@ -273,11 +265,40 @@ public class PlannerTool {
         transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),
                 requiredPhysicalOutputTraits, transformed);
 
-        Util.discard(transformed);
+        // apply inlining rules.
+        transformed = VoltPlanner.transformHep(Phase.INLINE,
+                HepMatchOrder.ARBITRARY, transformed, true);
 
+        CompiledPlan compiledPlan = new CompiledPlan(false);
+        try {
+            // assume not large query
+            calciteToVoltDBPlan((VoltPhysicalRel) transformed, compiledPlan);
+
+            compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
+            // Renumber the plan node ids to start with 1
+            compiledPlan.resetPlanNodeIds(1);
+        } catch (Exception e){
+            throw new PlannerFallbackException(e.getMessage());
+        }
         planner.close();
-        // TODO: finish Calcite planning and convert into AdHocPlannedStatement.
+        fragmentizePlan(compiledPlan);
+
+        return compiledPlan;
+    }
+
+    /**
+     * Plan a query with the Calcite planner.
+     * @param task the query to plan.
+     * @param batch the query batch which this query belongs to.
+     * @return a planned statement.
+     */
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
+            throws ValidationException, RelConversionException, PlannerFallbackException {
+        CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
+        plan.sql = task.getSQL();
+        CorePlan core = new CorePlan(plan, m_catalogHash);
         throw new PlannerFallbackException();
+//        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,

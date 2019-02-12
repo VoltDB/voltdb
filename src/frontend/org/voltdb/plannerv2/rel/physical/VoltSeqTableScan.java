@@ -33,6 +33,10 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.rules.physical.Constants;
 
 import com.google.common.base.Preconditions;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+
+import java.util.List;
 
 /**
  * The relational expression that represent a sequential VoltDB physical table scan.
@@ -159,5 +163,24 @@ public class VoltSeqTableScan extends VoltPhysicalTableScan {
                 preAggProgram,
                 m_splitCount);
         return newScan;
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        SeqScanPlanNode sspn = new SeqScanPlanNode();
+        List<String> qualName = table.getQualifiedName();
+        // index_0: schema name, Index_1: table name
+        sspn.setTargetTableAlias(qualName.get(1));
+        sspn.setTargetTableName(m_voltTable.getCatalogTable().getTypeName());
+
+        addProjection(sspn);
+        addPredicate(sspn);
+        if (m_aggregate == null) {
+            // If there is an aggregate, the Limit / Offset will be inlined with aggregate node
+            addLimitOffset(sspn);
+        }
+        addAggregate(sspn);
+
+        return sspn;
     }
 }

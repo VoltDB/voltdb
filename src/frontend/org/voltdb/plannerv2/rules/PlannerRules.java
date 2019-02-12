@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2.rules;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
@@ -31,6 +32,12 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalAggregateScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcAggregateMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
@@ -44,8 +51,6 @@ import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
-
-import com.google.common.collect.ImmutableList;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -74,8 +79,14 @@ public class PlannerRules {
             @Override public RuleSet getRules() {
                 return PlannerRules.PHYSICAL_CONVERSION;
             }
-        }
-        ;
+        },
+        INLINE {
+            @Override
+            public RuleSet getRules() {
+                return PlannerRules.INLINE;
+            }
+        };
+
         public abstract RuleSet getRules();
     }
 
@@ -138,7 +149,7 @@ public class PlannerRules {
 //            JoinPushThroughJoinRule.LEFT,
 //            JoinPushThroughJoinRule.RIGHT,
 //            SortProjectTransposeRule.INSTANCE,
-            );
+    );
 
     private static final RuleSet MP_FALLBACK = RuleSets.ofList(
             MPQueryFallBackRule.INSTANCE,
@@ -154,13 +165,23 @@ public class PlannerRules {
             VoltPJoinRule.INSTANCE
     );
 
+    private static final RuleSet INLINE = RuleSets.ofList(
+            VoltPhysicalCalcAggregateMergeRule.INSTANCE,
+            VoltPhysicalCalcScanMergeRule.INSTANCE,
+            VoltPhysicalLimitSerialAggregateMergeRule.INSTANCE,
+            VoltPhysicalLimitSortMergeRule.INSTANCE_1,
+            VoltPhysicalAggregateScanMergeRule.INSTANCE,
+            VoltPhysicalLimitScanMergeRule.INSTANCE_1
+    );
+
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(
                     LOGICAL,
                     MP_FALLBACK,
-                    PHYSICAL_CONVERSION
-                    )
-            );
+                    PHYSICAL_CONVERSION,
+                    INLINE
+            )
+    );
 
     public static ImmutableList<Program> getPrograms() {
         return PROGRAMS;

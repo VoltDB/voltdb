@@ -27,13 +27,26 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 
 import com.google_voltpatches.common.base.Preconditions;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}
@@ -189,7 +202,11 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     protected int getLimit() {
         if (m_limit != null) {
-            return RexLiteral.intValue(m_limit);
+            if (m_limit instanceof RexDynamicParam) { // when LIMIT ?
+                return -1;
+            } else {
+                return RexLiteral.intValue(m_limit);
+            }
         } else {
             return Integer.MAX_VALUE;
         }
@@ -201,7 +218,11 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     protected int getOffset() {
         if (m_offset != null) {
-            return RexLiteral.intValue(m_offset);
+            if (m_offset instanceof RexDynamicParam) {
+                return -1;
+            } else {
+                return RexLiteral.intValue(m_offset);
+            }
         } else {
             return 0;
         }
@@ -261,4 +282,79 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         return m_splitCount;
     }
 
+    /**
+     * Convert Scan's predicate (condition) to VoltDB AbstractExpressions
+     *
+     * @param scan
+     * @return
+     */
+    protected AbstractPlanNode addPredicate(AbstractScanPlanNode scan) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        Preconditions.checkNotNull(program);
+
+        RexLocalRef condition = program.getCondition();
+        if (condition != null) {
+            List<AbstractExpression> predList = new ArrayList<>();
+            predList.add(RexConverter.convert(program.expandLocalRef(condition)));
+            scan.setPredicate(predList);
+        }
+        return scan;
+    }
+
+    /**
+     * Convert Scan's LIMIT / OFFSET to an inline LimitPlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
+        if (hasLimitOffset()) {
+            LimitPlanNode limitPlanNode = VoltPhysicalLimit.toPlanNode(m_limit, m_offset);
+            node.addInlinePlanNode(limitPlanNode);
+        }
+        return node;
+    }
+
+    /**
+     * Convert Scan's Project to an inline ProjectionPlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addProjection(AbstractPlanNode node) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        assert program != null;
+
+        ProjectionPlanNode ppn = new ProjectionPlanNode();
+        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program));
+        node.addInlinePlanNode(ppn);
+        return node;
+    }
+
+    /**
+     * Convert Scan's aggregate to an inline AggregatePlanNode / HashAggregatePlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
+        if (m_aggregate != null) {
+
+            assert (m_preAggregateRowType != null);
+            AbstractPlanNode aggr = ((AbstractVoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
+            aggr.clearChildren();
+            node.addInlinePlanNode(aggr);
+            node.setOutputSchema(aggr.getOutputSchema());
+            node.setHaveSignificantOutputSchema(true);
+            // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltPhysicalLimitScanMergeRule.
+            // The VoltPhysicalAggregateScanMergeRule should be triggered prior to the VoltPhysicalLimitScanMergeRule
+            // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
+            Preconditions.checkArgument((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
+                    aggr instanceof AggregatePlanNode);
+            node = addLimitOffset(aggr);
+        }
+        return node;
+    }
 }

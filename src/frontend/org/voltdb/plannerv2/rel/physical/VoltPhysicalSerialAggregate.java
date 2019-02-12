@@ -28,6 +28,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannodes.AggregatePlanNode;
 
 import java.util.List;
 
@@ -180,5 +181,10 @@ public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
             digest += "_offset_" + m_offset.toString();
         }
         return digest;
+    }
+
+    @Override
+    protected AggregatePlanNode getAggregatePlanNode() {
+        return new AggregatePlanNode();
     }
 }
