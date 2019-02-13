@@ -50,11 +50,11 @@ import org.voltdb.iv2.TxnEgo;
  * It requires a field with a seqeuence number and another field with an
  * unique index. It will compute gaps in the sequence and check for
  * duplicates based on the index.  It expects that the max sequence number should
- * match the expected number of unique records.  
- * 
+ * match the expected number of unique records.
+ *
  * Partition information will also be verified.  It expects that the voltdb partition in the
  * metadata fields matches the computed partition from org.voltdb.iv2.TxnEgo.
- * 
+ *
  * it will also check that their are not too many duplicates.
  *
  */
@@ -103,7 +103,7 @@ public class KafkaClientVerifier {
 
         @Option(desc = " the number of consumers to create when reading a topic")
         Integer consumers = 1;
-        
+
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
         Integer timeout = 30;
 
@@ -301,7 +301,7 @@ public class KafkaClientVerifier {
         }
 
         System.out.println("Checking for missing rows");
-        
+
         Long[] sortedIds = foundRowIds.toArray(new Long[0]);
         Arrays.sort(sortedIds);
         List<Long> ids = Arrays.asList(sortedIds);
@@ -359,8 +359,8 @@ public class KafkaClientVerifier {
         if (duplicateCnt > 0) {
             // if we have more then 60 MB worth of duplicates, this is an error
             long duplicate_size = duplicateCnt * maxRecordSize.get();
-            // if volt was restarted we will see a valid gap in the sequence from when the client had failed transactions, 
-            // the amount of duplicates shouldn't 
+            // if volt was restarted we will see a valid gap in the sequence from when the client had failed transactions,
+            // the amount of duplicates shouldn't
             // exceed 60 MB ( max size of a .pbd) from retransmitting the entire .pbd .
             if ( missingCnt > 0 && duplicateCnt > 60 * 1024 * 1024) {
                 System.err.println("ERROR there were '" + duplicateCnt + "' duplicate ids using "+duplicate_size+ " bytes of space, it shouldn't exceed 60MB");
