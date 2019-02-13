@@ -705,7 +705,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
-            <exclude name="lib/python/vdm/tests/**"/>
             <exclude name="**/*.pyc" />
         </fileset>
     </copy>

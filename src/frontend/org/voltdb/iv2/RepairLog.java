@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -32,6 +31,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -217,16 +217,16 @@ public class RepairLog
             truncate(ctm.getTruncationHandle(), IS_MP);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
-        }
-        else if (msg instanceof DumpMessage) {
+        } else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
             repairLogger.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
                     + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
                repairLogger.warn("[Repair log contents]" + who + ": msg: " + il);
             }
-        }
-        else if (msg instanceof RepairLogTruncationMessage) {
+        } else if (msg instanceof DummyTransactionTaskMessage) {
+            m_lastSpHandle = Math.max(m_lastSpHandle, ((DummyTransactionTaskMessage) msg).getSpHandle());
+        } else if (msg instanceof RepairLogTruncationMessage) {
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
             truncate(truncateMsg.getHandle(), IS_SP);
         }
