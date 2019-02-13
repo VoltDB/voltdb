@@ -42,4 +42,11 @@ public class TestRelConversion extends Plannerv2TestCase {
                 .plan("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}")
                 .test();
     }
+
+    public void testVeryLongInExpr() {
+        m_tester.sql("select * from r1 where i in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)").test();
+
+        // ENG-15397
+//        m_tester.sql("select * from r1 where i in (si, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)").test();
+    }
 }
