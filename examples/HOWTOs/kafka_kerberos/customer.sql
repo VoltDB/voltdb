@@ -1,0 +1,16 @@
+insert into Customer values(30, 'a', 'b');
+insert into Customer values(31, 'a', 'b');
+insert into Customer values(32, 'a', 'b');
+insert into Customer values(33, 'a', 'b');
+insert into Customer values(34, 'a', 'b');
+insert into Customer values(35, 'a', 'b');
+insert into Customer values(36, 'a', 'b');
+insert into Customer values(37, 'a', 'b');
+insert into Customer values(38, 'a', 'b');
+insert into Customer values(39, 'a', 'b');
+insert into Customer values(40, 'a', 'b');
+insert into Customer values(41, 'a', 'b');
+insert into Customer values(42, 'a', 'b');
+insert into Customer values(43, 'a', 'b');
+insert into Customer values(44, 'a', 'b');
+insert into Customer values(45, 'a', 'b');
