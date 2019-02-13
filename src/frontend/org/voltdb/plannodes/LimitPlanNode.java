@@ -134,8 +134,16 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_limitParameterId = limitParameterId;
     }
 
+    public long getLimitParameterIndex() {
+        return m_limitParameterId;
+    }
+
     public void setOffsetParameterIndex(long offsetParameterId) {
         m_offsetParameterId = offsetParameterId;
+    }
+
+    public long getOffsetParameterIndex() {
+        return m_offsetParameterId;
     }
 
     @Override

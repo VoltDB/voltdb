@@ -44,6 +44,8 @@ import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 
+import java.util.NoSuchElementException;
+
 /**
  * Implementation of SQL standard function calls
  *
@@ -2152,6 +2154,7 @@ public class FunctionSQL extends Expression {
     // Assume that 10000-19999 are available for VoltDB-specific use
     // in specialized implementations of existing HSQL functions.
     private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
+    public final static int    FUNC_VOLT_INVALID = -1;
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -2603,6 +2606,40 @@ public class FunctionSQL extends Expression {
                 NumberType.checkValueIsInLongLimits(nodes[i].valueData);
                 nodes[i].dataType = Type.SQL_BIGINT;
             }
+        }
+    }
+
+    public static int voltGetSinceEpochId(String impliedArg) {
+        switch (impliedArg) {
+            case "SECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SINCE_EPOCH_SECOND;
+            case "MILLISECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SINCE_EPOCH_MILLISECOND;
+            case "MICROSECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SINCE_EPOCH_MICROSECOND;
+            default:
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_SINCE_EPOCH;
+        }
+    }
+
+    public static int voltGetToTimestampId(String impliedArg) {
+        switch (impliedArg) {
+            case "SECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP_SECOND;
+            case "MILLISECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
+            case "MICROSECOND":
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
+            default:
+                return FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP;
+        }
+    }
+
+    public static int voltGetFunctionId(String functionName) {
+        try {
+            return regularFuncMap.get(functionName.toUpperCase());
+        } catch (NoSuchElementException ex) {
+            return FUNC_VOLT_INVALID;
         }
     }
 

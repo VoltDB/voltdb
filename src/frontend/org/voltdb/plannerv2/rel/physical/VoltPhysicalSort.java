@@ -28,7 +28,11 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.plannerv2.utils.VoltDBRexUtil;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
@@ -116,4 +120,31 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
     }
 
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        AbstractPlanNode child = this.inputRelNodeToPlanNode(this, 0);
+
+        LimitPlanNode lpn = null;
+        if (fetch != null || offset != null) {
+            lpn = VoltPhysicalLimit.toPlanNode(fetch, offset);
+        }
+        OrderByPlanNode opn = null;
+        RelCollation collation = getCollation();
+        if (collation != null) {
+            opn = VoltDBRexUtil.collationToOrderByNode(collation, fieldExps);
+        }
+        AbstractPlanNode result;
+        if (opn != null) {
+            opn.addAndLinkChild(child);
+            result = opn;
+            if (lpn != null) {
+                opn.addInlinePlanNode(lpn);
+            }
+        } else {
+            assert(lpn != null);
+            lpn.addAndLinkChild(child);
+            result = lpn;
+        }
+        return result;
+    }
 }
