@@ -298,6 +298,13 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select si from P1 where si in (select i from R1)").testFail();
 
         m_tester.sql("select i from R1 where i in (select si from P1)").testFail();
+
+        // calcite will use Values to represent long list of IN items.
+        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+                .test();
+
+        m_tester.sql("select * from P1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+                .testFail();
     }
 
     public void testPartitionKeyEqualToTableColumn() {

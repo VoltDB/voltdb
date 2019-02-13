@@ -383,6 +383,17 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 //        comparePlans(sql, ignores);
     }
 
+    public void testCompareVeryLongInExpr() {
+        String sql = "select 1 from RTYPES where i IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)"; // Calcite Regular OR
+        // TODO: If we have many items in the IN clause, Calcite will use
+        // VoltLogicalJoin
+        //      VoltLogicalTableScan
+        //      VoltLogicalAggregate
+        //          VoltLogicalValues
+        // We have not implemented the plan conversion for join yet
+//        comparePlans(sql);
+    }
+
     public void testCompareLikeExpr1() {
         String sql = "select 1 from RTYPES where vc LIKE 'ab%c'";
         Map<String, String> ignores = new HashMap<>();

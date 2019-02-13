@@ -20,6 +20,7 @@ package org.voltdb.plannerv2.rules.physical;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalValues;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
@@ -36,7 +37,10 @@ public class VoltPValuesRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalValues values = call.rel(0);
-        RelTraitSet convertedTraits = values.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify();
+        RelTraitSet convertedTraits = values.getTraitSet()
+                .replace(VoltPhysicalRel.CONVENTION)
+                .replace(RelDistributions.SINGLETON)    // VoltPhysicalValues must be a SINGLETON Distribution.
+                .simplify();
 
         call.transformTo(new VoltPhysicalValues(values.getCluster(),
                 convertedTraits, values.getRowType(), values.getTuples(),

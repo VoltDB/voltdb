@@ -28,7 +28,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalValues;
 public class VoltLValuesRule extends RelOptRule {
     public static final VoltLValuesRule INSTANCE = new VoltLValuesRule();
 
-    VoltLValuesRule() {
+    private VoltLValuesRule() {
         super(operand(LogicalValues.class, Convention.NONE, any()));
     }
 
