@@ -44,8 +44,6 @@
             destdir="${clientclasses.dir}" >
             <classpath refid="build-classpath"/>
         </javac>
-        <subant buildpath="../testutils/" target="testutils"/>
-        <copy file="../testutils/testutils.jar" todir="." overwrite="true"/>
     </target>
 
     <target name="client" depends="client-compile">

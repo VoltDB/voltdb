@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package testutils;
+package genqa;
 
 import java.lang.Exception;
 public class ValidationErr extends Exception {

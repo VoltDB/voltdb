@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package testutils;
+package genqa;
 
 import java.io.IOException;
 import java.util.ArrayList;
