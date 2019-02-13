@@ -98,7 +98,7 @@ Check export stats and make sure there are no pending tuples
 
     SQL3> exec @Statistics EXPORT 0;
 
-Check the CustomerBack table to verify that the data inserted frfollow back from Kafka
+Check the CustomerBack table to verify that the data inserted follows back from Kafka
 
     SQL4> SELECT * FROM CustomerBack;
 
