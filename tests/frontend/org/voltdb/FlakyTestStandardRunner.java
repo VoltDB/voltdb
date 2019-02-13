@@ -68,10 +68,11 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
 
         // Optional debug print
         if (DEBUG) {
-            System.out.println("DEBUG: run.flaky.tests.debug: "+debug());
-            System.out.println("DEBUG: run.flaky.tests: "+RUN_FLAKY_TESTS);
-            System.out.println("DEBUG: testIsFlaky    : "+testIsFlaky);
-            System.out.println("DEBUG: description    : "+description);
+            System.out.println("DEBUG: In FlakyTestStandardRunner.runFlakyTest: "+debug());
+            System.out.println("DEBUG:   run.flaky.tests.debug: "+debug());
+            System.out.println("DEBUG:   run.flaky.tests: "+RUN_FLAKY_TESTS);
+            System.out.println("DEBUG:   testIsFlaky    : "+testIsFlaky);
+            System.out.println("DEBUG:   description    : "+description);
         }
 
         // When '-Drun.flaky.tests=FALSE' (or ='false', case insensitive),
@@ -79,7 +80,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // @Flaky, e.g., '@Flaky(isFlaky = false)'
         if ("FALSE".equalsIgnoreCase(RUN_FLAKY_TESTS)) {
             if (DEBUG) {
-                System.out.println("DEBUG: test will run : "+!testIsFlaky);
+                System.out.println("DEBUG:   test will run  : "+!testIsFlaky);
             }
             return !testIsFlaky;
 
@@ -88,7 +89,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // longer) @Flaky, e.g., '@Flaky(isFlaky = false)'
         } else if ("NONE".equalsIgnoreCase(RUN_FLAKY_TESTS)) {
             if (DEBUG) {
-                System.out.println("DEBUG: test will NOT be run!");
+                System.out.println("DEBUG:   test will NOT be run!");
             }
             return false;
 
@@ -96,7 +97,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // or 'ALL', or 'DEFAULT', or anything else), run all @Flaky tests
         } else {
             if (DEBUG) {
-                System.out.println("DEBUG: test WILL be run!");
+                System.out.println("DEBUG:   test WILL be run!");
             }
             return true;
         }
