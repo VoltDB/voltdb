@@ -29,6 +29,13 @@ import org.apache.calcite.rex.RexLiteral;
 
 import java.util.List;
 
+/**
+ * Sub-class of {@link org.apache.calcite.rel.core.Values}
+ * targeted at the VoltDB Physical calling {@link #CONVENTION}.
+ *
+ * @author Chao Zhou
+ * @since 9.0
+ */
 public class VoltPhysicalValues extends Values implements VoltPhysicalRel {
     private final int m_splitCount;
 

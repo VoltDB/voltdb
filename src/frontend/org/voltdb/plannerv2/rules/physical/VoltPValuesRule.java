@@ -26,6 +26,12 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalValues;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalValues;
 
+/**
+ * VoltDB physical rule that transform {@link VoltLogicalValues} to {@link VoltPhysicalValues}.
+ *
+ * @author Chao Zhou
+ * @since 9.0
+ */
 public class VoltPValuesRule extends RelOptRule {
 
     public static final VoltPValuesRule INSTANCE = new VoltPValuesRule();

@@ -28,6 +28,13 @@ import org.apache.calcite.rex.RexLiteral;
 
 import java.util.List;
 
+/**
+ * Sub-class of {@link org.apache.calcite.rel.core.Values}
+ * targeted at the VoltDB logical calling {@link #CONVENTION}.
+ *
+ * @author Chao Zhou
+ * @since 9.0
+ */
 public class VoltLogicalValues extends Values implements VoltLogicalRel {
     public VoltLogicalValues(RelOptCluster cluster, RelTraitSet traitSet, RelDataType rowType, ImmutableList<ImmutableList<RexLiteral>> tuples) {
         super(cluster, rowType, tuples, traitSet);

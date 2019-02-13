@@ -25,6 +25,12 @@ import org.apache.calcite.rel.logical.LogicalValues;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalValues;
 
+/**
+ * VoltDB logical rule that transform {@link LogicalValues} to {@link VoltLogicalValues}.
+ *
+ * @author Chao Zhou
+ * @since 9.0
+ */
 public class VoltLValuesRule extends RelOptRule {
     public static final VoltLValuesRule INSTANCE = new VoltLValuesRule();
 
