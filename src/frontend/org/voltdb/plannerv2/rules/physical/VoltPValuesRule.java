@@ -29,7 +29,7 @@ public class VoltPValuesRule extends RelOptRule {
 
     public static final VoltPValuesRule INSTANCE = new VoltPValuesRule();
 
-    VoltPValuesRule() {
+    private VoltPValuesRule() {
         super(operand(VoltLogicalValues.class, VoltLogicalRel.CONVENTION, any()));
     }
 

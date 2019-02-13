@@ -23,13 +23,13 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
-import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLiteral;
 
 import java.util.List;
 
-public class VoltPhysicalValues extends LogicalValues implements VoltPhysicalRel {
+public class VoltPhysicalValues extends Values implements VoltPhysicalRel {
     private final int m_splitCount;
 
     public VoltPhysicalValues(RelOptCluster cluster,
@@ -37,7 +37,7 @@ public class VoltPhysicalValues extends LogicalValues implements VoltPhysicalRel
                               RelDataType rowType,
                               ImmutableList<ImmutableList<RexLiteral>> tuples,
                               int splitCount) {
-        super(cluster, traitSet, rowType, tuples);
+        super(cluster, rowType, tuples, traitSet);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
     }
@@ -50,8 +50,6 @@ public class VoltPhysicalValues extends LogicalValues implements VoltPhysicalRel
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
-        // Don't ever print semiJoinDone=false. This way, we
-        // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .item("split", m_splitCount);
     }

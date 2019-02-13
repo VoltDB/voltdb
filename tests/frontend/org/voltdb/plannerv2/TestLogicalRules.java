@@ -472,9 +472,24 @@ public class TestLogicalRules extends Plannerv2TestCase {
 //                transform("foo").test();
     }
 
-    public void testLogicalValues() {
-        // ENG-15258
+    public void testIn() {
+        // If we have less items in the IN clause, Calcite will use ORs to represent it
+        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4)")
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], expr#8=[1], expr#9=[=($t0, $t8)], expr#10=[2], expr#11=[=($t0, $t10)], expr#12=[3], expr#13=[=($t0, $t12)], expr#14=[4], expr#15=[=($t0, $t14)], expr#16=[OR($t7, $t9, $t11, $t13, $t15)], proj#0..5=[{exprs}], $condition=[$t16])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R1]])\n")
+                .test();
+
+        // If we have many items in the IN clause, Calcite will use
+        // VoltLogicalJoin
+        //      VoltLogicalTableScan
+        //      VoltLogicalAggregate
+        //          VoltLogicalValues
         m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
-                .transform("foo").test();
+                .transform("VoltLogicalCalc(expr#0..6=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "  VoltLogicalJoin(condition=[=($0, $6)], joinType=[inner])\n" +
+                        "    VoltLogicalTableScan(table=[[public, R1]])\n" +
+                        "    VoltLogicalAggregate(group=[{0}])\n" +
+                        "      VoltLogicalValues(tuples=[[{ 0 }, { 1 }, { 2 }, { 3 }, { 4 }, { 5 }, { 6 }, { 7 }, { 8 }, { 9 }, { 10 }, { 11 }, { 12 }, { 13 }, { 14 }, { 15 }, { 16 }, { 17 }, { 18 }, { 19 }, { 20 }, { 21 }]])\n")
+                .test();
     }
 }
