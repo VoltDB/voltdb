@@ -41,7 +41,6 @@ CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/kafka*.jar; \
     \ls -1 "$VOLTDB_LIB"/slf4j-api-1.6.2.jar; \
-    \ls -1 ../utils/testutils.jar; \
 } 2> /dev/null | paste -sd ':' - )
 # LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
