@@ -27,17 +27,15 @@ fi
 CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-    \ls -1 /home/opt/kafka/libs/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar;
 } 2> /dev/null | paste -sd ':' - )
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
-ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
 VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
 POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
+CLASSPATH="$CLASSPATH:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
