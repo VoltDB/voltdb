@@ -109,10 +109,16 @@ function tt-set-build-args() {
 
     if [[ -z "$1" || "$1" == tt-* || "$1" == test-tools* ]]; then
         echo -e "\nWARNING: ${BASH_SOURCE[0]} function $FUNCNAME called without an argument:"
-        echo -e "    will have no effect!\n"
+        echo -e "    will have little or no effect!\n"
     else
-        VOLTBUILD_ARG=
+        # If at least one arg was passed, reset BUILD_ARGS to start over from
+        # scratch, since it is set cumulatively, possibly containing many values
         BUILD_ARGS=
+    fi
+
+    # If VOLTBUILD_ARG is unset, give it a default value
+    if [[ -z "$VOLTBUILD_ARG" ]]; then
+        VOLTBUILD_ARG="release"
     fi
 
     while [[ -n "$1" ]]; do
