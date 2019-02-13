@@ -340,7 +340,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     // to the coordinator for aggregation before it will send out
                     // distribution fragments, so two sites on the same node
                     // can't be attempting to set and clear this HashSet simultaneously
-                    if(TRACE_LOG.isTraceEnabled()){
+                    if (TRACE_LOG.isTraceEnabled()){
                         TRACE_LOG.trace("Checking saved table digest state for restore of: "
                                 + m_filePath + ", " + m_fileNonce);
                     }
@@ -1108,8 +1108,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     }
                 }
             }
-        }
-        catch (VoltAbortException e) {
+        } catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
             result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
@@ -1121,12 +1120,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
 
         ClusterSaveFileState savefile_state = null;
-        try
-        {
+        try {
             savefile_state = new ClusterSaveFileState(savefile_data[0]);
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             throw new VoltAbortException(e);
         }
 
@@ -1173,8 +1169,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
 
             final TableSaveFileState saveFileState = savefile_state.getTableState(tableName);
-            if (saveFileState == null)
-            {
+            if (saveFileState == null) {
                 // Pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
@@ -1972,8 +1967,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final SiteTracker st,
             final boolean isRecover,
             List<String> include,
-            List<String> exclude) throws Exception
-    {
+            List<String> exclude) throws Exception {
         /*
          * Create a mailbox to use to send fragment work to execution sites
          */
@@ -2170,7 +2164,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         TreeMap<Integer, VoltTable> partitioned_table_cache = null;
         SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
         List<Long> destHostSiteIds = null;
-        int sitePerHost = tracker.m_numberOfExecutionSites / tracker.m_numberOfHosts;
         if (asPartitioned) {
             partitioned_table_cache = new TreeMap<>();
             partition_to_siteCount = new HashMap<>(partitionCount*2);
@@ -2259,7 +2252,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 resultDependencyId, false, parameters);
                     } else { // replicated table
                         byte compressedTable[] = TableCompressor.getCompressedTableBytes(table);
-                        pfs = new SynthesizedPlanFragment[sitePerHost + 1];
+                        pfs = new SynthesizedPlanFragment[destHostSiteIds.size() + 1];
                         int fragmentIndex = 0;
                         for (long destSiteId : destHostSiteIds) {
                             int resultDepId = TableSaveFileState.getNextDependencyId();
@@ -2278,7 +2271,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 finalDepId,
                                 "Received confirmation of successful replicated table load \"" + tableName +
                                 "\" chunk " + chunkCount++ + " at host " + destHostId);
-                        assert(fragmentIndex == sitePerHost);
+                        assert(fragmentIndex == destHostSiteIds.size());
                         pfs[fragmentIndex] = new SynthesizedPlanFragment(
                                 SysProcFragmentId.PF_restoreReceiveResultTables,
                                 finalDepId, false, parameters);

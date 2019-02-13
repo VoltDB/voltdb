@@ -35,7 +35,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
         super(tableName, txnId);
     }
 
-    @Override void addHostData(VoltTableRow row) throws IOException {
+    @Override
+    void addHostData(VoltTableRow row) throws IOException {
         assert(row.getString("TABLE").equals(getTableName()));
         checkSiteConsistency(row); // throws if inconsistent
         // this cast should be safe; site_ids are ints but get
@@ -43,7 +44,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
         m_hostsWithThisTable.add((int) row.getLong("CURRENT_HOST_ID"));
     }
 
-    @Override public String debug() {
+    @Override
+    public String debug() {
         StringBuilder builder = new StringBuilder("Replicated table ");
         builder.append(getTableName()).append(" exists on host ");
         for (Integer host : m_hostsWithThisTable) {
@@ -53,7 +55,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
         return builder.toString();
     }
 
-    @Override public boolean isConsistent() {
+    @Override
+    public boolean isConsistent() {
         // right now there is nothing to check across all rows
         m_consistencyResult = "Table: " + getTableName() +
             " has consistent savefile state.";
@@ -80,7 +83,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
     }
 
     private void checkSiteConsistency(VoltTableRow row) throws IOException {
-        if (!row.getString("IS_REPLICATED").equals("TRUE")) {
+        if (! row.getString("IS_REPLICATED").equals("TRUE")) {
             String error = "Table: " + getTableName() + " was replicated " +
             "but has a savefile which indicates partitioning at site: " +
             row.getLong("CURRENT_HOST_ID");

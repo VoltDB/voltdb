@@ -30,7 +30,6 @@ import java.util.Collections;
 
 import org.junit.After;
 import org.junit.Test;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.NullCallback;
@@ -41,9 +40,8 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
 
-    VoltLogger m_logger = new VoltLogger("JUnit");
-
-    @After public void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         System.gc();
         System.runFinalization();
     }
@@ -51,7 +49,8 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
     /**
      * https://issues.voltdb.com/browse/ENG-15174
      */
-    @Test public void testMultiBlockSnapshotRestore() throws Exception {
+    @Test
+    public void testMultiBlockSnapshotRestore() throws Exception {
         // Create a table with a very large VARCHAR column, so it will be very easy for
         // the snapshot to have more than one block during restore.
         String ddl = "create table t (s1 varchar(1048576), s2 varchar(1048560));\n";
@@ -71,7 +70,7 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
 
         Client client = cluster.createClient(new ClientConfig());
         NullCallback callback = new NullCallback();
-        m_logger.info("Inserting some rows into table T.");
+        System.out.println("Inserting some rows into table T.");
         String text = String.join("", Collections.nCopies(1048560, "a"));
         for (int i = 1; i <= 30; i++) {
             client.callProcedure(callback, "T.insert", text, text);
@@ -79,19 +78,19 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
         client.drain();
         assertEquals(30, client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM T;").getResults()[0].asScalarLong());
 
-        m_logger.info("Kill node 1 and 2");
+        System.out.println("Kill node 1 and 2");
         cluster.killSingleHost(1);
         cluster.killSingleHost(2);
         Thread.sleep(1000);
 
-        m_logger.info("Take a snapshot.");
+        System.out.println("Take a snapshot.");
         client.callProcedure("@SnapshotSave", "{nonce:\"eng15174\",block:true}");
 
-        m_logger.info("Shutdown the cluster.");
+        System.out.println("Shutdown the cluster.");
         client.close();
         cluster.shutDown();
 
-        m_logger.info("Recover the cluster.");
+        System.out.println("Recover the cluster.");
         cluster.startUp(false);
         client = cluster.createClient(new ClientConfig());
 
