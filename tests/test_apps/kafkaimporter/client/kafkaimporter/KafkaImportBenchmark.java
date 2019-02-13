@@ -66,9 +66,6 @@ import org.voltdb.client.NoConnectionsException;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
-import testutils.KafkaClientVerifier;
-import testutils.ValidationErr;
-
 public class KafkaImportBenchmark {
 
     static VoltLogger log = new VoltLogger("Benchmark");
@@ -497,29 +494,6 @@ public class KafkaImportBenchmark {
                 throw new Exception("Timeout waiting for export to drain");
             }
             log.info("Export phase complete, " + exportRowCount + " rows exported, waiting for import to drain...");
-
-            // verify export completed successfully.
-            final KafkaClientVerifier verifier = new KafkaClientVerifier();
-            try {
-                verifier.verifySetup(args);
-                verifier.verifyTopic("EXPORT_PARTITIONED_TABLE", 6, 7, 3);
-            } catch(IOException e) {
-                System.err.println("ERROR " + e.toString());
-                e.printStackTrace(System.err);
-                System.exit(-1);
-            } catch (ValidationErr e ) {
-                System.err.println("ERROR in Validation: " + e.toString());
-                System.exit(-1);
-            } catch (Exception e) {
-                System.err.println("ERROR in Application: " + e.toString());
-                System.exit(-1);
-            }
-
-            /*
-            if (! verifier.testGood.get())
-                System.err.println("ERROR There were missing records during export");
-                System.exit(-1);
-            */
         }
 
         // final check time since the import and export tables have quiesced.
