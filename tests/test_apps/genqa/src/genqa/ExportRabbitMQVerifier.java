@@ -83,7 +83,7 @@ public class ExportRabbitMQVerifier {
 
             // Wait until the done message arrives, then verify count
             final QueueingConsumer.Delivery doneMsg = doneConsumer.nextDelivery();
-            final long expectedRows = Long.parseLong(ExportOnServerVerifier.RoughCSVTokenizer
+            final long expectedRows = Long.parseLong(RoughCSVTokenizer
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
 
             while (expectedRows > m_verifiedRows) {
@@ -113,14 +113,14 @@ public class ExportRabbitMQVerifier {
             {
                 long deliveryTag = envelope.getDeliveryTag();
 
-                String row[] = ExportOnServerVerifier.RoughCSVTokenizer.tokenize(new String(body, Charsets.UTF_8));
+                String row[] = RoughCSVTokenizer.tokenize(new String(body, Charsets.UTF_8));
                 if (row.length != 29) {
                     return;
                 }
-                ExportOnServerVerifier.ValidationErr err = null;
+                ValidationErr err = null;
                 try {
                     err = ExportOnServerVerifier.verifyRow(row);
-                } catch (ExportOnServerVerifier.ValidationErr validationErr) {
+                } catch (ValidationErr validationErr) {
                     validationErr.printStackTrace();
                 }
                 if (err != null) {
