@@ -51,6 +51,7 @@ A brief overview of the serialized format:
 
 COLUMN HEADER:
 [int: column header size in bytes (non-inclusive)]
+[byte: table status code]
 [short: num columns]
 [byte: column type] * num columns
 [string: column name] * num columns
@@ -154,6 +155,10 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     static final String JSON_SCHEMA_KEY = "schema";
     static final String JSON_DATA_KEY = "data";
     static final String JSON_STATUS_KEY = "status";
+
+    // Positions of data in header
+    private static final int POS_COL_COUNT = Integer.SIZE / Byte.SIZE + 1;
+    private static final int POS_COL_TYPES = POS_COL_COUNT + Short.SIZE / Byte.SIZE;
 
     /**
      * <p>Object that represents the name and schema for a {@link VoltTable} column.
@@ -376,7 +381,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         //  so add 4 bytes.
         m_rowStart = m_buffer.getInt(0) + 4;
 
-        m_colCount = m_buffer.getShort(5);
+        m_colCount = m_buffer.getShort(POS_COL_COUNT);
         m_rowCount = m_buffer.getInt(m_rowStart);
         m_buffer.position(m_buffer.limit());
         m_readOnly = readOnly;
@@ -616,7 +621,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         // just read the bytes for column types from the buffer into an array
         m_schemaString = new byte[m_colCount];
         int pos = m_buffer.position();
-        m_buffer.position(4 + 1 + 2); //headerLength + status code + column count
+        m_buffer.position(POS_COL_TYPES);
         m_buffer.get(m_schemaString);
         m_buffer.position(pos);
         return m_schemaString;
@@ -633,9 +638,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             throw new IllegalArgumentException("Not a valid column index.");
 
         // move to the start of the list of column names
-        // (this could be done faster by just reading the string lengths
-        //  and skipping ahead)
-        int pos = 4 + 1 + 2 + m_colCount;//headerLength + status code + column count + (m_colCount * colTypeByte)
+        int pos = POS_COL_TYPES + m_colCount;
         String name = null;
         for (int i = 0; i < index; i++)
             pos += m_buffer.getInt(pos) + 4;
@@ -651,7 +654,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         assert(verifyTableInvariants());
         assert(index < m_colCount);
         // move to the right place
-        VoltType retval = VoltType.get(m_buffer.get(4 + 1 + 2 + index));//headerLength + status code + column count
+        VoltType retval = VoltType.get(m_buffer.get(POS_COL_TYPES + index));
+
         assert(verifyTableInvariants());
         return retval;
     }
@@ -1136,7 +1140,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
             // where does the type bytes start
             // skip rowstart + status code + colcount
-            int typePos = 4 + 1 + 2;
+            int typePos = POS_COL_TYPES;
 
             for (int col = 0; col < m_colCount; col++) {
                 Object value = values[col];
@@ -2036,7 +2040,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         assert(m_colCount > 0);
         assert(m_rowStart > 0);
         // minimum reasonable table size
-        final int minsize = 4 + 1 + 2 + 1 + 4 + 4;
+        final int minsize = POS_COL_TYPES + 1 + 4 + 4;
         assert(m_buffer.capacity() >= minsize);
         assert(m_buffer.limit() >= minsize);
         if (m_buffer.position() < minsize) {
@@ -2045,7 +2049,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         }
 
         int rowStart = m_buffer.getInt(0) + 4;
-        if (rowStart < (4 + 1 + 2 + 1 + 4)) {
+        if (rowStart < (POS_COL_TYPES + 1 + 4)) {
             System.err.printf("rowStart with value %d is smaller than it should be.\n", rowStart);
             return false;
         }
