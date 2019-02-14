@@ -107,6 +107,13 @@ public abstract class OpsAgent
             this.clientData = clientData;
             this.request = request;
         }
+
+        @Override
+        public String toString() {
+            return "PendingOpsRequest [subselector=" + subselector + ", clientData=" + clientData
+                    + ", expectedOpsResponses=" + expectedOpsResponses + ", startTime=" + startTime + ", request="
+                    + request + "]";
+        }
     }
 
     private final Map<Long, PendingOpsRequest> m_pendingRequests = new HashMap<Long, PendingOpsRequest>();
@@ -236,14 +243,22 @@ public abstract class OpsAgent
         else if (!dummy) {
             for (int ii = 0; ii < request.aggregateTables.length; ii++) {
                 if (buf.hasRemaining()) {
-                    final int tableLength = buf.getInt();
-                    int oldLimit = buf.limit();
-                    buf.limit(buf.position() + tableLength);
-                    ByteBuffer tableBuf = buf.slice();
-                    buf.position(buf.limit()).limit(oldLimit);
-                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
-                    while (vt.advanceRow()) {
-                        request.aggregateTables[ii].add(vt);
+                    try {
+                        final int tableLength = buf.getInt();
+                        int oldLimit = buf.limit();
+                        buf.limit(buf.position() + tableLength);
+                        ByteBuffer tableBuf = buf.slice();
+                        buf.position(buf.limit()).limit(oldLimit);
+                        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBuf, true);
+                        request.aggregateTables[ii].addTable(vt);
+                    } catch (Exception e) {
+                        hostLog.error("Failed to merge table into index " + ii + " for request " + request, e);
+
+                        request.timer.cancel(false);
+                        m_pendingRequests.remove(requestId);
+                        sendErrorResponse(request.c, ClientResponse.UNEXPECTED_FAILURE,
+                                "Unexpected error occurred. Check logs for more details.", request.clientData);
+                        return;
                     }
                 }
             }
@@ -423,9 +438,9 @@ public abstract class OpsAgent
                 4 * results.length + // length prefix for each stats table
                 + statbytes);
         responseBuffer.putLong(requestId);
-        for (int i = 0; i < bufs.length; i++) {
-            responseBuffer.putInt(bufs[i].remaining());
-            responseBuffer.put(bufs[i]);
+        for (ByteBuffer buf : bufs) {
+            responseBuffer.putInt(buf.remaining());
+            responseBuffer.put(buf);
         }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
