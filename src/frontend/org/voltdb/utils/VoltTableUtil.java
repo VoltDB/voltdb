@@ -209,15 +209,7 @@ public class VoltTableUtil {
         }
 
         if (result != null) {
-            for (VoltTable vt : operands) {
-                if (vt != null) {
-                    vt.resetRowPosition();
-                    while (vt.advanceRow()) {
-                        result.add(vt);
-                    }
-                }
-            }
-
+            result.addTables(operands);
             result.resetRowPosition();
         }
 
