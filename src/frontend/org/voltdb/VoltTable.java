@@ -483,8 +483,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
                 m_buffer.putShort((short) columnCount);
 
-                for (int i = 0; i < columnCount; i++)
+                for (int i = 0; i < columnCount; i++) {
                     m_buffer.put(columns[i].type.getValue());
+                }
                 for (int i = 0; i < columnCount; i++) {
                     if (columns[i].name == null) {
                         m_buffer.position(0);
@@ -534,9 +535,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         Row retval = new Row(m_position);
         retval.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
         retval.m_wasNull = m_wasNull;
-        if (m_offsets != null)
-            for (int i = 0; i < m_colCount; i++)
+        if (m_offsets != null) {
+            for (int i = 0; i < m_colCount; i++) {
                 retval.m_offsets[i] = m_offsets[i];
+            }
+        }
         retval.m_activeRowIndex = m_activeRowIndex;
         return retval;
     }
@@ -596,8 +599,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             Row retval = new Row(m_position);
             retval.m_hasCalculatedOffsets = m_hasCalculatedOffsets;
             retval.m_wasNull = m_wasNull;
-            for (int i = 0; i < m_colCount; i++)
+            for (int i = 0; i < m_colCount; i++) {
                 retval.m_offsets[i] = m_offsets[i];
+            }
             retval.m_activeRowIndex = m_activeRowIndex;
             return retval;
         }
@@ -634,14 +638,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final String getColumnName(int index) {
         assert(verifyTableInvariants());
-        if ((index < 0) || (index >= m_colCount))
+        if ((index < 0) || (index >= m_colCount)) {
             throw new IllegalArgumentException("Not a valid column index.");
+        }
 
         // move to the start of the list of column names
         int pos = POS_COL_TYPES + m_colCount;
         String name = null;
-        for (int i = 0; i < index; i++)
+        for (int i = 0; i < index; i++) {
             pos += m_buffer.getInt(pos) + 4;
+        }
         name = readString(pos, METADATA_ENCODING);
         assert(name != null);
 
@@ -912,20 +918,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 case STRING: {
                     // Accept byte[] and String
                     if (value instanceof byte[]) {
-                        if (((byte[]) value).length > maxColSize)
+                        if (((byte[]) value).length > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
 
                         // bytes MUST be a UTF-8 encoded string.
                         assert(testForUTF8Encoding((byte[]) value));
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                     }
                     else {
-                        if (((String) value).length() > maxColSize)
+                        if (((String) value).length() > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
 
                         writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
                     }
@@ -938,10 +946,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         value = Encoder.hexDecode((String) value);
                     }
                     if (value instanceof byte[]) {
-                        if (((byte[]) value).length > maxColSize)
+                        if (((byte[]) value).length > maxColSize) {
                             throw new VoltOverflowException(
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
+                        }
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                     }
                     else {
@@ -1105,8 +1114,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_buffer.position(pos);
                 expandBuffer();
                 add(row);
+            } else {
+                throw e;
             }
-            else throw e;
         }
         assert(verifyTableInvariants());
     }
@@ -1196,8 +1206,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             if (m_buffer.limit() - m_buffer.position() < 32) {
                 expandBuffer();
                 addRow(values);
+            } else {
+                throw e;
             }
-            else throw e;
         }
         finally {
             // constrain buffer limit back to the new position
@@ -1438,17 +1449,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 case INTEGER:
                 case BIGINT:
                     long lval = r.getLong(i);
-                    if (r.wasNull())
+                    if (r.wasNull()) {
                         buffer.append("NULL");
-                    else
+                    } else {
                         buffer.append(lval);
+                    }
                     break;
                 case FLOAT:
                     double dval = r.getDouble(i);
-                    if (r.wasNull())
+                    if (r.wasNull()) {
                         buffer.append("NULL");
-                    else
+                    } else {
                         buffer.append(dval);
+                    }
                     break;
                 case TIMESTAMP:
                     TimestampType tstamp = r.getTimestampAsTimestamp(i);
@@ -1815,8 +1828,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             Object[] row = new Object[jsonRow.length()];
             for (int j = 0; j < jsonRow.length(); j++) {
                 row[j] = jsonRow.get(j);
-                if (row[j] == JSONObject.NULL)
+                if (row[j] == JSONObject.NULL) {
                     row[j] = null;
+                }
                 VoltType type = columns[j].type;
 
                 // convert strings to numbers
@@ -1834,14 +1848,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         break;
                     case DECIMAL:
                         String decVal;
-                        if (row[j] instanceof String)
+                        if (row[j] instanceof String) {
                             decVal = (String) row[j];
-                        else
+                        } else {
                             decVal = row[j].toString();
-                        if (decVal.compareToIgnoreCase("NULL") == 0)
+                        }
+                        if (decVal.compareToIgnoreCase("NULL") == 0) {
                             row[j] = null;
-                        else
+                        } else {
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
+                        }
                         break;
                     case FLOAT:
                         if (row[j] instanceof String) {
