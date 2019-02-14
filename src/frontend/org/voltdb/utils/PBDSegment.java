@@ -20,7 +20,12 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.attribute.UserDefinedFileAttributeView;
+import java.util.List;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
@@ -99,6 +104,8 @@ public abstract class PBDSegment {
 
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
+    protected static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
+
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
 
@@ -114,7 +121,7 @@ public abstract class PBDSegment {
     protected boolean m_closed = true;
     protected RandomAccessFile m_ras;
     protected FileChannel m_fc;
-    //Avoid unecessary sync with this flag
+    //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
 
     public PBDSegment(File file)
@@ -122,6 +129,7 @@ public abstract class PBDSegment {
         m_file = file;
     }
 
+    abstract long segmentIndex();
     abstract long segmentId();
     abstract File file();
 
@@ -213,7 +221,7 @@ public abstract class PBDSegment {
                     if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
                         if (reader.readIndex() == 1) {
                             /*
-                             * If truncation is occuring at the first object
+                             * If truncation is occurring at the first object
                              * Whammo! Delete the file.
                              */
                             entriesTruncated = -1;
@@ -283,5 +291,55 @@ public abstract class PBDSegment {
         close();
 
         return tracker;
+    }
+
+    /**
+     * Set or clear segment as 'final', i.e. whether segment is complete and logically immutable.
+     *
+     * Must be called with 'true' by segment owner when it has filled the segment, written all segment
+     * metadata, and after it has either closed or sync'd the segment file.
+     *
+     * Must be called with 'false' whenever opening segment for writing new data.
+     *
+     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment
+     * itself generally lacks context to decide whether it's final or not.
+     *
+     * @param isFinal   true if segment is set to final, false otherwise
+     * @throws IOException
+     */
+
+    public void setFinal(boolean isFinal) throws IOException {
+
+        setFinal(m_file, isFinal);
+    }
+
+    public static void setFinal(File file, boolean isFinal) throws IOException {
+
+        UserDefinedFileAttributeView view = getFileAttributeView(file);
+        view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+    }
+
+    public boolean isFinal() throws IOException {
+
+        return isFinal(m_file);
+    }
+
+    public static boolean isFinal(File file) throws IOException {
+
+        boolean ret = false;
+        UserDefinedFileAttributeView view = getFileAttributeView(file);
+
+        List<String> attrList = view.list();
+        if (attrList.contains(IS_FINAL_ATTRIBUTE)) {
+            ByteBuffer buf = ByteBuffer.allocate(view.size(IS_FINAL_ATTRIBUTE));
+            view.read(IS_FINAL_ATTRIBUTE, buf);
+            buf.flip();
+            ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
+        }
+        return ret;
+    }
+
+    protected static UserDefinedFileAttributeView getFileAttributeView(File file) {
+        return Files.getFileAttributeView(file.toPath(), UserDefinedFileAttributeView.class);
     }
 }
