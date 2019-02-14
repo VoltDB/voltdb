@@ -175,10 +175,10 @@ public class VoltTableUtil {
             writer = new CSVWriter(sw,
                     fullDelimiters[0], fullDelimiters[1], fullDelimiters[2], String.valueOf(fullDelimiters[3]));
         }
-        else if (delimiter == ',')
+        else if (delimiter == ',') {
             // CSV
             writer = new CSVWriter(sw, delimiter);
-        else {
+        } else {
             // TSV
             writer = CSVWriter.getStrictTSVWriter(sw);
         }
@@ -215,7 +215,9 @@ public class VoltTableUtil {
      * Return true if any string field in the table contains param s.
      */
     public static boolean tableContainsString(VoltTable t, String s, boolean caseSenstive) {
-        if (t.getRowCount() == 0) return false;
+        if (t.getRowCount() == 0) {
+            return false;
+        }
         if (!caseSenstive) {
             s = s.toLowerCase();
         }
@@ -225,7 +227,9 @@ public class VoltTableUtil {
             for (int i = 0; i < t.getColumnCount(); i++) {
                 if (t.getColumnType(i) == VoltType.STRING) {
                     String value = row.getString(i);
-                    if (value == null) continue;
+                    if (value == null) {
+                        continue;
+                    }
                     if (!caseSenstive) {
                         value = value.toLowerCase();
                     }
@@ -291,8 +295,11 @@ public class VoltTableUtil {
 
         @Override
         public long estimateSize() {
-            if (m_row == null) return 0;
-            else return m_fence - m_row.getActiveRowIndex();
+            if (m_row == null) {
+                return 0;
+            } else {
+                return m_fence - m_row.getActiveRowIndex();
+            }
         }
 
         @Override
