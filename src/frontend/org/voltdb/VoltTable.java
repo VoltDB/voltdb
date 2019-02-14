@@ -1202,9 +1202,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     private final void expandBuffer() {
+        expandBuffer(0);
+    }
+
+    private final void expandBuffer(int minSize) {
+        int newSize = m_buffer.capacity();
+        do {
+            // keep doubling the newSize until it is larger than minSize
+            newSize <<= 1;
+        } while (newSize < minSize);
+
         final int end = m_buffer.position();
         assert(end > m_rowStart);
-        final ByteBuffer buf2 = ByteBuffer.allocate(m_buffer.capacity() * 2);
+        final ByteBuffer buf2 = ByteBuffer.allocate(newSize);
         m_buffer.limit(end);
         m_buffer.position(0);
         buf2.put(m_buffer);
@@ -1254,6 +1264,78 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Add all rows from {@code other} into this VoltTable. Both tables must have the exact same schema including column
+     * names.
+     *
+     * @param other {@link VoltTable} to add to this table
+     * @throws IllegalArgumentException if {@code other} is not compatible with this table
+     */
+    public void addTable(VoltTable other) {
+        if (m_readOnly) {
+            throw new IllegalStateException("Table is read-only. Make a copy before changing.");
+        }
+
+        if (!hasExactSchema(other)) {
+            StringBuilder sb = new StringBuilder("Could not merge table with schema ");
+            other.getColumnString(sb).append(" into ");
+            throw new IllegalArgumentException(getColumnString(sb).toString());
+        }
+
+        // Allow the buffer to grow to max capacity
+        m_buffer.limit(m_buffer.capacity());
+
+        ByteBuffer rawRows = other.getAllRowsRaw();
+        if (m_buffer.remaining() < rawRows.remaining()) {
+            expandBuffer(m_buffer.capacity() - m_buffer.remaining() + rawRows.remaining());
+        }
+        m_buffer.put(rawRows);
+
+        // constrain buffer limit back to the new position
+        m_buffer.limit(m_buffer.position());
+
+        // increment the rowcount in the member var and in the buffer
+        m_rowCount += other.getRowCount();
+        m_buffer.putInt(m_rowStart, m_rowCount);
+    }
+
+    private ByteBuffer getAllRowsRaw() {
+        int origPosition = m_buffer.position();
+        int start = m_rowStart + ROW_COUNT_SIZE;
+        try {
+            m_buffer.position(start);
+            return m_buffer.slice();
+        } finally {
+            m_buffer.position(origPosition);
+        }
+    }
+
+    private boolean hasExactSchema(VoltTable other) {
+        if (getColumnCount() != other.getColumnCount() || m_rowStart != other.m_rowStart) {
+            return false;
+        }
+
+        // Compare header metadata to make sure column types and names are the same
+        ByteBuffer myDup = m_buffer.duplicate();
+        myDup.position(POS_COL_TYPES).limit(m_rowStart);
+        ByteBuffer otherDup = other.m_buffer.duplicate();
+        otherDup.position(POS_COL_TYPES).limit(m_rowStart);
+
+        return myDup.equals(otherDup);
+    }
+
+    private StringBuilder getColumnString(StringBuilder buffer) {
+        short colCount = m_buffer.getShort(5);
+        buffer.append(" column count: ").append(colCount).append('\n');
+        assert(colCount == m_colCount);
+
+        for (int i = 0; i < m_colCount; i++) {
+            buffer.append('(').append(getColumnName(i)).append(':').append(getColumnType(i).name()).append("), ");
+        }
+
+        return buffer;
+    }
+
+    /**
      * Returns a {@link java.lang.String String} representation of this table.
      * Resulting string will contain schema and all data and will be formatted.
      * @return a {@link java.lang.String String} representation of this table.
@@ -1280,14 +1362,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         byte statusCode = m_buffer.get(4);
         buffer.append(" status code: ").append(statusCode);
 
-        short colCount = m_buffer.getShort(5);
-        buffer.append(" column count: ").append(colCount).append("\n");
-        assert(colCount == m_colCount);
-
-        buffer.append(" cols ");
-        for (int i = 0; i < colCount; i++)
-            buffer.append("(").append(getColumnName(i)).append(":").append(getColumnType(i).name()).append("), ");
-        buffer.append("\n");
+        getColumnString(buffer);
 
         buffer.append(" rows -\n");
 
