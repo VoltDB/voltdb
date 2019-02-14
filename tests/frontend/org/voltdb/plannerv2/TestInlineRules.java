@@ -247,58 +247,58 @@ public class TestInlineRules extends Plannerv2TestCase {
 
     public void testAggr() {
         m_tester.sql("select avg(ti) from R1")
-                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#49,group={},EXPR$0=AVG($0),split=1,coorinator=false,type=serial)_split_1_coordinator_false])\n")
+                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#49,group={},EXPR$0=AVG($0),split=1,coordinator=false,type=serial)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select avg(ti) from R1 group by i")
                 .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], split=[1])\n" +
-                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#128,group={0},EXPR$0=AVG($1),split=1,coorinator=false,type=hash)_split_1_coordinator_false])\n")
+                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#128,group={0},EXPR$0=AVG($1),split=1,coordinator=false,type=hash)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select count(i) from R1 where ti > 3")
-                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#196,group={},EXPR$0=COUNT($0),split=1,coorinator=false,type=serial)_split_1_coordinator_false])\n")
+                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#196,group={},EXPR$0=COUNT($0),split=1,coordinator=false,type=serial)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select count(*) from R1")
-                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#252,group={},EXPR$0=COUNT(),split=1,coorinator=false,type=serial)_split_1_coordinator_false])\n")
+                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex#252,group={},EXPR$0=COUNT(),split=1,coordinator=false,type=serial)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select max(TI) from R1 group by SI having SI > 0")
                 .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], split=[1])\n" +
-                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#341,group={0},EXPR$0=MAX($1),split=1,coorinator=false,having=>($0, 0),type=hash)_split_1_coordinator_false>($0, 0)])\n")
+                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#341,group={0},EXPR$0=MAX($1),split=1,coordinator=false,having=>($0, 0),type=hash)_split_1_coordinator_false>($0, 0)])\n")
                 .test();
 
         m_tester.sql("select max(TI), SI, min(TI), I from R1 group by SI, I having avg(BI) > max(BI)")
                 .transform("VoltPhysicalCalc(expr#0..5=[{inputs}], EXPR$0=[$t2], SI=[$t0], EXPR$2=[$t3], I=[$t1], split=[1])\n" +
-                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#437,group={0, 1},EXPR$0=MAX($2),EXPR$2=MIN($2),agg#2=AVG($3),agg#3=MAX($3),split=1,coorinator=false,having=>($4, $5),type=hash)_split_1_coordinator_false>($4, $5)])\n")
+                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#437,group={0, 1},EXPR$0=MAX($2),EXPR$2=MIN($2),agg#2=AVG($3),agg#3=MAX($3),split=1,coordinator=false,having=>($4, $5),type=hash)_split_1_coordinator_false>($4, $5)])\n")
                 .test();
 
         m_tester.sql("select max(TI), SI, I, min(TI) from R1 group by I, SI having avg(BI) > 0 and si > 0")
                 .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], EXPR$0=[$t2], SI=[$t1], I=[$t0], EXPR$3=[$t3], split=[1])\n" +
-                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#533,group={0, 1},EXPR$0=MAX($2),EXPR$3=MIN($2),agg#2=AVG($3),split=1,coorinator=false,having=AND(>($4, 0), >($1, 0)),type=hash)_split_1_coordinator_falseAND(>($4, 0), >($1, 0))])\n")
+                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#533,group={0, 1},EXPR$0=MAX($2),EXPR$3=MIN($2),agg#2=AVG($3),split=1,coordinator=false,having=AND(>($4, 0), >($1, 0)),type=hash)_split_1_coordinator_falseAND(>($4, 0), >($1, 0))])\n")
                 .test();
 
         m_tester.sql("select max(TI), SI from R1 where I > 0 group by SI, I order by SI limit 3")
                 .transform("VoltPhysicalSort(sort0=[$1], dir0=[ASC], fetch=[3], split=[1])\n" +
                         "  VoltPhysicalCalc(expr#0..2=[{inputs}], EXPR$0=[$t2], SI=[$t0], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#661,group={0, 1},EXPR$0=MAX($2),split=1,coorinator=false,type=hash)_split_1_coordinator_false])\n")
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#661,group={0, 1},EXPR$0=MAX($2),split=1,coordinator=false,type=hash)_split_1_coordinator_false])\n")
                 .test();
     }
 
     public void testDistinct() {
         m_tester.sql("select distinct TI, I from R1")
-                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#54,group={0, 1},split=1,coorinator=false,type=hash)_split_1_coordinator_false])\n")
+                .transform("VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#54,group={0, 1},split=1,coordinator=false,type=hash)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select distinct max(TI) from R1 group by I")
-                .transform("VoltPhysicalHashAggregate(group=[{0}], split=[1], coorinator=[false], type=[hash])\n" +
+                .transform("VoltPhysicalHashAggregate(group=[{0}], split=[1], coordinator=[false], type=[hash])\n" +
                         "  VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#155,group={0},EXPR$0=MAX($1),split=1,coorinator=false,type=hash)_split_1_coordinator_false])\n")
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#155,group={0},EXPR$0=MAX($1),split=1,coordinator=false,type=hash)_split_1_coordinator_false])\n")
                 .test();
 
         m_tester.sql("select max (distinct (TI)) from R1 group by I")
                 .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], split=[1])\n" +
-                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#238,group={0},EXPR$0=MAX(DISTINCT $1),split=1,coorinator=false,type=hash)_split_1_coordinator_false])\n")
+                        "  VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..1=[{inputs}], proj#0..1=[{exprs}], aggregate=[VoltPhysicalHashAggregate.CONVENTION.[].single(input=HepRelVertex#238,group={0},EXPR$0=MAX(DISTINCT $1),split=1,coordinator=false,type=hash)_split_1_coordinator_false])\n")
                 .test();
     }
 

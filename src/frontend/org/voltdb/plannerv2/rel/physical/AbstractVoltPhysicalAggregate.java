@@ -90,7 +90,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
-        pw.item("coorinator", m_isCoordinatorAggr);
+        pw.item("coordinator", m_isCoordinatorAggr);
         pw.itemIf("having", m_postPredicate, m_postPredicate != null);
         return pw;
     }
