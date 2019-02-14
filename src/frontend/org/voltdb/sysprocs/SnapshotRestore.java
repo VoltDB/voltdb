@@ -781,7 +781,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             resultSet.parseRestoreResultRow(vt);
                         }
                         if (result == null) {
-                            result = new VoltTable(VoltTableUtil.extractTableSchema(vt));
+                            result = new VoltTable(vt.getTableSchema());
                             result.setStatusCode(vt.getStatusCode());
                         }
                     }
@@ -2543,7 +2543,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         VoltTable result = null;
         if (!resultSet.isEmpty()) {
-            result = new VoltTable(VoltTableUtil.extractTableSchema(firstResult));
+            result = new VoltTable(firstResult.getTableSchema());
             result.setStatusCode(firstResult.getStatusCode());
             for (RestoreResultKey key : resultSet.keySet()) {
                 resultSet.addRowsForKey(key, result);

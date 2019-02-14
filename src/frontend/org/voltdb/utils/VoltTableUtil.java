@@ -197,12 +197,7 @@ public class VoltTableUtil {
         // Locate the first non-null table to get the schema
         for (VoltTable vt : operands) {
             if (vt != null) {
-                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                            vt.getColumnType(ii));
-                }
-                result = new VoltTable(columns);
+                result = new VoltTable(vt.getTableSchema());
                 result.setStatusCode(vt.getStatusCode());
                 break;
             }
@@ -214,21 +209,6 @@ public class VoltTableUtil {
         }
 
         return result;
-    }
-
-    /**
-     * Extract a table's schema.
-     * @param vt  input table with source schema
-     * @return  schema as column info array
-     */
-    public static VoltTable.ColumnInfo[] extractTableSchema(VoltTable vt)
-    {
-        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
-        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-            columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                    vt.getColumnType(ii));
-        }
-        return columns;
     }
 
     /**
