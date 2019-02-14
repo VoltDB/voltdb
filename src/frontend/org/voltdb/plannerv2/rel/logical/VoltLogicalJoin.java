@@ -17,18 +17,17 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 
@@ -42,7 +41,11 @@ import com.google.common.collect.ImmutableList;
  * @author Chao Zhou
  * @since 9.0
  */
-public class VoltLogicalJoin extends LogicalJoin implements VoltLogicalRel {
+public class VoltLogicalJoin extends Join implements VoltLogicalRel {
+
+    private final boolean semiJoinDone;
+    private final ImmutableList<RelDataTypeField> systemFieldList;
+
     /**
      * Creates a VoltLogicalJoin.
      *
@@ -72,8 +75,11 @@ public class VoltLogicalJoin extends LogicalJoin implements VoltLogicalRel {
             JoinRelType joinType,
             boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
-        super(cluster, traitSet, left, right, condition, variablesSet, joinType, semiJoinDone, systemFieldList);
+        super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+
+        this.semiJoinDone = semiJoinDone;
+        this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }
 
     @Override public VoltLogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
@@ -87,5 +93,13 @@ public class VoltLogicalJoin extends LogicalJoin implements VoltLogicalRel {
         // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
+    }
+
+    @Override public boolean isSemiJoinDone() {
+        return semiJoinDone;
+    }
+
+    @Override public List<RelDataTypeField> getSystemFieldList() {
+        return systemFieldList;
     }
 }

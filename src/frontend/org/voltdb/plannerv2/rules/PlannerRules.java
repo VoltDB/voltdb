@@ -18,9 +18,11 @@
 package org.voltdb.plannerv2.rules;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.prepare.RelOptTableImpl;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CalcMergeRule;
@@ -37,6 +39,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.Table;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
@@ -61,6 +64,10 @@ import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -139,6 +146,33 @@ public class PlannerRules {
         }
     };
 
+    private static List<Integer> collectColRefs(RexNode node, List<Integer> accum) {
+        if (node == null || ! node.isA(SqlKind.COMPARISON)) {
+            if (node.isA(SqlKind.INPUT_REF)) {
+                accum.add(((RexInputRef) node).getIndex());
+            }
+        } else {
+            for (RexNode child : ((RexCall) node).getOperands()) {
+                accum = collectColRefs(child, accum);
+            }
+        }
+        return accum;
+    }
+
+    private static boolean pushDownFilter(Join join, JoinRelType joinType, RexNode expr) {
+        final int outerTableColumns = join.getLeft().getRowType().getFieldCount();
+        return collectColRefs(expr, new ArrayList<>()).stream()
+                .map(n -> n < outerTableColumns)
+                .collect(Collectors.toSet())
+                .size() == 2;
+    }
+
+    private static RelOptRule JOIN = new FilterJoinRule.JoinConditionPushRule(
+            RelFactories.LOGICAL_BUILDER, PlannerRules::pushDownFilter);
+    private static final FilterJoinRule FILTER_ON_JOIN =
+            new FilterJoinRule.FilterIntoJoinRule(true, RelFactories.LOGICAL_BUILDER,
+                    PlannerRules::pushDownFilter);
+
     /**
      * Look for suitable Calcite built-in logical rules and add them.
      * Add VoltDB logical rules - they are mostly for giving RelNodes a convention.
@@ -158,11 +192,10 @@ public class PlannerRules {
             // Is there an example of this merge?
             // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
-            FilterProjectTransposeRule.INSTANCE,
-            //FilterJoinRule.FILTER_ON_JOIN,
-            new FilterJoinRule.FilterIntoJoinRule(true, RelFactories.LOGICAL_BUILDER,
-                    FilterJoinRule.TRUE_PREDICATE,
-                    MOVEABLE_TO_JOIN_COND),
+            //FilterProjectTransposeRule.INSTANCE,
+            //FILTER_ON_JOIN,
+            FilterJoinRule.FILTER_ON_JOIN,
+            //JOIN,
             FilterJoinRule.JOIN,
 
             // Reduces constants inside a LogicalCalc.
