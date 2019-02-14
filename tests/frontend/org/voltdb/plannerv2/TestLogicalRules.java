@@ -472,9 +472,13 @@ public class TestLogicalRules extends Plannerv2TestCase {
 //                transform("foo").test();
     }
 
-    public void testLogicalValues() {
-        // ENG-15258
-//        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
-//                .transform("foo").test();
+    public void testInExpr() {
+        m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], expr#8=[1], expr#9=[=($t0, $t8)], expr#10=[2], expr#11=[=($t0, $t10)], expr#12=[3], expr#13=[=($t0, $t12)], expr#14=[4], expr#15=[=($t0, $t14)], expr#16=[5], expr#17=[=($t0, $t16)], expr#18=[6], expr#19=[=($t0, $t18)], expr#20=[7], expr#21=[=($t0, $t20)], expr#22=[8], expr#23=[=($t0, $t22)], expr#24=[9], expr#25=[=($t0, $t24)], expr#26=[10], expr#27=[=($t0, $t26)], expr#28=[11], expr#29=[=($t0, $t28)], expr#30=[12], expr#31=[=($t0, $t30)], expr#32=[13], expr#33=[=($t0, $t32)], expr#34=[14], expr#35=[=($t0, $t34)], expr#36=[15], expr#37=[=($t0, $t36)], expr#38=[16], expr#39=[=($t0, $t38)], expr#40=[17], expr#41=[=($t0, $t40)], expr#42=[18], expr#43=[=($t0, $t42)], expr#44=[19], expr#45=[=($t0, $t44)], expr#46=[20], expr#47=[=($t0, $t46)], expr#48=[21], expr#49=[=($t0, $t48)], expr#50=[OR($t7, $t9, $t11, $t13, $t15, $t17, $t19, $t21, $t23, $t25, $t27, $t29, $t31, $t33, $t35, $t37, $t39, $t41, $t43, $t45, $t47, $t49)], proj#0..5=[{exprs}], $condition=[$t50])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R1]])\n").test();
+
+        m_tester.sql("select * from r3 where ii in(pk, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
+                .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[=($t2, $t0)], expr#4=[1], expr#5=[=($t2, $t4)], expr#6=[2], expr#7=[=($t2, $t6)], expr#8=[3], expr#9=[=($t2, $t8)], expr#10=[4], expr#11=[=($t2, $t10)], expr#12=[5], expr#13=[=($t2, $t12)], expr#14=[6], expr#15=[=($t2, $t14)], expr#16=[7], expr#17=[=($t2, $t16)], expr#18=[8], expr#19=[=($t2, $t18)], expr#20=[9], expr#21=[=($t2, $t20)], expr#22=[10], expr#23=[=($t2, $t22)], expr#24=[11], expr#25=[=($t2, $t24)], expr#26=[12], expr#27=[=($t2, $t26)], expr#28=[13], expr#29=[=($t2, $t28)], expr#30=[14], expr#31=[=($t2, $t30)], expr#32=[15], expr#33=[=($t2, $t32)], expr#34=[16], expr#35=[=($t2, $t34)], expr#36=[17], expr#37=[=($t2, $t36)], expr#38=[18], expr#39=[=($t2, $t38)], expr#40=[19], expr#41=[=($t2, $t40)], expr#42=[20], expr#43=[=($t2, $t42)], expr#44=[21], expr#45=[=($t2, $t44)], expr#46=[OR($t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t21, $t23, $t25, $t27, $t29, $t31, $t33, $t35, $t37, $t39, $t41, $t43, $t45)], proj#0..2=[{exprs}], $condition=[$t46])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R3]])\n").test();
     }
 }

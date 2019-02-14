@@ -59,7 +59,8 @@ public class VoltSqlToRelConverterConfig implements SqlToRelConverter.Config {
 
     @Override
     public int getInSubQueryThreshold() {
-        return this.DEFAULT.getInSubQueryThreshold();
+        // forces usage of OR rather than join against an inline table in all cases.
+        return Integer.MAX_VALUE;
     }
 
     @Override
