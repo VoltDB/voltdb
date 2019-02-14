@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -91,6 +92,7 @@ public abstract class OpsAgent
         protected VoltTable[] aggregateTables = null;
         protected final long startTime;
         private final JSONObject request;
+        Future<?> timer;
         public PendingOpsRequest(
                 OpsSelector selector,
                 String subselector,
@@ -247,8 +249,11 @@ public abstract class OpsAgent
             }
         }
 
-        request.expectedOpsResponses--;
-        if (request.expectedOpsResponses > 0) return;
+        if (--request.expectedOpsResponses > 0) {
+            return;
+        }
+
+        request.timer.cancel(false);
 
         m_pendingRequests.remove(requestId);
 
@@ -312,7 +317,7 @@ public abstract class OpsAgent
 
         final long requestId = m_nextRequestId++;
         m_pendingRequests.put(requestId, newRequest);
-        m_es.schedule(new Runnable() {
+        newRequest.timer = m_es.schedule(new Runnable() {
             @Override
             public void run() {
                 checkForRequestTimeout(requestId);
