@@ -138,7 +138,7 @@ public class KafkaClientVerifier {
         private final Integer timeoutSec;
 
         public TopicReader(KafkaConsumer<String, String> consumer, CountDownLatch cdl, Integer uniqueFieldNum,
-                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout) {
+                Integer sequenceFieldNum, Integer partitionFieldNum, int timeout, AtomicBoolean testGood ) {
             this.consumer = consumer;
             m_cdl = cdl;
             m_uniqueFieldNum = uniqueFieldNum;
@@ -198,6 +198,8 @@ public class KafkaClientVerifier {
                             System.err.println("ERROR mismatched exported partition for txid " + rowTxnId
                                     + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
                                     + ", while export record says " + partition);
+
+                            testGood.set(false);
                         }
                     }
                 }
@@ -261,7 +263,7 @@ public class KafkaClientVerifier {
             consumer.subscribe(Arrays.asList(topic));
             System.out.println("Creating consumer for " + topic);
             TopicReader reader = new TopicReader(consumer, consumersLatch, uniqueIndexFieldNum, sequenceFieldNum,
-                    partitionFieldNum, consumerTimeoutSecs );
+                    partitionFieldNum, consumerTimeoutSecs, testGood);
             executor.execute(reader);
         }
 
@@ -310,10 +312,6 @@ public class KafkaClientVerifier {
         long lastId = 0;
         int print_cnt = 0;
         for (Long id : ids) {
-            if (lastId > id) {
-                // double check the sequence.
-                System.err.println("out of sequence id: " + id + " > " + lastId);
-            }
             if (id == lastId) {
                 duplicateCnt++;
                 continue;
