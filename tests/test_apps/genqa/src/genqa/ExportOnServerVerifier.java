@@ -96,29 +96,6 @@ public class ExportOnServerVerifier {
         boolean fileSeen = false;
     }
 
-    public static class ValidationErr extends Exception {
-        private static final long serialVersionUID = 1L;
-        final String msg;
-        final Object value;
-        final Object expected;
-
-        ValidationErr(String msg, Object value, Object expected) {
-            this.msg = msg;
-            this.value = value;
-            this.expected = expected;
-        }
-
-        public ValidationErr(String string) {
-            this.msg = string;
-            this.value = "[not provided]";
-            this.expected = "[not provided]";
-        }
-        @Override
-        public String toString() {
-            return msg + " Value: " + value + " Expected: " + expected;
-        }
-    }
-
     ExportOnServerVerifier()
     {
     }
@@ -1690,71 +1667,4 @@ public class ExportOnServerVerifier {
         System.exit(0);
     }
 
-    public static class RoughCSVTokenizer {
-
-        private RoughCSVTokenizer() {
-        }
-
-        private static void moveToBuffer(List<String> resultBuffer, StringBuilder buf) {
-            resultBuffer.add(buf.toString());
-            buf.delete(0, buf.length());
-        }
-
-        public static String[] tokenize(String csv) {
-            List<String> resultBuffer = new java.util.ArrayList<String>();
-
-            if (csv != null) {
-                int z = csv.length();
-                Character openingQuote = null;
-                boolean trimSpace = false;
-                StringBuilder buf = new StringBuilder();
-
-                for (int i = 0; i < z; ++i) {
-                    char c = csv.charAt(i);
-                    trimSpace = trimSpace && Character.isWhitespace(c);
-                    if (c == '"' || c == '\'') {
-                        if (openingQuote == null) {
-                            openingQuote = c;
-                            int bi = 0;
-                            while (bi < buf.length()) {
-                                if (Character.isWhitespace(buf.charAt(bi))) {
-                                    buf.deleteCharAt(bi);
-                                } else {
-                                    bi++;
-                                }
-                            }
-                        }
-                        else if (openingQuote == c ) {
-                            openingQuote = null;
-                            trimSpace = true;
-                        }
-                    }
-                    else if (c == '\\') {
-                        if ((z > i + 1)
-                            && ((csv.charAt(i + 1) == '"')
-                                || (csv.charAt(i + 1) == '\\'))) {
-                            buf.append(csv.charAt(i + 1));
-                            ++i;
-                        } else {
-                            buf.append("\\");
-                        }
-                    } else {
-                        if (openingQuote != null) {
-                            buf.append(c);
-                        } else {
-                            if (c == ',') {
-                                moveToBuffer(resultBuffer, buf);
-                            } else {
-                                if (!trimSpace) buf.append(c);
-                            }
-                        }
-                    }
-                }
-                moveToBuffer(resultBuffer, buf);
-            }
-
-            String[] result = new String[resultBuffer.size()];
-            return resultBuffer.toArray(result);
-        }
-    }
 }
