@@ -225,6 +225,9 @@ public class Tokens {
     static final String        T_MEMBER            = "MEMBER";
     static final String        T_MERGE             = "MERGE";
     static final String        T_METHOD            = "METHOD";
+    // A VoltDB extension NIBBLE EXPORT
+    static final String        T_MIGRATE           = "MIGRATE";
+    // End of VoltDB extension
     static final String        T_MIN               = "MIN";
     public static final String T_MINUTE            = "MINUTE";
     static final String        T_MOD               = "MOD";
@@ -335,10 +338,13 @@ public class Tokens {
     static final String        T_SYSTEM            = "SYSTEM";
     static final String        T_SYSTEM_USER       = "SYSTEM_USER";
     // A VoltDB extension STREAM
-    static final String        T_STREAM = "STREAM";
+    static final String        T_STREAM            = "STREAM";
     // End of VoltDB extension
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
+    // A VoltDB extension NIBBLE EXPORT
+    static final String        T_TARGET            = "TARGET";
+    // End of VoltDB extension
     static final String        T_THEN              = "THEN";
     public static final String T_TIME              = "TIME";
     public static final String T_TIMESTAMP         = "TIMESTAMP";
@@ -1113,6 +1119,8 @@ public class Tokens {
     public static final int SYSTEM_USER                      = 275;
     // A VoltDB extension STREAM
     public static final int STREAM                           = 1305;
+    public static final int MIGRATE                          = 1400;
+    public static final int TARGET                           = 1401;
     // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
@@ -1928,6 +1936,8 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SYSTEM_USER, SYSTEM_USER);
         // A VoltDB extension STREAM
         reservedKeys.put(Tokens.T_STREAM, STREAM);
+        reservedKeys.put(Tokens.T_MIGRATE, MIGRATE);
+        reservedKeys.put(Tokens.T_TARGET, TARGET);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);

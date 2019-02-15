@@ -2521,7 +2521,6 @@ public class Table extends TableBase implements SchemaObject {
     void updateRowSet(Session session, HashMappedList rowSet, int[] cols,
                       boolean isTriggeredSet) {
 
-        boolean         hasLob = false;
         PersistentStore store  = session.sessionData.getRowStore(this);
 
         for (int i = 0; i < rowSet.size(); i++) {
@@ -2734,6 +2733,7 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
+            ttl.attributes.put("stream", timeToLive.stream);
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
@@ -2765,17 +2765,20 @@ public class Table extends TableBase implements SchemaObject {
     // End of VoltDB extension
 
     // A VoltDB extension to support TTL
-    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize,
+            int maxFrequency, String streamName) {
         dropTTL();
-        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)), batchSize, maxFrequency);
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)),
+                batchSize, maxFrequency, streamName);
     }
 
     public TimeToLiveVoltDB getTTL() {
         return timeToLive;
     }
 
-    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
-        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn,
+            int batchSize, int maxFrequency, String streamName) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, streamName);
     }
 
     public void dropTTL() {
@@ -2790,5 +2793,4 @@ public class Table extends TableBase implements SchemaObject {
     public String toString() {
         return super.toString() + ":" + getName().name;
     }
-    /**********************************************************************/
 }

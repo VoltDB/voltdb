@@ -38,13 +38,15 @@ public class TimeToLiveVoltDB {
     final ColumnSchema ttlColumn;
     final int batchSize;
     final int maxFrequency;
+    final String stream;
     public TimeToLiveVoltDB(int value, String unit, ColumnSchema column,
-            int batchSize, int maxFrequency) {
+            int batchSize, int maxFrequency, String streamName) {
         ttlValue = value;
         ttlUnit = unit;
         ttlColumn = column;
         this.batchSize = batchSize;
         this.maxFrequency = maxFrequency;
+        stream = streamName;
     }
 
     @Override
@@ -53,7 +55,8 @@ public class TimeToLiveVoltDB {
             TimeToLiveVoltDB ttl = (TimeToLiveVoltDB)o;
             return (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
                     ttl.ttlColumn.getName().equals(ttlColumn.getName()) &&
-                    ttl.batchSize == batchSize && ttl.maxFrequency == maxFrequency);
+                    ttl.batchSize == batchSize && ttl.maxFrequency == maxFrequency &&
+                    ttl.stream.equals(stream));
         }
         return false;
     }
