@@ -323,7 +323,9 @@ public abstract class PBDSegment {
 
         try {
             UserDefinedFileAttributeView view = getFileAttributeView(file);
-            view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+            if (view != null) {
+                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+            }
         } catch (Exception e) {
             // No-op
         }
@@ -346,12 +348,14 @@ public abstract class PBDSegment {
         try {
             UserDefinedFileAttributeView view = getFileAttributeView(file);
 
-            List<String> attrList = view.list();
-            if (attrList.contains(IS_FINAL_ATTRIBUTE)) {
-                ByteBuffer buf = ByteBuffer.allocate(view.size(IS_FINAL_ATTRIBUTE));
-                view.read(IS_FINAL_ATTRIBUTE, buf);
-                buf.flip();
-                ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
+            if (view != null) {
+                List<String> attrList = view.list();
+                if (attrList.contains(IS_FINAL_ATTRIBUTE)) {
+                    ByteBuffer buf = ByteBuffer.allocate(view.size(IS_FINAL_ATTRIBUTE));
+                    view.read(IS_FINAL_ATTRIBUTE, buf);
+                    buf.flip();
+                    ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
+                }
             }
         } catch (Exception e) {
             // No-op
