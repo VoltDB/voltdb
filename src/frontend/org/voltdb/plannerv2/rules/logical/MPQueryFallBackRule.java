@@ -82,57 +82,6 @@ public class MPQueryFallBackRule extends RelOptRule {
                 throw new PlannerFallbackException("MP query not supported in Calcite planner.");
             }
             call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
-        } else if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalJoin) {
-            final VoltLogicalCalc calc = call.rel(0);
-            final VoltLogicalJoin join = call.rel(1);
-            final RelOptTable outer = ((HepRelVertex) join.getLeft()).getCurrentRel().getTable();
-            final RelOptTable inner = ((HepRelVertex) join.getRight()).getCurrentRel().getTable();
-            if (outer != null && inner != null) {
-                final boolean outerIsReplicated = outer.getDistribution().getType() == RelDistribution.Type.SINGLETON,
-                        innerIsReplicated = inner.getDistribution().getType() == RelDistribution.Type.SINGLETON;
-                final RelDistribution joinDist;
-                if (!(outerIsReplicated && innerIsReplicated)) {
-                    final int outerColumns = outer.getRowType().getFieldCount();
-                    final Integer outerPartCol = ((RelOptTableImpl) outer).getTable().getPartitionColumn();
-                    final Integer innerPartCol = ((RelOptTableImpl) inner).getTable().getPartitionColumn();
-                    if (join.getJoinType() != JoinRelType.INNER) {
-                        throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-                    } else if (!outerIsReplicated && !innerIsReplicated) { // has to be inner join with equal-condition on partition column to be SP
-                        final RexLiteral joinValue = getInnerJoin2PEqualValue(join.getCondition(),
-                                outerColumns, outerPartCol, innerPartCol);
-                        if (joinValue == null) {
-                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-                        } else {
-                            outer.getDistribution().setPartitionEqualValue(joinValue);
-                            inner.getDistribution().setPartitionEqualValue(joinValue);
-                            joinDist = outer.getDistribution(); // TODO
-                        }
-                    } else if (outerIsReplicated) {     // replicated inner join partitioned
-                        final RexLiteral literal = getInnerJoinPREqualValue(join.getCondition(), innerPartCol, outerColumns);
-                        if (literal == null) {
-                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-                        } else {
-                            inner.getDistribution().setPartitionEqualValue(literal);
-                            joinDist = inner.getDistribution();
-                        }
-                    } else {                            // partitioned inner join replicated
-                        final RexLiteral literal = getInnerJoinPREqualValue(join.getCondition(), outerPartCol, outerColumns);
-                        if (literal == null) {
-                            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-                        } else {
-                            outer.getDistribution().setPartitionEqualValue(literal);
-                            joinDist = outer.getDistribution();
-                        }
-                    }
-                } else {
-                    joinDist = outer.getDistribution();
-                }
-                if (join.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) == null) {
-                    join.getTraitSet().replace(joinDist);       // XXX: why join's traitset does not include distribution trait?
-                }
-                call.transformTo(calc.copy(calc.getTraitSet().replace(joinDist), calc.getInputs()));
-                //call.transformTo(join.copy(join.getTraitSet().replace(joinDist), join.getInputs()));
-            }
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);
