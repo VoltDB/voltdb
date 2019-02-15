@@ -506,11 +506,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @throws IOException
      */
     private void deleteStalePbdFile(File file) throws IOException {
-        try {
-            PBDSegment.setFinal(file, false);
-        } catch (IOException ioe) {
-            LOG.warn("Failed to clear final attribute in " + file.getName() + ": " + ioe);
-        }
+        PBDSegment.setFinal(file, false);
         if (m_usageSpecificLog.isDebugEnabled()) {
             m_usageSpecificLog.debug("Segment " + file.getName()
                 + " (final: " + PBDSegment.isFinal(file) + "), will be closed and deleted during init");
