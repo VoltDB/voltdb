@@ -106,7 +106,7 @@ for f in $VOLTDB_LIB/*.jar; do
 done
 
 # add test classes to CLASSPATH, make sure it works either release or debug build
-# if will have both debug and release build, we will use the release one.
+# if we have both debug and release build, we will use the release one.
 CLASSPATH=${CLASSPATH}:$VOLTDB_HOME/obj/release/test:$VOLTDB_HOME/obj/debug/test
 
 # add junit jars to CLASSPATH
