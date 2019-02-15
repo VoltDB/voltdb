@@ -227,7 +227,6 @@ public class SocketExporter extends ExportClientBase {
                         connect();
                     }
                     if (haplist.isEmpty()) {
-                        m_atomicWorkLock.unlock();
                         m_logger.rateLimitedLog(120, Level.ERROR, null, "Failed to connect to export socket endpoint %s, some servers may be down.", host);
                         throw new RestartBlockException(true);
                     }
