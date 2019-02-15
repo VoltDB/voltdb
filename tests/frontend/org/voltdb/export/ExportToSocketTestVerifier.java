@@ -90,7 +90,7 @@ public class ExportToSocketTestVerifier {
         return isExpectedRow(true);
     }
 
-    public Matcher<String[]> isExpectedRow(final boolean m_verifySequenceNumber) {
+    public Matcher<String[]> isExpectedRow(final boolean verifySequenceNumber) {
         return new TypeSafeDiagnosingMatcher<String[]>() {
             String [] expected = ( m_data.peek() == null ? null : m_data.poll() );
             int matchSequenceNumber = m_sequenceNumber;
@@ -116,7 +116,7 @@ public class ExportToSocketTestVerifier {
                 if( ! match) {
                     d.appendText("{ EOD exhausted expected rows }");
                 }
-                if (match && m_verifySequenceNumber) {
+                if (match && verifySequenceNumber) {
                     int rowSeq = Integer.valueOf(gotten[2]);
                     if (! (match = seqMatcher.matches(rowSeq))) {
                         d.appendText("{ expected sequence " ).appendDescriptionOf(seqMatcher);
@@ -129,7 +129,7 @@ public class ExportToSocketTestVerifier {
                 if (match) {
                     String [] toBeMatched;
                     Matcher<String[]> rowMatcher;
-                    if (m_verifySequenceNumber) {
+                    if (verifySequenceNumber) {
                         toBeMatched = Arrays.copyOfRange(
                            gotten, ExportDecoderBase.INTERNAL_FIELD_COUNT - 1,
                            gotten.length
