@@ -93,7 +93,8 @@ public class ExportToSocketTestVerifier {
     public Matcher<String[]> isExpectedRow(final boolean m_verifySequenceNumber) {
         return new TypeSafeDiagnosingMatcher<String[]>() {
             String [] expected = ( m_data.peek() == null ? null : m_data.poll() );
-            Matcher<Integer> seqMatcher = equalTo(m_sequenceNumber);
+            int matchSequenceNumber = m_sequenceNumber;
+            Matcher<Integer> seqMatcher = equalTo(matchSequenceNumber);
 
             @Override
             public void describeTo(Description d) {
@@ -150,7 +151,7 @@ public class ExportToSocketTestVerifier {
                     }
                 }
                 d.appendText("]");
-                System.out.println("Validated table " + m_tableName + " partition id " + m_partitionId + " sequence " + m_sequenceNumber);
+                System.out.println("Validated table " + m_tableName + " partition id " + m_partitionId + " sequence " + matchSequenceNumber);
                 return match;
             }
         };
