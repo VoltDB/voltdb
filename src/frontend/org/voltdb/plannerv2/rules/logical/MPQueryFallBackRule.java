@@ -17,8 +17,15 @@
 
 package org.voltdb.plannerv2.rules.logical;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptTable;
@@ -34,6 +41,7 @@ import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Util;
+import org.voltcore.utils.Pair;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
@@ -89,6 +97,54 @@ public class MPQueryFallBackRule extends RelOptRule {
             if (childDist != RelDistributions.ANY) {
                 SingleRel node = call.rel(0);
                 call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
+            }
+        }
+    }
+
+    static Set<Pair<Integer, Integer>> getAllJoiningColumns(RexCall joinCondition) {
+        if (joinCondition.isA(SqlKind.AND)) {
+            return joinCondition.getOperands().stream()
+                    .flatMap(node -> {
+                        if (node instanceof RexCall) {  // Calcite flattens cascaded AND into a list (x1 AND x2 AND x3 ...) => AND(x1, x2, x3, ...)
+                            final Pair<Integer, Integer> r = getJoiningColumns((RexCall) node);
+                            return r == null ? Stream.empty() : Stream.of(r);
+                        } else {
+                            return Stream.empty();
+                        }
+                    }).collect(Collectors.toSet());
+        } else {
+            final Pair<Integer, Integer> pair = getJoiningColumns(joinCondition);
+            if (pair == null) {
+                return new HashSet<>();
+            } else {
+                return Stream.of(pair).collect(Collectors.toSet());
+            }
+        }
+    }
+
+    /**
+     * For the condition of form "T1.c1 = T2.c2", the c1/c2 indexes are based on the joined table with columns coming
+     * from both tables. Return [c1, c2] such that c1 < c2 (i.e. if they come from different table, then c1 comes from
+     * outer table and c2 from inner table).
+     * For other forms of join condition, return null.
+     * @param joinCondition The join condition
+     * @return ordered indexes of column references.
+     */
+    private static Pair<Integer, Integer> getJoiningColumns(RexCall joinCondition) {
+        if (! joinCondition.isA(SqlKind.EQUALS)) {
+            return null;
+        } else {
+            final RexNode leftConj = joinCondition.getOperands().get(0), rightConj = joinCondition.getOperands().get(1);
+            if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
+                return null;
+            } else {
+                final int col1 = ((RexInputRef) leftConj).getIndex(),
+                        col2 = ((RexInputRef) rightConj).getIndex();
+                if (col1 < col2) {
+                    return Pair.of(col1, col2);
+                } else {
+                    return Pair.of(col2, col1);
+                }
             }
         }
     }
