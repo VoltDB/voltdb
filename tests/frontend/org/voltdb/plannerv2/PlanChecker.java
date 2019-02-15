@@ -76,10 +76,6 @@ public class PlanChecker extends CalcitePlannerTestCase {
             if (VoltFastSqlParser.parse(sql).isA(SqlKind.DDL)) {
                 return;
             }
-        } catch (SqlParseException e) {
-            return;
-        }
-        try {
             if (!CALCITE_CHECKS.check(sql)) {
                 // The query cannot pass the compatibility check, we just ignore it.
                 return;
@@ -91,14 +87,9 @@ public class PlanChecker extends CalcitePlannerTestCase {
         CompiledPlan voltdbPlan;
         try {
             calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
-        } catch (Exception e) {
-            // The SQL is invalid in VOLT, stop checking and print nothing
-            return;
-        }
-        try {
             voltdbPlan = compileAdHocPlan(sql, true, true);
         } catch (Exception e) {
-            // The SQL is not supported in Calcite planner, stop checking and print nothing
+            // The SQL is invalid in VOLT or is not supported in Calcite planner, stop checking and print nothing
             return;
         }
 
