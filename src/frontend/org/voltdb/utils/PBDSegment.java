@@ -326,7 +326,7 @@ public abstract class PBDSegment {
             if (view != null) {
                 view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             // No-op
         }
     }
@@ -357,7 +357,7 @@ public abstract class PBDSegment {
                     ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             // No-op
         }
         return ret;
