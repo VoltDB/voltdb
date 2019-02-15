@@ -116,7 +116,8 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void onSourceDone(int partitionId, String signature) {
+        public void onSourceDrained(int partitionId, String tableName) {
+
         }
 
         @Override
@@ -135,6 +136,11 @@ public class TestExportDataSource extends TestCase {
         @Override
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public int getCatalogVersion() {
+            return 0;
         }
     }
 
@@ -197,7 +203,6 @@ public class TestExportDataSource extends TestCase {
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
                     0,
-                    table.getSignature(),
                     table.getColumns(),
                     table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
@@ -205,7 +210,6 @@ public class TestExportDataSource extends TestCase {
                 assertEquals("database", s.getDatabase());
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
-                assertEquals(table.getSignature(), s.getSignature());
             } finally {
                 s.close();
             }
@@ -220,7 +224,6 @@ public class TestExportDataSource extends TestCase {
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
                 0,
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -319,7 +322,6 @@ public class TestExportDataSource extends TestCase {
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
                 0,
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -397,7 +399,6 @@ public class TestExportDataSource extends TestCase {
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
                 0,
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -469,7 +470,7 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 1))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 1, 0))
                 );
 
         // Poll and discard buffer 2, too
@@ -503,7 +504,6 @@ public class TestExportDataSource extends TestCase {
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
                 0,
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
