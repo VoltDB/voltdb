@@ -535,22 +535,22 @@ public class ExportManager
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
         final CatalogMap<Connector> connectors = getConnectors(catalogContext);
+
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("UpdateCatalog: requiresNewGeneration: " + requiresNewExportGeneration
                     + ", for " + connectors.size() + " connectors.");
             dumpConnectors(connectors);
         }
-        Map<String, Pair<Properties, Set<String>>> processorConfigBeforeUpdate = m_processorConfig;
+
+        // Update processor config: note that we want to run a generation update even if the
+        // processor config has no changes; we still need to handle changes in the exported tables
         updateProcessorConfig(connectors);
-        if (m_processorConfig.isEmpty() && processorConfigBeforeUpdate.isEmpty()) {
-            exportLog.info("Both prior and current processor configs are empty, no changes.");
-            return;
-        }
+
         if (!requiresNewExportGeneration) {
             exportLog.info("No stream related changes in update catalog.");
             return;
         }
-        /**
+        /*
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
          * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.

@@ -65,9 +65,9 @@ bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
 
 
 /**
- * a table is only enable for export if explicitly listed in
- * a connector's table list and if export is enabled for the
- * database as a whole
+ * a table is only enabled for export if explicitly listed in
+ * a connector's table list (regardless of the enabled state of
+ * the connector)
  */
 bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIndex) {
 
@@ -83,11 +83,6 @@ bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIn
          connIter++)
     {
         catalog::Connector *connector = connIter->second;
-
-        // skip this connector if disabled
-        if (!connector->enabled()) {
-            continue;
-        }
 
         // iterate the connector tableinfo list looking for tableIndex matches
         std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;

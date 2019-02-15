@@ -202,20 +202,22 @@ public class ExportGeneration implements Generation {
         }
 
         // Now create datasources based on the catalog
+        // Note that we create sources on disabled connectors
+
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
-            if (conn.getEnabled()) {
-                for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                    Table table = ti.getTable();
+            for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                Table table = ti.getTable();
+                if (!currentTables.contains(table.getTypeName())) {
                     addDataSources(table, hostId, localPartitionsToSites, processor);
-                    exportedTables.add(table.getTypeName());
                     createdSources = true;
                 }
+                exportedTables.add(table.getTypeName());
             }
         }
 
-        updateDataSources(exportedTables);
+        updateStreamStatus(exportedTables);
 
         // FIXME: remove datasources that are not exported anymore
         for (String table : exportedTables) {
@@ -232,8 +234,9 @@ public class ExportGeneration implements Generation {
         createAckMailboxesIfNeeded(messenger, partitionsInUse);
     }
 
+    // FIXME: we are only transitioning to DROPPED when actually dropping the stream
     // mark a DataSource as dropped if its connector is dropped.
-    private void updateDataSources( List<String> exportedTables) {
+    private void updateStreamStatus( List<String> exportedTables) {
         synchronized(m_dataSourcesByPartition) {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
                 Map<String, ExportDataSource> sources = it.next();
@@ -407,7 +410,11 @@ public class ExportGeneration implements Generation {
     public void updateAckMailboxes(int partition, Set<Long> newHSIds) {
         ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
         synchronized (m_dataSourcesByPartition) {
-            for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
+            Map<String, ExportDataSource> partitionMap = m_dataSourcesByPartition.get(partition);
+            if (partitionMap == null) {
+                return;
+            }
+            for( ExportDataSource eds: partitionMap.values()) {
                 eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
                 if (newHSIds != null && !newHSIds.isEmpty()) {
                     // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
