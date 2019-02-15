@@ -280,6 +280,34 @@ public class ExportManager
         return false;
     }
 
+    private boolean hasExportedTables(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void dumpConnectors(CatalogMap<Connector> connectors) {
+
+        if (!exportLog.isDebugEnabled()) return;
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        exportLog.debug(sb.toString());
+    }
     /**
      * Indicate to associated {@link ExportGeneration}s to become
      * masters for the given partition id
@@ -368,7 +396,6 @@ public class ExportManager
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
             return;
         }
-
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
@@ -411,6 +438,7 @@ public class ExportManager
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
+
         Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
 
         // If the export source changes before the previous generation drains
@@ -470,12 +498,16 @@ public class ExportManager
             boolean isRejoin) {
         try {
             CatalogMap<Connector> connectors = getConnectors(catalogContext);
-            if (!hasEnabledConnectors(connectors)) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("initialize for " + connectors.size() + " connectors.");
+                dumpConnectors(connectors);
+            }
+            if (!hasExportedTables(connectors)) {
                 return;
             }
 
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Creating connector " + m_loaderClass);
+                exportLog.debug("Creating processor " + m_loaderClass);
             }
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
@@ -502,13 +534,16 @@ public class ExportManager
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final CatalogMap<Connector> connectors = db.getConnectors();
-
+        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("UpdateCatalog: requiresNewGeneration: " + requiresNewExportGeneration
+                    + ", for " + connectors.size() + " connectors.");
+            dumpConnectors(connectors);
+        }
         Map<String, Pair<Properties, Set<String>>> processorConfigBeforeUpdate = m_processorConfig;
         updateProcessorConfig(connectors);
         if (m_processorConfig.isEmpty() && processorConfigBeforeUpdate.isEmpty()) {
+            exportLog.info("Both prior and current processor configs are empty, no changes.");
             return;
         }
         if (!requiresNewExportGeneration) {

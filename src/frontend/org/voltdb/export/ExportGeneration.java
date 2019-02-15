@@ -189,21 +189,43 @@ public class ExportGeneration implements Generation {
             HostMessenger messenger,
             List<Pair<Integer, Integer>> localPartitionsToSites)
     {
+        // Collect table names of existing datasources
+        Set<String> currentTables = new HashSet<>();
+        synchronized(m_dataSourcesByPartition) {
+            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
+                Map<String, ExportDataSource> sources = it.next();
+                currentTables.addAll(sources.keySet());
+            }
+        }
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Current tables: " + currentTables);
+        }
+
         // Now create datasources based on the catalog
         boolean createdSources = false;
-        List<String> exportSignatures = new ArrayList<>();
+        List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
                     addDataSources(table, hostId, localPartitionsToSites, processor);
-                    exportSignatures.add(table.getSignature());
+                    exportedTables.add(table.getTypeName());
                     createdSources = true;
                 }
             }
         }
 
-        updateDataSources(exportSignatures);
+        updateDataSources(exportedTables);
+
+        // FIXME: remove datasources that are not exported anymore
+        for (String table : exportedTables) {
+            currentTables.remove(table);
+        }
+        if (!currentTables.isEmpty()) {
+            // FIXME
+            exportLog.info("XXX MUST REMOVE TABLES: " + currentTables);
+        }
+
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = createdSources ?
                 localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet()) : new HashSet<Integer>();
@@ -211,13 +233,13 @@ public class ExportGeneration implements Generation {
     }
 
     // mark a DataSource as dropped if its connector is dropped.
-    private void updateDataSources( List<String> exportSignatures) {
+    private void updateDataSources( List<String> exportedTables) {
         synchronized(m_dataSourcesByPartition) {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
                 Map<String, ExportDataSource> sources = it.next();
-                for (String signature : sources.keySet()) {
-                    ExportDataSource src = sources.get(signature);
-                    if (!exportSignatures.contains(signature)) {
+                for (String tableName: sources.keySet()) {
+                    ExportDataSource src = sources.get(tableName);
+                    if (!exportedTables.contains(tableName)) {
                         src.setStatus(ExportDataSource.StreamStatus.DROPPED);
                     } else if (src.getStatus() == ExportDataSource.StreamStatus.DROPPED) {
                         src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
@@ -249,12 +271,13 @@ public class ExportGeneration implements Generation {
                         byte stringBytes[] = new byte[length];
                         buf.get(stringBytes);
                         String signature = new String(stringBytes, Constants.UTF8ENCODING);
+                        String tableName = tableNameFromSignature(signature);
                         if (partitionSources == null) {
                             exportLog.error("Received an export ack for partition " + partition +
                                     " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
                             return;
                         }
-                        final ExportDataSource eds = partitionSources.get(signature);
+                        final ExportDataSource eds = partitionSources.get(tableName);
                         if (eds == null) {
                             // For dangling buffers
                             if (msgType == ExportManager.TAKE_MASTERSHIP) {
@@ -268,7 +291,7 @@ public class ExportGeneration implements Generation {
                                 sendDummyTakeMastershipResponse(message.m_sourceHSId, requestId, partition, stringBytes);
                             } else {
                                 exportLog.warn("Received export message " + msgType + " for partition " +
-                                        partition + " source signature " + signature +
+                                        partition + " source " + tableName +
                                         " which does not exist on this node, sources = " + partitionSources);
                             }
                             return;
@@ -565,8 +588,10 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void onSourceDone(int partitionId, String signature) {
+        String tableName = tableNameFromSignature(signature);
+
         assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+        assert(m_dataSourcesByPartition.get(partitionId).containsKey(tableName));
         ExportDataSource source;
         synchronized(m_dataSourcesByPartition) {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
@@ -577,15 +602,15 @@ public class ExportGeneration implements Generation {
                 return;
             }
 
-            source = sources.get(signature);
+            source = sources.get(tableName);
             if (source == null) {
                 exportLog.warn("Could not find export data source for signature " + partitionId +
-                        " signature " + signature + ". The export cleanup stream is being discarded.");
+                        " table " + tableName + ". The export cleanup stream is being discarded.");
                 return;
             }
 
             //Remove first then do cleanup. After this is done trigger processor cleanup.
-            sources.remove(signature);
+            sources.remove(tableName);
         }
         //Do closing outside the synchronized block.
         exportLog.info("Finished processing " + source);
@@ -610,12 +635,12 @@ public class ExportGeneration implements Generation {
                 dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                 m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
             } else {
-                if (dataSourcesForPartition.get(source.getSignature()) != null) {
+                if (dataSourcesForPartition.get(source.getTableName()) != null) {
                     exportLog.warn("On Disk generation with same table, partition already exists using known data source.");
                     return;
                 }
             }
-            dataSourcesForPartition.put( source.getSignature(), source);
+            dataSourcesForPartition.put(source.getTableName(), source);
         }
     }
 
@@ -639,28 +664,28 @@ public class ExportGeneration implements Generation {
                         dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                         m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                     }
-                    final String key = table.getSignature();
+                    final String key = table.getTypeName();
                     if (!dataSourcesForPartition.containsKey(key)) {
                         ExportDataSource exportDataSource = new ExportDataSource(this,
                                 processor,
                                 "database",
-                                table.getTypeName(),
+                                key,
                                 partition,
                                 siteId,
-                                key,
+                                table.getSignature(),
                                 table.getColumns(),
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
-                                    " signature " + key + " partition " + partition + " site " + siteId);
+                            exportLog.debug("Creating ExportDataSource for table in catalog " + key +
+                                    " signature " + table.getSignature() + " partition " + partition + " site " + siteId);
                         }
 
                         dataSourcesForPartition.put(key, exportDataSource);
                     } else {
                         //Since we are loading from catalog any found EDS mark it to be in catalog.
                         dataSourcesForPartition.get(key).markInCatalog();
-                        ExportClientBase client = processor.getExportClient(table.getTypeName());
+                        ExportClientBase client = processor.getExportClient(key);
                         if (client != null) {
                             dataSourcesForPartition.get(key).setRunEveryWhere(client.isRunEverywhere());
                         }
@@ -688,10 +713,11 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        ExportDataSource source = sources.get(signature);
+        String tableName = tableNameFromSignature(signature);
+        ExportDataSource source = sources.get(tableName);
         if (source == null) {
             exportLog.error("PUSH Could not find export data source for partition " + partitionId +
-                    " Signature " + signature + ". The export data is being discarded.");
+                    " Table " + tableName + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -727,13 +753,16 @@ public class ExportGeneration implements Generation {
                                                 boolean isRecover, boolean isRejoin,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
+
+        String tableName = tableNameFromSignature(signature);
+
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
         List<ListenableFuture<?>> tasks = new ArrayList<>();
         Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
         // It is possible that for restore the partitions have changed, in which case what we are doing is silly
         if (dataSource != null) {
-            ExportDataSource source = dataSource.get(signature);
+            ExportDataSource source = dataSource.get(tableName);
             if (source != null) {
                 Pair<Long, Long> usoAndSeq = sequenceNumberPerPartition.get(partitionId);
                 if (usoAndSeq != null) {
@@ -925,5 +954,15 @@ public class ExportGeneration implements Generation {
     @Override
     public String toString() {
         return "Export Generation";
+    }
+
+    /**
+     * Return table name from signature
+     * FIXME: needs EE change to drop signatures
+     * @param signature
+     * @return table name
+     */
+    private String tableNameFromSignature(String signature) {
+        return signature.substring(0,  signature.indexOf("|"));
     }
 }
