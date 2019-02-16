@@ -4,7 +4,7 @@
     See the HOWTO on enabling SSL for more.
 -->
 <deployment>
-    <cluster hostcount="1" kfactor="0" />
+    <cluster kfactor="0" />
     <ssl enabled="true" external="true">
         <keystore   path="example.keystore"   password="example"/>
         <truststore path="example.truststore" password="example"/>

@@ -16,7 +16,7 @@
     https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
 -->
 <deployment>
-    <cluster hostcount="1"/>
+    <cluster kfactor="0"/>
     <commandlog enabled="true" synchronous="false">
         <frequency time="200" transactions="500"/>
     </commandlog>

@@ -10,7 +10,7 @@
     https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
 -->
 <deployment>
-    <cluster hostcount="1"/>
+    <cluster kfactor="0"/>
     <commandlog enabled="false" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
