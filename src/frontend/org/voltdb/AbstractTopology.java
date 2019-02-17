@@ -33,7 +33,9 @@ import java.util.OptionalInt;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.json_voltpatches.JSONArray;
@@ -51,6 +53,8 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Iterables;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.MultimapBuilder;
 import com.google_voltpatches.common.collect.Sets;
@@ -950,7 +954,11 @@ public class AbstractTopology {
     public static AbstractTopology getTopology(Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts,
             int kfactor, boolean restorePartition ) {
         TopologyBuilder builder = addPartitionsToHosts(hostInfos, missingHosts, kfactor, 0);
-        return new AbstractTopology(EMPTY_TOPOLOGY, builder);
+        AbstractTopology topo = new AbstractTopology(EMPTY_TOPOLOGY, builder);
+        if (restorePartition) {
+            topo = restorePartitionsForRecovery(topo,hostInfos);
+        }
+        return topo;
     }
 
     /**
@@ -1057,6 +1065,98 @@ public class AbstractTopology {
         stringer.endObject();
 
         return new JSONObject(stringer.toString());
+    }
+
+    private static AbstractTopology restorePartitionsForRecovery(AbstractTopology topology,
+            Map<Integer, HostInfo> hostInfos) {
+        final AtomicInteger recoveredHostCount = new AtomicInteger(0);
+        Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
+        hostInfos.forEach((k, v) -> {
+            Set<Integer> partitions = v.getRecoveredPartitions();
+            if (!partitions.isEmpty()) {
+                restoredPartitionsByHosts.computeIfAbsent(partitions, p -> new ArrayList<>()).add(k);
+                recoveredHostCount.incrementAndGet();
+            }
+        });
+
+        if (restoredPartitionsByHosts.isEmpty() || topology.getHostCount() != recoveredHostCount.get()) {
+            return topology;
+        }
+
+        Map<Integer, Partition> allPartitions = Maps.newHashMap(topology.partitionsById);
+        Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
+        List<Host> hosts = Lists.newArrayList();
+        for (Map.Entry<Set<Integer>, List<Integer>> entry : restoredPartitionsByHosts.entrySet()) {
+            List<Integer> restoredHosts = entry.getValue();
+            List<Integer> matchedHosts = new ArrayList<>();
+            for (Iterator<Map.Entry<Integer, Host>> it = hostsById.entrySet().iterator(); it.hasNext();) {
+                Host host = it.next().getValue();
+
+                // host the same list of partitions but different host id, a candidate for swap
+                if (host.getPartitionIdList().equals(entry.getKey())) {
+                    if (!restoredHosts.remove(Integer.valueOf(host.id))) {
+                        matchedHosts.add(host.id);
+                    } else {
+                        it.remove();
+                        hosts.add(host);
+                    }
+                }
+            }
+
+            // all the partitions are on the right hosts or no matching layout found
+            if (restoredHosts.isEmpty() || matchedHosts.isEmpty()) {
+                continue;
+            }
+
+            // found matching hosts, let us swap
+            for(int i = 0; i < restoredHosts.size(); i++) {
+                Host restoredHost = hostsById.get(restoredHosts.get(i));
+                Host matchedHost = hostsById.get(matchedHosts.get(i));
+                allPartitions = relocatePartitions(allPartitions, restoredHost, matchedHost);
+                hostsById.remove(Integer.valueOf(restoredHost.id));
+                hosts.add(restoredHost);
+            }
+        }
+
+        Map<Integer, List<Partition>> partitionsByHost = Maps.newHashMap();
+        allPartitions.forEach((k, v) -> {
+            for (Integer hostId : v.hostIds){
+                partitionsByHost.computeIfAbsent(hostId, p -> new ArrayList<>()).add(v);
+            }
+        });
+        ImmutableMap.Builder<Integer, Host> hostsByIdBuilder = ImmutableMap.builder();
+        partitionsByHost.forEach((k, v) -> {
+            hostsByIdBuilder.put(k, new Host(k, topology.hostsById.get(k).haGroup, ImmutableSortedSet.copyOf(v), false));
+        });
+        return new AbstractTopology(topology, hostsByIdBuilder.build(), ImmutableMap.copyOf(allPartitions));
+    }
+
+    private static Map<Integer, Partition> relocatePartitions(Map<Integer, Partition> allPartitions, Host restoredHost, Host matchedHost) {
+        Map<Integer, Partition> partitions = Maps.newHashMap();
+        for(Partition p : allPartitions.values()) {
+            List<Integer> hostIds = Lists.newArrayList(p.hostIds);
+            boolean relocated = false;
+            int leader = p.leaderHostId;
+            if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
+                hostIds.remove(restoredHost.id);
+                hostIds.add(matchedHost.id);
+                relocated = true;
+                leader = (leader == restoredHost.id) ? matchedHost.id : leader;
+            }
+
+            if (!hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)) {
+                hostIds.remove(matchedHost.id);
+                hostIds.add(restoredHost.id);
+                relocated = true;
+                leader = (leader == matchedHost.id) ? restoredHost.id : leader;
+            }
+            if (relocated) {
+                p = new Partition(p.id, leader, hostIds);
+            }
+            partitions.put(p.id, p);
+        }
+        return partitions;
+
     }
 
     public static AbstractTopology topologyFromJSON(String jsonTopology) throws JSONException {

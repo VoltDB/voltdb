@@ -30,6 +30,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -55,7 +56,11 @@ import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.utils.Pair;
 import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.Partition;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google.common.collect.Iterables;
 import com.google_voltpatches.common.collect.ContiguousSet;
@@ -779,5 +784,46 @@ public class TestAbstractTopology {
             }
             latch.countDown();
         }
+    }
+
+    @Test
+    public void testRestorePlacementOnRecovery() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        VoltFile.resetSubrootForThisProcess();
+        LocalCluster cluster = null;
+        try{
+            cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 6, 3, 1);
+            cluster.startUp();
+            cluster.shutDown();
+            // host ids in LocalCluster will be assigned async. So when a local host is recovered, it may be assigned
+            // with different host id.  The property is used for placement restore test.
+            List<String> restoredMsg = new ArrayList<String> (Arrays.asList("Partition placement has been restored"));
+            cluster.setLogSearchPatterns(restoredMsg);
+            cluster.startUp(false);
+            assert(cluster.verifyLogMessages(restoredMsg));
+        } finally {
+            if (cluster != null){
+                cluster.shutDown();
+            }
+        }
+    }
+
+    private LocalCluster createLocalCluster(String jarName, int sph, int hostCount, int kfactor) throws IOException {
+        final String schema = "CREATE TABLE P1 (ID BIGINT DEFAULT '0' NOT NULL," +
+                        " VIOLATION BIGINT DEFAULT '0' NOT NULL," +
+                        " CONSTRAINT VIOC ASSUMEUNIQUE ( VIOLATION )," +
+                        " PRIMARY KEY (ID)); PARTITION TABLE P1 ON COLUMN ID;";
+        LocalCluster cluster = new LocalCluster(jarName, sph, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
+        cluster.setNewCli(true);
+        cluster.overrideAnyRequestForValgrind();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.configureLogging(null, null, false, true, 200, Integer.MAX_VALUE, 300);
+        cluster.setHasLocalServer(false);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        return cluster;
     }
 }
