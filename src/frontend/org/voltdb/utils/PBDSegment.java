@@ -296,6 +296,13 @@ public abstract class PBDSegment {
     /**
      * Set or clear segment as 'final', i.e. whether segment is complete and logically immutable.
      *
+     * NOTES:
+     *
+     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the
+     * operation is a no-op: this will be the case on filesystems that do no support extended file
+     * attributes. Also note that the {@code FileStore.supportsFileAttributeView} method does not provide
+     * a reliable way to test for the availability of the extended file attributes.
+     *
      * Must be called with 'true' by segment owner when it has filled the segment, written all segment
      * metadata, and after it has either closed or sync'd the segment file.
      *
@@ -305,36 +312,53 @@ public abstract class PBDSegment {
      * itself generally lacks context to decide whether it's final or not.
      *
      * @param isFinal   true if segment is set to final, false otherwise
-     * @throws IOException
      */
 
-    public void setFinal(boolean isFinal) throws IOException {
+    public void setFinal(boolean isFinal) {
 
         setFinal(m_file, isFinal);
     }
 
-    public static void setFinal(File file, boolean isFinal) throws IOException {
+    public static void setFinal(File file, boolean isFinal) {
 
-        UserDefinedFileAttributeView view = getFileAttributeView(file);
-        view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+        try {
+            UserDefinedFileAttributeView view = getFileAttributeView(file);
+            if (view != null) {
+                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+            }
+        } catch (IOException e) {
+            // No-op
+        }
     }
 
-    public boolean isFinal() throws IOException {
+    /**
+     * Returns whether the file is final
+     *
+     * @see notes on {@code setFinal}
+     * @return true if file is final, false otherwise
+     */
+    public boolean isFinal() {
 
         return isFinal(m_file);
     }
 
-    public static boolean isFinal(File file) throws IOException {
+    public static boolean isFinal(File file) {
 
         boolean ret = false;
-        UserDefinedFileAttributeView view = getFileAttributeView(file);
+        try {
+            UserDefinedFileAttributeView view = getFileAttributeView(file);
 
-        List<String> attrList = view.list();
-        if (attrList.contains(IS_FINAL_ATTRIBUTE)) {
-            ByteBuffer buf = ByteBuffer.allocate(view.size(IS_FINAL_ATTRIBUTE));
-            view.read(IS_FINAL_ATTRIBUTE, buf);
-            buf.flip();
-            ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
+            if (view != null) {
+                List<String> attrList = view.list();
+                if (attrList.contains(IS_FINAL_ATTRIBUTE)) {
+                    ByteBuffer buf = ByteBuffer.allocate(view.size(IS_FINAL_ATTRIBUTE));
+                    view.read(IS_FINAL_ATTRIBUTE, buf);
+                    buf.flip();
+                    ret = Boolean.parseBoolean(Charset.defaultCharset().decode(buf).toString());
+                }
+            }
+        } catch (IOException e) {
+            // No-op
         }
         return ret;
     }

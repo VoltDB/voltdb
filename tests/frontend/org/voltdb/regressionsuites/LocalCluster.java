@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -383,15 +384,16 @@ public class LocalCluster extends VoltServerConfig {
         // start ignores them silently if they are set.
         if (schemaToStage != null) {
             try {
-                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+                templateCmdLine.m_userSchemas = Collections
+                        .singletonList(VoltProjectBuilder.createFileForSchema(schemaToStage));
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchemas + "\"");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
         if (classesJarToStage != null) {
-            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
-            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+            templateCmdLine.m_stagedClassesPaths = Collections.singletonList(new VoltFile(classesJarToStage));
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPaths + "\"");
         }
 
         // if the user wants valgrind and it makes sense, give it to 'em
@@ -775,7 +777,8 @@ public class LocalCluster extends VoltServerConfig {
         }
         if (new Integer(hostId).equals(m_mismatchNode)) {
             assert m_usesStagedSchema;
-            cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+            cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                    : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
         }
         cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
 
@@ -1058,7 +1061,8 @@ public class LocalCluster extends VoltServerConfig {
             }
             if (new Integer(hostId).equals(m_mismatchNode)) {
                 assert m_usesStagedSchema;
-                cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+                cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                        : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
             }
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
