@@ -34,7 +34,38 @@
  * A table is export only its catalog says so.
  */
 bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
+
+    // FIXME: use only catalog property
     return catalogTable.stream();
+
+    /* FIXME - original code: is it kosher to replace?
+    // no export, no export only tables
+    if (database.connectors().size() == 0) {
+        return false;
+    }
+
+    // iterate through all connectors
+    std::map<std::string, catalog::Connector*>::const_iterator connIter;
+    for (connIter = database.connectors().begin();
+            connIter != database.connectors().end();
+            connIter++)
+    {
+        catalog::Connector *connector = connIter->second;
+
+        // iterate the connector tableinfo list looking for tableIndex matches
+        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
+        for (it = connector->tableInfo().begin();
+                it != connector->tableInfo().end();
+                it++)
+        {
+            if (it->second->table()->relativeIndex() == tableIndex) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+    */
 }
 
 
