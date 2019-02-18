@@ -480,7 +480,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testENG15245() {
         m_tester.sql("select CAST(border as VARCHAR) from R5")
-                .transform("foo")
+                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t3):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t4])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .test();
     }
 }

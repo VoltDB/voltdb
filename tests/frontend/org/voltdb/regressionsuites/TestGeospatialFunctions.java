@@ -1048,27 +1048,26 @@ public class TestGeospatialFunctions extends RegressionSuite {
         client.callProcedure("places.Insert", 51, "Someplace2",
                 GeographyPointValue.fromWKT("POINT(-13.499999999999999995 -17)"));
 
-        // ENG-15245
-//        // get WKT representation using asText()
-//        VoltTable asTextVT = client.callProcedure("@AdHoc",
-//                "select loc, asText(loc) from places order by pk").getResults()[0];
-//
-//        // get WKT representation using cast(point as varchar)
-//        VoltTable castVT =  client.callProcedure("@AdHoc",
-//                "select loc, cast(loc as VARCHAR) from places order by pk").getResults()[0];
-//
-//        // verify results of asText from EE matches WKT format defined in frontend/java
-//        while (asTextVT.advanceRow()) {
-//            GeographyPointValue gpv = asTextVT.getGeographyPointValue(0);
-//            if (gpv == null) {
-//                assertEquals(null, asTextVT.getString(1));
-//            }
-//            else {
-//                assertEquals(gpv.toString(), asTextVT.getString(1));
-//            }
-//        }
-//        // verify WKT from asText and cast(point as varchar) results in same result WKT.
-//        assertEquals(asTextVT, castVT);
+        // get WKT representation using asText()
+        VoltTable asTextVT = client.callProcedure("@AdHoc",
+                "select loc, asText(loc) from places order by pk").getResults()[0];
+
+        // get WKT representation using cast(point as varchar)
+        VoltTable castVT =  client.callProcedure("@AdHoc",
+                "select loc, cast(loc as VARCHAR) from places order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
+        while (asTextVT.advanceRow()) {
+            GeographyPointValue gpv = asTextVT.getGeographyPointValue(0);
+            if (gpv == null) {
+                assertEquals(null, asTextVT.getString(1));
+            }
+            else {
+                assertEquals(gpv.toString(), asTextVT.getString(1));
+            }
+        }
+        // verify WKT from asText and cast(point as varchar) results in same result WKT.
+        assertEquals(asTextVT, castVT);
     }
 
     public void testPolygonAsText() throws Exception {
@@ -1122,29 +1121,28 @@ public class TestGeospatialFunctions extends RegressionSuite {
                     someWhere.isFixable() ? 1 : 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
-        // ENG-15245
-//        // get WKT representation using asText()
-//        vt = client.callProcedure("@AdHoc",
-//                "select region, asText(region) from borders order by pk").getResults()[0];
-//
-//        // get WKT representation using cast(polygon as varchar)
-//        VoltTable castVT = client.callProcedure("@AdHoc",
-//                "select region, cast(region as VARCHAR) from borders order by pk").getResults()[0];
-//
-//        // verify results of asText from EE matches WKT format defined in frontend/java
-//        GeographyValue gv;
-//        while (vt.advanceRow()) {
-//            gv = vt.getGeographyValue(0);
-//            if (gv == null) {
-//                assertEquals(null, vt.getString(1));
-//            }
-//            else {
-//                assertEquals(gv.toString(), vt.getString(1));
-//            }
-//        }
-//
-//        // verify WKT from asText and cast(polygon as varchar) results are same.
-//        assertEquals(vt, castVT);
+        // get WKT representation using asText()
+        vt = client.callProcedure("@AdHoc",
+                "select region, asText(region) from borders order by pk").getResults()[0];
+
+        // get WKT representation using cast(polygon as varchar)
+        VoltTable castVT = client.callProcedure("@AdHoc",
+                "select region, cast(region as VARCHAR) from borders order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
+        GeographyValue gv;
+        while (vt.advanceRow()) {
+            gv = vt.getGeographyValue(0);
+            if (gv == null) {
+                assertEquals(null, vt.getString(1));
+            }
+            else {
+                assertEquals(gv.toString(), vt.getString(1));
+            }
+        }
+
+        // verify WKT from asText and cast(polygon as varchar) results are same.
+        assertEquals(vt, castVT);
     }
 
     public void testPointPolygonAsTextNegative() throws Exception {
