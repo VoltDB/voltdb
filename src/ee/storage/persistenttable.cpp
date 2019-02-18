@@ -804,9 +804,6 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-<<<<<<< HEAD
-    } catch (ConstraintFailureException& e) {
-=======
         if (m_st != nullptr) {
             if (!m_st->insertTuple(source)) {
                 VOLT_ERROR("Failed to insert tuple into companion stream of %s", m_name.c_str());
@@ -814,7 +811,6 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
         }
     }
     catch (ConstraintFailureException& e) {
->>>>>>> c19ee15e5f... First hack at exporting from tables, exports to first configured target
         deleteTupleStorage(target); // also frees object columns
         throw;
     } catch (TupleStreamException& e) {
