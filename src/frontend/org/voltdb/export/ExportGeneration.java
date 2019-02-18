@@ -721,11 +721,15 @@ public class ExportGeneration implements Generation {
 
                         dataSourcesForPartition.put(key, exportDataSource);
                     } else {
-                        //Since we are loading from catalog any found EDS mark it to be in catalog.
-                        dataSourcesForPartition.get(key).markInCatalog();
+                        // Associate any existing EDS to the export client in the new processor
+                        // and mark it as being in catalog
+                        ExportDataSource eds = dataSourcesForPartition.get(key);
+
+                        eds.markInCatalog();
                         ExportClientBase client = processor.getExportClient(key);
                         if (client != null) {
-                            dataSourcesForPartition.get(key).setRunEveryWhere(client.isRunEverywhere());
+                            eds.setClient(client);
+                            eds.setRunEveryWhere(client.isRunEverywhere());
                         }
                     }
                 } catch (IOException e) {
@@ -754,8 +758,14 @@ public class ExportGeneration implements Generation {
         String tableName = tableNameFromSignature(signature);
         ExportDataSource source = sources.get(tableName);
         if (source == null) {
-            exportLog.error("PUSH Could not find export data source for partition " + partitionId +
-                    " Table " + tableName + ". The export data is being discarded.");
+            /*
+             * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
+             * FIXME: do we want to modify EE to let him discard those buffers?
+             */
+            exportLog.info("PUSH on unknown export data source for partition " + partitionId +
+                    " Table " + tableName + ". The export data ("
+                    + "seq: " + startSequenceNumber + ", count: " + tupleCount + ", sync:" + sync
+                    + ") is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
