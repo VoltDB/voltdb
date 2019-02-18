@@ -116,10 +116,6 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void onSourceDone(int partitionId, String signature) {
-        }
-
-        @Override
         public void pushExportBuffer(int partitionId, String signature, long seqNo,
                 int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
         }

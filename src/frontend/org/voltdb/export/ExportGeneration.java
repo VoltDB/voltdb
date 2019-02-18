@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,10 +96,13 @@ public class ExportGeneration implements Generation {
 
     private Mailbox m_mbox = null;
 
-    private volatile boolean shutdown = false;
+    private volatile boolean m_shutdown = false;
 
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
+
+    // The version of the current catalog
+    public volatile int m_catalogVersion;
 
     /**
      * Constructor to create a new generation of export data
@@ -134,6 +138,16 @@ public class ExportGeneration implements Generation {
 
     }
 
+    /**
+     * Initialize generation from disk, creating data sources from the PBD files.
+     *
+     * Called immediately before calling {@code initializeGenerationFromCatalog}.
+     *
+     * @param messenger
+     * @param processor new {@code ExportDataProcessor}, with decoders not started yet
+     * @param files the contents of the export overflow directory
+     * @param localPartitionsToSites
+     */
     private void initializeGenerationFromDisk(HostMessenger messenger,
             final ExportDataProcessor processor,
             File[] files, List<Pair<Integer, Integer>> localPartitionsToSites) {
@@ -182,6 +196,20 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    /**
+     * Initialize generation from catalog.
+     *
+     * Notes on catalog update:
+     * - If present, the old {@code ExportDataProcessor} has been shut down.
+     * - the new {@code ExportDataProcessor} has not started its decoders.
+     *
+     * @param catalogContext
+     * @param connectors
+     * @param processor
+     * @param hostId
+     * @param messenger
+     * @param localPartitionsToSites
+     */
     void initializeGenerationFromCatalog(CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
@@ -189,6 +217,10 @@ public class ExportGeneration implements Generation {
             HostMessenger messenger,
             List<Pair<Integer, Integer>> localPartitionsToSites)
     {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Updating to catalog version : " + m_catalogVersion);
+        }
+
         // Collect table names of existing datasources
         Set<String> currentTables = new HashSet<>();
         synchronized(m_dataSourcesByPartition) {
@@ -201,32 +233,32 @@ public class ExportGeneration implements Generation {
             exportLog.debug("Current tables: " + currentTables);
         }
 
-        // Now create datasources based on the catalog
-        // Note that we create sources on disabled connectors
+        // Now create datasources based on the catalog (if already present will not be re-created).
+        // Note that we create sources on disabled connectors.
 
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 Table table = ti.getTable();
-                if (!currentTables.contains(table.getTypeName())) {
-                    addDataSources(table, hostId, localPartitionsToSites, processor);
-                    createdSources = true;
-                }
+                addDataSources(table, hostId, localPartitionsToSites, processor);
+                createdSources = true;
                 exportedTables.add(table.getTypeName());
             }
         }
 
         updateStreamStatus(exportedTables);
 
-        // FIXME: remove datasources that are not exported anymore
+        // Remove datasources that are not exported anymore
         for (String table : exportedTables) {
             currentTables.remove(table);
         }
         if (!currentTables.isEmpty()) {
-            // FIXME
-            exportLog.info("XXX MUST REMOVE TABLES: " + currentTables);
+            onSourcesDone(currentTables);
         }
+
+        // Update catalog version so that datasources use this version when propagating acks
+        m_catalogVersion = catalogContext.catalogVersion;
 
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = createdSources ?
@@ -234,8 +266,7 @@ public class ExportGeneration implements Generation {
         createAckMailboxesIfNeeded(messenger, partitionsInUse);
     }
 
-    // FIXME: we are only transitioning to DROPPED when actually dropping the stream
-    // mark a DataSource as dropped if its connector is dropped.
+    // Mark a DataSource as dropped if its not present in the connectors.
     private void updateStreamStatus( List<String> exportedTables) {
         synchronized(m_dataSourcesByPartition) {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
@@ -489,7 +520,7 @@ public class ExportGeneration implements Generation {
     }
 
     private Watcher constructMailboxChildWatcher(final HostMessenger messenger) {
-        if (shutdown) {
+        if (m_shutdown) {
             return null;
         }
         return new Watcher() {
@@ -512,12 +543,12 @@ public class ExportGeneration implements Generation {
     }
 
     private void handleChildUpdate(final WatchedEvent event, final HostMessenger messenger) {
-        if (shutdown) return;
+        if (m_shutdown) return;
         messenger.getZK().getChildren(event.getPath(), constructMailboxChildWatcher(messenger), constructChildRetrievalCallback(), null);
     }
 
     private AsyncCallback.ChildrenCallback constructChildRetrievalCallback() {
-        if (shutdown) {
+        if (m_shutdown) {
             return null;
         }
         return new AsyncCallback.ChildrenCallback() {
@@ -528,7 +559,7 @@ public class ExportGeneration implements Generation {
                     @Override
                     public void run() {
                         try {
-                            if (shutdown) return;
+                            if (m_shutdown) return;
                             KeeperException.Code code = KeeperException.Code.get(rc);
                             //Other node must have drained so ignore.
                             if (code == KeeperException.Code.NONODE) {
@@ -593,35 +624,35 @@ public class ExportGeneration implements Generation {
         return new ArrayList<>();
     }
 
-    @Override
-    public void onSourceDone(int partitionId, String signature) {
-        String tableName = tableNameFromSignature(signature);
+    /**
+     * Close and delete the {@code ExportDataSource} instance that are not exporting any more.
+     *
+     * @param doneTables set of table names
+     */
+    private void onSourcesDone(Set<String> doneTables) {
 
-        assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(tableName));
-        ExportDataSource source;
+        List<ExportDataSource> doneSources = new LinkedList<>();
         synchronized(m_dataSourcesByPartition) {
-            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
 
-            if (sources == null) {
-                exportLog.warn("Could not find export data sources for partition "
-                        + partitionId + ". The export cleanup stream is being discarded.");
-                return;
+                Map<String, ExportDataSource> sources = it.next();
+                for (Map.Entry<String, ExportDataSource> e : sources.entrySet()) {
+                    if (!doneTables.contains(e.getKey())) {
+                        continue;
+                    }
+
+                    doneSources.add(e.getValue());
+                    sources.remove(e.getKey());
+                }
             }
-
-            source = sources.get(tableName);
-            if (source == null) {
-                exportLog.warn("Could not find export data source for signature " + partitionId +
-                        " table " + tableName + ". The export cleanup stream is being discarded.");
-                return;
-            }
-
-            //Remove first then do cleanup. After this is done trigger processor cleanup.
-            sources.remove(tableName);
         }
-        //Do closing outside the synchronized block.
-        exportLog.info("Finished processing " + source);
-        source.closeAndDelete();
+
+        //Do closings outside the synchronized block: note that it's fire and forget
+        // and we don't wait for the completions.
+        for (ExportDataSource source : doneSources) {
+            exportLog.info("Finished processing " + source);
+            source.closeAndDelete();
+        }
     }
 
     /*
@@ -735,7 +766,7 @@ public class ExportGeneration implements Generation {
     }
 
     private void cleanup(final HostMessenger messenger) {
-        shutdown = true;
+        m_shutdown = true;
         //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
             synchronized(m_dataSourcesByPartition) {
@@ -844,7 +875,7 @@ public class ExportGeneration implements Generation {
             exportLog.error("Error closing export data sources", e);
         }
         //Do this before so no watchers gets created.
-        shutdown = true;
+        m_shutdown = true;
         cleanup(messenger);
     }
 
@@ -971,5 +1002,9 @@ public class ExportGeneration implements Generation {
      */
     private String tableNameFromSignature(String signature) {
         return signature.substring(0,  signature.indexOf("|"));
+    }
+
+    public int getCatalogVersion() {
+        return m_catalogVersion;
     }
 }
