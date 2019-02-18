@@ -1084,7 +1084,6 @@ public class AbstractTopology {
 
         Map<Integer, Partition> allPartitions = Maps.newHashMap(topology.partitionsById);
         Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
-        List<Host> hosts = Lists.newArrayList();
         for (Map.Entry<Set<Integer>, List<Integer>> entry : restoredPartitionsByHosts.entrySet()) {
             List<Integer> restoredHosts = entry.getValue();
             List<Integer> matchedHosts = new ArrayList<>();
@@ -1098,23 +1097,19 @@ public class AbstractTopology {
                         matchedHosts.add(host.id);
                     } else {
                         it.remove();
-                        hosts.add(host);
                     }
                 }
             }
 
             // all the partitions are on the right hosts or no matching layout found
-            if (restoredHosts.isEmpty() || matchedHosts.isEmpty()) {
-                continue;
-            }
-
-            // found matching hosts, let us swap
-            for(int i = 0; i < restoredHosts.size(); i++) {
-                Host restoredHost = hostsById.get(restoredHosts.get(i));
-                Host matchedHost = hostsById.get(matchedHosts.get(i));
-                allPartitions = relocatePartitions(allPartitions, restoredHost, matchedHost);
-                hostsById.remove(Integer.valueOf(restoredHost.id));
-                hosts.add(restoredHost);
+            if (!restoredHosts.isEmpty() && !matchedHosts.isEmpty()) {
+                // found matching hosts, let us swap
+                for(int i = 0; i < restoredHosts.size(); i++) {
+                    Host restoredHost = hostsById.get(restoredHosts.get(i));
+                    Host matchedHost = hostsById.get(matchedHosts.get(i));
+                    allPartitions = relocatePartitions(allPartitions, restoredHost, matchedHost);
+                    hostsById.remove(Integer.valueOf(restoredHost.id));
+                }
             }
         }
 
@@ -1136,25 +1131,24 @@ public class AbstractTopology {
         for(Partition p : allPartitions.values()) {
             List<Integer> hostIds = Lists.newArrayList(p.hostIds);
             boolean relocated = false;
-            int leader = p.leaderHostId;
+            int leaderHostId = p.leaderHostId;
             if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
                 hostIds.remove(Integer.valueOf(restoredHost.id));
                 hostIds.add(matchedHost.id);
                 relocated = true;
-                leader = (leader == restoredHost.id) ? matchedHost.id : leader;
+                leaderHostId = (leaderHostId == restoredHost.id) ? matchedHost.id : leaderHostId;
             } else if (!hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)) {
                 hostIds.remove(Integer.valueOf(matchedHost.id));
                 hostIds.add(restoredHost.id);
                 relocated = true;
-                leader = (leader == matchedHost.id) ? restoredHost.id : leader;
+                leaderHostId = (leaderHostId == matchedHost.id) ? restoredHost.id : leaderHostId;
             }
             if (relocated) {
-                p = new Partition(p.id, leader, hostIds);
+                p = new Partition(p.id, leaderHostId, hostIds);
             }
             partitions.put(p.id, p);
         }
         return partitions;
-
     }
 
     public static AbstractTopology topologyFromJSON(String jsonTopology) throws JSONException {
