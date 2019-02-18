@@ -28,7 +28,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -956,7 +955,7 @@ public class AbstractTopology {
         TopologyBuilder builder = addPartitionsToHosts(hostInfos, missingHosts, kfactor, 0);
         AbstractTopology topo = new AbstractTopology(EMPTY_TOPOLOGY, builder);
         if (restorePartition) {
-            topo = restorePartitionsForRecovery(topo,hostInfos);
+            topo = mutateRestorePartitionsForRecovery(topo, hostInfos);
         }
         return topo;
     }
@@ -1067,7 +1066,7 @@ public class AbstractTopology {
         return new JSONObject(stringer.toString());
     }
 
-    private static AbstractTopology restorePartitionsForRecovery(AbstractTopology topology,
+    private static AbstractTopology mutateRestorePartitionsForRecovery(AbstractTopology topology,
             Map<Integer, HostInfo> hostInfos) {
         final AtomicInteger recoveredHostCount = new AtomicInteger(0);
         Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
@@ -1093,7 +1092,8 @@ public class AbstractTopology {
                 Host host = it.next().getValue();
 
                 // host the same list of partitions but different host id, a candidate for swap
-                if (host.getPartitionIdList().equals(entry.getKey())) {
+                Set<Integer> partitionIds = Sets.newHashSet(host.getPartitionIdList());
+                if (partitionIds.equals(entry.getKey())) {
                     if (!restoredHosts.remove(Integer.valueOf(host.id))) {
                         matchedHosts.add(host.id);
                     } else {
@@ -1138,14 +1138,12 @@ public class AbstractTopology {
             boolean relocated = false;
             int leader = p.leaderHostId;
             if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
-                hostIds.remove(restoredHost.id);
+                hostIds.remove(Integer.valueOf(restoredHost.id));
                 hostIds.add(matchedHost.id);
                 relocated = true;
                 leader = (leader == restoredHost.id) ? matchedHost.id : leader;
-            }
-
-            if (!hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)) {
-                hostIds.remove(matchedHost.id);
+            } else if (!hostIds.contains(restoredHost.id) && hostIds.contains(matchedHost.id)) {
+                hostIds.remove(Integer.valueOf(matchedHost.id));
                 hostIds.add(restoredHost.id);
                 relocated = true;
                 leader = (leader == matchedHost.id) ? restoredHost.id : leader;
