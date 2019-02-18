@@ -22,7 +22,9 @@ import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -1212,6 +1214,10 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             newSize <<= 1;
         } while (newSize < minSize);
 
+        expandBufferTo(newSize);
+    }
+
+    private void expandBufferTo(int newSize) {
         final int end = m_buffer.position();
         assert(end > m_rowStart);
         final ByteBuffer buf2 = ByteBuffer.allocate(newSize);
@@ -1275,11 +1281,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             throw new IllegalStateException("Table is read-only. Make a copy before changing.");
         }
 
-        if (!hasExactSchema(other)) {
-            StringBuilder sb = new StringBuilder("Could not merge table with schema ");
-            other.getColumnString(sb).append(" into ");
-            throw new IllegalArgumentException(getColumnString(sb).toString());
-        }
+        checkHasExactSchema(other);
 
         // Allow the buffer to grow to max capacity
         m_buffer.limit(m_buffer.capacity());
@@ -1298,6 +1300,53 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer.putInt(m_rowStart, m_rowCount);
     }
 
+    /**
+     * Add all rows from {@code tables} into this VoltTable. All tables must have the exact same schema including column
+     * names.
+     *
+     * @param tables {@link Collection} of {@link VoltTable}s to add to this table
+     * @throws IllegalArgumentException if any table in {@code tables} is not compatible with this table
+     */
+    public void addTables(Collection<VoltTable> tables) {
+        if (m_readOnly) {
+            throw new IllegalStateException("Table is read-only. Make a copy before changing.");
+        }
+
+        try {
+            // Allow the buffer to grow to max capacity
+            m_buffer.limit(m_buffer.capacity());
+
+            Collection<ByteBuffer> rawTables = new ArrayList<>(tables.size());
+            int totalRawSize = 0;
+            int newRowCounts = 0;
+            for (VoltTable table : tables) {
+                if (table == null) {
+                    continue;
+                }
+                checkHasExactSchema(table);
+                ByteBuffer rawTable = table.getAllRowsRaw();
+                rawTables.add(rawTable);
+                totalRawSize += rawTable.remaining();
+                newRowCounts += table.getRowCount();
+            }
+
+            if (m_buffer.remaining() < totalRawSize) {
+                expandBufferTo(m_buffer.position() + totalRawSize);
+            }
+
+            for (ByteBuffer rawTable : rawTables) {
+                m_buffer.put(rawTable);
+            }
+
+            // increment the rowcount in the member var and in the buffer
+            m_rowCount += newRowCounts;
+            m_buffer.putInt(m_rowStart, m_rowCount);
+        } finally {
+            // constrain buffer limit back to the new position
+            m_buffer.limit(m_buffer.position());
+        }
+    }
+
     private ByteBuffer getAllRowsRaw() {
         int origPosition = m_buffer.position();
         int start = m_rowStart + ROW_COUNT_SIZE;
@@ -1306,6 +1355,14 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             return m_buffer.slice();
         } finally {
             m_buffer.position(origPosition);
+        }
+    }
+
+    private void checkHasExactSchema(VoltTable other) {
+        if (!hasExactSchema(other)) {
+            StringBuilder sb = new StringBuilder("Could not merge table with schema ");
+            other.getColumnString(sb).append(" into ");
+            throw new IllegalArgumentException(getColumnString(sb).toString());
         }
     }
 
