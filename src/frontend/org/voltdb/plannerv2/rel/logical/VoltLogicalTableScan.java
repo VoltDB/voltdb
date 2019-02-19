@@ -47,7 +47,7 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
             RelTraitSet traitSet,
             RelOptTable table,
             VoltTable voltTable) {
-        super(cluster, traitSet, table, voltTable);
+       super(cluster, traitSet, table, voltTable);
     }
 
     @Override public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {
