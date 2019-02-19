@@ -24,11 +24,14 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.VoltDB;
+import org.voltdb.export.ExportDataSource.StreamTableSchemaSerializer;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
 import org.voltdb.utils.VoltFile;
@@ -41,12 +44,15 @@ import org.voltdb.utils.VoltFile;
  * portion of the queue.
  *
  * Export PBD buffer layout:
- *    --- Buffer Header   ---
- *    seqNo(8) + tupleCount(4) + uniqueId(8) + exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length)
- *    {
- *          ---Inside schema---
- *          tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
- *    }
+ *    -- Segment Header ---
+ *    crc(8) + numberOfEntries(4) + totalBytes(4)
+ *    -- Export Segment Header ---
+ *    exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length) +
+ *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    --- Common Entry Header   ---
+ *    crc(8) + length(4) + flags(4)
+ *    --- Export Entry Header   ---
+ *    seqNo(8) + tupleCount(4) + uniqueId(8)
  *    --- Row Header      ---
  *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
  *    nullArrayLength(4) + nullArray(var length)
@@ -78,10 +84,15 @@ public class StreamBlockQueue {
 
     private final String m_nonce;
     private final String m_path;
+    private final String m_streamName;
     private BinaryDequeReader m_reader;
 
-    public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
-        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
+    public StreamBlockQueue(String path, String nonce, String streamName)
+            throws java.io.IOException {
+        m_streamName = streamName;
+        StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
+                VoltDB.instance().getCatalogContext(), m_streamName);
+        m_persistentDeque = new PersistentBinaryDeque( nonce, ds, new VoltFile(path), exportLog);
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
@@ -108,8 +119,14 @@ public class StreamBlockQueue {
      */
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
         BBContainer cont = null;
+        BBContainer schemaCont = null;
         try {
-            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            // Start to read a new segment
+            if (m_reader.isStartOfSegment()) {
+                schemaCont = m_reader.getSchema(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            }
+            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -120,12 +137,13 @@ public class StreamBlockQueue {
             cont.b().order(ByteOrder.LITTLE_ENDIAN);
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            long seqNo = cont.b().getLong(0);
-            int tupleCount = cont.b().getInt(8);
-            long uniqueId = cont.b().getLong(12);
+            long seqNo = cont.b().getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
+            int tupleCount = cont.b().getInt(StreamBlock.ROW_NUMBER_OFFSET);
+            long uniqueId = cont.b().getLong(StreamBlock.UNIQUE_ID_OFFSET);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
+                schemaCont,
                 seqNo,
                 tupleCount,
                 uniqueId,
@@ -224,8 +242,8 @@ public class StreamBlockQueue {
     /*
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
-    public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
+    public void offer(StreamBlock streamBlock, DeferredSerialization ds, boolean createNewFile) throws IOException {
+        m_persistentDeque.offer(streamBlock.asBBContainer(), ds, !DISABLE_COMPRESSION, createNewFile);
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
@@ -296,11 +314,6 @@ public class StreamBlockQueue {
                     return null;
                 }
                 b.getLong(); // uniqueId
-                byte version = b.get(); // export version
-                assert(version == EXPORT_BUFFER_VERSION);
-                b.getLong(); // generation id
-                int firstRowStart = b.getInt() + b.position();
-                b.position(firstRowStart);
 
                 // Partial truncation
                 int offset = 0;
@@ -331,7 +344,9 @@ public class StreamBlockQueue {
 
         // close reopen reader
         m_persistentDeque.close();
-        m_persistentDeque = new PersistentBinaryDeque(m_nonce, new VoltFile(m_path), exportLog);
+        StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
+                VoltDB.instance().getCatalogContext(), m_streamName);
+        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog);
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
@@ -354,7 +369,6 @@ public class StreamBlockQueue {
         });
     }
 
-
     @Override
     public void finalize() {
         try {
@@ -371,5 +385,4 @@ public class StreamBlockQueue {
             }
         }
     }
-
 }

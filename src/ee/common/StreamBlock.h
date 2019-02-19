@@ -167,22 +167,17 @@ namespace voltdb
         ExportStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
             StreamBlock(data, headerSize, capacity, uso),
             m_rowCount(0),
-            m_needsSchema(true),
             m_startSequenceNumber(0)
         {}
 
         ExportStreamBlock(ExportStreamBlock* other) :
             StreamBlock(other),
             m_rowCount(other->m_rowCount),
-            m_needsSchema(other->m_needsSchema),
             m_startSequenceNumber(other->m_startSequenceNumber)
         {}
 
         ~ExportStreamBlock()
         {}
-
-        inline bool needsSchema() { return m_needsSchema; }
-        inline void noSchema() { m_needsSchema = false; }
 
         inline void recordStartSequenceNumber(int64_t startSequenceNumber) {
             m_startSequenceNumber = startSequenceNumber;
@@ -216,7 +211,6 @@ namespace voltdb
 
     private:
         size_t m_rowCount;
-        bool m_needsSchema;
         int64_t m_startSequenceNumber;
     };
 

@@ -121,7 +121,7 @@ public class TestExportDataSource extends TestCase {
 
         @Override
         public void pushExportBuffer(int partitionId, String signature, long seqNo,
-                int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
+                int tupleCount, long uniqueId, long genId, ByteBuffer buffer, boolean sync) {
         }
 
         @Override
@@ -147,6 +147,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addTable("RepTableName", false);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
                 VoltFile.recursivelyDelete(f);
@@ -194,6 +195,7 @@ public class TestExportDataSource extends TestCase {
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
+                    0,
                     table.getSignature(),
                     table.getColumns(),
                     table.getPartitioncolumn(),
@@ -211,12 +213,12 @@ public class TestExportDataSource extends TestCase {
 
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -237,23 +239,23 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 0L, foo, false);
+            s.pushExportBuffer(1, 1, 0, 0, foo, false);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 1, 0, foo, false);
+            s.pushExportBuffer(2, 1, 0, 0, foo, false);
             assertEquals(s.sizeInBytes(), 40);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 1, 0, foo, false);
+            s.pushExportBuffer(3, 1, 0, 0, foo, false);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(3, 1, 0, null, true);
+            s.pushExportBuffer(3, 1, 0, 0, null, true);
 
             assertEquals( 60, s.sizeInBytes());
 
@@ -310,12 +312,12 @@ public class TestExportDataSource extends TestCase {
 
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -340,7 +342,7 @@ public class TestExportDataSource extends TestCase {
             // Push a first buffer - and read it back
             ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
             foo0.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 0L, foo0, false);
+            s.pushExportBuffer(1, 1, 0, 0, foo0, false);
 
             AckingContainer cont0 = s.poll().get();
             cont0.updateStartTime(System.currentTimeMillis());
@@ -371,7 +373,7 @@ public class TestExportDataSource extends TestCase {
             // Push a buffer - should satisfy fut1
             ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
             foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 1, 0L, foo1, false);
+            s.pushExportBuffer(2, 1, 0, 0, foo1, false);
 
             // Verify the pushed buffer can be got
             AckingContainer cont1 = fut1.get();
@@ -388,12 +390,12 @@ public class TestExportDataSource extends TestCase {
 
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -426,22 +428,22 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(1, 1, 0L, foo, false);
+        s.pushExportBuffer(1, 1, 0, 0, foo, false);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(2, 1, 0, foo, false);
+        s.pushExportBuffer(2, 1, 0, 0, foo, false);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(3, 1, 0, foo, false);
+        s.pushExportBuffer(3, 1, 0, 0, foo, false);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(3, 1, 0, null, true);
+        s.pushExportBuffer(3, 1, 0, 0, null, true);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
@@ -494,12 +496,12 @@ public class TestExportDataSource extends TestCase {
 
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
+                0,
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -513,7 +515,7 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(101, 1, 0L, foo, true);
+            s.pushExportBuffer(101, 1, 0, 0, foo, true);
             long sz = s.sizeInBytes();
             assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();
@@ -529,7 +531,7 @@ public class TestExportDataSource extends TestCase {
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(111, 1, 0, foo2, true);
+            s.pushExportBuffer(111, 1, 0, 0, foo2, true);
             sz = s.sizeInBytes();
             assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();

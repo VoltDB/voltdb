@@ -262,7 +262,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return processCatalogAdditions(timestamp, true, isStreamUpdate, purgedStreams);
         }
         void purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams);
-        void markAllExportingStreamsNew();
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.

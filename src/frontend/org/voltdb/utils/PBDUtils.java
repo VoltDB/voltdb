@@ -17,25 +17,24 @@
 
 package org.voltdb.utils;
 
-import org.voltcore.utils.DeferredSerialization;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.HybridCrc32;
 
 public class PBDUtils {
     public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
     {
         int written = 0;
         try {
-            final int objSizePosition = mbuf.position();
-            mbuf.position(mbuf.position() + PBDSegment.OBJECT_HEADER_BYTES);
+            mbuf.position(mbuf.position() + PBDSegment.ENTRY_HEADER_BYTES);
             final int objStartPosition = mbuf.position();
             ds.serialize(mbuf);
             written = mbuf.position() - objStartPosition;
-            mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, PBDSegment.NO_FLAGS);
         } finally {
             ds.cancel();
         }
@@ -61,5 +60,18 @@ public class PBDUtils {
             pos += read;
         }
         buf.flip();
+    }
+
+    public static void writeEntryHeader(HybridCrc32 crc, ByteBuffer headerBuf,
+            ByteBuffer destBuf, int size, int flag) {
+        crc.update(size);
+        crc.update(flag);
+        crc.update(destBuf);
+        headerBuf.order(ByteOrder.LITTLE_ENDIAN);
+        headerBuf.clear();
+        headerBuf.putLong(crc.getValue());
+        headerBuf.putInt(size);
+        headerBuf.putInt(flag);
+        headerBuf.order(ByteOrder.BIG_ENDIAN);
     }
 }

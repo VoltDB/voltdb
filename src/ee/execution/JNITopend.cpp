@@ -160,7 +160,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJJJLjava/nio/ByteBuffer;Z)V");
+            "(ILjava/lang/String;JJJJJLjava/nio/ByteBuffer;Z)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -537,7 +537,8 @@ void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string signature,
         ExportStreamBlock *block,
-        bool sync) {
+        bool sync,
+        int64_t generationId) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
 
     if (block != NULL) {
@@ -554,6 +555,7 @@ void JNITopend::pushExportBuffer(
                 block->startSequenceNumber(),
                 block->getRowCount(),
                 block->lastSpUniqueId(),
+                generationId,
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE);
@@ -567,6 +569,7 @@ void JNITopend::pushExportBuffer(
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
+                generationId,
                 NULL,
                 NULL,
                 sync ? JNI_TRUE : JNI_FALSE);

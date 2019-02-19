@@ -144,7 +144,7 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, bool sync);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, bool sync, int64_t generationId);
     void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
@@ -1606,7 +1606,8 @@ void VoltDBIPC::pushExportBuffer(
         int32_t partitionId,
         std::string signature,
         voltdb::ExportStreamBlock *block,
-        bool sync) {
+        bool sync,
+        int64_t generationId) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
@@ -1628,6 +1629,8 @@ void VoltDBIPC::pushExportBuffer(
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
         sync ?
             static_cast<int8_t>(1) : static_cast<int8_t>(0);
+    index += 8;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonll(generationId);
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);

@@ -54,6 +54,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
@@ -157,6 +158,9 @@ public class TestExportGeneration {
 
         m_mockVoltDB = new MockVoltDB();
         m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite(m_host, m_site), m_part);
+        m_mockVoltDB.addTable("e1", false);
+        m_mockVoltDB.addColumnToTable("e1", "id", VoltType.INTEGER, true, "AA", VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("e1", "f1", VoltType.STRING, true, "AA", VoltType.STRING);
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
@@ -224,6 +228,7 @@ public class TestExportGeneration {
                     seqNo,
                     1,
                     0L,
+                    System.currentTimeMillis(),
                     foo.duplicate(),
                     false
                     );
@@ -254,6 +259,7 @@ public class TestExportGeneration {
                 /*seqNo*/1L,
                 1,
                 0L,
+                System.currentTimeMillis(),
                 foo.duplicate(),
                 false
                 );
