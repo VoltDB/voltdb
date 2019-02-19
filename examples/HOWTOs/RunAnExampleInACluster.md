@@ -4,14 +4,14 @@
 VoltDB requires you to initialize a root directory before starting a new cluster. 
 If you want to run with no data redundancy (kfactor=0) you do not need a configuration file.
 
-You can just go to each node and type:
+You can log into each node and run:
 
 ```bash
 voltdb init --force
 ```
 
 If you want to run with data redundancy you will need a configuration file that specifies
-the redundancy. It can be as simple as this
+the redundancy. This example configures two copies of all the data (kfactor=1):
 
 ```xml
 <?xml version="1.0"?>
@@ -25,24 +25,22 @@ the redundancy. It can be as simple as this
 
 Save this file as config.xml, or use the HOWTOS/deployment-file-examples/deployment-with-redundancy.xml file provided in the VoltDB kit.
 
-To initialize with a config file, type this on all nodes: 
+To initialize with a config file, log into each node and run: 
 ```bash
 voltdb init --force --config=config.xml
 ```
 ### Step Two: Start VoltDB
 
-To start a 3 node cluster you will provide the server count using --count= or -c. On your 3 servers, voltserver1, voltserver2, voltserver3 issue the same command:
+To start a 3 node cluster you will provide the server count using --count= or -c. On your 3 servers, `voltserver1`, `voltserver2`, `voltserver3` and run:
 
 ```bash
-> voltdb start -c 3 -H voltserver1,voltserver2,voltserver3
+voltdb start -c 3 -H voltserver1,voltserver2,voltserver3 &
 ```
 
-Now you should have a running cluster. On all three machines you should see the `Server Completed Initialization.` log message.
+The servers will all connect to each other and form a running cluster. On all machines you should see the `Server Completed Initialization.` log message.
 
 
-### Step Three: Prepare the Client run.sh script to Connect to Multiple Servers
-
-Make a list of the hostnames of the servers on which you're going to run VoltDB.
+### Step Three: Edit the example run.sh script to sonnect the client application to multiple servers
 
 For the purposes of this example, we will use 3 servers: `voltserver1`, `voltserver2`, and `voltserver3`.
 
@@ -75,4 +73,6 @@ Now save the `run.sh` file.
 
 Run the client script:
 
-    ./run.sh client
+```bash
+./run.sh client
+```
