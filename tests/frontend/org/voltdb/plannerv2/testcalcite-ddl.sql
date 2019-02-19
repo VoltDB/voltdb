@@ -53,7 +53,8 @@ create table R5 (
     pk integer,
     vc varchar(256),
     ii integer,
-    Border GEOGRAPHY);
+    border GEOGRAPHY,
+    point GEOGRAPHY_POINT);
 
 create table RI3 (
     pk integer,

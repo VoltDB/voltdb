@@ -425,11 +425,6 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         comparePlans("select i from R1 where i=? limit ?");
     }
 
-    public void testENG15245() {
-//        comparePlans("select CAST(pk as VARCHAR) from R5");
-//        comparePlans("select CAST(border as VARCHAR) from R5");
-    }
-
     // TODO: tests on index table scan
     // TODO: tests on Aggr
     // TODO: tests on Join
