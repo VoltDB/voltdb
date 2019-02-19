@@ -4424,7 +4424,11 @@ public class ParserDDL extends ParserRoutine {
             ColumnSchema column) {
 
         HsqlName writeName  = null;
+        Type     typeObject = readTypeDefinition(false);
         String   sql        = getLastPart();
+        Object[] args       = new Object[] {
+            table, column, typeObject
+        };
 
         if (!table.isTemp()) {
             writeName = table.getName();
