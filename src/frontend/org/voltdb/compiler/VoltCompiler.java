@@ -1351,6 +1351,9 @@ public class VoltCompiler {
             "the catalog.");
         }
 
+        if (targetName != null) {
+            tableref.setTargetname(targetName);
+        }
         // streams cannot have tuple limits
         if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
             throw new VoltCompilerException("Streams cannot have row limits configured");

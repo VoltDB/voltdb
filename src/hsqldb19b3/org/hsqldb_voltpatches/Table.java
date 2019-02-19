@@ -149,6 +149,7 @@ public class Table extends TableBase implements SchemaObject {
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
     TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
+    private boolean isStream = false;          //is this a stream (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2731,8 +2732,8 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
             ttl.attributes.put("unit",  timeToLive.ttlUnit);
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
-            ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
+            ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             ttl.attributes.put("stream", timeToLive.stream);
             table.children.add(ttl);
         }
@@ -2792,5 +2793,17 @@ public class Table extends TableBase implements SchemaObject {
     @Override
     public String toString() {
         return super.toString() + ":" + getName().name;
+    }
+
+    public boolean isStream() {
+        return isStream;
+    }
+
+    public void setStream(boolean isStream) {
+        this.isStream = isStream;
+    }
+
+    public boolean isForExport() {
+        return (timeToLive != null && !StringUtil.isEmpty(timeToLive.stream));
     }
 }

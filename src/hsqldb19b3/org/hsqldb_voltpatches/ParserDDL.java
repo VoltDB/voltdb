@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
 
-import org.eclipse.jetty.util.StringUtil;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
@@ -44,7 +43,6 @@ import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.rights.GranteeManager;
 import org.hsqldb_voltpatches.rights.Right;
 import org.hsqldb_voltpatches.rights.User;
-import org.hsqldb_voltpatches.types.BooleanType;
 import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.UserTypeModifier;
@@ -240,6 +238,7 @@ public class ParserDDL extends ParserRoutine {
 
         switch (token.tokenType) {
 
+            case Tokens.STREAM :
             case Tokens.TABLE : {
                 read();
                 processAlterTable();
@@ -305,6 +304,11 @@ public class ParserDDL extends ParserRoutine {
                 return compileAlterSequence();
             }
             case Tokens.TABLE : {
+                read();
+
+                return compileAlterTable();
+            }
+            case Tokens.STREAM : {
                 read();
 
                 return compileAlterTable();
@@ -1094,13 +1098,7 @@ public class ParserDDL extends ParserRoutine {
         }
         read();
 
- //        //add a hidden cloumn
-//        if (stream != null && !alter) {
-//            ColumnSchema column = new ColumnSchema((HsqlName)(HsqlNameManager.getAutoColumnName("EXPORTED")),
-//                    Type.TINYINT, false, false, null);
-//            table.addColumn(column);
-//        }
-        if (token.tokenType == Tokens.SEMICOLON) {
+      if (token.tokenType == Tokens.SEMICOLON) {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
         } else {
             throw unexpectedToken();
@@ -1126,6 +1124,11 @@ public class ParserDDL extends ParserRoutine {
             int batchSize, int maxFrequency, String streamName) {
         if (!alter) {
             table.addTTL(value, unit, column, batchSize, maxFrequency, streamName);
+        } else {
+            // The migration target can not be altered
+            if (table.getTTL() != null && table.getTTL().stream != null && !table.getTTL().stream.equalsIgnoreCase(streamName)){
+                throw unexpectedToken("The migration target can not be altered.");
+            }
         }
 
         Object[] args = new Object[] {
@@ -1362,7 +1365,7 @@ public class ParserDDL extends ParserRoutine {
         name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
 
         Table table = TableUtil.newTable(database, type, name);
-
+        table.setStream(true);
         if (token.tokenType == Tokens.AS) {
             return readTableAsSubqueryDefinition(table);
         }
@@ -4421,11 +4424,7 @@ public class ParserDDL extends ParserRoutine {
             ColumnSchema column) {
 
         HsqlName writeName  = null;
-        Type     typeObject = readTypeDefinition(false);
         String   sql        = getLastPart();
-        Object[] args       = new Object[] {
-            table, column, typeObject
-        };
 
         if (!table.isTemp()) {
             writeName = table.getName();

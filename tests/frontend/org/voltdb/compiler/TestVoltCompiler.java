@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -3469,6 +3470,19 @@ public class TestVoltCompiler extends TestCase {
         return table.getPartitioncolumn().getName();
     }
 
+    private String getColumnInfoFor(Database db, String tableName, String columnName) {
+        Table table = getTableInfoFor(db, tableName);
+        if (table == null) {
+            return null;
+        }
+        for (Column column: table.getColumns()) {
+            if (column.getName().equalsIgnoreCase(columnName)) {
+                return columnName;
+            }
+        }
+        return null;
+
+    }
     private  MaterializedViewInfo getViewInfoFor(Database db, String tableName, String viewName) {
         Table table = db.getTables().getIgnoreCase(tableName);
         if (table == null) {
@@ -3592,6 +3606,24 @@ public class TestVoltCompiler extends TestCase {
         assertNull(getTableInfoFor(db, "User_Stream"));
         assertNull(getTableInfoFor(db, "User_Logins"));
         assertNull(getTableInfoFor(db, "User_LoginLastTime"));
+    }
+
+    public void testAlterStream() throws Exception {
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "ALTER STREAM e DROP COLUMN D2 ;\n" +
+                "ALTER STREAM e ADD COLUMN D4 VARCHAR(1);\n" +
+                "ALTER STREAM e ALTER COLUMN D4 INTEGER;\n"
+                );
+        // test drop, add and modify column
+        assertNull(getColumnInfoFor(db, "e", "D2"));
+        assertNotNull(getColumnInfoFor(db, "e", "D4"));
+        Table t = getTableInfoFor(db, "e");
+        for (Column c : t.getColumns()) {
+            if ("D4".equalsIgnoreCase(c.getName())) {
+                assert(c.getType() == Types.SMALLINT);
+            }
+        }
     }
 
     public void testBadDropStream() throws Exception {
@@ -3845,8 +3877,21 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerNibbleExport() throws Exception {
         String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
-                     " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+                " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET NO_TEST;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+        pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }

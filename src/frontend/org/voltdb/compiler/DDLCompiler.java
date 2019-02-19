@@ -1277,8 +1277,11 @@ public class DDLCompiler {
         // But the index creation needs to know if the table is replicated, and coerce
         // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
-        table.setIsreplicated(! node.attributes.containsKey("partitioncolumn"));
-
+        table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
+        table.setIsstream(isStream);
+        if (streamTarget != null) {
+            table.setTargetname(streamTarget);
+        }
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
 
@@ -1352,7 +1355,11 @@ public class DDLCompiler {
             ttl.setBatchsize(ttlValue);
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
-            ttl.setMigrationtarget(ttlNode.attributes.get("migrartionTarget"));
+            final String migrationTarget = ttlNode.attributes.get("migrartionTarget");
+            if (migrationTarget != null) {
+                ttl.setMigrationtarget(ttlNode.attributes.get("migrartionTarget"));
+                table.setForexport(true);
+            }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
                     ttl.setTtlcolumn(col);
