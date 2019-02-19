@@ -748,7 +748,6 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
     // Override start sequence number
     stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
@@ -778,7 +777,6 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
         }
 
         stream.endTransaction(uid);
-        lastUID = uid;
     }
 
     TupleSchema::freeTupleSchema(schema);
