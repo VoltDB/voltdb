@@ -68,9 +68,10 @@ public interface BinaryDeque {
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
      * @param objects Array of buffers representing the objects to be pushed to the head of the queue
+     * @param DeferredSerialization serializer method to write subsystem-specific meta data.
      * @throws java.io.IOException
      */
-    public void push(BBContainer objects[]) throws IOException;
+    public void push(BBContainer objects[], DeferredSerialization ds) throws IOException;
 
     /**
      * Start a BinaryDequeReader for reading, positioned at the start of the deque.

@@ -34,7 +34,6 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.HybridCrc32;
 import org.voltdb.NativeLibraryLoader;
-import org.voltdb.VoltDB;
 import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PairSequencer.CyclicSequenceException;
@@ -228,7 +227,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
 
                 for (PBDSegment currSegment : m_segments.tailMap(m_segment.segmentIndex(), inclusive).values()) {
-                    if (currSegment.getNumEntries(false) > 0)  return false;
+                    if (currSegment.getNumEntries(false) > 0) {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -280,27 +281,33 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
                 assertions();
                 moveToValidSegment();
+                // If cursor points to a deleted segment, looks for next segment until finds a valid one
+                long lastSegmentId = peekLastSegment().segmentIndex();
+                while (!m_segment.file().exists()) {
+                    // Tail segment should always exists
+                    if (m_segment.segmentIndex() == lastSegmentId) {
+                        throw new IOException("Tail segment file " + m_segment.file().getName() + " doesn't exist! ");
+                    }
+                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
+                }
                 PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
+                // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }
-                // If cursor points to a deleted segment, looks for next segment until finds a valid one
-                long lastSegmentId = peekLastSegment().segmentIndex();
                 while (!segmentReader.hasMoreEntries()) {
-                    // Tail segment should always exists
-                    if (m_segment.segmentIndex() == lastSegmentId) {
-                        if (!m_segment.file().exists()) {
-                            throw new IOException("Tail segment file " + m_segment.file().getName() + " doesn't exist! ");
-                        }
+                    if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
                         return false;
                     }
+
+                    segmentReader.close();
                     m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
+                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
                     if (segmentReader == null) {
                         segmentReader = m_segment.openForRead(m_cursorId);
                     }
                 }
-                // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                 if (segmentReader.readIndex() == 0) {
                     return true;
                 }
@@ -861,7 +868,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public synchronized void push(BBContainer objects[]) throws IOException {
+    public synchronized void push(BBContainer objects[], DeferredSerialization ds) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Cannot push(): PBD has been Closed");
@@ -872,7 +879,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         //Take the objects that were provided and separate them into deques of objects
         //that will fit in a single write segment
-        int maxObjectSize = PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES;
+        int maxObjectSize = PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES ;
+        if (ds != null) {
+            maxObjectSize -= ds.getSerializedSize();
+        }
+
         int available = maxObjectSize;
         for (BBContainer object : objects) {
             int needed = PBDSegment.ENTRY_HEADER_BYTES + object.b().remaining();
@@ -881,15 +892,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 if (needed > maxObjectSize) {
                     throw new IOException("Maximum object size is " + maxObjectSize);
                 }
-                currentSegment = new ArrayDeque<BBContainer>();
                 segments.offer(currentSegment);
+                currentSegment = new ArrayDeque<BBContainer>();
                 available = maxObjectSize;
             }
             available -= needed;
             currentSegment.add(object);
         }
 
-        segments.add(currentSegment);
+        segments.offer(currentSegment);
         assert(segments.size() > 0);
 
         // Calculate first index to push
@@ -913,6 +924,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         new VoltFile(m_path, fname));
             writeSegment.openForWrite(true);
             writeSegment.setFinal(false);
+            if (ds != null) {
+                writeSegment.writeExtraHeader(ds);
+            }
 
             // Prepare for next file
             nextIndex--;

@@ -47,7 +47,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 public class StreamBlock {
 
     // start seq number(8) + committed seq number (8) + row count(4) + uniqueId (8)
-    public static final int HEADER_SIZE = 28; //sequence number(8) + row count(4) + uniqueId(8)
+    public static final int HEADER_SIZE = 28;
     public static final int SEQUENCE_NUMBER_OFFSET = 0;
     public static final int COMMIT_SEQUENCE_NUMBER_OFFSET = 8;
     public static final int ROW_NUMBER_OFFSET = 16;

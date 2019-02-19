@@ -238,8 +238,6 @@ public abstract class PBDSegment {
     ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
         if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
 
-//        // Open for write because corrupted file may be truncated
-//        openForWrite(false);
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
 

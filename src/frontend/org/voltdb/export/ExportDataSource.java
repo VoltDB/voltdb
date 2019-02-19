@@ -1887,7 +1887,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return false;
     }
 
-
     private void setCommittedSeqNo(long committedSeqNo) {
         if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
         if (committedSeqNo > m_committedSeqNo) {

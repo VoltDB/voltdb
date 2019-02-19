@@ -195,19 +195,12 @@ public class PBDRegularSegment extends PBDSegment {
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             initNumEntries(0, 0);
-
         }
         if (forWrite) {
-            m_fc.position(m_writeOffset);
+            m_fc.position(m_fc.size());
         } else {
             m_fc.position(SEGMENT_HEADER_BYTES);
         }
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Open PBD Segment " + m_file.getName() +
-                    " for " + (forWrite ? "write" : "read") +
-                    " position set to " + m_fc.position());
-        }
-
 
         m_closed = false;
     }
