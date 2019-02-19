@@ -67,7 +67,7 @@ public class TestLowImpactDelete extends TestCase {
               + "    id BIGINT not null, \n"
               + "    ts TIMESTAMP not null, "
               + "    PRIMARY KEY (id) \n"
-              + " ) USING TTL 10 SECONDS ON COLUMN TS BATCH_SIZE 10 MAX_FREQUENCY 3; \n"
+              + " ) USING TTL 10 SECONDS ON COLUMN TS MAX_FREQUENCY 3 BATCH_SIZE 10; \n"
               + "PARTITION TABLE ttl ON COLUMN id;"
               + "CREATE INDEX ttlindex ON ttl (ts);"
 
