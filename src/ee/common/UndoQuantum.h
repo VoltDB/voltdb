@@ -36,7 +36,7 @@ namespace voltdb {
 class UndoLog;
 
 
-class UndoQuantum final {
+class UndoQuantum {
     // UndoQuantum has a very limited public API that allows UndoAction registration
     // and copying buffers into pooled storage. Anything else is reserved for friends.
     friend class ::StreamedTableTest;
@@ -50,7 +50,7 @@ protected:
 public:
     inline UndoQuantum(int64_t undoToken, Pool *dataPool)
         : m_undoToken(undoToken), m_dataPool(dataPool) {}
-    inline ~UndoQuantum() {}
+    inline virtual ~UndoQuantum() {}
 
     /**
      * Add a new UndoReleaseAction to the list of undo actions. interest is an optional UndoQuantumReleaseInterest which
@@ -121,8 +121,6 @@ public:
     inline int64_t getUndoToken() const {
         return m_undoToken;
     }
-
-    bool isDummy() {return false;}
 
     inline int64_t getAllocatedMemory() const
     {
