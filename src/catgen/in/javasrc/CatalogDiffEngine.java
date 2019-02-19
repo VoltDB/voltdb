@@ -509,11 +509,12 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint ||
+            suspect instanceof Constraint)
         {
             return null;
         }
         else if (suspect instanceof TimeToLive) {
+            // stream table can not have ttl columns
             Column column = ((TimeToLive) suspect).getTtlcolumn();
             Table table = (Table) column.getParent();
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
