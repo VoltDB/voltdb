@@ -282,6 +282,9 @@ public class UpdateCore extends VoltSystemProcedure {
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
+                // Bring the DR and Export buffer update to date.
+                context.getSiteProcedureConnection().quiesce();
+
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
                         VoltDB.instance().catalogUpdate(

@@ -441,6 +441,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
+                    long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             partitionId,
@@ -448,6 +449,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             startSequenceNumber,
                             tupleCount,
                             uniqueId,
+                            genId,
                             0,
                             length == 0 ? null : getBytes(length),
                             sync);

@@ -46,16 +46,11 @@ static const int COLUMN_COUNT = 5;
 static const int TUPLE_SIZE = 20;
 //RowSize(int32_t)+PartitionIndex(int32_t)+ColumnCount(int32_t)+nullMaskLength(2)
 static const int TUPLE_HEADER_SZ = 14;
-//ColumnNamesLength(5*int32_t)+ColumnNames(5)+TypeBytes(5*1)+ColumnLength(5*int32_t)+TableName(int32_t + 3)+metadataColumnInfo(ExportTupleStream::s_mdSchemaSize)
-static const int SCHEMA_SIZE = 20 + 5 + 5 + 20 + 7 + ExportTupleStream::s_mdSchemaSize; // 228
-//MetadataDataSize 5*int64_t+1byte (DB supplied columns)
-static const int METADATA_DATA_SIZE = 41;
 //Data size without schema information. = 75
-static const int MAGIC_TUPLE_SIZE = TUPLE_HEADER_SZ + METADATA_DATA_SIZE + TUPLE_SIZE;
+static const int MAGIC_TUPLE_SIZE = TUPLE_HEADER_SZ + TUPLE_SIZE;
 //Buffer row count size
-// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + EXPORT_BUFFER_HEADER_SIZE)
-static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE +
-        MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE + ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE;
+// Size of Buffer header including schema and uso
+static const int BUFFER_HEADER_SIZE = MAGIC_HEADER_SPACE_FOR_JAVA + ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE;
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
@@ -131,8 +126,6 @@ public:
         *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
         m_tuple = new TableTuple(m_schema);
         m_tuple->move(m_tupleMemory);
-        m_schemaSize = SCHEMA_SIZE;
-        assert(m_wrapper->computeSchemaSize(m_tableName, m_columnNames) == SCHEMA_SIZE);
         m_tupleSize = MAGIC_TUPLE_SIZE;
         m_tuplesToFill = (BUFFER_SIZE - BUFFER_HEADER_SIZE) / (m_tupleSize);
 //        cout << "tuple size: " << m_tupleSize << " column name size: metadata - " << m_wrapper->getMDColumnNamesSerializedSize()
@@ -211,7 +204,6 @@ protected:
     MockVoltDBEngine* m_engine;
     boost::scoped_ptr<ExecutorContext> m_context;
     size_t m_tupleSize;
-    size_t m_schemaSize;
     int m_tuplesToFill;
     std::string m_tableName;
 };

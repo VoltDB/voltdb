@@ -53,10 +53,11 @@ public interface BinaryDeque {
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
      * @param object
+     * @param ds
      * @param allowCompression
      * @throws IOException
      */
-    void offer(BBContainer object, boolean allowCompression) throws IOException;
+    void offer(BBContainer object, DeferredSerialization ds, boolean allowCompression, boolean createNewFile) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 
@@ -118,10 +119,20 @@ public interface BinaryDeque {
          * Read and return the object at the current read position of this reader.
          * The entry will be removed once all active readers have read the entry.
          * @param ocf
+         * @param checkCRC
          * @return BBContainer with the bytes read. Null if there is nothing left to read.
          * @throws IOException
          */
-        public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+        public BBContainer poll(OutputContainerFactory ocf, boolean checkCRC) throws IOException;
+
+        /**
+         * Read and return the schema of table located in the segment header
+         * @param ocf
+         * @param checkCRC
+         * @return
+         * @throws IOException
+         */
+        public BBContainer getSchema(OutputContainerFactory ocf, boolean checkCRC) throws IOException;
 
         /**
          * Number of bytes left to read for this reader.
@@ -143,6 +154,13 @@ public interface BinaryDeque {
          * @throws IOException
          */
         public boolean isEmpty() throws IOException;
+
+        /**
+         * Is the object this reader going to read the first object of segment?
+         * @return true if the object this reader going to read is the first object of segment
+         * throws IOException
+         */
+        public boolean isStartOfSegment() throws IOException;
     }
 
     public static class TruncatorResponse {
