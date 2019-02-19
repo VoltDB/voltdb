@@ -107,6 +107,7 @@ public class GuestProcessor implements ExportDataProcessor {
         }
     }
 
+    @Override
     public ExportClientBase getExportClient(final String tableName) {
         ExportClientBase client = null;
         synchronized (GuestProcessor.this) {
@@ -235,7 +236,6 @@ public class GuestProcessor implements ExportDataProcessor {
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
-                                m_source.getSignature(),
                                 m_source.getTableName(),
                                 m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),

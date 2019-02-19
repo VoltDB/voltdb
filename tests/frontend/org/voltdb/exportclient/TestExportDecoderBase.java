@@ -27,13 +27,13 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.TimeZone;
-
-import junit.framework.TestCase;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -46,8 +46,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
+import junit.framework.TestCase;
 
 public class TestExportDecoderBase extends TestCase
 {
@@ -148,7 +147,7 @@ public class TestExportDecoderBase extends TestCase
         }
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", "yankeelover",
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "yankeelover",
                 partitionColumn, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
                 AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;

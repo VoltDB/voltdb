@@ -41,7 +41,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -88,7 +87,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
-    private final String m_signature;
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
 
@@ -117,8 +115,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_lastPushedSeqNo = 0L;
     // Relinquish export master after this sequence number
     private long m_seqNoToDrain = Long.MAX_VALUE;
-    //This is released when all mailboxes are set.
-    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     // This EDS is export master when the flag set to true
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
     // This is set when mastership is going to transfer to another node.
@@ -198,7 +194,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String tableName,
             int partitionId,
             int siteId,
-            String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
             String overflowPath
@@ -208,12 +203,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
-        m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
+        m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
 
-        PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(m_signatureBytes);
-        String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
+        String nonce = m_tableName + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
@@ -329,9 +321,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
             m_siteId = partitionsLocalSite;
-            m_signature = jsObj.getString("signature");
-            m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
+            m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
             JSONArray columns = jsObj.getJSONArray("columns");
             for (int ii = 0; ii < columns.length(); ii++) {
                 JSONObject column = columns.getJSONObject(ii);
@@ -356,9 +347,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new IOException(e);
         }
 
-        PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(m_signatureBytes);
-        final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
+        final String nonce = m_tableName + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
          // Pretend it's rejoin so we set first unpolled to a safe place
@@ -393,7 +382,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         //export stream for run-everywhere clients doesn't need ack mailboxes
-        if (m_runEveryWhere) {
+        if (m_runEveryWhere || m_closed) {
             return;
         }
         if (exportLog.isDebugEnabled()) {
@@ -468,10 +457,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public String getSignature() {
-        return m_signature;
-    }
-
     public final int getPartitionId() {
         return m_partitionId;
     }
@@ -487,7 +472,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
-        stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
         stringer.keySymbolValuePair("startTime", ManagementFactory.getRuntimeMXBean().getStartTime());
         stringer.key("columns").array();
@@ -528,11 +512,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        result = m_signature.compareTo(o.m_signature);
-        if (result != 0) {
-            return result;
-        }
-
         return 0;
     }
 
@@ -555,7 +534,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result = 0;
         result += m_database.hashCode();
         result += m_tableName.hashCode();
-        result += m_signature.hashCode();
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
@@ -813,7 +791,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
+
+        // We're going away, so shut ourselves from the external world
         m_closed = true;
+        m_ackMailboxRefs.set(null);
+        m_mastershipAccepted.set(false);
 
         // FIXME: necessary? Old processor should have been shut down.
         //Returning null indicates end of stream
@@ -832,7 +814,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
-                    m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
@@ -844,8 +825,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<?> close() {
         m_closed = true;
-        //If we are waiting at this allow to break out when close comes in.
-        m_allowAcceptingMastership.release();
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -1091,6 +1070,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip forwarding ack of seq " + seq);
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
             // msgType:byte(1) + partition:int(4) + length:int(4) +
@@ -1129,6 +1114,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                if (p == null) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug(ExportDataSource.this.toString() + ": Skip forwarding ack to new replicas");
+                    }
+                    return;
+                }
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
                  // msg type(1) + partition:int(4) + length:int(4) +
@@ -1231,6 +1222,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending give mastership message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 ) {
             // msg type(1) + partition:int(4) + length:int(4) +
@@ -1263,6 +1260,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void sendTakeMastershipMessage() {
         m_queryResponses.clear();
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         m_currentRequestId = System.nanoTime();
         if (mbx != null && p.getSecond().size() > 0) {
@@ -1293,6 +1296,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending query response message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
@@ -1418,6 +1427,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
             m_queryResponses.clear();
             Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            if (p == null) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug(ExportDataSource.this.toString() + ": Skip sending gap query.");
+                }
+                return;
+            }
             Mailbox mbx = p.getFirst();
             m_currentRequestId = System.nanoTime();
             if (mbx != null && p.getSecond().size() > 0) {
@@ -1504,6 +1519,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     m_queryResponses.put(sendHsId, new QueryResponse(lastSeq));
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                    if (p == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore query response.");
+                        }
+                        return;
+                    }
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
                         List<Entry<Long, QueryResponse>> candidates =
                                 m_queryResponses.entrySet().stream()
@@ -1567,6 +1588,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void sendTakeMastershipResponse(long senderHsId, long requestId) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership response message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
@@ -1596,6 +1623,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     m_queryResponses.put(sendHsId, null);
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                    if (p == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore take mastership response.");
+                        }
+                        return;
+                    }
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
                         acceptMastership();
                     }

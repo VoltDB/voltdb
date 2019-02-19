@@ -190,7 +190,6 @@ public class TestExportDataSource extends TestCase {
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
-                    table.getSignature(),
                     table.getColumns(),
                     table.getPartitioncolumn(),
                     TEST_DIR.getAbsolutePath());
@@ -198,7 +197,6 @@ public class TestExportDataSource extends TestCase {
                 assertEquals("database", s.getDatabase());
                 assertEquals(table_name, s.getTableName());
                 assertEquals(m_part, s.getPartitionId());
-                assertEquals(table.getSignature(), s.getSignature());
             } finally {
                 s.close();
             }
@@ -213,7 +211,6 @@ public class TestExportDataSource extends TestCase {
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -312,7 +309,6 @@ public class TestExportDataSource extends TestCase {
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -390,7 +386,6 @@ public class TestExportDataSource extends TestCase {
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
@@ -496,7 +491,6 @@ public class TestExportDataSource extends TestCase {
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
-                table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());

@@ -70,7 +70,7 @@ public class ExportTestClient extends ExportClientBase
         if (verifier == null) {
             System.out.println("No verifier for table " + tableName + " and partition " + partition);
             System.out.println("Expected Verifiers registered: " + m_verifiers);
-            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, "foo", tableName,
+            AdvertisedDataSource source = new AdvertisedDataSource((int )partition, tableName,
                     "", 0, 0, null, null, null,
                     AdvertisedDataSource.ExportFormat.SEVENDOTX);
             verifier = new ExportTestVerifier(source);

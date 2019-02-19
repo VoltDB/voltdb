@@ -151,6 +151,7 @@ public class ExportGeneration implements Generation {
     private void initializeGenerationFromDisk(HostMessenger messenger,
             final ExportDataProcessor processor,
             File[] files, List<Pair<Integer, Integer>> localPartitionsToSites) {
+
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
 
         /*
@@ -161,15 +162,17 @@ public class ExportGeneration implements Generation {
         Map<String, File> dataFiles = new HashMap<>();
         for (File data: files) {
             if (data.getName().endsWith(".pbd")) {
-                // Naming convention for pdb file, [table name]_[table crc]_[partition].[index].pdb
-                String nonce = data.getName().substring(0, data.getName().indexOf('.'));
+                // Naming convention for pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb
+                String nonce = data.getName().substring(0, data.getName().lastIndexOf('.'));
+                nonce = nonce.substring(0, nonce.lastIndexOf('_'));
+                nonce = nonce.substring(0, nonce.lastIndexOf('_'));
                 dataFiles.put(nonce, data);
             }
         }
         for (File ad: files) {
             if (ad.getName().endsWith(".ad")) {
-                // Naming convention for ad file, [table name]_[table crc]_[partition].ad
-                String nonce = ad.getName().substring(0, ad.getName().indexOf('.'));
+                // Naming convention for ad file, [table name]_[partition].ad
+                String nonce = ad.getName().substring(0, ad.getName().lastIndexOf('.'));
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
@@ -304,8 +307,7 @@ public class ExportGeneration implements Generation {
                         final int length = buf.getInt();
                         byte stringBytes[] = new byte[length];
                         buf.get(stringBytes);
-                        String signature = new String(stringBytes, Constants.UTF8ENCODING);
-                        String tableName = tableNameFromSignature(signature);
+                        String tableName = new String(stringBytes, Constants.UTF8ENCODING);
                         if (partitionSources == null) {
                             exportLog.error("Received an export ack for partition " + partition +
                                     " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
@@ -710,13 +712,12 @@ public class ExportGeneration implements Generation {
                                 key,
                                 partition,
                                 siteId,
-                                table.getSignature(),
                                 table.getColumns(),
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Creating ExportDataSource for table in catalog " + key +
-                                    " signature " + table.getSignature() + " partition " + partition + " site " + siteId);
+                            exportLog.debug("Creating ExportDataSource for table in catalog " + key
+                                    + " partition " + partition + " site " + siteId);
                         }
 
                         dataSourcesForPartition.put(key, exportDataSource);
