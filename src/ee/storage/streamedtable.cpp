@@ -158,7 +158,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_executorContext->currentSpHandle(),
                                       currSequenceNo,
                                       m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
                                       source,
                                       partitionColumn(),
                                       ExportTupleStream::INSERT);

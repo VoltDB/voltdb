@@ -275,7 +275,6 @@ SET (VOLTDB_SRC
   storage/temptable.cpp
   storage/TempTableLimits.cpp
   storage/TupleBlock.cpp
-  storage/TupleStreamBase.cpp
   structures/ContiguousAllocator.cpp
   structures/CompactingPool.cpp
 )

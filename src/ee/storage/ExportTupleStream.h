@@ -79,7 +79,7 @@ public:
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return s_mdSchemaSize; }
 
-    int64_t debugAllocatedBytesInEE() const {
+    int64_t testAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
         int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
@@ -94,7 +94,6 @@ public:
             int64_t spHandle,
             int64_t seqNo,
             int64_t uniqueId,
-            int64_t timestamp,
             const TableTuple &tuple,
             int partitionColumn,
             ExportTupleStream::Type type);
@@ -132,6 +131,15 @@ public:
     inline ExportTupleStream* getNextFlushStream() const {
         return m_nextFlushStream;
     }
+
+    inline bool testFlushPending() {
+        return m_flushPending;
+    }
+
+    inline int64_t testFlushBuffCreateTime() {
+        return m_lastFlush;
+    }
+
 
 public:
     // Computed size for metadata columns

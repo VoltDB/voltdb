@@ -129,13 +129,12 @@ public:
                                int64_t spHandle,
                                int64_t seqNo,
                                int64_t uniqueId,
-                               int64_t timestamp,
                                const TableTuple &tuple,
                                int partitionColumn,
                                ExportTupleStream::Type type) {
         receivedTuples.push_back(tuple);
         return ExportTupleStream::appendTuple(m_engine, spHandle, seqNo,
-                                              uniqueId, timestamp, tuple, partitionColumn, type);
+                                              uniqueId, tuple, partitionColumn, type);
     }
 
     std::vector<TableTuple> receivedTuples;

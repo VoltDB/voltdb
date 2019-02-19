@@ -70,14 +70,18 @@ public:
     ~MockVoltDBEngine() { }
 
 
-    virtual ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
+    ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
         return &m_enginesNewest;
     }
 
-    virtual ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
+    ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
         return &m_enginesOldest;
     }
 
+    bool streamsToFlush() {
+        assert(m_enginesNewest == m_enginesOldest);
+        return m_enginesOldest != NULL;
+    }
 
 private:
     ExportTupleStream* m_enginesOldest;
@@ -153,20 +157,38 @@ public:
 
         size_t mark = m_wrapper->bytesUsed();
         int64_t prevSeqNo = m_wrapper->getSequenceNumber();
+        int64_t uniqueId = UniqueId::makeIdFromComponents(currentTxnId + VOLT_EPOCH_IN_MILLIS, 0, 0);
 
         // append into the buffer (sequence number should be the same as the currentTxnId for test purposes)
-        m_wrapper->appendTuple(m_engine, currentTxnId, seqNo, currentTxnId, 1, *m_tuple,
+        m_wrapper->appendTuple(m_engine, currentTxnId, seqNo, uniqueId, *m_tuple,
                                1,
                                ExportTupleStream::INSERT);
         return rollbackMarker(mark, prevSeqNo);
     }
 
     void commit(int64_t currentTxnId) {
-        m_wrapper->commit(m_engine, currentTxnId, currentTxnId);
+        int64_t uniqueId = UniqueId::makeIdFromComponents(currentTxnId + VOLT_EPOCH_IN_MILLIS, 0, 0);
+        m_wrapper->commit(m_engine, currentTxnId, uniqueId);
     }
 
     void rollbackExportTo(rollbackMarker marker) {
         m_wrapper->rollbackExportTo(marker.mark, marker.seqNo);
+    }
+
+    void periodicFlush(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
+        m_wrapper->periodicFlush(timeInMillis, lastCommittedSpHandle);
+        *m_engine->getNewestExportStreamWithPendingRowsForAssignment() = NULL;
+        *m_engine->getOldestExportStreamWithPendingRowsForAssignment() = NULL;
+    }
+
+    bool checkTargetFlushTime(int64_t target) {
+        if (!m_engine->streamsToFlush() || !m_wrapper->testFlushPending()) return -1;
+        int64_t expectedUniqueId = UniqueId::makeIdFromComponents(target + VOLT_EPOCH_IN_MILLIS, 0, 0);
+        return m_wrapper->testFlushBuffCreateTime() == UniqueId::ts(expectedUniqueId);
+    }
+
+    bool testNoStreamsToFlush() {
+        return !m_engine->streamsToFlush() && !m_wrapper->testFlushPending();
     }
 
     virtual ~ExportTupleStreamTest() {
@@ -255,7 +277,9 @@ TEST_F(ExportTupleStreamTest, DoOneTuple) {
     // write a new tuple and then flush the buffer
     appendTuple(1, 2, 1);
     commit(2);
-    m_wrapper->periodicFlush(-1, 2);
+    ASSERT_TRUE(checkTargetFlushTime(2));
+    periodicFlush(-1, 2);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -272,7 +296,7 @@ TEST_F(ExportTupleStreamTest, DoOneTuple) {
 TEST_F(ExportTupleStreamTest, BasicOps) {
 
     // verify the block count statistic.
-    size_t allocatedByteCount = m_wrapper->debugAllocatedBytesInEE();
+    size_t allocatedByteCount = m_wrapper->testAllocatedBytesInEE();
 
     EXPECT_TRUE(allocatedByteCount == 0);
     std::ostringstream os;
@@ -283,10 +307,12 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
         commit(cnt);
     }
 
-    m_wrapper->periodicFlush(-1, 2);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    periodicFlush(-1, 2);
+    ASSERT_TRUE(testNoStreamsToFlush());
     allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE;
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->testAllocatedBytesInEE();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->testAllocatedBytesInEE(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 1 << ", actual: " << m_topend.exportBlocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.exportBlocks.size() == 1, os.str().c_str());
     boost::shared_ptr<ExportStreamBlock> results2 = m_topend.exportBlocks.front();
@@ -297,12 +323,14 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
         appendTuple(cnt-1, cnt, cnt);
         commit(cnt);
     }
-    m_wrapper->periodicFlush(-1, 5);
+    ASSERT_TRUE(checkTargetFlushTime(3));
+    periodicFlush(-1, 5);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     // 3 rows - 2 blocks (2, 3)
     allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
-    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->testAllocatedBytesInEE();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->testAllocatedBytesInEE(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 2 << ", actual: " << m_topend.exportBlocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.exportBlocks.size() == 2, os.str().c_str());
 
@@ -323,8 +351,8 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
 
     // ack all of the data and re-verify block count
-    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    EXPECT_TRUE(m_wrapper->debugAllocatedBytesInEE()== 0);
+    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->testAllocatedBytesInEE();
+    EXPECT_TRUE(m_wrapper->testAllocatedBytesInEE()== 0);
 }
 
 /**
@@ -336,13 +364,18 @@ TEST_F(ExportTupleStreamTest, FarFutureFlush) {
         appendTuple(i-1, i, i);
         commit(i);
     }
-    m_wrapper->periodicFlush(-1, 99);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    periodicFlush(-1, 99);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     for (int i = 100; i < 103; i++) {
         appendTuple(i-1, i, i-97);
         commit(i);
     }
-    m_wrapper->periodicFlush(-1, 130);
+    // Make sure the flushTime is based on the first txn of the buffer
+    ASSERT_TRUE(checkTargetFlushTime(100));
+    periodicFlush(-1, 130);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -379,7 +412,12 @@ TEST_F(ExportTupleStreamTest, Fill) {
 
     // now, drop in one more (this will push the previous buffer with committed Txns
     appendTuple(m_tuplesToFill, m_tuplesToFill + 1, m_tuplesToFill + 1);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    ASSERT_FALSE(m_topend.receivedExportBuffer);
+    commit(m_tuplesToFill + 1);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
+    // Make sure the target flush time is for the last txn
+    ASSERT_TRUE(checkTargetFlushTime(m_tuplesToFill + 1));
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
@@ -409,8 +447,10 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
 
     commit(1);
 
-    // now, finally drop in a tuple that closes the first TXN
+    // now, finally drop in a tuple that should not affect the flush time of the new buffer
     appendTuple(1, 2, m_tuplesToFill+2);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
@@ -441,11 +481,14 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
     rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, m_tuplesToFill+1);
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
+    ASSERT_FALSE(m_topend.receivedExportBuffer);
     rollbackExportTo(lastAppendTupleMarker);
+    ASSERT_FALSE(m_topend.receivedExportBuffer);
+    ASSERT_TRUE(checkTargetFlushTime(1));
 
     // so flush and make sure we got something sane
-    m_wrapper->periodicFlush(-1, 1);
+    periodicFlush(-1, 1);
+    ASSERT_TRUE(testNoStreamsToFlush());
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
@@ -467,13 +510,41 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
     // We shouldn't yet get a buffer even though we've filled a bunch because
     // the transaction is still open.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
+    ASSERT_TRUE(checkTargetFlushTime(2));
 }
 
 /**
  * Simple rollback test, verify that we can rollback the first tuple,
  * append another tuple, and only get one tuple in the output buffer.
  */
-TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
+TEST_F(ExportTupleStreamTest, RollbackFirstTupleForNewTxn) {
+
+    rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, 1);
+    ASSERT_TRUE(testNoStreamsToFlush());
+    // rollback the first tuple
+    rollbackExportTo(lastAppendTupleMarker);
+
+    // write a new tuple and then flush the buffer
+    appendTuple(1, 3, 1);
+    commit(3);
+    ASSERT_TRUE(checkTargetFlushTime(3));
+    periodicFlush(-1, 3);
+    ASSERT_TRUE(testNoStreamsToFlush());
+
+    // we should only have one tuple in the buffer
+    ASSERT_TRUE(m_topend.receivedExportBuffer);
+    boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
+    m_topend.exportBlocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), m_tupleSize);
+    EXPECT_EQ(results->getRowCount(), 1);
+}
+
+/**
+ * Simple rollback test, verify that we can rollback the first tuple,
+ * append another tuple, and only get one tuple in the output buffer.
+ */
+TEST_F(ExportTupleStreamTest, RollbackFirstTupleAndRestartTxn) {
 
     rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, 1);
     // rollback the first tuple
@@ -482,7 +553,9 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
     // write a new tuple and then flush the buffer
     appendTuple(1, 2, 1);
     commit(2);
-    m_wrapper->periodicFlush(-1, 2);
+    ASSERT_TRUE(checkTargetFlushTime(2));
+    periodicFlush(-1, 2);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -490,6 +563,7 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), m_tupleSize);
+    EXPECT_EQ(results->getRowCount(), 1);
 }
 
 
@@ -509,13 +583,17 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
     // add another and roll it back and flush
     rollbackMarker lastAppendTupleMarker = appendTuple(m_tuplesToFill - 1, m_tuplesToFill, m_tuplesToFill);
     rollbackExportTo(lastAppendTupleMarker);
-    m_wrapper->periodicFlush(-1, m_tuplesToFill);
+    // have not finished filling the first buffer yet so the flush should still be the first txn
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    periodicFlush(-1, m_tuplesToFill);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize));
+    EXPECT_EQ(results->getRowCount(), m_tuplesToFill - 1);
 }
 
 /**
@@ -548,13 +626,16 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferRowByRow)
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
     ASSERT_EQ(m_wrapper->getCurrBlockForTest()->getRowCount(), 3);
-    m_wrapper->periodicFlush(-1, 3);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    periodicFlush(-1, 3);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * 3));
+    EXPECT_EQ(results->getRowCount(), 3);
 }
 
 TEST_F(ExportTupleStreamTest, RollbackWholeBufferByTxn)
@@ -579,13 +660,16 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferByTxn)
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
     ASSERT_EQ(m_wrapper->getCurrBlockForTest()->getRowCount(), 3);
-    m_wrapper->periodicFlush(-1, 3);
+    ASSERT_TRUE(checkTargetFlushTime(1));
+    periodicFlush(-1, 3);
+    ASSERT_TRUE(testNoStreamsToFlush());
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * 3));
+    EXPECT_EQ(results->getRowCount(), 3);
 }
 
 TEST_F(ExportTupleStreamTest, PartialRollback)
@@ -618,6 +702,7 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
         }
     }
     m_wrapper->rollbackExportTo(mark, seqNo);
+    ASSERT_TRUE(checkTargetFlushTime(1));
     commit(11);
     EXPECT_GT(m_wrapper->getCurrBlockForTest()->getRowCount(), 0);
     // Commit flushes the first buffer but leaves the tail of 11 (single row) as m_currBlock

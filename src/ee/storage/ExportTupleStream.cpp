@@ -86,7 +86,6 @@ size_t ExportTupleStream::appendTuple(
         int64_t spHandle,
         int64_t seqNo,
         int64_t uniqueId,
-        int64_t timestamp,
         const TableTuple &tuple,
         int partitionColumn,
         ExportTupleStream::Type type)
@@ -114,12 +113,7 @@ size_t ExportTupleStream::appendTuple(
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
-    if ((m_currBlock->remaining() < tupleMaxLength) ) {
-        if (m_currBlock->lastSequenceNumber() == m_committedSequenceNumber) {
-            // If this block had committed rows, it was registered with the Engine as a flush candidate
-            // remove it since the new buffer does not have any committed rows in it yet.
-            removeFromFlushList(engine, false);
-        }
+    if ((m_currBlock->remaining() < tupleMaxLength)) {
         //If we can not fit the data get a new block with size that includes schemaSize as well.
         extendBufferChain(tupleMaxLength);
     }
@@ -156,7 +150,7 @@ size_t ExportTupleStream::appendTuple(
 
     // write metadata columns - data we always write this.
     io.writeLong(spHandle);
-    io.writeLong(timestamp);
+    io.writeLong(UniqueId::ts(uniqueId));
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
     io.writeLong(m_siteId);
@@ -440,8 +434,6 @@ void ExportTupleStream::extendBufferChain(size_t minLength) {
     TupleStreamBase::commonExtendBufferChain(blockSize, m_uso);
 
     m_currBlock->recordStartSequenceNumber(m_nextSequenceNumber);
-
-    pushPendingBlocks();
 }
 
 

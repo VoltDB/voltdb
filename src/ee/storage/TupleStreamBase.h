@@ -102,7 +102,7 @@ protected:
     /** time interval between flushing partially filled buffers */
     int64_t m_flushInterval;
 
-    /** timestamp of most recent flush() */
+    /** timestamp of most recent flush() for DR last buffer create time for Export */
     int64_t m_lastFlush;
 
     /** size of buffer requested from the top-end */

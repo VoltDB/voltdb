@@ -121,7 +121,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_txnId(0),
     m_spHandle(0),
     m_uniqueId(0),
-    m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
     m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024, siteId), // engine may be null in unit tests
     m_traceOn(false),
