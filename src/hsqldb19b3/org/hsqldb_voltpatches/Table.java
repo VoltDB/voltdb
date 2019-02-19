@@ -2803,7 +2803,7 @@ public class Table extends TableBase implements SchemaObject {
         this.isStream = isStream;
     }
 
-    public boolean isForExport() {
+    public boolean isForMigration() {
         return (timeToLive != null && !StringUtil.isEmpty(timeToLive.stream));
     }
 }
