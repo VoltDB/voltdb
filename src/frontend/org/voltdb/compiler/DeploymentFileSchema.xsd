@@ -460,7 +460,15 @@
         </xs:simpleType>
     </xs:attribute>
     <xs:attribute name="role" type="drRoleType" default="master" />
+    <xs:attribute name="schema" type="drSchemaCheckType" default="strict" />
   </xs:complexType>
+
+  <xs:simpleType name="drSchemaCheckType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="strict"/>
+      <xs:enumeration value="flexible"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- DR cluster role -->
   <xs:simpleType name="drRoleType">
