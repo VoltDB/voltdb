@@ -627,7 +627,10 @@ public class ExportGeneration implements Generation {
     }
 
     /**
-     * Close and delete the {@code ExportDataSource} instance that are not exporting any more.
+     * Close and delete the {@code ExportDataSource} instances that were dropped.
+     *
+     * Note that this method waits on the completion of the closeAndDelete calls on
+     * the {@code ExportDataSource} instances
      *
      * @param doneTables set of table names
      */
@@ -638,22 +641,29 @@ public class ExportGeneration implements Generation {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
 
                 Map<String, ExportDataSource> sources = it.next();
-                for (Map.Entry<String, ExportDataSource> e : sources.entrySet()) {
-                    if (!doneTables.contains(e.getKey())) {
+                for (String doneTable : doneTables) {
+                    ExportDataSource eds = sources.get(doneTable);
+                    if (eds == null) {
                         continue;
                     }
-
-                    doneSources.add(e.getValue());
-                    sources.remove(e.getKey());
+                    doneSources.add(eds);
+                    sources.remove(doneTable);
                 }
             }
         }
 
-        //Do closings outside the synchronized block: note that it's fire and forget
-        // and we don't wait for the completions.
+        //Do closings outside the synchronized block and wait for completion.
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (ExportDataSource source : doneSources) {
             exportLog.info("Finished processing " + source);
-            source.closeAndDelete();
+            tasks.add(source.closeAndDelete());
+        }
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            //Logging of errors  is done inside the tasks so nothing to do here
+            //intentionally not failing if there is an issue with close
+            exportLog.error("Error deleting export data sources", e);
         }
     }
 
@@ -729,8 +739,13 @@ public class ExportGeneration implements Generation {
                         eds.markInCatalog();
                         ExportClientBase client = processor.getExportClient(key);
                         if (client != null) {
+                            // Associate to an existing export client
                             eds.setClient(client);
                             eds.setRunEveryWhere(client.isRunEverywhere());
+                        } else {
+                            // Reset to no export client
+                            eds.setClient(null);
+                            eds.setRunEveryWhere(true);
                         }
                     }
                 } catch (IOException e) {

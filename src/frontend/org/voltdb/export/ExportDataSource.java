@@ -397,8 +397,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setClient(ExportClientBase client) {
-        //TODO precondition?
-        m_exportTargetName = client.getTargetName();
+        m_exportTargetName = client != null ? client.getTargetName() : "";
         m_client = client;
     }
 
@@ -790,15 +789,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_closed;
     }
 
+    /**
+     * This is called on updateCatalog when an exporting stream is dropped.
+     *
+     * Note: The {@code ExportDataProcessor} must have been shut down prior
+     *      to calling this method.
+     *
+     * @return
+     */
     public ListenableFuture<?> closeAndDelete() {
 
         // We're going away, so shut ourselves from the external world
         m_closed = true;
         m_ackMailboxRefs.set(null);
+
+        // Export mastership should have been released: force it.
         m_mastershipAccepted.set(false);
 
         // FIXME: necessary? Old processor should have been shut down.
-        //Returning null indicates end of stream
+        // Returning null indicates end of stream
         try {
             if (m_pollFuture != null) {
                 m_pollFuture.set(null);
@@ -812,6 +821,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    // Discard the pending container, shortcutting the standard discard logic
+                    AckingContainer ack = m_pendingContainer.getAndSet(null);
+                    if (ack != null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Discard pending container, lastSeqNo: " + ack.getLastSeqNo());
+                        }
+                        ack.internalDiscard();
+                    }
                     m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
                 } catch(IOException e) {
@@ -843,7 +860,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
     public void setPendingContainer(AckingContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
-        m_pendingContainer.set(container);
+        if (m_closed) {
+            // A very slow export decoder must have noticed the export processor shutting down
+            exportLog.info("Discarding stale pending container");
+            container.internalDiscard();
+        } else {
+            m_pendingContainer.set(container);
+        }
     }
 
     public ListenableFuture<AckingContainer> poll() {
@@ -1015,6 +1038,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public void updateStartTime(long startTime) {
             m_startTime = startTime;
+        }
+
+        // Package private
+        long getLastSeqNo() {
+            return m_lastSeqNo;
+        }
+
+        // Package private
+        void internalDiscard() {
+            checkDoubleFree();
+            m_backingCont.discard();
         }
 
         @Override
