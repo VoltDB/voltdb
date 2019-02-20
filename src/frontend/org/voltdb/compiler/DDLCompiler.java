@@ -1355,9 +1355,9 @@ public class DDLCompiler {
             ttl.setBatchsize(ttlValue);
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
-            final String migrationTarget = ttlNode.attributes.get("migrartionTarget");
+            final String migrationTarget = ttlNode.attributes.get("migrationTarget");
             if (migrationTarget != null) {
-                ttl.setMigrationtarget(ttlNode.attributes.get("migrartionTarget"));
+                ttl.setMigrationtarget(migrationTarget);
                 table.setForexport(true);
             }
             for (Column col : table.getColumns()) {

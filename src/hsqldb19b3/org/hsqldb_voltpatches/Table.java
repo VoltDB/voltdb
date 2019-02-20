@@ -2734,7 +2734,7 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
-            ttl.attributes.put("stream", timeToLive.stream);
+            ttl.attributes.put("migrationTarget", timeToLive.stream);
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
