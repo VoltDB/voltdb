@@ -517,6 +517,9 @@ public class CatalogDiffEngine {
             // stream table can not have ttl columns
             Column column = ((TimeToLive) suspect).getTtlcolumn();
             Table table = (Table) column.getParent();
+            if (m_inStrictMatViewDiffMode) {
+                return "May not dynamically add TTl on materialized view's columns.";
+            }
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically add TTL on stream table's columns.";
             }
