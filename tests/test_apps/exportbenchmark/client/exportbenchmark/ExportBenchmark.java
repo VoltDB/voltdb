@@ -573,13 +573,9 @@ public class ExportBenchmark {
      * @throws NoConnectionsException
      */
     private void runTest() throws InterruptedException {
-<<<<<<< HEAD
+
+        boolean isSocketTest = config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"));
         boolean success = true;
-=======
-
-        boolean isSocketTest = config.target.equals("socket");
-
->>>>>>> e71497746d573cbe71d1aec0da9ac1202d7dc5fc
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -590,7 +586,6 @@ public class ExportBenchmark {
             System.exit(1);
         }
 
-<<<<<<< HEAD
         Thread writes = null;
         if ( !config.socketmode.equals("receiver")) {
             // Figure out how long to run for
@@ -615,32 +610,13 @@ public class ExportBenchmark {
                 }
             });
             writes.start();
+            Thread.sleep(config.warmup * 1000);
         }
 
-        if (config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"))) {
-            // don't do this for 'kafka' or 'other' -- nothing to listen to
-            setupSocketListener();
-            listenForStats();
-        }
-=======
-        // Figure out how long to run for
-        benchmarkStartTS = System.currentTimeMillis();
-        if (config.warmup == 0) {
-            benchmarkWarmupEndTS = 0;
-        } else {
-            benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
-        }
-        //If we are going by count turn of end by timestamp.
-        if (config.count > 0) {
-            benchmarkEndTS = 0;
-        } else {
-            benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
-        }
-
-        // On a socket test, listen for stats until the exports are drained
-        // don't do this for Kafka -- nothing to listen to
         Thread statsListener = null;
         if (isSocketTest) {
+            // On a socket test, listen for stats until the exports are drained
+            // don't do this for other export types
             final CountDownLatch listenerRunning = new CountDownLatch(1);
             statsListener = new Thread(new Runnable() {
                 @Override
@@ -654,19 +630,6 @@ public class ExportBenchmark {
             listenerRunning.await();
         }
 
-        // Do the inserts in a separate thread
-        Thread writes = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                doInserts(client);
-            }
-        });
-        writes.start();
-        Thread.sleep(config.warmup * 1000);
->>>>>>> e71497746d573cbe71d1aec0da9ac1202d7dc5fc
-
-
-
         if (!config.socketmode.equals("receiver")) {
             writes.join();
             periodicStatsTimer.cancel();
@@ -674,7 +637,7 @@ public class ExportBenchmark {
         }
 
         // wait for export to finish draining if we are receiver..
-        if (config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"))) {
+        if (isSocketTest) {
             try {
                 success = waitForStreamedAllocatedMemoryZero();
             } catch (IOException e) {
