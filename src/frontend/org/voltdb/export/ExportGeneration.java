@@ -220,6 +220,8 @@ public class ExportGeneration implements Generation {
             HostMessenger messenger,
             List<Pair<Integer, Integer>> localPartitionsToSites)
     {
+        // Update catalog version so that datasources use this version when propagating acks
+        m_catalogVersion = catalogContext.catalogVersion;
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Updating to catalog version : " + m_catalogVersion);
         }
@@ -259,9 +261,6 @@ public class ExportGeneration implements Generation {
         if (!currentTables.isEmpty()) {
             onSourcesDone(currentTables);
         }
-
-        // Update catalog version so that datasources use this version when propagating acks
-        m_catalogVersion = catalogContext.catalogVersion;
 
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = createdSources ?
@@ -335,14 +334,22 @@ public class ExportGeneration implements Generation {
 
                         if (msgType == ExportManager.RELEASE_BUFFER) {
                             final long seqNo = buf.getLong();
+                            final long catalogVersion = buf.getInt();
                             try {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
-                                            " with sequence number: " + seqNo +
+                                            " , sequence number: " + seqNo + ", catalogVersion: " + catalogVersion +
                                             " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                             " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                                 }
-                                eds.ack(seqNo);
+                                if (catalogVersion < eds.getCatalogVersionCreated()) {
+                                    exportLog.warn("Received stale export RELEASE_BUFFER sent in version " +
+                                            catalogVersion + ", for partition " +
+                                            partition + " source " + tableName +
+                                            ", created in version " + + eds.getCatalogVersionCreated());
+                                } else {
+                                    eds.ack(seqNo);
+                                }
                             } catch (RejectedExecutionException ignoreIt) {
                                 // ignore it: as it is already shutdown
                             }
@@ -1026,10 +1033,11 @@ public class ExportGeneration implements Generation {
      * @param signature
      * @return table name
      */
-    private String tableNameFromSignature(String signature) {
+    public static String tableNameFromSignature(String signature) {
         return signature.substring(0,  signature.indexOf("|"));
     }
 
+    @Override
     public int getCatalogVersion() {
         return m_catalogVersion;
     }

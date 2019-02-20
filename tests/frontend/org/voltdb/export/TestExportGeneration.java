@@ -193,7 +193,8 @@ public class TestExportGeneration {
             cb.get();
         }
 
-        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature);
+        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName);
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
 
@@ -209,7 +210,8 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
+        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
@@ -230,7 +232,7 @@ public class TestExportGeneration {
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, tableName, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
 
             cont.discard();
@@ -274,9 +276,10 @@ public class TestExportGeneration {
         Long hsid = getOtherMailboxHsid();
         assertNotNull( "other mailbox not listed in zookeeper",  hsid);
 
+        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, 1L).asVoltMessage()
+                new AckPayloadMessage(m_part, tableName, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -288,6 +291,61 @@ public class TestExportGeneration {
         }
         assertTrue("timeout on data source size poll", retries >= 0);
         assertEquals("unexpected data sources size", 0, m_expDs.sizeInBytes());
+    }
+
+    @Test
+    public void testStaleAckDelivery() throws Exception {
+        ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
+
+        int retries = 4000;
+        long size = m_expDs.sizeInBytes();
+
+        m_exportGeneration.pushExportBuffer(
+                m_part,
+                m_tableSignature,
+                /*seqNo*/1L,
+                1,
+                0L,
+                foo.duplicate(),
+                false
+                );
+
+        while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+        assertTrue("timeout on data source size poll", retries >= 0);
+        assertEquals("unexpected data sources size", foo.capacity() - StreamBlock.HEADER_SIZE, m_expDs.sizeInBytes());
+
+        retries = 1000;
+        size = m_expDs.sizeInBytes();
+
+        Long hsid = getOtherMailboxHsid();
+        assertNotNull( "other mailbox not listed in zookeeper",  hsid);
+
+        // Send an ack message with a catalogVersion < the EDS catalogVersion
+        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        m_mbox.send(
+                hsid,
+                new AckPayloadMessage(m_part,
+                        tableName, 1L,
+                        m_expDs.getCatalogVersionCreated() - 1) // stale catalogVersion
+                    .asVoltMessage()
+                );
+
+        while( --retries >= 0) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+
+        // The ack should have been ignored
+        assertEquals("unexpected data sources size", size, m_expDs.sizeInBytes());
     }
 
     private Long getOtherMailboxHsid() throws Exception {

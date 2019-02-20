@@ -131,6 +131,11 @@ public class TestExportDataSource extends TestCase {
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
+
+        @Override
+        public int getCatalogVersion() {
+            return 0;
+        }
     }
 
     @Override

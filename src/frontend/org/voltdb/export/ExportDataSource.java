@@ -89,6 +89,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_tableName;
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
+    private final int m_catalogVersionCreated;
 
     // For stats
     private final int m_siteId;
@@ -200,6 +201,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
     {
         m_generation = generation;
+        m_catalogVersionCreated = m_generation.getCatalogVersion();
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
@@ -298,6 +300,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             List<Pair<Integer, Integer>> localPartitionsToSites,
             final ExportDataProcessor processor) throws IOException {
         m_generation = generation;
+        m_catalogVersionCreated = m_generation.getCatalogVersion();
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -378,6 +381,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public boolean inCatalog() {
         return m_isInCatalog;
+    }
+
+    public int getCatalogVersionCreated() {
+        return m_catalogVersionCreated;
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -1112,9 +1119,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
-            // msgType:byte(1) + partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8).
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+            final int msgLen = getAckMessageLength();
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.RELEASE_BUFFER);
@@ -1122,6 +1127,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(seq);
+            buf.putInt(m_generation.getCatalogVersion());
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1156,9 +1162,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
-                 // msg type(1) + partition:int(4) + length:int(4) +
-                    // signaturesBytes.length + ackUSO:long(8).
-                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+                    final int msgLen = getAckMessageLength();
 
                     ByteBuffer buf = ByteBuffer.allocate(msgLen);
                     buf.put(ExportManager.RELEASE_BUFFER);
@@ -1166,6 +1170,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
                     buf.putLong(m_lastReleasedSeqNo);
+                    buf.putInt(m_generation.getCatalogVersion());
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1180,6 +1185,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
+    }
+
+    private int getAckMessageLength() {
+        // msg type(1) + partition:int(4) + length:int(4) +
+        // signaturesBytes.length + ackUSO:long(8) + catalogVersion:int(4).
+        final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
+        return msgLen;
     }
 
     public void ack(final long seq) {
