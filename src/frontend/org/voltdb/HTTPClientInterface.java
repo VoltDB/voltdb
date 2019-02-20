@@ -53,6 +53,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.ClientResponseToJsonApiV2;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -113,13 +114,15 @@ public class HTTPClientInterface {
         final AtomicBoolean m_complete = new AtomicBoolean(false);
         final Continuation m_continuation;
         final String m_jsonp;
+        private int m_api_version;
 
-        public JSONProcCallback(Continuation continuation, String jsonp) {
+        public JSONProcCallback(Continuation continuation, String jsonp, int api_version) {
             assert continuation != null : "given continuation is null";
 
             m_continuation = continuation;
             m_continuation.addContinuationListener(this);
             m_jsonp = jsonp;
+            m_api_version = api_version;
         }
 
         @Override
@@ -130,12 +133,16 @@ public class HTTPClientInterface {
                     m_rate_limited_log.log(
                             EstTime.currentTimeMillis(), Level.WARN, null,
                             "Procedure response arrived for a request that was timed out by jetty"
-                            );
+                    );
                 }
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
-            String msg = rimpl.toJSONString();
+            String msg = null;
+            if (m_api_version == 1)
+                msg = rimpl.toJSONString();
+            else if (m_api_version == 2)
+                msg = ClientResponseToJsonApiV2.toJSONStringV2(rimpl);
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
@@ -320,8 +327,12 @@ public class HTTPClientInterface {
 
             continuation.suspend(response);
             suspended = true;
+            JSONProcCallback cb;
+            if (request.getServletPath().equals("/api/2.0"))
+                cb = new JSONProcCallback(continuation, jsonp, 2);
+            else
+                cb = new JSONProcCallback(continuation, jsonp, 1);
 
-            JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
             boolean success;
             String hostname = request.getRemoteHost();
             if (params != null) {

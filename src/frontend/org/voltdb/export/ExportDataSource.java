@@ -636,13 +636,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int tupleCount,
             long uniqueId,
             ByteBuffer buffer,
-            boolean sync,
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
-                    lastSequenceNumber + "], sync=" + sync + ", poll=" + poll);
+                    lastSequenceNumber + "], poll=" + poll);
         }
         if (buffer != null) {
             // header space along is 8 bytes
@@ -695,15 +694,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
-        if (sync) {
-            try {
-                //Don't do a real sync, just write the in memory buffers
-                //to a file. @Quiesce or blocking snapshot will do the sync
-                m_committedBuffers.sync(true);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
-            }
-        }
         if (poll) {
             try {
                 pollImpl(m_pollFuture);
@@ -728,7 +718,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, false);
+                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -742,7 +732,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -751,6 +741,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             }));
+            if (sync) {
+                try {
+                    //Don't do a real sync, just write the in memory buffers
+                    //to a file. Blocking snapshot will do the fsync
+                    ListenableFuture<?> rslt = sync(true);
+                    rslt.get();
+                } catch (ExecutionException | InterruptedException e) {
+                    // swallow the exception since IOException will perform a CrashLocal
+                }
+            }
         } catch (RejectedExecutionException rej) {
             m_bufferPushPermits.release();
             //We are shutting down very much rolling generation so dont passup for error reporting.
@@ -799,7 +799,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 m_committedBuffers.sync(m_nofsync);
             } catch (IOException e) {
-                exportLog.error("failed to sync export overflow", e);
+                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
     }

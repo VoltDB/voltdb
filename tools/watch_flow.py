@@ -51,7 +51,7 @@ class ProcedureCaller:
 
     def __init__(self, args):
         try:
-            self.client = voltdbclient.FastSerializer(args.server, args.port, args.username, args.password)
+            self.client = voltdbclient.FastSerializer(args.server, args.port, False, args.username, args.password)
         except socket.error,e:
             print "Can't connect to " + args.server + ":" + str(args.port)
             print str(e)

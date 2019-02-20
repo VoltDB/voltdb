@@ -297,7 +297,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     if expectedOut:
         haddiffs = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
+            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + "\nTest Failed!\n\n"
             haddiffs = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"

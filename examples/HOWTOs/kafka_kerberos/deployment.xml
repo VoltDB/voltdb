@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<deployment>
+        <cluster hostcount="1" sitesperhost="8" kfactor="0" />
+      <export>
+        <configuration enabled="true" target="test" type="kafka">
+            <property name="bootstrap.servers">volt3d.voltdb.lan:9092</property>
+            <property name="topic.prefix">T8_</property>
+            <property name="skipinternals">true</property>
+            <property name="security.protocol">SASL_PLAINTEXT</property>
+            <property name="sasl.kerberos.service.name">kafka</property>
+       </configuration>
+      </export>
+      <import>
+        <configuration enabled="true"  module="kafkastream10.jar" type="kafka" version="10">
+            <property name="brokers">volt3d.voltdb.lan:9092</property>
+            <property name="topics">T8_CUSTOMER</property>
+            <property name="procedure">addCustomer</property>
+            <property name="groupid">1</property>
+            <property name="security.protocol">SASL_PLAINTEXT</property>
+            <property name="sasl.kerberos.service.name">kafka</property>
+        </configuration>
+      </import>
+  <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+</deployment>

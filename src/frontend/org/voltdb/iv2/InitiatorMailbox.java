@@ -35,6 +35,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -450,10 +451,10 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()) != null);
+        TransactionState txnState = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()));
 
         // If a fragment is part of a transaction which have not been seen on this site, restart it.
-        if (!seenTheTxn) {
+        if (txnState == null) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
                     "Transaction being restarted due to MigratePartitionLeader.", message.getTxnId());
@@ -470,15 +471,12 @@ public class InitiatorMailbox implements Mailbox
 
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
-        if (!m_scheduler.isLeader() && !message.isForReplica() && seenTheTxn) {
-            message.setForOldLeader(true);
+        if (!m_scheduler.isLeader() && !message.isForReplica()) {
+            message.setExecutedOnPreviousLeader(true);
+            txnState.setLeaderMigrationInvolved();
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
-        }
-        if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
-            tmLog.debug("The batch index of the fragment: " + message.getCurrentBatchIndex() + ". It is the 1st time on:"
-                    + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
         }
         return false;
     }
@@ -607,6 +605,7 @@ public class InitiatorMailbox implements Mailbox
         else if (repairWork instanceof FragmentTaskMessage) {
             // We need to get this into the repair log in case we've never seen it before.  Adding fragment
             // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
+            ((FragmentTaskMessage)repairWork).setExecutedOnPreviousLeader(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
@@ -614,6 +613,7 @@ public class InitiatorMailbox implements Mailbox
             // CompleteTransactionMessages should always be safe to handle.  Either the work was done, and we'll
             // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
             // get into the repair log and then let them run their course.
+            ((CompleteTransactionMessage)repairWork).setRequireAck(false);
             m_repairLog.deliver(repairWork);
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }

@@ -325,7 +325,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return saveTables(client, path, nonce, null, null, true, false);
     }
 
-    private VoltTable[] saveTablesWithDefaultNouceAndPath(Client client) {
+    private VoltTable[] saveTablesWithDefaultNonceAndPath(Client client) {
         String defaultParam = "{block:false,format:\"native\"}";
         VoltTable[] results = null;
         try {
@@ -3356,7 +3356,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3425,7 +3425,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3520,7 +3520,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3619,9 +3619,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, repl_table);
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 // now reptable has 1000 rows and parttable has 126 rows
-                saveTablesWithDefaultNouceAndPath(client);
+                saveTablesWithDefaultNonceAndPath(client);
 
-                Thread.sleep(1000);
+                waitForSnapshotToFinish(client);
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
                 VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
@@ -3629,12 +3629,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                Thread.sleep(250);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
-                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                File snapshotPath = new File(getSnapshotPath(lc, 0));
                 TreeMap<Long, String> snapshotNonces = new TreeMap<>();
                 for (File child : snapshotPath.listFiles()) {
                     Matcher matcher = pat.matcher(child.getName());
@@ -3715,8 +3716,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, repl_table);
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 // now reptable has 1000 rows and parttable has 126 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
@@ -3725,12 +3726,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                Thread.sleep(250);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
-                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                File snapshotPath = new File(getSnapshotPath(lc, 0));
                 TreeMap<Long, String> snapshotNonces = new TreeMap<>();
                 for (File child : snapshotPath.listFiles()) {
                     Matcher matcher = pat.matcher(child.getName());
@@ -3745,7 +3747,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                         MiscUtils.deleteRecursively(child);
                     }
                 }
-                snapshotPath = new File(lc.getServerSpecificRoot("1") + "/snapshots");
+                snapshotPath = new File(getSnapshotPath(lc, 1));
                 for (File child : snapshotPath.listFiles()) {
                     if (child.getName().startsWith(latestNonce)) {
                         MiscUtils.deleteRecursively(child);
@@ -3845,6 +3847,67 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
+
+    public void testReplicatedTableCSVSnapshotStatus()
+    throws Exception
+    {
+        m_config.shutDown();
+
+        int host_count = 2;
+        int site_count = 1;
+        int k_factor = 0;
+        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
+                                           BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project =
+            new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String replicatedTableName = "REPLICATED_TESTER";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(100, 0, null);
+                loadTable(client, replicatedTableName, true, repl_table);
+                VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, null, null, true, true);
+                assertEquals("Wrong host/site count from @SnapshotSave.",
+                             host_count * site_count, results[0].getRowCount());
+            }
+            finally {
+                client.close();
+            }
+
+            // Connect to each host and check @SnapshotStatus.
+            // Only one host should say it saved the replicated table we're watching.
+            Set<Long> hostIds = new HashSet<>();
+            for (int iclient = 0; iclient < host_count; iclient++) {
+                client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(iclient));
+                try {
+                    SnapshotResult[] results =
+                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
+                    for (SnapshotResult result : results) {
+                        if (result.table.equals(replicatedTableName)) {
+                            hostIds.add(result.hostID);
+                        }
+                    }
+                }
+                finally {
+                    client.close();
+                }
+            }
+            assertEquals("Replicated table CSV is not saved on exactly one host.", 1, hostIds.size());
+        }
+        catch (Exception e) {
+            fail(String.format("Caught %s: %s", e.getClass().getName(), e.getMessage()));
+        }
+        finally {
+            lc.shutDown();
+        }
+    }
+
 
     public static class SnapshotResult {
         Long hostID;
@@ -3985,5 +4048,33 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         builder.addServerConfig(config, false);
 
         return builder;
+    }
+
+    static void waitForSnapshotToFinish(Client client)
+            throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+        for (int i = 0; i < 20; ++i) {
+            if (isSnapshotFinished(client)) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        fail("Snapshot did not complete before timeout");
+    }
+
+    static boolean isSnapshotFinished(Client client)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr = client.callProcedure("@Statistics", "SNAPSHOTSTATUS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable table = cr.getResults()[0];
+        while (table.advanceRow()) {
+            if (table.getLong("END_TIME") < table.getLong("START_TIME")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static String getSnapshotPath(LocalCluster cluster, int hostId) {
+        return cluster.getServerSpecificRoot(Integer.toString(hostId)) + File.separator + "snapshots";
     }
 }

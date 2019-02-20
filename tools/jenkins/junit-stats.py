@@ -105,7 +105,7 @@ QUERY4 = """
 class Stats(object):
     def __init__(self):
         self.jhost = 'http://ci.voltdb.lan'
-        self.dbhost = 'volt24'
+        self.dbhost = 'junitstatsdb.voltdb.lan'
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', 'qa')
@@ -163,7 +163,7 @@ class Stats(object):
             return
 
         # throw a link to the query for the test history into the ticket to aid in checking/debugging the filer
-        note = 'http://volt24/adminer.php?server=volt24&username=qaquery&db=qa&sql=select+%2A+from+%60junit-test-failures%60+WHERE+name+%3D+%27'+issue['name']+'%27+and+job+%3D+%27'+job+'%27order+by+build+desc'
+        note = 'http://junitstatsdb.voltdb.lan/adminer.php?server=junitstatsdb.voltdb.lan&username=qaquery&db=qa&sql=select+%2A+from+%60junit-test-failures%60+WHERE+name+%3D+%27'+issue['name']+'%27+and+job+%3D+%27'+job+'%27order+by+build+desc'
         # and a link to the test history on jenkins by last completed build
         history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
@@ -584,7 +584,7 @@ class Tests(unittest.TestCase):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', "junitstatstests")
-        self.dbhost = 'volt24'
+        self.dbhost = 'junitstatsdb.voltdb.lan'
 
     def open_db(self):
         self.set_env()

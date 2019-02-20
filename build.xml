@@ -175,7 +175,8 @@
         <include name='*.jar' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
-        <exclude name='kafka-clients-0.10.2.1.jar' />
+ <!--         <exclude name='kafka-clients-0.10.2.1.jar' /> -->
+  <!--       <exclude name='kafka-clients-0.8.2.2.jar' /> -->
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
@@ -704,7 +705,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
-            <exclude name="lib/python/vdm/tests/**"/>
             <exclude name="**/*.pyc" />
         </fileset>
     </copy>
@@ -1729,6 +1729,8 @@ TEST CASES
 
             <jvmarg value="-Dtestindex=${testindex}" />
             <jvmarg value="-Dtestcount=${testcount}" />
+            <jvmarg value="-Drun.flaky.tests=${run.flaky.tests}" />
+            <jvmarg value="-Drun.flaky.tests.debug=${run.flaky.tests.debug}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>

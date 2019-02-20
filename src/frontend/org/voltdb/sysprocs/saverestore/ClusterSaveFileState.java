@@ -111,10 +111,8 @@ public class ClusterSaveFileState
             table_state = getTableState(table_name);
             table_state.addHostData(saveFileState); // throws if inconsistent
         }
-        for (TableSaveFileState table_state : m_tableStateMap.values())
-        {
-            if (!table_state.isConsistent())
-            {
+        for (TableSaveFileState table_state : m_tableStateMap.values()) {
+            if (!table_state.isConsistent()) {
                 String error = table_state.getConsistencyResult();
                 throw new IOException(error);
             }

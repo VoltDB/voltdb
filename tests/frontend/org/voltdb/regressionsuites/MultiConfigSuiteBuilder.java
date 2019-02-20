@@ -26,11 +26,16 @@ package org.voltdb.regressionsuites;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
-import junit.framework.Test;
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Predicates;
+
+import org.junit.Test;
+import org.voltdb.FlakyTestStandardRunner;
+import org.voltdb.FlakyTestRule.Flaky;
+import org.voltdb.FlakyTestRule.FlakyTestRunner;
+
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
@@ -46,9 +51,11 @@ import junit.framework.TestSuite;
 public class MultiConfigSuiteBuilder extends TestSuite {
 
     /** The class that contains the JUnit test methods to run */
-    final Class<? extends TestCase> m_testClass;
+    private final Class<? extends TestCase> m_testClass;
     // Collection of test method names to be ignored and not executed
-    final Collection<String> m_ignoredTests;
+    final Predicate<String> m_testPredicate;
+    // Print debug statements only if -Drun.flaky.tests.debug=TRUE
+    private final boolean DEBUG = FlakyTestStandardRunner.debug();
 
     /**
      * Get the JUnit test methods for a given class. These methods have no
@@ -57,6 +64,10 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @return A list of the names of each JUnit test method.
      */
     List<String> getTestMethodNames() {
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.getTestMethodNames");
+        }
+
         ArrayList<String> retval = new ArrayList<>();
 
         for (Method m : m_testClass.getMethods()) {
@@ -67,12 +78,45 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                 continue;
             }
             String name = m.getName();
-            if (!name.startsWith("test") || m_ignoredTests.contains(name)) {
+
+            // TODO: once all tests are converted to JUnit4, we can remove the
+            // '!name.startsWith("test") &&' part (and could also remove checking
+            // getReturnType and getParameterCount, above)
+            if ((!name.startsWith("test") && m.getAnnotation(Test.class) == null)
+                    || !m_testPredicate.apply(name)) {
                 continue;
+            }
+            Flaky flakyAnnotation = m.getAnnotation(Flaky.class);
+            if (flakyAnnotation != null) {
+                Method runFlakyTestMethod = null;
+                boolean runFlakyTest = true;
+                Class<? extends FlakyTestRunner> flakyTestRunner = flakyAnnotation.runCondition();
+                try {
+                    runFlakyTestMethod = flakyTestRunner.getMethod( "runFlakyTest",
+                                          Boolean.TYPE, String.class );
+                    runFlakyTest = (boolean) runFlakyTestMethod.invoke(
+                                          flakyTestRunner.getDeclaredConstructor().newInstance(),
+                                          flakyAnnotation.isFlaky(), flakyAnnotation.description() );
+                } catch (Exception e) {
+                    System.out.println("WARNING: in MultiConfigSuiteBuilder.getTestMethodNames, caught exception:");
+                    e.printStackTrace(System.out);
+                }
+                if (DEBUG) {
+                    System.out.println("DEBUG:   flakyAnnotation   : "+flakyAnnotation);
+                    System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
+                    System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
+                    System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                }
+                if (!runFlakyTest) {
+                    continue;
+                }
             }
             retval.add(name);
         }
 
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.getTestMethodNames");
+        }
         return retval;
     }
 
@@ -82,19 +126,28 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param testClass The class that contains the JUnit test methods to run.
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
-        this(testClass, Collections.emptySet());
+        this(testClass, Predicates.alwaysTrue());
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder constructor(1): "+testClass);
+        }
     }
 
     /**
      * Initialize by passing in a class that contains JUnit test methods to run.
      *
-     * @param testClass The class that contains the JUnit test methods to run.
-     * @param ignoredTests {@link Collection} of test names to be skipped. A test will be skipped if
-     *                  {@code skipTest.contains(methodName)} returns {@code true}
+     * @param testClass     The class that contains the JUnit test methods to run.
+     * @param testPredicate {@link Predicate} which will test the test names. If {@code testPredicate} returns
+     *                      {@code false} the test will not be executed.
      */
-    public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Collection<String> ignoredTests) {
+    public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Predicate<String> testPredicate) {
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder constructor(2): "+testClass+", "+testPredicate);
+        }
         m_testClass = testClass;
-        m_ignoredTests = ignoredTests;
+        m_testPredicate = testPredicate;
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder constructor(2)");
+        }
     }
 
     /**
@@ -104,10 +157,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (1): "+config);
+        }
         return addServerConfig(config, true);
     }
 
     public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
+        if (DEBUG) {
+            System.out.println("DEBUG: Entering MultiConfigSuiteBuilder.addServerConfig (2): "+config+", "+reuseServer);
+        }
 
         if (config.isValgrind()) {
             reuseServer = false;
@@ -156,6 +215,15 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         // get the set of test methods
         List<String> methods = getTestMethodNames();
 
+        if (DEBUG) {
+            if (methods.size() < 10) {
+                System.out.println("DEBUG:    methods: "+methods);
+            } else {
+                System.out.println("DEBUG:    methods: ["+methods.get(0)
+                        +", ..., "+methods.get(methods.size()-1)+"]");
+            }
+        }
+
         // add a test case instance for each method for the specified
         // server config
         for (int i = 0; i < methods.size(); i++) {
@@ -171,14 +239,25 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             // The last test method for the current cluster configuration will need to
             // shutdown the cluster completely after finishing the test.
             rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
+
+            if (DEBUG) {
+                if (i < 3 || i > 145) {
+                    System.out.println("DEBUG:    i, mname, rs: "+i+", "+mname+", "+rs);
+                } else if (i == 3) {
+                    System.out.println("DEBUG:      ...");
+                }
+            }
             super.addTest(rs);
         }
 
+        if (DEBUG) {
+            System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder.addServerConfig (2), true");
+        }
         return true;
     }
 
     @Override
-    public void addTest(Test test) {
+    public void addTest(junit.framework.Test test) {
         // don't let users do this
         throw new RuntimeException("Unsupported Usage");
     }

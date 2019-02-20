@@ -27,7 +27,6 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -36,9 +35,6 @@ import org.voltdb.utils.VoltTableUtil;
  * embedded planner process.
  */
 public class SwapTablesCore extends AdHocBase {
-
-    private static final int DEP_swapTables = (int) SysProcFragmentId.PF_swapTables | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_swapTablesAggregate = (int) SysProcFragmentId.PF_swapTablesAggregate;
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -55,11 +51,11 @@ public class SwapTablesCore extends AdHocBase {
             if (context.isLowestSiteId()) {
                 VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
             }
-            return new TableDependencyPair(DEP_swapTables, dummy);
+            return new TableDependencyPair(SysProcFragmentId.PF_swapTables, dummy);
         }
         else if (fragmentId == SysProcFragmentId.PF_swapTablesAggregate) {
-            return new TableDependencyPair(DEP_swapTablesAggregate,
-                    VoltTableUtil.unionTables(dependencies.get(DEP_swapTables)));
+            return new TableDependencyPair(SysProcFragmentId.PF_swapTablesAggregate,
+                    VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_swapTables)));
         }
 
         assert false;
@@ -90,22 +86,7 @@ public class SwapTablesCore extends AdHocBase {
 
     private VoltTable[] performSwapTablesCallback(String oneTable, String otherTable)
     {
-        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_swapTables;
-        pfs[0].outputDepId = DEP_swapTables;
-        pfs[0].inputDepIds = new int[]{};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(oneTable, otherTable);
-
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_swapTablesAggregate;
-        pfs[1].outputDepId = DEP_swapTablesAggregate;
-        pfs[1].inputDepIds = new int[]{DEP_swapTables};
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, DEP_swapTablesAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_swapTables, SysProcFragmentId.PF_swapTablesAggregate,
+                oneTable, otherTable);
     }
 }

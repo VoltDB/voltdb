@@ -70,7 +70,7 @@ public class FragmentResponseMessage extends VoltMessage {
     // indicate that the fragment is handled via original partition leader
     // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_isForOldLeader = false;
+    boolean m_executedOnPreviousLeader = false;
 
     // Used by MPI to differentiate responses due to the transaction restart
     long m_restartTimestamp = -1L;
@@ -250,7 +250,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
-        buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_executedOnPreviousLeader ? (byte) 1 : (byte) 0);
         buf.putLong(m_restartTimestamp);
         buf.putInt(m_drBufferSize);
         for (DependencyPair depPair : m_dependencies) {
@@ -286,7 +286,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
-        m_isForOldLeader = buf.get() == 1;
+        m_executedOnPreviousLeader = buf.get() == 1;
         m_restartTimestamp = buf.getLong();
         m_drBufferSize = buf.getInt();
         for (int i = 0; i < m_dependencyCount; i++) {
@@ -361,12 +361,12 @@ public class FragmentResponseMessage extends VoltMessage {
         return sb.toString();
     }
 
-    public void setForOldLeader(boolean forOldLeader) {
-        m_isForOldLeader = forOldLeader;
+    public void setExecutedOnPreviousLeader(boolean forOldLeader) {
+        m_executedOnPreviousLeader = forOldLeader;
     }
 
-    public boolean isForOldLeader() {
-        return m_isForOldLeader;
+    public boolean isExecutedOnPreviousLeader() {
+        return m_executedOnPreviousLeader;
     }
 
     public long getRestartTimestamp() {
