@@ -514,12 +514,13 @@ public class CatalogDiffEngine {
             return null;
         }
         else if (suspect instanceof TimeToLive) {
-            // stream table can not have ttl columns
             Column column = ((TimeToLive) suspect).getTtlcolumn();
             Table table = (Table) column.getParent();
+            // view table can not have ttl columns
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add TTl on materialized view's columns.";
             }
+            // stream table can not have ttl columns
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically add TTL on stream table's columns.";
             }
