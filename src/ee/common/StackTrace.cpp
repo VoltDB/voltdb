@@ -67,7 +67,7 @@ bool backtraceIsSupported() {
 
 }
 
-StackTrace::StackTrace() {
+StackTrace::StackTrace(uint32_t skipFrames) {
 
     if (backtraceIsSupported()) {
         /**
@@ -79,7 +79,7 @@ StackTrace::StackTrace() {
         const int numTraces = backtrace( traces, 128);
         m_traceSymbols = backtrace_symbols( traces, numTraces);
 
-        for (int ii = 0; ii < numTraces; ii++) {
+        for (int ii = skipFrames; ii < numTraces; ii++) {
             std::size_t sz = 200;
             // Note: must use malloc vs. new so __cxa_demangle can use realloc.
             char *function = static_cast<char*>(::malloc(sz));
@@ -141,16 +141,6 @@ void StackTrace::printMangledAndUnmangledToFile(FILE *targetFile) {
         const char *str = st.m_traces[ii].c_str();
         fprintf(targetFile, "demangled[%d]: %s\n", ii, str);
     }
-}
-
-std::string StackTrace::stringStackTrace()
-{
-    StackTrace st;
-    std::ostringstream stacked;
-    for (int ii=2; ii < st.m_traces.size(); ii++) {
-        stacked << st.m_traces[ii] << "\n";
-    }
-    return stacked.str();
 }
 
 } // namespace voltdb

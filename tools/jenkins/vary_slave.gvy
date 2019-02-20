@@ -206,6 +206,17 @@ boolean isIdle(host) {
 void setRotation(rotation, stacks_lit) {
 
     def always_offline =    build.buildVariableResolver.resolve("offline").replace(" ", "").tokenize(',')
+    // if cluster members are in the maintenance list, find the cluster master and add it to the offline list too
+    adds = []
+    for (o in always_offline) {
+        stack_map.each { name, stack ->
+            if (o in stack && !(name in (always_offline + adds))) {
+                adds.add(name)
+            }
+        }
+    }
+    always_offline.addAll(adds)
+    println(always_offline)
 
     /* rotation can be:
         notcluster - day rotation is selected: controller offline/nodes online
@@ -367,7 +378,8 @@ void setRotation(rotation, stacks_lit) {
 
         if (stacks.size() == 0) { return }
 
-        Thread.sleep(30000)
+        //Thread.sleep(30000)
+        break  //only one pass, rescheule in jenkins once a minute
     }
 }
 

@@ -108,6 +108,17 @@ uploadClientArchives {
                        organizationUrl 'http://www.voltdb.com'
                    }
                }
+
+               dependencies {
+                   runtime 'io.netty:netty-all:4.1.32.Final'
+                   runtime 'io.netty:netty-tcnative-boringssl-static:2.0.20.Final'
+               }
+            }
+            // Set all dependencies as optional
+            pom.withXml {
+                asNode().dependencies.dependency.findAll {
+                    it.appendNode('optional').value = 'true'
+                }
             }
         }
     }
@@ -140,7 +151,7 @@ uploadServerArchives {
             pom.project {
                name 'voltdb'
                packaging 'jar'
-               description 'VoltDB client interface libraries'
+               description 'VoltDB server libraries'
                url 'http://www.voltdb.com/'
 
                scm {

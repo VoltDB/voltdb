@@ -73,36 +73,11 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
             return true;
         }
 
-        boolean killAndRejoin(String mode) {
-            try {
-                m_cluster.killSingleHost(2);
-                // just set the override for the last host
-                m_cluster.setOverridesForModes(new String[]{"", "", mode});
-                return m_cluster.recoverOne(2, 0, "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false;
-            }
-        }
-
-        boolean killAndRejoin() {
-            try {
-                m_cluster.killSingleHost(2);
-                return m_cluster.recoverOne(2, 0, "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false;
-            }
-        }
-
-        boolean killAndRejoin(int node) {
-            try {
-                m_cluster.killSingleHost(node);
-                return m_cluster.recoverOne(node, 0, "");
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false;
-            }
+        boolean killAndRejoin(int node) throws Exception {
+            // Rejoin does not support paused so clear it
+            m_cluster.clearOverridesForModes();
+            m_cluster.killSingleHost(node);
+            return m_cluster.recoverOne(node, 0, "");
         }
 
         void shutdown() throws InterruptedException {
@@ -199,7 +174,7 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
     }
 
     @Test
-    public void testJoins() throws InterruptedException {
+    public void testRejoins() throws InterruptedException {
         try {
             MixedPauseCluster cluster = null;
 

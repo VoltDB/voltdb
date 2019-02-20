@@ -186,10 +186,6 @@ public class TestProcedureDetails extends RegressionSuite {
         for (long i = 0; i < 4; i++) {
             assertTrue(procedureDetail.advanceRow());
             trivialVerification(procedureDetail);
-            long hostId = procedureDetail.getLong("HOST_ID");
-            long siteId = procedureDetail.getLong("SITE_ID");
-            long partitionId = procedureDetail.getLong("PARTITION_ID");
-            assertEquals(hostId * 2 + siteId, partitionId);
             assertEquals(expectedInvocationCount, procedureDetail.getLong("INVOCATIONS"));
             assertEquals(expectedInvocationCount, procedureDetail.getLong("TIMED_INVOCATIONS"));
             assertEquals(0, procedureDetail.getLong("ABORTS"));
@@ -201,6 +197,7 @@ public class TestProcedureDetails extends RegressionSuite {
             }
 
             if (testConfig.isSinglePartition()) {
+                long partitionId = procedureDetail.getLong("PARTITION_ID");
                 assertEquals(partitionId, testConfig.getWorkingPartition());
                 assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
                         procedureDetail.getString("PROCEDURE"));
@@ -224,7 +221,6 @@ public class TestProcedureDetails extends RegressionSuite {
         if (testConfig.isSinglePartition()) {
             assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP",
                     procedureDetail.getString("PROCEDURE"));
-            assertEquals(hostId * 2 + siteId, partitionId);
             // See which partition this query went to.
             testConfig.setWorkingPartition(partitionId);
         }

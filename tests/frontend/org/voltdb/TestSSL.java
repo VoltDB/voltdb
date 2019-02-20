@@ -107,7 +107,7 @@ public class TestSSL extends TestCase {
         Map<String,String> env = new TreeMap<>();
         env.put("io.netty.leakDetection.level","PARANOID");
         m_cluster = new LocalCluster("ssl.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, false, true, env);
+                LocalCluster.FailureState.ALL_RUNNING, false, env);
         boolean success = m_cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("ssl.xml"));
@@ -216,7 +216,7 @@ public class TestSSL extends TestCase {
         int sitesPerHost = 2;
         int hostCount = 3;
         int kFactor = 2;
-        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI, false);
+        m_cluster = new LocalCluster("sslRejoin.jar", sitesPerHost, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setMaxHeap(1400);
         m_cluster.overrideAnyRequestForValgrind();
         m_cluster.setHasLocalServer(false);

@@ -31,7 +31,7 @@ class InterruptException : public SerializableEEException {
 public:
 
     InterruptException(std::string message);
-    virtual ~InterruptException() {}
+    virtual ~InterruptException() throw() {}
 
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;

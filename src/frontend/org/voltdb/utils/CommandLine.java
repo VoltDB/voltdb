@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
@@ -100,8 +101,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
         cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
-        cl.m_userSchema = m_userSchema;
-        cl.m_stagedClassesPath = m_stagedClassesPath;
+        cl.m_userSchemas = m_userSchemas;
+        cl.m_stagedClassesPaths = m_stagedClassesPaths;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -342,7 +343,9 @@ public class CommandLine extends VoltDB.Configuration
 
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
-        if (m_newCli) return this;
+        if (m_newCli) {
+            return this;
+        }
 
         this.voltFilePrefix = voltFilePrefix;
         return this;
@@ -541,8 +544,9 @@ public class CommandLine extends VoltDB.Configuration
          */
         cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
 
-        if (rmi_host_name != null)
+        if (rmi_host_name != null) {
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
+        }
         cmdline.add("-Dlog4j.configuration=" + log4j);
         if (m_vemTag != null) {
             cmdline.add("-D" + VEM_TAG_PROPERTY + "=" + m_vemTag);
@@ -737,8 +741,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
-        if (m_userSchema != null) {
-            cmdline.add("schema"); cmdline.add(m_userSchema.getAbsolutePath());
+        if (m_userSchemas != null) {
+            cmdline.add("schema");
+            cmdline.add(m_userSchemas.stream().map(File::getAbsolutePath).collect(Collectors.joining(",")));
         }
 
         if (customCmdLn != null && !customCmdLn.trim().isEmpty())
@@ -780,11 +785,6 @@ public class CommandLine extends VoltDB.Configuration
         }
         if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
-        }
-
-        if (m_sitesperhost != VoltDB.UNDEFINED) {
-            cmdline.add("sitesperhost");
-            cmdline.add(Integer.toString(m_sitesperhost));
         }
 
         //Add mesh and hostcount for probe only.

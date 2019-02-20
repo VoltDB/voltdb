@@ -91,7 +91,7 @@ dependencies {
     compile files('../../../obj/release/test')
     compile files('../../../obj/release/clientobj')
     compile files('../../../obj/release/prod')
-    compile files('../../../lib/commons-lang3-3.0.jar')
+    compile files('../../../lib/commons-lang3-3.8.1.jar')
     //compile files('../../../obj/release/testprocs')
 }
 

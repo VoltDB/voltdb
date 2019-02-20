@@ -56,6 +56,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
@@ -121,18 +122,20 @@ public class ExportGeneration implements Generation {
             int hostId,
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
+            final ExportDataProcessor processor,
             List<Pair<Integer, Integer>> localPartitionsToSites,
             File exportOverflowDirectory)
     {
         File files[] = exportOverflowDirectory.listFiles();
         if (files != null) {
-            initializeGenerationFromDisk(messenger, files, localPartitionsToSites);
+            initializeGenerationFromDisk(messenger, processor, files, localPartitionsToSites);
         }
-        initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, localPartitionsToSites);
+        initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, messenger, localPartitionsToSites);
 
     }
 
     private void initializeGenerationFromDisk(HostMessenger messenger,
+            final ExportDataProcessor processor,
             File[] files, List<Pair<Integer, Integer>> localPartitionsToSites) {
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
 
@@ -156,7 +159,7 @@ public class ExportGeneration implements Generation {
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
-                        addDataSource(ad, localPartitionsToSites, onDiskPartitions);
+                        addDataSource(ad, localPartitionsToSites, onDiskPartitions, processor);
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + ad, true, e);
                     }
@@ -181,6 +184,7 @@ public class ExportGeneration implements Generation {
 
     void initializeGenerationFromCatalog(CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
+            final ExportDataProcessor processor,
             int hostId,
             HostMessenger messenger,
             List<Pair<Integer, Integer>> localPartitionsToSites)
@@ -192,7 +196,7 @@ public class ExportGeneration implements Generation {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(table, hostId, localPartitionsToSites);
+                    addDataSources(table, hostId, localPartitionsToSites, processor);
                     exportSignatures.add(table.getSignature());
                     createdSources = true;
                 }
@@ -591,9 +595,11 @@ public class ExportGeneration implements Generation {
     /*
      * Create a datasource based on an ad file
      */
-    private void addDataSource(File adFile, List<Pair<Integer, Integer>> localPartitionsToSites,
-            List<Integer> adFilePartitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites);
+    private void addDataSource(File adFile,
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            List<Integer> adFilePartitions,
+            final ExportDataProcessor processor) throws IOException {
+        ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor);
         adFilePartitions.add(source.getPartitionId());
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
@@ -614,7 +620,9 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(Table table, int hostId, List<Pair<Integer, Integer>> localPartitionsToSites)
+    private void addDataSources(Table table, int hostId,
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            final ExportDataProcessor processor)
     {
         for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
 
@@ -634,6 +642,7 @@ public class ExportGeneration implements Generation {
                     final String key = table.getSignature();
                     if (!dataSourcesForPartition.containsKey(key)) {
                         ExportDataSource exportDataSource = new ExportDataSource(this,
+                                processor,
                                 "database",
                                 table.getTypeName(),
                                 partition,
@@ -651,6 +660,10 @@ public class ExportGeneration implements Generation {
                     } else {
                         //Since we are loading from catalog any found EDS mark it to be in catalog.
                         dataSourcesForPartition.get(key).markInCatalog();
+                        ExportClientBase client = processor.getExportClient(table.getTypeName());
+                        if (client != null) {
+                            dataSourcesForPartition.get(key).setRunEveryWhere(client.isRunEverywhere());
+                        }
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB(
@@ -711,24 +724,49 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, long sequenceNumber) {
+                                                boolean isRecover, boolean isRejoin,
+                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
-
+        List<ListenableFuture<?>> tasks = new ArrayList<>();
         Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
         // It is possible that for restore the partitions have changed, in which case what we are doing is silly
         if (dataSource != null) {
             ExportDataSource source = dataSource.get(signature);
             if (source != null) {
-                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, sequenceNumber);
-                try {
-                    task.get();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                            "You can back up export overflow data and start the " +
-                                            "DB without it to get past this error", true, e);
+                Pair<Long, Long> usoAndSeq = sequenceNumberPerPartition.get(partitionId);
+                if (usoAndSeq != null) {
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, usoAndSeq.getSecond());
+                    tasks.add(task);
                 }
             }
+        }
+        // After recovery partition layout may have changed, causing some export PBDs become dangling,
+        // truncate them as well, this should be done once per node.
+        if (isLowestSite) {
+            synchronized(m_dataSourcesByPartition) {
+                for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+                    for (ExportDataSource source : dataSources.values()) {
+                        if (!source.inCatalog()) {
+                            Pair<Long, Long> pair = sequenceNumberPerPartition.get(source.getPartitionId());
+                            if (pair != null) {
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, pair.getSecond());
+                                tasks.add(task);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        try {
+            if (!tasks.isEmpty()) {
+                Futures.allAsList(tasks).get();
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
+                                    "You can back up export overflow data and start the " +
+                                    "DB without it to get past this error", true, e);
         }
     }
 

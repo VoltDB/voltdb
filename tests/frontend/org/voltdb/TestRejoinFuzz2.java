@@ -68,8 +68,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true,
-                    null); // doesnt run with IV2 yet -- note from jh: what?
+                    false, null); // doesnt run with IV2 yet -- note from jh: what?
         cluster.setMaxHeap(256);
         if (LocalCluster.isMemcheckDefined()) {
             //Way to much data in this test. Using less data makes it redundant

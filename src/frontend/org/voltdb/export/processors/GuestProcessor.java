@@ -107,6 +107,26 @@ public class GuestProcessor implements ExportDataProcessor {
         }
     }
 
+    public ExportClientBase getExportClient(final String tableName) {
+        ExportClientBase client = null;
+        synchronized (GuestProcessor.this) {
+            String groupName = m_targetsByTableName.get(tableName.toLowerCase());
+            // skip export tables that don't have an enabled connector and are still in catalog
+            if (groupName == null) {
+                m_logger.warn("Table " + tableName + " has no enabled export connector.");
+                return null;
+            }
+            //If we have a new client for the target use it or see if we have an older client which is set before
+            //If no client is found dont create the runner and log
+            client = m_clientsByTarget.get(groupName);
+            if (client == null) {
+                m_logger.warn("Table " + tableName + " has no configured connector.");
+                return null;
+            }
+        }
+        return client;
+    }
+
     @Override
     public void readyForData() {
         for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
@@ -121,30 +141,16 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     String tableName = source.getTableName().toLowerCase();
                     String groupName = m_targetsByTableName.get(tableName);
-
-                    // skip export tables that don't have an enabled connector and are still in catalog
-                    if (groupName == null && source.getClient() == null) {
-                        m_logger.warn("Table " + tableName + " has no enabled export connector.");
-                        continue;
-                    }
-                    if (groupName == null && source.getClient() != null) {
-                        groupName = source.getClient().getTargetName();
-                        m_targetsByTableName.put(tableName, groupName);
-                    }
-                    //If we have a new client for the target use it or see if we have an older client which is set before
-                    //If no client is found dont create the runner and log
-                    ExportClientBase client = (m_clientsByTarget.get(groupName) != null) ?
-                            m_clientsByTarget.get(groupName) : ( ExportClientBase)source.getClient();
-                    if (client == null) {
+                    if (source.getClient() == null) {
                         m_logger.warn("Table " + tableName + " has no configured connector.");
                         continue;
                     }
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
-                    m_clientsByTarget.putIfAbsent(groupName, client);
-                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), client, source);
+                    m_clientsByTarget.putIfAbsent(groupName, source.getClient());
+                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), source.getClient(), source);
                     // DataSource should start polling only after command log replay on a recover
                     source.setReadyForPolling(m_startPolling);
-                    source.setOnMastership(runner, client.isRunEverywhere());
+                    source.setOnMastership(runner);
                 }
             }
         }
@@ -187,9 +193,6 @@ public class GuestProcessor implements ExportDataProcessor {
             for (int type : m_source.m_columnTypes) {
                 m_types.add(VoltType.get((byte)type));
             }
-
-            m_source.setClient(client);
-            m_source.runEveryWhere(m_client.isRunEverywhere());
         }
 
         @Override
@@ -367,7 +370,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
                                         cont.updateStartTime(System.currentTimeMillis());
-                                        edb.onBlockStart();
+                                        if (firstRowOfBlock) {
+                                            edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
+                                        }
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.

@@ -1302,12 +1302,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
-        }
-        if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        } else if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
             msg.append("cannot contain aggregate expressions.");
             return false;
-        }
-        if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
+        } else if (hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
@@ -1317,12 +1315,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 msg.append("cannot contain subqueries.");
             }
             return false;
-        }
-        if (hasUserDefinedFunctionExpression()) {
+        } else if (hasUserDefinedFunctionExpression()) {
             msg.append("cannot contain calls to user defined functions.");
             return false;
+        } else {
+            return true;
         }
-        return true;
     }
 
     public List<AbstractExpression> findAllUserDefinedFunctionCalls() {

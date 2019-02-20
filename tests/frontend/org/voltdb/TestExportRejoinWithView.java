@@ -199,7 +199,7 @@ public class TestExportRejoinWithView extends TestExportBase {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setMaxHeap(1024);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);

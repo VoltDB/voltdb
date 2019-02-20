@@ -86,6 +86,13 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/DRTupleStream.h"
 
+#if !defined(NDEBUG) && defined(MACOSX)
+// Mute EXC_BAD_ACCESS in the debug mode for running LLDB.
+#include <mach/task.h>
+#include <mach/mach_init.h>
+#include <mach/mach_port.h>
+#endif
+
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
 // The next #define limits the number of features pulled into the build
@@ -141,8 +148,7 @@ typedef boost::multi_index::multi_index_container<
     >
 > PlanSet;
 
-  int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
-
+int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -2154,6 +2160,16 @@ std::string VoltDBEngine::dumpCurrentHashinator() const {
 
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
+    #if !defined(NDEBUG) && defined(MACOSX)
+    // When debugging the VoltDB execution engine started via JNI with LLDB,
+    // It is very common to run into an EXC_BAD_ACCESS in the debugger and cannot
+    // get out. LLDB uses task_set_exception_ports() to change the exception port of
+    // the process it is debugging. Here, we call the same function again to override
+    // the exception port for EXC_BAD_ACCESS, so that it won't be passed to LLDB.
+    // int mute_exc_bad_access_for_debugging =
+    task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS,
+                             MACH_PORT_NULL, EXCEPTION_DEFAULT, 0);
+    #endif
     m_executorContext->setupForTick(lastCommittedSpHandle);
     //Push tuples for exporting streams.
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {

@@ -233,7 +233,7 @@ public class TestExportGroups extends TestExportBase {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setMaxHeap(1024);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
@@ -248,7 +248,7 @@ public class TestExportGroups extends TestExportBase {
          * compile a catalog with the export table in a different target
          */
         config = new LocalCluster("export-ddl-diff-grp.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
         config.setMaxHeap(1024);
@@ -269,7 +269,7 @@ public class TestExportGroups extends TestExportBase {
          * compile a catalog with the export table in a different group
          */
         config = new LocalCluster("export-ddl-nonexist-grp.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         //ExportToFile needs diff paths which VoltFile magic provides so need to run in old mode.
         ((LocalCluster )config).setNewCli(false);
         config.setMaxHeap(1024);

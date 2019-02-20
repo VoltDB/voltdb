@@ -484,8 +484,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     if (columnIndex < 0) {
         std::ostringstream message;
         message << "tupleValueFactory: invalid column_idx " << columnIndex <<
-                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n" <<
-                StackTrace::stringStackTrace();
+                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n";
+        StackTrace::streamStackTrace(message, "");
         throw UnexpectedEEException(message.str());
     }
 

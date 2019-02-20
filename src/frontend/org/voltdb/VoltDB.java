@@ -64,6 +64,7 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -109,6 +110,8 @@ public class VoltDB {
     //Whatever the default timezone was for this locale before we replaced it
     public static final TimeZone REAL_DEFAULT_TIMEZONE;
 
+    public static final String DISABLE_PLACEMENT_RESTORE = "DISABLE_PLACEMENT_RESTORE";
+
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(GMT_TIMEZONE);
@@ -122,6 +125,7 @@ public class VoltDB {
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
+        private boolean m_validateSuccess;
 
         public int m_ipcPort = DEFAULT_IPC_PORT;
 
@@ -324,10 +328,16 @@ public class VoltDB {
         public boolean m_safeMode = false;
 
         /** location of user supplied schema */
-        public File m_userSchema = null;
+        public List<File> m_userSchemas = null;
 
         /** location of user supplied classes and resources jar file */
-        public File m_stagedClassesPath = null;
+        public List<File> m_stagedClassesPaths = null;
+
+        /** Best effort to recover previous partition layout*/
+        public boolean m_restorePlacement = !Boolean.valueOf(System.getenv("DISABLE_PLACEMENT_RESTORE") == null ?
+                     Boolean.toString(Boolean.getBoolean("DISABLE_PLACEMENT_RESTORE")) : System.getenv("DISABLE_PLACEMENT_RESTORE"));
+;
+        public String m_recoveredPartitions = "";
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -481,8 +491,6 @@ public class VoltDB {
                     m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("missing")) {
                     m_missingHostCount = Integer.parseInt(args[++i].trim());
-                }else if (arg.equals("sitesperhost")){
-                    m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {
@@ -689,32 +697,46 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
                 } else if (arg.equalsIgnoreCase("schema")) {
-                    m_userSchema = new File(args[++i].trim());
-                    if (!m_userSchema.exists()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " does not exist.");
-                        referToDocAndExit();
-                    }
-                    if (!m_userSchema.canRead()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " can't be read.");
-                        referToDocAndExit();
-                    }
-                    if (!m_userSchema.isFile()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not an ordinary file.");
-                        referToDocAndExit();
+                    for (String schemaPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
+                        File userSchema = new File(schemaPath);
+                        if (!userSchema.exists()) {
+                            System.err.println("FATAL: Supplied schema file " + userSchema + " does not exist.");
+                            referToDocAndExit();
+                        }
+                        if (!userSchema.canRead()) {
+                            System.err.println("FATAL: Supplied schema file " + userSchema + " can't be read.");
+                            referToDocAndExit();
+                        }
+                        if (!userSchema.isFile()) {
+                            System.err
+                                    .println("FATAL: Supplied schema file " + userSchema + " is not an ordinary file.");
+                            referToDocAndExit();
+                        }
+                        if (m_userSchemas == null) {
+                            m_userSchemas = new ArrayList<>();
+                        }
+                        m_userSchemas.add(userSchema);
                     }
                 } else if (arg.equalsIgnoreCase("classes")) {
-                    m_stagedClassesPath = new File(args[++i].trim());
-                    if (!m_stagedClassesPath.exists()){
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " does not exist.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.canRead()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " can't be read.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.isFile()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
-                        referToDocAndExit();
+                    for (String jarPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
+                        File stagedJar = new File(jarPath);
+                        if (!stagedJar.exists()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " does not exist.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.canRead()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " can't be read.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.isFile()) {
+                            System.err.println(
+                                    "FATAL: Supplied classes jar file " + stagedJar + " is not an ordinary file.");
+                            referToDocAndExit();
+                        }
+                        if (m_stagedClassesPaths == null) {
+                            m_stagedClassesPaths = new ArrayList<>();
+                        }
+                        m_stagedClassesPaths.add(stagedJar);
                     }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
@@ -838,6 +860,7 @@ public class VoltDB {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
+                    .put(ClusterSettings.PARTITITON_IDS, m_recoveredPartitions)
                     .build();
         }
 
@@ -956,6 +979,17 @@ public class VoltDB {
             }
         }
 
+        private void generateFatalLog(String fatalMsg) {
+            if (m_validateSuccess) {
+                m_validateSuccess = false;
+                StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+                sb.append(System.getProperty("sun.java.command", "[not available]"));
+                hostLog.info(sb.toString());
+            }
+            hostLog.fatal(fatalMsg);
+        }
+
+
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
@@ -963,25 +997,23 @@ public class VoltDB {
          * @return Returns true if all required configuration settings are present.
          */
         public boolean validate() {
-            boolean isValid = true;
+            m_validateSuccess = true;
 
             EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
-                isValid = false;
-                hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
+                generateFatalLog("The startup action is missing (either create, recover or rejoin).");
             }
             if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
-                isValid = false;
-                hostLog.fatal("The hostname is missing.");
+                generateFatalLog("The hostname is missing.");
             }
 
             // check if start action is not valid in community
             if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
-                isValid = false;
-                hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
-                String msg = m_startAction.featureNameForErrorString();
-                msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
-                hostLog.fatal(msg);
+                StringBuilder sb = new StringBuilder().append(
+                        "VoltDB Community Edition only supports the \"create\" start action.");
+                sb.append(m_startAction.featureNameForErrorString());
+                sb.append(" is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.");
+                generateFatalLog(sb.toString());
             }
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
                     EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
@@ -989,39 +1021,32 @@ public class VoltDB {
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("The deployment file location is empty.");
+                    generateFatalLog("The deployment file location is empty.");
                 }
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
             if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
-                isValid = false;
-                hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
+                generateFatalLog("Starting in admin mode is only allowed when using start, create or recover.");
             }
             if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
-                isValid = false;
-                hostLog.fatal("List of hosts is missing");
+                generateFatalLog("List of hosts is missing");
             }
 
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
-                isValid = false;
-                hostLog.fatal("Option \"--count\" may only be specified when using start");
+                generateFatalLog("Option \"--count\" may only be specified when using start");
             }
             if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < m_coordinators.size()) {
-                isValid = false;
-                hostLog.fatal("List of hosts is greater than option \"--count\"");
+                generateFatalLog("List of hosts is greater than option \"--count\"");
             }
             if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < 0) {
-                isValid = false;
-                hostLog.fatal("\"--count\" may not be specified with negative values");
+                generateFatalLog("\"--count\" may not be specified with negative values");
             }
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
-                isValid = false;
-                hostLog.fatal("\"add\" and \"noadd\" options cannot be specified at the same time");
+                generateFatalLog("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
-            return isValid;
+            return m_validateSuccess;
         }
 
         /**

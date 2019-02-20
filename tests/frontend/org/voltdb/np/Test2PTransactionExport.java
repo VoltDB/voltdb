@@ -132,7 +132,7 @@ public class Test2PTransactionExport {
 
         cluster = new LocalCluster("test2pexport.jar", 4, 2, KFACTOR,
                                    BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING,
-                                   true, false, additionalEnv);
+                                   true, additionalEnv);
         cluster.setNewCli(true);
         cluster.setHasLocalServer(false);
         cluster.setCallingMethodName(method);

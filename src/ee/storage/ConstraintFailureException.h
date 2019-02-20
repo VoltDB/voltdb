@@ -55,7 +55,7 @@ public:
     ConstraintFailureException(Table *table, TableTuple tuple, std::string message, PersistentTableSurgeon *surgeon =  NULL);
 
     virtual const std::string message() const;
-    virtual ~ConstraintFailureException();
+    virtual ~ConstraintFailureException() throw();
 
     const TableTuple* getConflictTuple() const { return &m_tuple; }
     const TableTuple* getOriginalTuple() const { return &m_otherTuple; }

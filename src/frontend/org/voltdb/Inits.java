@@ -815,9 +815,10 @@ public class Inits {
                                 // when c/l is disabled resolves this issue.
                                 if (clenabled == true && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                                     VoltDB.crashLocalVoltDB(String.format(
-                                            "Unable to load version %s catalog \"%s\" "
-                                                    + "from snapshot into a version %s server.",
-                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                                "Cannot load command logs from one version (%s) into a different version of VoltDB (%s). " +
+                                                "To upgrade the VoltDB software, first use \"voltadmin shutdown --save\", then " +
+                                                "upgrade and restart.", catalogVersion, serverVersion),
+                                            false, null);
                                     return;
                                 }
                                 // upgrade the catalog - the following will save the recpmpiled catalog

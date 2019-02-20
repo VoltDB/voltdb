@@ -75,7 +75,7 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
     output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
 }
 
-ConstraintFailureException::~ConstraintFailureException() {
+ConstraintFailureException::~ConstraintFailureException() throw () {
     // if delayed tuple deallocation for serialization (by passing in tableSurgeon),
     // do cleanup here
     VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));

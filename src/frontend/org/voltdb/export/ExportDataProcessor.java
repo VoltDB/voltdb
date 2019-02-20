@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -45,6 +46,13 @@ public interface ExportDataProcessor  {
     void addLogger(VoltLogger logger);
 
     void setExportGeneration(ExportGeneration generation);
+
+    /**
+     * Get export client from processor, used by initializing export data source
+     * @param tableName
+     * @return
+     */
+    public ExportClientBase getExportClient(String tableName);
 
     /**
      * Inform the processor that initialization is complete; commence work.
@@ -72,5 +80,4 @@ public interface ExportDataProcessor  {
      * @param config an instance of {@linkplain Properties}
      */
     public void checkProcessorConfig(Properties config);
-
 }

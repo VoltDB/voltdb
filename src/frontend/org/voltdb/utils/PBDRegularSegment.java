@@ -45,24 +45,33 @@ public class PBDRegularSegment extends PBDSegment {
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
-    //ID of this segment
-    private final Long m_index;
+    // Index of this segment in the in-memory segment map
+    private final long m_index;
+
+    // Persistent ID of this segment, based on managing a monotonic counter
+    private final long m_id;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
 
     private DBBPool.BBContainer m_tmpHeaderBuf = null;
 
-    public PBDRegularSegment(Long index, File file) {
+    public PBDRegularSegment(Long index, Long  id, File file) {
         super(file);
         m_index = index;
+        m_id = id;
         reset();
     }
 
     @Override
-    public long segmentId()
+    public long segmentIndex()
     {
         return m_index;
+    }
+
+    @Override
+    public long segmentId() {
+        return m_id;
     }
 
     @Override
@@ -89,9 +98,9 @@ public class PBDRegularSegment extends PBDSegment {
             wasClosed = true;
             open(false, false);
         }
-        if (m_fc.size() > 0) {
+        if (m_fc.size() >= SEGMENT_HEADER_BYTES) {
             m_tmpHeaderBuf.b().clear();
-            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), COUNT_OFFSET);
+            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), 0);
             m_numOfEntries = m_tmpHeaderBuf.b().getInt();
             m_size = m_tmpHeaderBuf.b().getInt();
         } else {
@@ -209,6 +218,20 @@ public class PBDRegularSegment extends PBDSegment {
         m_size = -1;
     }
 
+    @Override
+    public void closeAndTruncate() throws IOException {
+        try
+        {
+            if (m_ras == null) {
+                m_ras = new RandomAccessFile( m_file, "rw");
+            }
+            m_ras.setLength(0);
+        }
+        finally
+        {
+            close();
+        }
+    }
     @Override
     public boolean isClosed()
     {

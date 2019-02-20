@@ -224,7 +224,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
     m_uso = mark;
     // make the stream of tuples contiguous outside of actual system failures
     m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
-    assert (m_uncommittedTupleCount < 0);
+    assert (m_uncommittedTupleCount >= 0 || exportSeqNo == SIZE_MAX);
     m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
@@ -332,7 +332,7 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
-    if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
+    if (timeInMillis < 0 || (s_exportFlushTimeout > 0 && timeInMillis - m_lastFlush > s_exportFlushTimeout)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;

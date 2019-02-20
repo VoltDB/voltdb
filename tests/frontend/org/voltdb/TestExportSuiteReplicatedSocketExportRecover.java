@@ -134,7 +134,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
          * compile the catalog all tests start with
          */
        config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 2,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         if (MiscUtils.isPro()) {
             project.configureLogging(null, null, false, true, 200, 999, 300);

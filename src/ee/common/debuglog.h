@@ -88,26 +88,23 @@
     #define __FUNCTION__ ""
 #endif
 
-#define VOLT_LOG_START(lvl, msg, ...) do {                                      \
+#define _VOLT_LOG(lvl, msg, ...) do {                                           \
         struct timeval __now__;                                                 \
         ::gettimeofday(&__now__, NULL);                                         \
         tm *__curTime__ = localtime(&__now__.tv_sec);                           \
         char __time_str__[32];                                                  \
         ::strftime(__time_str__, 32, VOLT_LOG_TIME_FORMAT, __curTime__);        \
-        ::printf("[%s] [T%d:E%d] [%s:%d:%s()] %s,%03jd - " msg "\n", lvl,       \
+        ::printf("[%s] [T%d:E%d] [%s:%d:%s()] %s,%03jd - " msg, lvl,            \
                 voltdb::ThreadLocalPool::getThreadPartitionIdWithNullCheck(),   \
                 voltdb::ThreadLocalPool::getEnginePartitionIdWithNullCheck(),   \
                 __FILE__, __LINE__, __FUNCTION__,                               \
                 __time_str__, (intmax_t) __now__.tv_usec / 1000, ##__VA_ARGS__);\
+        ::fflush(stdout);                                                       \
     } while (0)
 
-#define VOLT_LOG_END ::fflush(stdout)
+#define VOLT_LOG(lvl, msg, ...) _VOLT_LOG(lvl, msg  "\n", ##__VA_ARGS__)
 
-#define VOLT_LOG(...) VOLT_LOG_START(__VA_ARGS__); VOLT_LOG_END
-
-#define VOLT_LOG_STACK(lvl) VOLT_LOG_START(lvl, "STACK TRACE");             \
-    voltdb::StackTrace::printStackTrace();                                  \
-    VOLT_LOG_END
+#define VOLT_LOG_STACK(lvl) _VOLT_LOG(lvl, "STACK TRACE\n%s", voltdb::StackTrace::stringStackTrace("    ").c_str())
 
 // Two convenient macros for debugging
 // 1. Logging macros.
@@ -170,7 +167,7 @@
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
     #define VOLT_TRACE_ENABLED
     //#pragma message("VOLT_TRACE was enabled.")
-    #define VOLT_TRACE(...) VOLT_LOG("TRACE", __VA_ARGS__); VOLT_LOG_END
+    #define VOLT_TRACE(...) VOLT_LOG("TRACE", __VA_ARGS__)
     #define VOLT_TRACE_STACK() VOLT_LOG_STACK("TRACE")
 #else
     #define VOLT_TRACE(...) ((void)0)

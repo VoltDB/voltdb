@@ -19,14 +19,19 @@
 # voltdb start cmd with -H will be ignored, -H will be set to the pod name.
 #
 
-from __future__ import print_function
 import sys, os
 import socket
 import subprocess
 import httplib2
 import shlex
-from time import sleep
+from time import time, sleep, strftime, gmtime, localtime, timezone
 from subprocess import Popen, STDOUT
+import logging
+import fileinput
+import re
+from traceback import format_exc
+from tempfile import mkstemp
+import random
 
 
 # mount point for persistent volume voltdbroot
@@ -35,7 +40,7 @@ PV_VOLTDBROOT = os.getenv('VOLTDB_K8S_ADAPTER_PVVOLTDBROOT', "/voltdbroot")
 
 # TODO: need to implement internal-interface option (voltdb command) support
 VOLTDB_INTERNAL_INTERFACE = int(os.getenv('VOLTDB_K8S_ADAPTER_INTERNAL_PORT', 3021))
-VOLTDB_HTTP_PORT = int(os.getenv('VOLTDB_K8S_ADAPTER_HTTP_PORT', 8080))
+VOLTDB_HTTP_PORT = int(os.getenv('VOLTDB_K8S_ADAPTER_ADMIN_PORT', 8080))
 
 
 # These VoltDB start args may be comma separated lists, the value passed to voltdb will be selected
@@ -53,13 +58,6 @@ MAYBE_ORDINAL_START_ARGS = ['--externalinterface',
                         '--drpublic',
                      ]
 
-def printerr(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-def printdbg(*args, **kwargs):
-    if __debug__:
-        print(*args, file=sys.stdout, **kwargs)
-
 def query_dns_srv(query):
     m_list = []
     try:
@@ -69,16 +67,18 @@ def query_dns_srv(query):
         #nginx.default.svc.cluster.local    service = 10 100 0 voltdb-0.nginx.default.svc.cluster.local.
         # the fqdn is structured as ... headless-service-name.namespace.svc.cluster.local
         # this is similar to etcd
-        cmd = "nslookup -type=SRV %s | awk '/%s/ {print $NF}'" % ((query,)*2)
+        logging.debug(query)
+        cmd = "nslookup -type=SRV %s | awk '/^%s/ {print $NF}'" % ((query,)*2)
         #cmd = "host -t SRV %s | awk '{print $NF}'" % query
         answers = subprocess.check_output(cmd, shell=True)
+        logging.debug(answers)
     except Exception as e:
-        printerr(str(e))
+        logging.error(str(e))
         return m_list
     for rdata in answers.split('\n'):
         if len(rdata):
             m_list.append(rdata.split(' ')[-1][:-1])  # drop the trailing '.'
-    printdbg(m_list)
+    logging.debug(m_list)
     # return a list of fq hostnames of pods in the service domain
     return sorted(m_list)
 
@@ -86,10 +86,12 @@ def query_dns_srv(query):
 def try_to_connect(host, port):
     s = socket.socket()
     try:
+        logging.debug("try_to_connect to '"+host+":"+str(port)+"'")
         s.connect((host, port))
+        logging.debug("connected!")
         return True
     except Exception as e:
-        printdbg(str(e))
+        logging.debug(str(e))
         return False
     finally:
         s.close()
@@ -100,8 +102,8 @@ def http_get(url, host, port):
     proto = "http"
     admin = "true"
     urlp = "%s://%s:%d/api/1.0/?%s&admin=%s" % (proto, host, port, url, admin)
-    printdbg(urlp)
-    h = httplib2.Http(".cache")
+    logging.debug(urlp)
+    h = httplib2.Http(".cache", timeout=15)
     return h.request(urlp, "GET")
 
 
@@ -109,6 +111,7 @@ def get_system_information(host, port, section='OVERVIEW'):
     try:
         resource = "Procedure=@SystemInformation&Parameters=[\"" + section + "\"]"
         resp_headers, content = http_get(resource, host, port)
+        logging.debug(resp_headers, content)
         return resp_headers, content
     except:
         raise
@@ -153,102 +156,141 @@ def str_to_arg_list(text):
             al.append(a)
     return al
 
-#def init_voltdbroot(working_voltdbroot, assets_dir):
+
+def get_fqhostname():
+    # get the pod's hostname, typically cluster-name-ORDINAL.domain
+    return os.getenv('VOLTDB_K8S_ADAPTER_FQHOSTNAME', socket.getfqdn())
 
 
 def get_hostname_tuple(fqdn):
-    hostname, domain = fqdn.split('.', 1)
-    ssp = hostname.split('-')
-    hn = ('-'.join(ssp[0:-1]), ssp[-1], hostname, domain)  # statefulset hostnames are podname-pod_ordinal
+    try:
+        hostname, domain = fqdn.split('.', 1)
+        ssp = hostname.split('-')
+        hn = ('-'.join(ssp[0:-1]), ssp[-1], hostname, domain)  # statefulset hostnames are podname-pod_ordinal
+    except:
+        return None
     return hn   # returns a tuple (ss-name, pod_ordinal, hostname, domain)
 
 
-if __name__ == "__main__":
+def setup_logging():
+    log_format = '%(asctime)s %(levelname)-8s %(filename)14s:%(lineno)-6d %(message)s'
+    loglevel = logging.DEBUG
+    console_loglevel = logging.DEBUG
+    # got our voltdbroot?
+    ssname, pod_ordinal, my_hostname, domain = get_hostname_tuple(get_fqhostname())
+    # TODO: there could be multiple roots, for which this won't work
+    plogfile = os.path.join(PV_VOLTDBROOT, "voltdbk8s.log")
+    merge_logfile = ""
+    try:
+        merge_logfile = subprocess.check_output(shlex.split("find -L "+os.path.join(PV_VOLTDBROOT, ssname, 'voltdbroot')
+                                                                           +" -type f -name 'volt.log'")).strip()
+    except subprocess.CalledProcessError as e:
+        merge_logfile = ""
+    logger = logging.getLogger()
+    logger.setLevel(logging.NOTSET)
+    logger.propogate = True
+    file = logging.FileHandler(plogfile, 'a')
+    console = logging.StreamHandler()
+    file.setLevel(loglevel)
+    console.setLevel(console_loglevel)
+    formatter = logging.Formatter(log_format)
+    file.setFormatter(formatter)
+    console.setFormatter(formatter)
+    logging.getLogger('').handlers = []
+    logging.getLogger('').addHandler(console)
+    logging.getLogger('').addHandler(file)
+    if merge_logfile:
+        voltdblog = logging.FileHandler(merge_logfile, 'a')
+        voltdblog.setFormatter(formatter)
+        logging.getLogger('').addHandler(voltdblog)
 
-    sys.stderr = sys.stdout
-    print("VoltDB K8S CONTROLLER")
-    printdbg(sys.argv)
-    printdbg(os.environ)
+    # print banner
+    logging.info("VoltDB K8S CONTROLLER")
+    logging.info("GMT is: " + strftime("%Y-%m-%d %H:%M:%S", gmtime()) +
+                 " LOCALTIME is: " + strftime("%Y-%m-%d %H:%M:%S", localtime()) +
+                 " TIMEZONE OFFSET is: " + str(timezone))
+    logging.info("logging to: '%s'" % plogfile)
+    if merge_logfile:
+        logging.info("logging to: '%s'" % merge_logfile)
+    logging.info("command line: %s" % ' '.join(sys.argv))
+    for k, v in os.environ.items():
+        logging.debug("environment: " + k + "=" + v)
+    logging.debug(os.getcwd())
+
+
+def hang():
+    # launch as a subprocess
+    sp = Popen(['sleep', '999999'], stderr=STDOUT)
+    logging.info("maintenance mode sleep ... pid " + str(sp.pid))
+    sys.stdout.flush()
+    sys.stderr.flush()
+    sp.wait()
+
+
+def main():
+    # See if /voltdbroot (persistent storage mount) is exists
+    if not os.path.exists(PV_VOLTDBROOT):
+        logging.error("Persistent volume '%s' is not mounted!!!!" % PV_VOLTDBROOT)
+        sys.exit(1)
+
+    # setup loggers
+    # log to the console and to a file on the PV
+    setup_logging()
 
     # check that our args look like a voltdb start command line and only that
-    if not (sys.argv[1] == 'voltdb' and sys.argv[2] == 'start'):
-        printerr("WARNING: expected voltdb start command but found '%s'" % sys.argv[1])
-        ###sys.exit(-1)
+    if not sys.argv[2] == 'start':
+        logging.error("WARNING: expected voltdb start command but found '%s'" % sys.argv[1])
+        sys.exit(1)
 
-    fqhostname = os.getenv('VOLTDB_K8S_ADAPTER_FQHOSTNAME', socket.getfqdn())
-
-    printdbg(fqhostname)
+    fqhostname = get_fqhostname()
+    logging.info("HOSTNAME: " +fqhostname)
 
     # use the domain of the leader address to find other pods in our cluster
     hn = get_hostname_tuple(fqhostname)
-    printdbg(hn)
+    logging.debug(hn)
 
     ssname, pod_ordinal, my_hostname, domain = hn
 
     if len(hn) != 4 or not pod_ordinal.isdigit():
-        # we don't know what do with this, just fork
-        #fork_voltdb(ssname+"-0."+domain)
-        printerr("ERROR: Hostname parse error, is this a statefulset pod?, cannot continue")
-        printerr(fqhostname)
-        sys.exit(-1)
-
+        logging.error("Hostname parse error, is this a statefulset pod?, cannot continue")
+        sys.exit(1)
     pod_ordinal = int(pod_ordinal)
 
-    # TODO: -D not tested
     din = find_arg_index(sys.argv, '-D,--dir')
     if din:
-        voltdbroot = '.'.join(my_hostname, sys.argv[din])
-    else:
-        voltdbroot = fqhostname
+        logging.error("-D is not supported in the init or start command in k8s")
+        sys.exit(1)
 
-    # discover pods in our cluster, if any
-    # nb. voltdb pods are registered when then are started, and therefore may not appear ready to k8s
-    cluster_pods = query_dns_srv(domain)
-
-    # find nodes which are actually up and
-    # nodes may be "published before they are ready to receive traffic"
-    cluster_pods_up = []
-    for host in cluster_pods:
-        print("Connecting to '%s'" % host)
-        if try_to_connect(host, VOLTDB_INTERNAL_INTERFACE):
-            # we may have found a running node, get voltdb SYSTEMINFORMATION
-            if try_to_connect(host, VOLTDB_HTTP_PORT):
-                sys_info = None
-                try:
-                    sys_info = get_system_information(host, VOLTDB_HTTP_PORT)
-                    cluster_pods_up.append(host)
-                except:
-                    pass
-    # in the event that no pods are up, direct fork to pod-0
-    if len(cluster_pods_up) == 0:
-        cluster_pods_up = [ssname+"-0."+domain]
-
-    printdbg(cluster_pods_up)
-
-    # before we fork over, see if /voltdbroot (persistent storage mount) is empty
-    # if it is, initialize a new database there from our assets
-    if not os.path.exists(PV_VOLTDBROOT):
-        printerr("ERROR: '%s' is not mounted!!!!" % PV_VOLTDBROOT)
-        sys.exit(-1)
+    # assets: mounted by config maps
     assets_dir = os.path.join(os.getenv('VOLTDB_INIT_VOLUME', '/etc/voltdb'))
-    working_voltdbroot = os.path.join(PV_VOLTDBROOT, voltdbroot)
 
-    try:
-        pv = os.listdir(working_voltdbroot)
-    except OSError:
-        pv = []
-    printdbg("pv: " + str(pv))
+    # we expect there to be a symlink to the voltdbroot parent directory with the statefulset name
+    # in the PV root directory. The symlink is the cluster name and the same on every PV claim,
+    # so there is a common dir name and a unique dir name on each PV claim.
+    # Here we use the dir name prefix VDBRtttttt where t is the unixtime*16^7. You may use any valid dir name chars
+    # ending in ".domain". The cluster-name symlink should point to the voltdb root dir.
+    # In voltdbroot/cluster-name/voltdbroot/config there is path.properties
+    # paths in this file are coerced to the simlink reference prior to forking voltdb.
 
-    DO_INIT = len(pv) == 0
+    # vdb root dir symlink name
+    working_voltdbroot = os.path.join(PV_VOLTDBROOT, ssname)
+
     # initialize the voltdbroot if necessary
-    if DO_INIT:
-        print("Initializing a new voltdb database at '%s'" % working_voltdbroot)
-        try:
-            os.mkdir(working_voltdbroot)
-        except OSError:
-            pass
+    if not os.path.exists(os.path.join(working_voltdbroot, 'voltdbroot', '.initialized')):
+        logging.info("Initializing a new voltdb database at '%s'" % working_voltdbroot)
         olddir = os.getcwd()
-        os.chdir(working_voltdbroot)
+        os.chdir(PV_VOLTDBROOT)
+        try:
+            os.unlink(ssname)
+        except:
+            pass
+        # generate a unique name for the voltdbroot
+        #voltdbroot = fqhostname  # old way
+        voltdbroot = "VDBR-" + str(pod_ordinal) + "-" + str(int(time()*1e6)) + "." + domain
+        os.mkdir(voltdbroot)
+        os.system("ls -l")
+        os.symlink(voltdbroot, ssname)
+        os.chdir(voltdbroot)
         cmd = [sys.argv[1], 'init']
         """
         These asset files are mounted from a configmap
@@ -272,28 +314,21 @@ if __name__ == "__main__":
         extra_init_args = os.getenv('VOLTDB_INIT_ARGS')
         if extra_init_args:
             cmd.extend(str_to_arg_list(extra_init_args))
-        print("Init command: " + str(cmd))
-        sp = Popen(cmd, shell=False, stderr=STDOUT)
+        logging.info("Init command: " + str(cmd))
+        os.system("echo $PWD")
+        os.system("ls -la")
+        sp = Popen(cmd, shell=False) ###a, stderr=STDOUT)
         sp.wait()
         if sp.returncode != 0:
-            print("ERROR failed Initializing voltdb database at '%s' (did you forget --force?)" %
+            logging.error("failed Initializing voltdb database at '%s' (did you forget --force?)" %
                   working_voltdbroot)
-            sys.exit(-1)
-        print("Initialize new voltdb succeeded!!!")
-        os.chdir(PV_VOLTDBROOT)
-        os.system("rm -f " + ssname)
-        os.system("ln -sf " + voltdbroot + " " + ssname)
+            sys.exit(1)
+        logging.info("Initialize new voltdb succeeded!!!")
+        # setup logging again, pointing to the new logfile in the voltdbroot
+        setup_logging()
         os.chdir(olddir)
 
-    # check that we have the correct/consistent PV for this node
-    try:
-        pv = os.listdir(PV_VOLTDBROOT)
-    except OSError:
-        pv = []
-    if voltdbroot not in pv:
-        printerr("ERROR voltdbroot expected: '%s' actual: '%s'" % (voltdbroot, pv))
-        sys.exit(1)
-
+    os.system("find "+PV_VOLTDBROOT+" -ls")
     os.chdir(working_voltdbroot)
     args = sys.argv[:]  # copy
 
@@ -312,43 +347,95 @@ if __name__ == "__main__":
     for oa in MAYBE_ORDINAL_START_ARGS:
         ix = find_arg_index(args, oa)
         if ix is not None:
-            printdbg(args[ix])
             if ',' in args[ix]:
                 li = args[ix].split(',')
-                printdbg(li)
-                printdbg(pod_ordinal)
-                printdbg(len(li))
                 if len(li) < pod_ordinal:
-                    printerr("ERROR treating '%s' as a pod_ordinal comma separated list but there appear to be"
+                    logging.error("Treating '%s' as a pod_ordinal comma separated list but there appear to be"
                              " insufficient entries for host '%s'" % (oa, pod_ordinal))
-                    sys.exit(-1)
+                    sys.exit(1)
                 args[ix] = li[pod_ordinal]
 
-    # build the voltdb start command line
-    printdbg(args)
-    args = shlex.split(' '.join(args))
+    # DNS discover pods in our cluster
+    # nb. voltdb pods are registered when then are started, and therefore may not appear ready to k8s
+
+    # find nodes which: 1) have the mesh port open; 2) respond to an admin query
+    # nodes may be "published before they are ready to receive traffic"
+
+    while True:
+        cluster_pods = query_dns_srv(domain)
+        if fqhostname in cluster_pods:
+            # remove ourself
+            cluster_pods.remove(fqhostname)
+        cluster_pods_responding_mesh = []
+        cluster_pods_up = []
+        connect_hosts = [ssname + "-0." + domain]
+
+        for host in cluster_pods:
+            logging.info("Connecting to '%s'" % host)
+            if try_to_connect(host, VOLTDB_INTERNAL_INTERFACE):
+                cluster_pods_responding_mesh.append(host)
+                # we may have found a running node, get voltdb SYSTEMINFORMATION
+                if try_to_connect(host, VOLTDB_HTTP_PORT):
+                    cluster_pods_up.append(host)
+                    # sys_info = None
+                    # try:
+                    #     sys_info = get_system_information(host, VOLTDB_ADMIN_PORT)
+                    # except:
+                    #     pass
+        logging.debug("database nodes up: %s" % cluster_pods_up)
+        logging.debug("mesh ports responding: %s" % cluster_pods_responding_mesh)
+
+        # if the database is up use all that are available
+        if len(cluster_pods_up) > 0:
+            connect_hosts = cluster_pods_up
+            break
+
+        # if the database is down
+        # forming initial mesh we direct the connection request to host0
+        # bring up pods in an orderly fashion, one at a time
+        if len(cluster_pods_responding_mesh) >= pod_ordinal:
+            break
+        sleep(1)
 
     if os.path.isdir(assets_dir):
         license_file = os.path.join(assets_dir, 'license')
         if os.path.isfile(license_file):
             add_or_replace_arg(args, "-l,--license", license_file)
     add_or_replace_arg(args, "-D,--dir", working_voltdbroot, action="replace")
-    add_or_replace_arg(args, "-H,--host", ','.join(cluster_pods_up))
+    add_or_replace_arg(args, "-H,--host", random.choice(connect_hosts))
 
-    print("VoltDB cmd is '%s'" % args[1:])
-    print("Starting VoltDB...")
-    os.system('date')
+    # fix path.properties voltdbroot path
+    # ensure that all fq paths to voltdbroot use the ssname symlink
+    res = "=(.*)/.+?\." + domain.replace('.','\.') +"/"
+    cre = re.compile(res, flags=re.MULTILINE)
+    with open('voltdbroot/config/path.properties', 'r') as f:
+        lines = f.read()
+        if len(lines) == 0:
+            logging.error("path.properties is empty")
+            os.system("find . -ls")
+            #sleep(9999999)
+            sys.exit(1)
+        lines = cre.sub("=\g<1>/"+ssname+"/", lines)
+        tfd, tmpfilepath = mkstemp(dir="voltdbroot/config")
+        with os.fdopen(tfd, 'w') as f:
+            f.write(lines)
+    # need this to be atomic
+    os.rename(tmpfilepath, "voltdbroot/config/path.properties")
+    with open('voltdbroot/config/path.properties', 'r') as f:
+        lines = f.read()
 
     # For maintenance mode, don't bring up the database just sleep indefinitely
     # nb. in maintenance mode, liveness checks will timeout if enabled
-    printdbg(args)
     if '--k8s-maintenance' in args:
-        print("going to sleep...")
-        sys.stdout.flush()
-        sys.stderr.flush()
-        while True:
-            sleep(10000)
+        hang()
         #os.execv('tail' '-f', '/dev/null')
+
+    # build the voltdb start command line
+    logging.debug(os.getcwd())
+    args = shlex.split(' '.join(args))
+
+    logging.info("VoltDB cmd is '%s'" % ' '.join(args[1:]))
+    logging.info("Starting VoltDB...")
 
     # flush so we see our output in k8s logs
     sys.stdout.flush()
@@ -358,3 +445,10 @@ if __name__ == "__main__":
     d = os.path.dirname(args[0])
     os.execv(os.path.join(d, args[1]), args[1:])
     sys.exit(0)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except:
+        logging.error(format_exc())
+        raise

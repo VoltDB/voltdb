@@ -193,6 +193,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public ExportDataSource(
             Generation generation,
+            ExportDataProcessor processor,
             String db,
             String tableName,
             int partitionId,
@@ -216,7 +217,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L);
+        // Pretend it's rejoin so we set first unpolled to a safe place
+        resetStateInRejoinOrRecover(0L, true);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -289,13 +291,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
         m_isInCatalog = true;
-        m_client = null;
+        m_client = processor.getExportClient(m_tableName);
+        if (m_client != null) {
+            m_runEveryWhere = m_client.isRunEverywhere();
+            if (exportLog.isDebugEnabled() && m_runEveryWhere) {
+                exportLog.debug(toString() + " is a replicated export stream");
+            }
+        }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                     m_tableName + " partition " + m_partitionId, 1);
     }
 
     public ExportDataSource(Generation generation, File adFile,
-            List<Pair<Integer, Integer>> localPartitionsToSites) throws IOException {
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            final ExportDataProcessor processor) throws IOException {
         m_generation = generation;
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
@@ -352,13 +361,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L);
+         // Pretend it's rejoin so we set first unpolled to a safe place
+        resetStateInRejoinOrRecover(0L, true);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
-        m_client = null;
+        m_client = processor.getExportClient(m_tableName);
+        if (m_client != null) {
+            m_runEveryWhere = m_client.isRunEverywhere();
+            if (exportLog.isDebugEnabled() && m_runEveryWhere) {
+                exportLog.debug(toString() + " is a replicated export stream");
+            }
+        }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
     }
@@ -369,6 +385,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void markInCatalog() {
         m_isInCatalog = true;
+    }
+
+    public boolean inCatalog() {
+        return m_isInCatalog;
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -616,13 +636,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int tupleCount,
             long uniqueId,
             ByteBuffer buffer,
-            boolean sync,
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
-                    lastSequenceNumber + "], sync=" + sync + ", poll=" + poll);
+                    lastSequenceNumber + "], poll=" + poll);
         }
         if (buffer != null) {
             // header space along is 8 bytes
@@ -675,15 +694,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
-        if (sync) {
-            try {
-                //Don't do a real sync, just write the in memory buffers
-                //to a file. @Quiesce or blocking snapshot will do the sync
-                m_committedBuffers.sync(true);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
-            }
-        }
         if (poll) {
             try {
                 pollImpl(m_pollFuture);
@@ -708,7 +718,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, false);
+                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -722,7 +732,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -731,6 +741,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             }));
+            if (sync) {
+                try {
+                    //Don't do a real sync, just write the in memory buffers
+                    //to a file. Blocking snapshot will do the fsync
+                    ListenableFuture<?> rslt = sync(true);
+                    rslt.get();
+                } catch (ExecutionException | InterruptedException e) {
+                    // swallow the exception since IOException will perform a CrashLocal
+                }
+            }
         } catch (RejectedExecutionException rej) {
             m_bufferPushPermits.release();
             //We are shutting down very much rolling generation so dont passup for error reporting.
@@ -738,7 +758,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> truncateExportToSeqNo(boolean isRecover, long sequenceNumber) {
+    public ListenableFuture<?> truncateExportToSeqNo(boolean isRecover, boolean isRejoin, long sequenceNumber) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -759,7 +779,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(sequenceNumber);
+                    resetStateInRejoinOrRecover(sequenceNumber, isRejoin);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -779,7 +799,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 m_committedBuffers.sync(m_nofsync);
             } catch (IOException e) {
-                exportLog.error("failed to sync export overflow", e);
+                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
     }
@@ -1358,27 +1378,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param runEveryWhere       Set if connector "replicated" property is set to true Like replicated table, every
      *                            replicated export stream is its own master.
      */
-    public void setOnMastership(Runnable toBeRunOnMastership, boolean runEveryWhere) {
+    public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        runEveryWhere(runEveryWhere);
-    }
-
-    public ExportFormat getExportFormat() {
-        return m_format;
-    }
-
-    /**
-     * @param runEveryWhere Set if connector "replicated" property is set to true Like replicated table, every
-     *                      replicated export stream is its own master.
-     */
-    public synchronized void runEveryWhere(boolean runEveryWhere) {
-        m_runEveryWhere = runEveryWhere;
-        if (runEveryWhere) {
+        // If connector "replicated" property is set to true then every
+        // replicated export stream is its own master
+        if (m_runEveryWhere) {
             //export stream for run-everywhere clients doesn't need ack mailbox
             m_ackMailboxRefs.set(null);
             acceptMastership();
         }
+    }
+
+    public void setRunEveryWhere(boolean runEveryWhere) {
+        if (exportLog.isDebugEnabled() && runEveryWhere != m_runEveryWhere) {
+            exportLog.debug("Change " + toString() + " to " +
+                    (runEveryWhere ? "replicated stream" : " non-replicated stream"));
+        }
+        m_runEveryWhere = runEveryWhere;
+    }
+
+    public ExportFormat getExportFormat() {
+        return m_format;
     }
 
     public ListeningExecutorService getExecutorService() {
@@ -1389,8 +1410,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         // jump over a gap for run everywhere
         if (m_runEveryWhere) {
+            // It's unlikely but thinking switch regular stream to replicated stream on the fly.
             if (m_gapTracker.getFirstGap() != null) {
                 m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                exportLog.info(toString() + " skipped stream gap because it's a replicated stream, " +
+                        "setting next poll sequence number to " + m_firstUnpolledSeqNo);
             }
             m_queueGap = 0;
             return;
@@ -1628,10 +1652,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
-        m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
-                Math.max(initialSequenceNumber,
-                        m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1));
+    // During rejoin it's possible that the stream is blocked by a gap before the export
+    // sequence number carried by rejoin snapshot, so we couldn't trust the sequence number
+    // in snapshot to find where to poll next buffer. The right thing to do should be setting
+    // the firstUnpolled to a safe point in case of releasing a gap prematurely, waits for
+    // current master to tell us where to poll next buffer.
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean isRejoin) {
+        if (isRejoin) {
+            if (!m_gapTracker.isEmpty()) {
+                m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, m_gapTracker.getFirstSeqNo() - 1);
+            }
+        } else {
+            m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
+        }
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }

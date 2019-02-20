@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -45,6 +44,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
@@ -58,15 +58,12 @@ import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 
 public class TestLeaderAppointer extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 1;
     private int m_kfactor;
     private AbstractTopology m_topo;
-    private Set<Integer> m_hostIds;
-    private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
@@ -117,25 +114,19 @@ public class TestLeaderAppointer extends ZKTestBase {
         when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
-        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
         for (int hostId = 0; hostId < hostCount; hostId++) {
-            sphMap.put(hostId, sitesPerHost);
-        }
-        m_hostIds = Sets.newTreeSet();
-        m_hostGroups = Maps.newHashMap();
-        for (int i = 0; i < hostCount; i++) {
-            m_hostIds.add(i);
-            m_hostGroups.put(i, "0");
+            hostInfos.put(hostId, new HostInfo("", "0", sitesPerHost));
         }
         m_kfactor = replicationFactor;
-        m_topo = AbstractTopology.getTopology(sphMap, new HashSet<Integer>(), m_hostGroups, replicationFactor);
+        m_topo = AbstractTopology.getTopology(hostInfos, new HashSet<Integer>(), replicationFactor);
         int partitionCount = m_topo.getPartitionCount();
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
-        when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
+        when(m_hm.getLiveHostIds()).thenReturn(hostInfos.keySet());
         m_mpi = mock(MpInitiator.class);
         createAppointer(enablePPD);
 
-        m_cache = new LeaderCache(m_zk, VoltZK.iv2appointees, m_changeCallback);
+        m_cache = new LeaderCache(m_zk, "", VoltZK.iv2appointees, m_changeCallback);
         m_cache.start(true);
     }
 
@@ -144,7 +135,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
                 m_kfactor,
-                m_topo.topologyToJSON(), m_mpi, stats, false);
+                m_topo, m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -169,7 +160,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     void registerLeader(int partitionId, long HSId) throws KeeperException, InterruptedException
     {
-        LeaderCacheWriter iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters);
+        LeaderCacheWriter iv2masters = new LeaderCache(m_zk, "", VoltZK.iv2masters);
         iv2masters.put(partitionId, HSId);
     }
 
@@ -292,7 +283,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    m_topo.topologyToJSON(),
+                                    m_topo,
                                     m_mpi,
                                     new KSafetyStats(),
                                     false);
@@ -376,11 +367,12 @@ public class TestLeaderAppointer extends ZKTestBase {
         dutthread.join();
         // Now, delete the leader of partition 0 from ZK
         m_newAppointee.set(false);
+        long expectedNewLeader = m_cache.pointInTimeCache().get(0).equals(0L) ? 1L : 0L;
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         while (!m_newAppointee.get()) {
             Thread.sleep(0);
         }
-        assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+        assertEquals(expectedNewLeader, m_cache.pointInTimeCache().get(0).longValue());
         // now, kill the other replica and watch everything BURN
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         while (!VoltDB.wasCrashCalled) {
@@ -416,6 +408,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         dutthread.join();
         // kill the appointer and delete one of the leaders
         m_dut.shutdown();
+        long expectedNewLeader = m_cache.pointInTimeCache().get(0).equals(0L) ? 1L : 0L;
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up
         createAppointer(false);
@@ -424,7 +417,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         while (!m_newAppointee.get()) {
             Thread.sleep(0);
         }
-        assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+        assertEquals(expectedNewLeader, m_cache.pointInTimeCache().get(0).longValue());
 
         // Add a new partition with two replicas, see if the newly elected leader appointer picks up the new
         // partition and elects a new leader
@@ -535,7 +528,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    m_topo.topologyToJSON(),
+                                    m_topo,
                                     m_mpi,
                                     new KSafetyStats(),
                                     true);

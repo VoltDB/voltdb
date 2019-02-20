@@ -617,7 +617,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             org.voltdb.VoltDB.crashLocalVoltDB(
                     "Aborting recovery due to a remote node (" + CoreUtils.hsIdToString(faultMessage.failedSite) +
                     ") failure. Retry again.",
-                    true,
+                    false,
                     null);
         }
         Set<Long> unknownFaultedHosts = new TreeSet<>();

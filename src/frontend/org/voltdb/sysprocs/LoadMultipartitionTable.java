@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
@@ -34,7 +33,6 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -46,18 +44,12 @@ import org.voltdb.types.ConstraintType;
  */
 public class LoadMultipartitionTable extends VoltSystemProcedure
 {
-    static final int DEP_distribute = (int) SysProcFragmentId.PF_distribute |
-                                      DtxnConstants.MULTIPARTITION_DEPENDENCY;
-
-    static final int DEP_aggregate = (int) SysProcFragmentId.PF_aggregate;
-
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
     }
 
 
-    @SuppressWarnings("deprecation")
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -97,11 +89,11 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 // result.addRow(-1);
                 throw e;
             }
-            return new DependencyPair.TableDependencyPair(DEP_distribute, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_distribute, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_aggregate) {
             long[] modifiedTuples = new long[context.getNumberOfPartitions()];
-            List<VoltTable> deps = dependencies.get(DEP_distribute);
+            List<VoltTable> deps = dependencies.get(SysProcFragmentId.PF_distribute);
             assert(deps.size() > 0);
 
             // go through all the deps and find one mod tuple count per partition
@@ -115,9 +107,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                     modifiedTuples[partitionId] = rowsModified;
                 }
                 else {
-                    if (modifiedTuples[partitionId] != rowsModified)
+                    if (modifiedTuples[partitionId] != rowsModified) {
                         throw new RuntimeException(
                                 "@LoadMultipartitionTable received different tuple mod counts from two replicas.");
+                    }
                 }
             }
 
@@ -125,7 +118,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             long rowsModified =  modifiedTuples[0];
 
             result.addRow(rowsModified);
-            return new DependencyPair.TableDependencyPair(DEP_aggregate, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_aggregate, result);
         }
 
         // must handle every dependency id.
@@ -173,27 +166,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
         // use loadTable path for bulk insert
         if (!isUpsert && table.getRowCount() > 1) {
-            SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
-            // create a work unit to invoke super.loadTable() on each site.
-            pfs[0] = new SynthesizedPlanFragment();
-            pfs[0].fragmentId = SysProcFragmentId.PF_distribute;
-            pfs[0].outputDepId = DEP_distribute;
-            pfs[0].inputDepIds = new int[] {};
-            pfs[0].multipartition = true;
-            pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, table);
-
-            // create a work unit to aggregate the results.
-            // MULTIPARTION_DEPENDENCY bit set, requiring result from each site
-            pfs[1] = new SynthesizedPlanFragment();
-            pfs[1].fragmentId = SysProcFragmentId.PF_aggregate;
-            pfs[1].outputDepId = DEP_aggregate;
-            pfs[1].inputDepIds = new int[] { DEP_distribute };
-            pfs[1].multipartition = false;
-            pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-            // distribute and execute the fragments providing pfs and id
-            // of the aggregator's output dependency table.
-            VoltTable[] results = executeSysProcPlanFragments(pfs, DEP_aggregate);
+            VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_distribute,
+                    SysProcFragmentId.PF_aggregate, tableName, table);
             return results[0].asScalarLong();
         }
 

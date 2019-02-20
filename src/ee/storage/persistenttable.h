@@ -632,6 +632,9 @@ private:
 
     void tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict);
 
+    void checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
+          TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate);
+
     bool checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
