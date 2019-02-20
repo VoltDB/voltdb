@@ -76,9 +76,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <logger name="org.voltdb.sysprocs.SnapshotRestore">
+<!--     <logger name="org.voltdb.sysprocs.SnapshotRestore">
         <level value="TRACE"/>
-    </logger>
+    </logger> -->
 
     <root>
         <priority value="info" />

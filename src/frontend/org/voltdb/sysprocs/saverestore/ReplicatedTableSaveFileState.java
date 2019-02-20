@@ -124,6 +124,9 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
     generateReplicatedToReplicatedPlan(SiteTracker siteTracker) {
         Set<Long> allSiteIds = siteTracker.getAllSites();
         Set<Integer> hostsMissingTable = getHostsMissingTable(allSiteIds);
+        // send a fragment to all the sites with this table to load the local copy of this table.
+        // send a fragment to selected sites to send the table data to all the HOSTS
+        // (not sites) without this table to load.
         int planFragmentCount = m_sitesWithThisTable.size() + hostsMissingTable.size() + 1;
         SynthesizedPlanFragment[] restorePlan = new SynthesizedPlanFragment[planFragmentCount];
         int planIndex = 0;
@@ -137,6 +140,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
             if (! sourceSitePicker.hasNext()) {
                 sourceSitePicker = m_sitesWithThisTable.iterator();
             }
+            // pick a site to be responsible for sending the data.
             long sourceSiteId = sourceSitePicker.next();
             restorePlan[planIndex] =
                 constructDistributeReplicatedTableAsReplicatedFragment(
