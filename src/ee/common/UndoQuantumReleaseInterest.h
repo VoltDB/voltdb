@@ -21,7 +21,7 @@
 namespace voltdb {
 class UndoQuantumReleaseInterest {
 public:
-    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1);
+    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1) {}
     virtual void notifyQuantumRelease() = 0;
     virtual ~UndoQuantumReleaseInterest() {}
 
