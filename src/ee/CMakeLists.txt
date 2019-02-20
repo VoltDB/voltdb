@@ -248,6 +248,7 @@ SET (VOLTDB_SRC
   storage/constraintutil.cpp
   storage/CopyOnWriteContext.cpp
   storage/CopyOnWriteIterator.cpp
+  storage/DRTableNotFoundException.cpp
   storage/DRTupleStream.cpp
   storage/ElasticContext.cpp
   storage/ElasticIndex.cpp
