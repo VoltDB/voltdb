@@ -94,6 +94,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
+import org.voltdb.utils.VoltTypeUtil;
 
 
 
@@ -1278,9 +1279,12 @@ public class DDLCompiler {
         // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
-        table.setIsstream(isStream);
-        if (streamTarget != null) {
-            table.setTargetname(streamTarget);
+        if (isStream) {
+            if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
+                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get());
+            } else {
+                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.VIEW_ONLY_STREAM.get());
+            }
         }
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
@@ -1358,7 +1362,7 @@ public class DDLCompiler {
             final String migrationTarget = ttlNode.attributes.get("migrationTarget");
             if (migrationTarget != null) {
                 ttl.setMigrationtarget(migrationTarget);
-                table.setForexport(true);
+                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.MIGRATE_TABLE.get());
             }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {

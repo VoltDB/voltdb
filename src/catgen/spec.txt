@@ -166,9 +166,7 @@ begin Table                                  "A table (relation) in the database
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
   TimeToLive* timeToLive                     "Time to live"
-  bool isStream                              "Is the table a steam?"
-  bool forExport                             "Is the table for nibble export?"
-  string targetName                          "The export target name"
+  int streamType                             "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

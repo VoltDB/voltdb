@@ -69,6 +69,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTypeUtil;
 
 import junit.framework.TestCase;
 
@@ -3626,6 +3627,24 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    public void testDDLCompilerStreamType() throws Exception {
+        String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+                " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+        Database db = checkDDLAgainstGivenSchema(null,
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER);\n",
+                "CREATE STREAM e1 PARTITION ON COLUMN D1 EXPORT TO TARGET T(D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                ddl
+                );
+        Table t = getTableInfoFor(db, "e");
+        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.VIEW_ONLY_STREAM.get());
+
+        t = getTableInfoFor(db, "e1");
+        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get());
+
+        t = getTableInfoFor(db, "ttl");
+        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.MIGRATE_TABLE.get());
+
+    }
     public void testBadDropStream() throws Exception {
         // non-existent stream
         badDDLAgainstSimpleSchema(".+object not found: E1.*",

@@ -81,6 +81,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTypeUtil;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -1361,9 +1362,6 @@ public class VoltCompiler {
             "the catalog.");
         }
 
-        if (targetName != null) {
-            tableref.setTargetname(targetName);
-        }
         // streams cannot have tuple limits
         if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
             throw new VoltCompilerException("Streams cannot have row limits configured");

@@ -358,4 +358,20 @@ public abstract class VoltTypeUtil {
         }
         return vt;
     }
+
+    public static enum TABLE_STREAM_EXTENSION {
+        NO_STREAM(0),              // Regular PersistentTable
+        VIEW_ONLY_STREAM(1),       // StreamTable without ExportTupleStream (Views only)
+        EXPORT_STREAM(2),          // StreamTable with ExportTupleStream
+        MIGRATE_TABLE(3),          // PersistentTable with associated Stream for migrating DELETES
+        EXPORT_TABLE(4);           // PersistentTable with associated Stream for leaking INSERTS
+
+        final int type;
+        TABLE_STREAM_EXTENSION(int type) {
+            this.type = type;
+        }
+        public int get() {
+            return type;
+        }
+    }
 }
