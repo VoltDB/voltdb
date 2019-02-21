@@ -44,6 +44,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
@@ -935,7 +936,7 @@ public class DDLCompiler {
                 else {
                     m_tracker.removePartition(tableName);
                 }
-                if (export != null) {
+                if (!StringUtil.isEmpty(export)) {
                     m_tracker.addExportedTable(tableName, export, isStream);
                 } else {
                     m_tracker.removeExportedTable(tableName, isStream);

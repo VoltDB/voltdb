@@ -1366,7 +1366,7 @@ public class VoltCompiler {
             "the catalog.");
         }
 
-        if (tableref.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get()) {
+        if (VoltTypeUtil.TABLE_STREAM_EXTENSION.isStream(tableref.getStreamtype())) {
             // streams cannot have tuple limits
             if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
                 throw new VoltCompilerException("Streams cannot have row limits configured");
@@ -1398,7 +1398,7 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-        if (tableref.getIndexes().size() > 0 && tableref.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get()) {
+        if (tableref.getIndexes().size() > 0 && VoltTypeUtil.TABLE_STREAM_EXTENSION.isStream(tableref.getStreamtype())) {
             compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");

@@ -373,5 +373,9 @@ public abstract class VoltTypeUtil {
         public int get() {
             return type;
         }
+
+        public static boolean isStream(int e) {
+            return (e ==EXPORT_STREAM.get() || e == VIEW_ONLY_STREAM.get());
+        }
     }
 }
