@@ -45,6 +45,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Pair;
+import org.voltdb.plannerv2.guards.AcceptAllSelect;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerRules;
@@ -219,9 +220,9 @@ public class VoltPlanner implements Planner {
         } catch (CalciteContextException cce) {
             // Some of the validation errors happened because of the lack of support
             // we ought to add to Calcite. We need to fallback for those cases.
-            //if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
-            //    throw new PlannerFallbackException(cce);
-            //}
+            if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
+                throw new PlannerFallbackException(cce);
+            }
             throw cce;
         } catch (RuntimeException e) {
             throw new ValidationException(e);

@@ -61,9 +61,9 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         // will throw this exception, calcite try to infer the parameter types in function and disallow null and ? there
         // @see #SqlValidatorImpl.inferUnknownTypes
         // see ENG-15222
-        if (message.contains("Illegal use of 'NULL'") || message.contains("Illegal use of dynamic parameter")) {
-            return true;
-        }
+        //if (message.contains("Illegal use of 'NULL'") || message.contains("Illegal use of dynamic parameter")) {
+        //    return true;
+        //}
 
         if (IGNORE_PATTERN.matcher(message).find()) {
             return true;
