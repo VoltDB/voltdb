@@ -66,6 +66,15 @@ public:
         }
     }
 
+    inline void registerSynchronizedUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+        assert(undoAction);
+        m_undoActions.push_back(undoAction);
+
+        if (interest != NULL) {
+           m_interests.push_back(interest);
+        }
+    }
+
     /**
      * removeInterest is an UndoQuantumReleaseInterest which will be removed
      * from the list of interested parties if it had been previously added.

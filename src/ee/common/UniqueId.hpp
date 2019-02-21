@@ -24,7 +24,7 @@
 
 namespace voltdb
 {
-const static int64_t VOLT_EPOCH = 1199145600000000L;
+const static int64_t VOLT_EPOCH =           1199145600000000L;
 const static int64_t VOLT_EPOCH_IN_MILLIS = 1199145600000L;
 
 class UniqueId {
@@ -71,6 +71,13 @@ public:
     static int64_t ts(UniqueId uid) {
         int64_t time = uid >> (COUNTER_BITS + PARTITIONID_BITS);
         time += VOLT_EPOCH;
+        return time;
+    }
+
+    // Timestamp excluding the counter
+    static int64_t tsInMillis(UniqueId uid) {
+        int64_t time = uid >> (COUNTER_BITS + PARTITIONID_BITS);
+        time += VOLT_EPOCH_IN_MILLIS;
         return time;
     }
 

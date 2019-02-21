@@ -278,7 +278,7 @@ void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, in
         m_committedSpHandle = m_openSpHandle;
         if (m_currBlock->startSequenceNumber() > m_committedSequenceNumber) {
             // Started a new block so reset the flush timeout
-            m_lastFlush = UniqueId::ts(m_committedUniqueId);
+            m_lastFlush = UniqueId::tsInMillis(m_committedUniqueId);
             removeFromFlushList(engine, true);
         }
         m_committedSequenceNumber = m_nextSequenceNumber-1;
