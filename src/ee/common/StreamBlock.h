@@ -182,7 +182,7 @@ namespace voltdb
         {}
 
         inline bool needsSchema() { return m_needsSchema; }
-        inline void noSchema() { m_needsSchema = false; };
+        inline void noSchema() { m_needsSchema = false; }
 
         inline void recordStartSequenceNumber(int64_t startSequenceNumber) {
             m_startSequenceNumber = startSequenceNumber;

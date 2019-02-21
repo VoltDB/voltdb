@@ -410,7 +410,11 @@ bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
         assert(m_pendingBlocks.empty());
         if (m_flushPending) {
             assert(m_currBlock->getRowCount() > 0);
+            // Most paths move a block to m_pendingBlocks and then use pushPendingBlocks (comment from there)
+            // The block is handed off to the topend which is responsible for releasing the
+            // memory associated with the block data. The metadata is deleted here.
             pushStreamBuffer(m_currBlock, timeInMillis < 0);
+            delete m_currBlock;
             m_currBlock = NULL;
             extendBufferChain(0);
             m_prevFlushStream = NULL;
