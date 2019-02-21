@@ -162,9 +162,9 @@ public class ExportGeneration implements Generation {
         Map<String, File> dataFiles = new HashMap<>();
         for (File data: files) {
             if (data.getName().endsWith(".pbd")) {
-                // Naming convention for pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb
-                String nonce = data.getName().substring(0, data.getName().lastIndexOf('.'));
-                nonce = nonce.substring(0, nonce.lastIndexOf('_'));
+                // Naming convention for pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb,
+                // so cut out 2 last segments starting with '_'.
+                String nonce = data.getName().substring(0, data.getName().lastIndexOf('_'));
                 nonce = nonce.substring(0, nonce.lastIndexOf('_'));
                 dataFiles.put(nonce, data);
             }

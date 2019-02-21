@@ -50,7 +50,7 @@ public class AdvertisedDataSource
 
     @Override
     public int hashCode() {
-        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId;
+        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + tableName.hashCode();
     }
 
     @Override
@@ -58,6 +58,7 @@ public class AdvertisedDataSource
         if (o instanceof AdvertisedDataSource) {
             AdvertisedDataSource other = (AdvertisedDataSource)o;
             if (other.m_generation == m_generation &&
+                    other.tableName.equals(tableName) &&
                     other.partitionId == partitionId) {
                 return true;
                     }
