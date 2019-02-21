@@ -438,4 +438,16 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                         "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .test();
     }
+
+    public void testENG15245() {
+        m_tester.sql("select CAST(border as VARCHAR) from R5")
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltSeqTableScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n")
+                .test();
+
+        m_tester.sql("select CAST(point as VARCHAR) from R5")
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
+                        "  VoltSeqTableScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n")
+                .test();
+    }
 }

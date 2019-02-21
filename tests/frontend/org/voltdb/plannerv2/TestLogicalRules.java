@@ -481,4 +481,16 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[=($t2, $t0)], expr#4=[1], expr#5=[=($t2, $t4)], expr#6=[2], expr#7=[=($t2, $t6)], expr#8=[3], expr#9=[=($t2, $t8)], expr#10=[4], expr#11=[=($t2, $t10)], expr#12=[5], expr#13=[=($t2, $t12)], expr#14=[6], expr#15=[=($t2, $t14)], expr#16=[7], expr#17=[=($t2, $t16)], expr#18=[8], expr#19=[=($t2, $t18)], expr#20=[9], expr#21=[=($t2, $t20)], expr#22=[10], expr#23=[=($t2, $t22)], expr#24=[11], expr#25=[=($t2, $t24)], expr#26=[12], expr#27=[=($t2, $t26)], expr#28=[13], expr#29=[=($t2, $t28)], expr#30=[14], expr#31=[=($t2, $t30)], expr#32=[15], expr#33=[=($t2, $t32)], expr#34=[16], expr#35=[=($t2, $t34)], expr#36=[17], expr#37=[=($t2, $t36)], expr#38=[18], expr#39=[=($t2, $t38)], expr#40=[19], expr#41=[=($t2, $t40)], expr#42=[20], expr#43=[=($t2, $t42)], expr#44=[21], expr#45=[=($t2, $t44)], expr#46=[OR($t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t21, $t23, $t25, $t27, $t29, $t31, $t33, $t35, $t37, $t39, $t41, $t43, $t45)], proj#0..2=[{exprs}], $condition=[$t46])\n" +
                         "  VoltLogicalTableScan(table=[[public, R3]])\n").test();
     }
+
+    public void testENG15245() {
+        m_tester.sql("select CAST(border as VARCHAR) from R5")
+                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R5]])\n")
+                .test();
+
+        m_tester.sql("select CAST(point as VARCHAR) from R5")
+                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                        "  VoltLogicalTableScan(table=[[public, R5]])\n")
+                .test();
+    }
 }

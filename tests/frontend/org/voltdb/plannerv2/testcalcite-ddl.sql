@@ -49,6 +49,13 @@ create table R4 (
     ii integer,
     tm timestamp);
 
+create table R5 (
+    pk integer,
+    vc varchar(256),
+    ii integer,
+    border GEOGRAPHY,
+    point GEOGRAPHY_POINT);
+
 create table RI3 (
     pk integer,
     vc varchar(256),
