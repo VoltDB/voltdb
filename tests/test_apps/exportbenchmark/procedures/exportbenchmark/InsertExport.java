@@ -34,7 +34,7 @@ public class InsertExport extends VoltProcedure {
             + "type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, "
             + "type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    public long run(long rowid, int reversed)
+    public long run(long rowid, int multiply)
     {
         @SuppressWarnings("deprecation")
         long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
@@ -42,35 +42,42 @@ public class InsertExport extends VoltProcedure {
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(txid);
 
-        // Insert a new record
+        // Check multiply factor and adjust to reasonable value
+        if (multiply <= 0) {
+            multiply = 1;
+        }
+
+        // Insert a new record with olptional multiply factor
         SampleRecord record = new SampleRecord(rowid, rand);
 
-        voltQueueSQL(
-                export
-                , txid
-                , rowid
-                , record.rowid_group
-                , record.type_null_tinyint
-                , record.type_not_null_tinyint
-                , record.type_null_smallint
-                , record.type_not_null_smallint
-                , record.type_null_integer
-                , record.type_not_null_integer
-                , record.type_null_bigint
-                , record.type_not_null_bigint
-                , record.type_null_timestamp
-                , record.type_not_null_timestamp
-                , record.type_null_float
-                , record.type_not_null_float
-                , record.type_null_decimal
-                , record.type_not_null_decimal
-                , record.type_null_varchar25
-                , record.type_not_null_varchar25
-                , record.type_null_varchar128
-                , record.type_not_null_varchar128
-                , record.type_null_varchar1024
-                , record.type_not_null_varchar1024
-        );
+        for (int i = 0; i < multiply; i++) {
+            voltQueueSQL(
+                    export
+                    , txid
+                    , rowid
+                    , record.rowid_group
+                    , record.type_null_tinyint
+                    , record.type_not_null_tinyint
+                    , record.type_null_smallint
+                    , record.type_not_null_smallint
+                    , record.type_null_integer
+                    , record.type_not_null_integer
+                    , record.type_null_bigint
+                    , record.type_not_null_bigint
+                    , record.type_null_timestamp
+                    , record.type_not_null_timestamp
+                    , record.type_null_float
+                    , record.type_not_null_float
+                    , record.type_null_decimal
+                    , record.type_not_null_decimal
+                    , record.type_null_varchar25
+                    , record.type_not_null_varchar25
+                    , record.type_null_varchar128
+                    , record.type_not_null_varchar128
+                    , record.type_null_varchar1024
+                    , record.type_not_null_varchar1024
+                    );
+        }
 
         // Execute last statement batch
         voltExecuteSQL(true);

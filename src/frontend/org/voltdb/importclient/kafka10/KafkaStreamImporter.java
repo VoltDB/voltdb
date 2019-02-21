@@ -32,6 +32,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.RoundRobinAssignor;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.serialization.ByteBufferDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.AbstractImporter;
@@ -99,6 +100,13 @@ public class KafkaStreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, m_config.getHeartBeatInterval());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RoundRobinAssignor.class.getName());
+        if (m_config.getSaslKerberosServiceName() != null) {
+            props.put(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, m_config.getSaslKerberosServiceName());
+        }
+
+        if (m_config.getSecurityProtocol() != null) {
+            props.put("security.protocol", m_config.getSecurityProtocol());
+        }
 
         // While importers could be restarted upon catalog update, a cluster could be paused, triggering
         // stopping the importer @stop().

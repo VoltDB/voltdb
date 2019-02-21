@@ -17,33 +17,20 @@
 
 package org.voltdb.sysprocs;
 
-import org.voltcore.logging.VoltLogger;
+import java.util.List;
+import java.util.Map;
+
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.dtxn.DtxnConstants;
-
-import java.util.List;
-import java.util.Map;
 
 
 /**
  * Dummy MP Write System Procedure for generate fragments to all sites in cluster
- *
- * @throws VoltAbortException
  */
 public class PingPartitions extends VoltSystemProcedure {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    static final int DEP_PingPartitionDistribute = (int)
-            SysProcFragmentId.PF_pingPartitions | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_PingPartitionAggregate= (int) SysProcFragmentId.PF_pingPartitionsAggregate;
-
-    static final int DEP_EnableScoreboardDistribute = (int)
-            SysProcFragmentId.PF_enableScoreboard  | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    static final int DEP_EnableScoreboardAggregate = (int) SysProcFragmentId.PF_enableScoreboardAggregate;
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -64,20 +51,20 @@ public class PingPartitions extends VoltSystemProcedure {
         dummy.addRow(STATUS_OK);
 
         if (fragmentId == SysProcFragmentId.PF_pingPartitions) {
-            return new DependencyPair.TableDependencyPair(DEP_PingPartitionDistribute, dummy);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pingPartitions, dummy);
         } else if (fragmentId == SysProcFragmentId.PF_pingPartitionsAggregate) {
-            return new DependencyPair.TableDependencyPair(DEP_PingPartitionAggregate, dummy);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_pingPartitionsAggregate, dummy);
         } else if (fragmentId == SysProcFragmentId.PF_enableScoreboard) {
-            return new DependencyPair.TableDependencyPair(DEP_EnableScoreboardDistribute, dummy);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_enableScoreboard, dummy);
         } else if (fragmentId == SysProcFragmentId.PF_enableScoreboardAggregate) {
-            return new DependencyPair.TableDependencyPair(DEP_EnableScoreboardAggregate, dummy);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_enableScoreboardAggregate, dummy);
         }
 
         assert (false);
         return null;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte enableScoreboard) throws VoltAbortException {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte enableScoreboard) {
         if (enableScoreboard == (byte) 1) {
             return runPingAndEnableScoreboard();
         }
@@ -85,39 +72,13 @@ public class PingPartitions extends VoltSystemProcedure {
     }
 
     private VoltTable[] runDummyPings() {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_pingPartitions;
-        spf[0].outputDepId = DEP_PingPartitionDistribute;
-        spf[0].inputDepIds = new int[] {};
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_pingPartitionsAggregate;
-        spf[1].outputDepId = DEP_PingPartitionAggregate;
-        spf[1].inputDepIds = new int[] {DEP_PingPartitionDistribute};
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-        return executeSysProcPlanFragments(spf, DEP_PingPartitionAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_pingPartitions,
+                SysProcFragmentId.PF_pingPartitionsAggregate);
     }
 
     private VoltTable[] runPingAndEnableScoreboard() {
-        SynthesizedPlanFragment spf[] = new SynthesizedPlanFragment[2];
-        spf[0] = new SynthesizedPlanFragment();
-        spf[0].fragmentId = SysProcFragmentId.PF_enableScoreboard;
-        spf[0].outputDepId = DEP_EnableScoreboardDistribute;
-        spf[0].inputDepIds = new int[] {};
-        spf[0].multipartition = true;
-        spf[0].parameters = ParameterSet.emptyParameterSet();
-
-        spf[1] = new SynthesizedPlanFragment();
-        spf[1].fragmentId = SysProcFragmentId.PF_enableScoreboardAggregate;
-        spf[1].outputDepId = DEP_EnableScoreboardAggregate;
-        spf[1].inputDepIds = new int[] {DEP_EnableScoreboardDistribute};
-        spf[1].multipartition = false;
-        spf[1].parameters = ParameterSet.emptyParameterSet();
-        return executeSysProcPlanFragments(spf, DEP_EnableScoreboardAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_enableScoreboard,
+                SysProcFragmentId.PF_enableScoreboardAggregate);
     }
 
 }

@@ -22,7 +22,7 @@ from operator import itemgetter, attrgetter
 import numpy
 from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
 
-STATS_SERVER = 'volt2'
+STATS_SERVER = 'perfstatsdb.voltdb.lan'
 
 def COLORS(k):
     return (((k ** 3) % 255) / 255.0,

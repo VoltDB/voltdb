@@ -24,7 +24,6 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Set;
 
 import org.voltcore.utils.CoreUtils;
@@ -160,7 +159,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
-        checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
         catalog_creator.shutdown(null);
@@ -228,7 +226,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
-        checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
                      m_state.getRootDependencyId());
         catalog_creator.shutdown(null);
@@ -244,32 +241,6 @@ public class TestReplicatedTableSaveFileState extends TestCase
     {
         m_siteInput.addRow(hostId, "host", hostId, "ohost", "cluster", DATABASE_NAME,
                            TABLE_NAME, 0, "FALSE", 0, 2);
-    }
-
-    private void checkPlanDependencies(SynthesizedPlanFragment[] plan)
-    {
-        Set<Integer> aggregate_deps = new HashSet<Integer>();
-        for (int dependency_id : plan[plan.length - 1].inputDepIds)
-        {
-            aggregate_deps.add(dependency_id);
-        }
-        Set<Integer> plan_deps = new HashSet<Integer>();
-        for (int i = 0; i < plan.length - 1; ++i)
-        {
-            int fragment_dep = -1;
-            if (plan[i].fragmentId ==
-                SysProcFragmentId.PF_restoreLoadReplicatedTable)
-            {
-                fragment_dep = (Integer) plan[i].parameters.toArray()[1];
-            }
-            else if (plan[i].fragmentId ==
-                SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated)
-            {
-                fragment_dep = (Integer) plan[i].parameters.toArray()[2];
-            }
-            plan_deps.add(fragment_dep);
-        }
-        assertTrue(aggregate_deps.equals(plan_deps));
     }
 
     private ReplicatedTableSaveFileState m_state;

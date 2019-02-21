@@ -133,6 +133,26 @@ function run_benchmark() {
         --statsfile=exportbench.csv
 }
 
+function run_benchmark_10x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=30 \
+	--multiply=10 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
+function run_benchmark_100x() {
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark.ExportBenchmark \
+        --duration=60 \
+	--multiply=100 \
+        --servers=localhost \
+        --statsfile=exportbench.csv
+}
+
 function shutdown() {
     voltadmin shutdown
 }
