@@ -786,6 +786,37 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
     }
 
+    public void testAlterStreamTTL() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a stream
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE STREAM A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterStreamTTL1.jar");
+
+        // add TTL, not supported, failed in DiffEngine
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterStreamTTL2.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testAlterViewTTL() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW B (CC1, CC2) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL1.jar"));
+        catalogForJar(testDir + File.separator + "testAlterStreamTTL1.jar");
+
+        // add TTL, not supported
+        builder.addLiteralSchema("\nALTER TABLE B USING TTL 20 MINUTES ON COLUMN CC2;");
+        assertFalse("Failed to reject alter TTL on view table", builder.compile(testDir + File.separator + "testAlterStreamTTL2.jar"));
+    }
+
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
