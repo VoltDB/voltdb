@@ -46,7 +46,7 @@ public class ExportMatchers {
             final long uso) {
         return new TypeSafeMatcher<VoltMessage>() {
             Matcher<BinaryPayloadMessage> payloadMatcher =
-                    ackPayloadIs(partitionId, signature, uso);
+                    ackPayloadIs(partitionId, signature, uso, 0);
             @Override
             public void describeTo(Description d) {
                 d.appendDescriptionOf(payloadMatcher);
@@ -61,17 +61,19 @@ public class ExportMatchers {
     public static final Matcher<BinaryPayloadMessage> ackPayloadIs(
             final int partitionId,
             final String signature,
-            final long seqNo) {
+            final long seqNo,
+            final int catalogVersion) {
 
         return new TypeSafeMatcher<BinaryPayloadMessage>() {
             Matcher<AckPayloadMessage> payloadMatcher =
-                    ackMessageIs(partitionId, signature, seqNo);
+                    ackMessageIs(partitionId, signature, seqNo, catalogVersion);
             @Override
             public void describeTo(Description d) {
                 d.appendText("BinaryPayloadMessage [ partitionId: ")
                 .appendValue(partitionId).appendText(", seqNo: ")
                 .appendValue(seqNo).appendText(", signature: ")
-                .appendValue(signature).appendText("]");
+                .appendValue(signature).appendText(", catalogVersion: ")
+                .appendValue(catalogVersion).appendText("]");
             }
             @Override
             protected boolean matchesSafely(BinaryPayloadMessage p) {
@@ -90,7 +92,8 @@ public class ExportMatchers {
     static final Matcher<AckPayloadMessage> ackMessageIs(
             final int partitionId,
             final String signature,
-            final long seqNo) {
+            final long seqNo,
+            final int catalogVersion) {
 
         return new TypeSafeMatcher<AckPayloadMessage>() {
             @Override
@@ -98,12 +101,14 @@ public class ExportMatchers {
                 d.appendText("AckPayloadMessage [ partitionId: ")
                 .appendValue(partitionId).appendText(", seqNo: ")
                 .appendValue(seqNo).appendText(", signature: ")
-                .appendValue(signature).appendText("]");
+                .appendValue(signature).appendText(", catalogVersion: ")
+                .appendValue(catalogVersion).appendText("]");
             }
             @Override
             protected boolean matchesSafely(AckPayloadMessage m) {
                 return equalTo(partitionId).matches(m.getPartitionId())
                         && equalTo(signature).matches(m.getSignature())
+                        && equalTo(catalogVersion).matches(m.getCatalogVersion())
                         && equalTo(seqNo).matches(m.getSequenceNumber());
             }
         };

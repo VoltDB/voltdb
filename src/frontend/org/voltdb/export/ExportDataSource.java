@@ -201,7 +201,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
     {
         m_generation = generation;
-        m_catalogVersionCreated = m_generation.getCatalogVersion();
+        m_catalogVersionCreated = m_generation == null ? 0 : m_generation.getCatalogVersion();
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
@@ -300,7 +300,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             List<Pair<Integer, Integer>> localPartitionsToSites,
             final ExportDataProcessor processor) throws IOException {
         m_generation = generation;
-        m_catalogVersionCreated = m_generation.getCatalogVersion();
+        m_catalogVersionCreated = m_generation == null ? 0 : m_generation.getCatalogVersion();
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -385,6 +385,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public int getCatalogVersionCreated() {
         return m_catalogVersionCreated;
+    }
+
+    private int getGenerationCatalogVersion() {
+        return m_generation == null ? 0 : m_generation.getCatalogVersion();
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -1127,7 +1131,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(seq);
-            buf.putInt(m_generation.getCatalogVersion());
+            buf.putInt(getGenerationCatalogVersion());
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1170,7 +1174,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
                     buf.putLong(m_lastReleasedSeqNo);
-                    buf.putInt(m_generation.getCatalogVersion());
+                    buf.putInt(getGenerationCatalogVersion());
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 

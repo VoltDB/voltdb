@@ -462,7 +462,7 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 1))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 1, 0))
                 );
 
         // Poll and discard buffer 2, too
