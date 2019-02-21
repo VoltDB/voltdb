@@ -663,9 +663,14 @@ public class DDLCompiler {
         }
     }
 
-    private void processCreateTableExportStatement(DDLStatement stmt, Database db) throws VoltCompilerException {
+    private void processTableExportStatement(DDLStatement stmt, Database db, boolean alterTable) throws VoltCompilerException {
         String statement = stmt.statement;
-        Matcher statementMatcher = SQLParser.matchCreateTable(statement);
+        Matcher statementMatcher;
+        if (alterTable) {
+            statementMatcher = SQLParser.matchAlterTTL(statement);
+        } else {
+            statementMatcher = SQLParser.matchCreateTable(statement);
+        }
         if (statementMatcher.matches()) {
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
@@ -2177,8 +2182,10 @@ public class DDLCompiler {
 
                 boolean createTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
                         ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
-                if (createTable) {
-                    processCreateTableExportStatement(stmt, db);
+                boolean alterTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.ALTER) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                if (createTable || alterTable) {
+                    processTableExportStatement(stmt, db, alterTable);
                 }
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;

@@ -131,6 +131,19 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_TABLE");
 
     /**
+     * Pattern: CREATE TABLE tablename
+     *
+     *
+     * Capture groups:
+     *  (1) table name
+     */
+    private static final Pattern PAT_ALTER_TTL =
+        SPF.statement(
+            SPF.token("alter"), SPF.token("table"), SPF.capture("name", SPF.databaseObjectName()),
+            SPF.token("using"), SPF.token("TTL"),
+            SPF.anythingOrNothing()
+        ).compile("PAT_ALTER_TTL");
+    /**
      * PARTITION PROCEDURE procname ON TABLE tablename COLUMN columnname [PARAMETER paramnum]
      *
      * NB supports only unquoted table and column names
@@ -727,6 +740,11 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateTable(String statement)
     {
         return PAT_CREATE_TABLE.matcher(statement);
+    }
+
+    public static Matcher matchAlterTTL(String statement)
+    {
+        return PAT_ALTER_TTL.matcher(statement);
     }
 
     /**
