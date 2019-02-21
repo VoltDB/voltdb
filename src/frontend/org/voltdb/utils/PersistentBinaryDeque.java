@@ -302,7 +302,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Note: the "previous" id value may be > "current" id value
         long prevId = lastEntry == null ? getNextSegmentId() : lastEntry.getValue().segmentId();
-        Long writeSegmentIndex = lastEntry == null ? 0L : lastEntry.getKey() + 1;
+        Long writeSegmentIndex = lastEntry == null ? 1L : lastEntry.getKey() + 1;
 
         String fname = getSegmentFileName(curId, prevId);
         PBDSegment writeSegment =
@@ -414,6 +414,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 if (!fname.endsWith(".pbd")) {
                     continue;
                 }
+
+                if (!fname.startsWith(m_nonce + "_")) {
+                    continue;
+                }
+
                 if (file.length() == 0) {
                     // Old PBD file that was truncated to 0 instead of being deleted.
                     // Gluster FS bug required to leave those files around, but the
@@ -423,9 +428,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
 
-                if (!fname.startsWith(m_nonce + "_")) {
-                    continue;
-                }
                 String rootname = fname.substring(0, fname.lastIndexOf("."));
                 String[] parts = rootname.split("_");
                 if (parts.length < 3) {
@@ -640,7 +642,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         long curId = getNextSegmentId();
 
         PBDSegment lastSegment = peekLastSegment();
-        Long newSegmentIndex = lastSegment == null ? 1 : lastSegment.segmentIndex() + 1;
+        Long newSegmentIndex = lastSegment == null ? 1L : lastSegment.segmentIndex() + 1;
         long prevId = lastSegment == null ? getNextSegmentId() : lastSegment.segmentId();
 
         String fname = getSegmentFileName(curId, prevId);
@@ -832,7 +834,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         // Calculate first index to push
         PBDSegment first = peekFirstSegment();
-        Long nextIndex = first == null ? 0L: first.segmentIndex() - 1;
+        Long nextIndex = first == null ? 1L : first.segmentIndex() - 1;
 
         // The first segment id is either the "previous" of the current head
         // (this avoids having to rename the file of the current head), or  new id.
