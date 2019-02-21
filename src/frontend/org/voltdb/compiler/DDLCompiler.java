@@ -662,6 +662,26 @@ public class DDLCompiler {
         }
     }
 
+    private void processCreateTableExportStatement(DDLStatement stmt, Database db) throws VoltCompilerException {
+        String statement = stmt.statement;
+        Matcher statementMatcher = SQLParser.matchCreateTable(statement);
+        if (statementMatcher.matches()) {
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                for (VoltXMLElement subNode : tableXML.children) {
+                    if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
+                        final String migrationTarget = subNode.attributes.get("migrationTarget");
+                        if (migrationTarget != null) {
+                            tableXML.attributes.put("export", migrationTarget);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
@@ -908,6 +928,7 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 String drTable = e.attributes.get("drTable");
+                final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
@@ -915,10 +936,9 @@ public class DDLCompiler {
                     m_tracker.removePartition(tableName);
                 }
                 if (export != null) {
-                    m_tracker.addExportedTable(tableName, export);
-                }
-                else {
-                    m_tracker.removeExportedTable(tableName);
+                    m_tracker.addExportedTable(tableName, export, isStream);
+                } else {
+                    m_tracker.removeExportedTable(tableName, isStream);
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
@@ -2152,6 +2172,12 @@ public class DDLCompiler {
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {
                     processCreateStreamStatement(stmt, db, whichProcs);
+                }
+
+                boolean createTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                if (createTable) {
+                    processCreateTableExportStatement(stmt, db);
                 }
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
