@@ -666,7 +666,7 @@ public class ExportBenchmark {
         }
 
         // Make sure we got serverside stats if we are acting as a receiver
-        if (config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"))) {
+        if (isSocketTest) {
             if (serverStats.size() == 0 ) {
                 System.err.println("ERROR: Never received stats from export clients");
                 success = false;
@@ -792,11 +792,7 @@ public class ExportBenchmark {
 
         try {
             ExportBenchmark bench = new ExportBenchmark(config);
-            if ( config.target.equals("socket") && config.socketmode.equals("receiver")) {
-
-            } else {
-                bench.runTest();
-            }
+            bench.runTest();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
