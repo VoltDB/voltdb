@@ -158,14 +158,7 @@ public class AbstractTopology {
         }
 
         private Host(Host oldHost, int newId, Map<Integer, Partition> allPartitions) {
-            ImmutableSortedSet.Builder<Partition> builder = ImmutableSortedSet.naturalOrder();
-            for (Partition p : oldHost.partitions) {
-                builder.add(allPartitions.get(p.id));
-            }
-            id = newId;
-            haGroup = oldHost.haGroup;
-            partitions = builder.build();
-            isMissing = false;
+           this(oldHost, newId, allPartitions, false);
         }
 
         private Host(HostBuilder hostBuilder, Map<Integer, Partition> allPartitions) {
@@ -192,6 +185,8 @@ public class AbstractTopology {
         }
 
         public List<Integer> getPartitionIdList() {
+
+            // return as list to ensure the order as inserted
             return partitions.stream()
                     .map(p -> p.id)
                     .collect(Collectors.toList());
@@ -954,7 +949,7 @@ public class AbstractTopology {
             int kfactor, boolean restorePartition ) {
         TopologyBuilder builder = addPartitionsToHosts(hostInfos, missingHosts, kfactor, 0);
         AbstractTopology topo = new AbstractTopology(EMPTY_TOPOLOGY, builder);
-        if (restorePartition) {
+        if (restorePartition && hostInfos.size() == topo.getHostCount()) {
             topo = mutateRestorePartitionsForRecovery(topo, hostInfos);
         }
         return topo;
@@ -1068,17 +1063,15 @@ public class AbstractTopology {
 
     private static AbstractTopology mutateRestorePartitionsForRecovery(AbstractTopology topology,
             Map<Integer, HostInfo> hostInfos) {
-        final AtomicInteger recoveredHostCount = new AtomicInteger(0);
         Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
         hostInfos.forEach((k, v) -> {
             Set<Integer> partitions = v.getRecoveredPartitions();
             if (!partitions.isEmpty()) {
                 restoredPartitionsByHosts.computeIfAbsent(partitions, p -> new ArrayList<>()).add(k);
-                recoveredHostCount.incrementAndGet();
             }
         });
 
-        if (restoredPartitionsByHosts.isEmpty() || topology.getHostCount() != recoveredHostCount.get()) {
+        if (restoredPartitionsByHosts.isEmpty()) {
             return topology;
         }
 
