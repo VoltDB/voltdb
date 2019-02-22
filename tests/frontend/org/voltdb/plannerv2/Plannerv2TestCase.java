@@ -118,7 +118,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
             return m_transformedNode;
         }
 
-        public void test() throws AssertionError {
+        public void pass() throws AssertionError {
             if (m_sap == null) {
                 throw new AssertionError("Need to specify a SQL statement.");
             }
@@ -129,8 +129,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
             }
         }
 
-        public void testFail() {
-            fail("Not implemented.");
+        public void fail() {
+            PlannerTestCase.fail("Not implemented.");
         }
 
         void checkEx(Exception ex) throws AssertionError {
@@ -150,8 +150,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class ValidationTester extends Tester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             try {
                 m_parsedNode = m_planner.parse(m_sap.sql);
                 m_validatedNode = m_planner.validate(m_parsedNode);
@@ -162,8 +162,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class ConversionTester extends ValidationTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             try {
                 m_root = m_planner.rel(m_validatedNode);
                 if (m_expectedPlan != null) {
@@ -176,8 +176,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class LogicalRulesTester extends ConversionTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             if (m_ruleSetIndex < 0) {
                 throw new AssertionError("Need to specify a planner phase.");
             }
@@ -192,16 +192,16 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class MPFallbackTester extends LogicalRulesTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             m_transformedNode = VoltRelUtil.addTraitRecursively(m_transformedNode, RelDistributions.ANY);
             m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK, m_transformedNode);
         }
 
-        @Override public void testFail() {
+        @Override public void fail() {
             try {
-                test();
+                pass();
             }
             catch (PlannerFallbackException e){
                 assertEquals("MP query not supported in Calcite planner.", e.getMessage());
@@ -213,13 +213,13 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 // we got the exception, we are good.
                 return;
             }
-            fail("Expected fallback.");
+            PlannerTestCase.fail("Expected fallback.");
         }
     }
 
     public class PhysicalConversionRulesTester extends MPFallbackTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
             RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
                     replace(RelDistributions.ANY);
@@ -233,8 +233,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class InlineRulesTester extends PhysicalConversionRulesTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
                     HepMatchOrder.ARBITRARY, m_transformedNode, true);
             if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal() && m_expectedTransform != null) {

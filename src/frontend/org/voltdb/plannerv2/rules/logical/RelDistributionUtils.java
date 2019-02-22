@@ -7,10 +7,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.*;
-import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.tools.Program;
-import org.apache.calcite.util.Util;
 import org.voltcore.utils.Pair;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
@@ -25,7 +22,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Utility class to check whether the of table joining operation results in MP or SP query
+ * Utility class to check whether the of table joining operation results in MP or SP query.
+ * The reason we need this mechanism in the first place is that Calcite does not have concept of
+ * table partitioning, nor MP/SP.
+ * Some of the methods here are more debuggable than readable. Edit at your own risk.
  */
 final class RelDistributionUtils {
     private RelDistributionUtils() {}
@@ -422,6 +422,17 @@ final class RelDistributionUtils {
         switch (join.getJoinType()) {
             case INNER:
                 if (outerIsPartitioned || innerIsPartitioned) {
+                    if (join.getCondition().isA(SqlKind.LITERAL)) {
+                        assert join.getCondition().isAlwaysFalse() || join.getCondition().isAlwaysTrue();
+                        if (join.getCondition().isAlwaysFalse()) {
+                            return true;        // TODO: could join condition ever be false?
+                        } else if (outerIsPartitioned && innerIsPartitioned) {
+                            return outerHasPartitionKey &&
+                                    outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue());
+                        } else {
+                            return outerHasPartitionKey || innerHasPartitionKey;
+                        }
+                    }
                     assert join.getCondition() instanceof RexCall;
                     final RexCall joinCondition = (RexCall) join.getCondition();
                     final Set<Set<Integer>> joinColumnSets = getAllJoiningColumns(joinCondition);
@@ -537,134 +548,16 @@ final class RelDistributionUtils {
     }
 
     /**
-     * Helper function to decide whether the filtered result is located at a single partition.
+     * Trace the condition from a Calc node until we found that it is in the form of "column_p = literal",
+     * where column_p is the partition column provided.
+     * TODO: we need to make it more capable so that literals in conditions like
+     * "column_s = column_p AND column_p = literal" could be extracted.
      *
-     * @param program       the program of a {@link LogicalCalc}.
-     * @param rexNode       the current condition we are checking.
-     * @param partitionKeys the list of partition keys for the target table.
-     * @return true if the filtered result is located at a single partition.
+     * @param cond Calc condition, usually of {\code RexLocalRef}.
+     * @param src List of local/input references, or literals to search for
+     * @param partitionCol partition column of the partition table
+     * @return the literal if found, null otherwise.
      */
-    static boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
-        if (rexNode instanceof RexCall) {
-            RexCall rexCall = (RexCall) rexNode;
-            SqlKind sqlKind = rexCall.getOperator().getKind();
-            switch (sqlKind) {
-                case EQUALS:
-                    // SELECT ... FROM t WHERE PK = 0;
-                    // Note: SELECT ... FROM t WHERE PK = col1; is a MP query
-                    return (isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys)
-                            && !hasTableColumn(program, rexCall.getOperands().get(1))) ||
-                            (isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys)
-                                    && !hasTableColumn(program, rexCall.getOperands().get(0)));
-                case AND:
-                    // SELECT ... FROM t WHERE PK = 0 and A = 1;
-                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
-                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
-                case OR:
-                    // SELECT ... FROM t WHERE PK = 0 or A = 1;
-                    // SELECT ... FROM t WHERE PK in (1, 2, 3);
-                    // TODO: It could be SP, if all the values of PK are in the same partition,
-                    return false;
-                case NOT:
-                    // SELECT ... FROM t WHERE NOT PK <> 0;
-                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
-                default:
-                    return false;
-            }
-        } else if (rexNode instanceof RexInputRef) {
-            return partitionKeys.contains(((RexInputRef) rexNode).getIndex());
-        } else if (rexNode instanceof RexLocalRef) {
-            return isSinglePartitioned(program,
-                    program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Helper function to decide whether the complement of the filtered result is located at a single partition.
-     *
-     * @param program       the program of a {@link LogicalCalc}.
-     * @param rexNode       the condition of the program.
-     * @param partitionKeys the list of partition keys for the target table.
-     * @return true if the complement of the filtered result is located at a single partition.
-     */
-    private static boolean isComplementSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
-        if (rexNode instanceof RexCall) {
-            RexCall rexCall = (RexCall) rexNode;
-            SqlKind sqlKind = rexCall.getOperator().getKind();
-            switch (sqlKind) {
-                case NOT_EQUALS:
-                    // SELECT ... FROM t WHERE NOT PK <> 0;
-                    // Note: SELECT ... FROM t WHERE Not PK <> col1; is a MP query
-                    return (isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys)
-                            && !hasTableColumn(program, rexCall.getOperands().get(1))) ||
-                            (isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys)
-                                    && !hasTableColumn(program, rexCall.getOperands().get(0)));
-                case NOT:
-                    // SELECT ... FROM t WHERE NOT (NOT PK = 0);
-                    // I assume this branch will never be reached, cause calcite have a ReduceExpressionsRule
-                    // to simplify NOT(NOT..), but it is better safe than sorry.
-                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
-                case AND:
-                    // SELECT ... FROM t WHERE NOT (PK <> 0 and A = 2);
-                    return false;
-                case OR:
-                    // SELECT ... FROM t WHERE NOT (PK <> 0 or A = 2);
-                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
-                            isComplementSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
-                default:
-                    return false;
-            }
-        } else if (rexNode instanceof RexLocalRef) {
-            return isComplementSinglePartitioned(program,
-                    program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Helper function to check if the rexNode is a table column or includes a table column
-     * in its subtrees.
-     *
-     * @param program the program of a {@link LogicalCalc}.
-     * @param rexNode the rexNode
-     * @return true if the rexNode is a table column or includes a table column or
-     * includes a table column in its subtrees
-     */
-    private static boolean hasTableColumn(RexProgram program, RexNode rexNode) {
-        try {
-            rexNode.accept(new RexLocalRefFinder(program));
-        } catch (Util.FoundOne found) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * A visitor to find {@link RexLocalRef} of a table column in a node tree.
-     */
-    private static final class RexLocalRefFinder extends RexVisitorImpl<Void> {
-        final private RexProgram m_program;
-
-        private RexLocalRefFinder(RexProgram program) {
-            super(true);
-            m_program = program;
-        }
-
-        @Override
-        public Void visitLocalRef(RexLocalRef localRef) {
-            // True if the localRef is the Table Column
-            if (localRef.getIndex() < m_program.getProjectList().size()) {
-                throw Util.FoundOne.NULL;
-            }
-            // will visit recursively if the localRef is a expression or subquery
-            m_program.getExprList().get(localRef.getIndex()).accept(this);
-            return null;
-        }
-    }
-
     private static RexLiteral matchedColumnLiteral(RexNode cond, List<RexNode> src, int partitionCol) {
         if (cond.isA(SqlKind.LOCAL_REF)) {
             return matchedColumnLiteral(src.get(((RexLocalRef) cond).getIndex()), src, partitionCol);
@@ -728,4 +621,3 @@ final class RelDistributionUtils {
         }
     }
 }
-
