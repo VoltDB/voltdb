@@ -48,6 +48,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
@@ -992,7 +993,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 synchronized(HostMessenger.this) {
                     removeForeignHost(hostId);
                 }
-                m_acceptor.detract(hostId);
+                m_acceptor.detract(m_zk, hostId);
                 socket.close();
                 return;
             }

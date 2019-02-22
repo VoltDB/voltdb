@@ -24,10 +24,13 @@ package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -342,13 +345,9 @@ public class LocalCluster extends VoltServerConfig {
         //ArrayUtils.reverse(traces);
         int i;
         // skip all stack frames below this method
-        for (i = 0; ! traces[i].getClassName().equals(getClass().getName()); i++) {
-            ;
-        }
+        for (i = 0; !traces[i].getClassName().equals(getClass().getName()); i++) {}
         // skip all stack frames from localcluster itself
-        for (;      traces[i].getClassName().equals(getClass().getName()); i++) {
-            ;
-        }
+        for (; traces[i].getClassName().equals(getClass().getName()); i++) {}
         // skip the package name
         int dot = traces[i].getClassName().lastIndexOf('.');
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
@@ -387,15 +386,16 @@ public class LocalCluster extends VoltServerConfig {
         // start ignores them silently if they are set.
         if (schemaToStage != null) {
             try {
-                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+                templateCmdLine.m_userSchemas = Collections
+                        .singletonList(VoltProjectBuilder.createFileForSchema(schemaToStage));
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchemas + "\"");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
         if (classesJarToStage != null) {
-            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
-            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+            templateCmdLine.m_stagedClassesPaths = Collections.singletonList(new VoltFile(classesJarToStage));
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPaths + "\"");
         }
 
         // if the user wants valgrind and it makes sense, give it to 'em
@@ -536,13 +536,31 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
-        if (!m_compiled) {
-            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId);
-            m_compiled = m_initialCatalog != null;
-            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
-            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+        return compile(builder, null);
+    }
+
+    /**
+     * Update the catalog of a running instance. It is recommended that {@code builder} is the same builder which was
+     * used to compile this instance with the appropriate modifications.
+     *
+     * @param builder {@link VoltProjectBuilder} with updated configuration.
+     * @throws ProcCallException    If there was an error calling the procedure
+     * @throws InterruptedException If this thread was interrupted
+     * @throws IOException          If there was an error writing or reading the updated configuration
+     */
+    public void updateCatalog(VoltProjectBuilder builder) throws IOException, ProcCallException, InterruptedException {
+        m_compiled = false;
+        assertTrue(compile(builder));
+
+        String deplymentString = new String(Files.readAllBytes(Paths.get(builder.getPathToDeployment())),
+                Constants.UTF8ENCODING);
+        Client client = createAdminClient(new ClientConfig());
+        try {
+            assertEquals(ClientResponse.SUCCESS,
+                    client.callProcedure("@UpdateApplicationCatalog", null, deplymentString).getStatus());
+        } finally {
+            client.close();
         }
-        return m_compiled;
     }
 
     @Override
@@ -760,7 +778,8 @@ public class LocalCluster extends VoltServerConfig {
         }
         if (new Integer(hostId).equals(m_mismatchNode)) {
             assert m_usesStagedSchema;
-            cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+            cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                    : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
         }
         cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
 
@@ -1061,7 +1080,8 @@ public class LocalCluster extends VoltServerConfig {
             }
             if (new Integer(hostId).equals(m_mismatchNode)) {
                 assert m_usesStagedSchema;
-                cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+                cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                        : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
             }
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -1716,7 +1736,7 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
-            throw new IOException(e.getCause());
+            throw new IOException(e);
         }
         if (resp == null) {
             throw new IOException("Failed to prepare for shutdown.");
@@ -2304,7 +2324,7 @@ public class LocalCluster extends VoltServerConfig {
                                           DrRoleType drRole, boolean hasLocalServer) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null, null);
         lc.setHasLocalServer(hasLocalServer);
         lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
@@ -2406,16 +2426,7 @@ public class LocalCluster extends VoltServerConfig {
         m_compiled = true;
     }
 
-    public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
-            int kfactor, int clusterId, int replicationPort,
-            int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-            DrRoleType drRole, VoltProjectBuilder builder,
-            String callingMethodName) throws IOException {
-        return compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort,
-                remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null, callingMethodName);
-    }
-
-    public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
+    private static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                               int kfactor, int clusterId, int replicationPort,
                                               int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                               DrRoleType drRole, VoltProjectBuilder builder,
