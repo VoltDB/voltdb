@@ -93,7 +93,7 @@ public class AbstractTopology {
 
     public static class Partition implements Comparable<Partition>{
         public final int id;
-        public int leaderHostId;
+        public final int leaderHostId;
         public final ImmutableSortedSet<Integer> hostIds;
 
         private Partition(int id, int leaderHostId, Collection<Integer> hostIds) {
