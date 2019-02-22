@@ -19,13 +19,12 @@
 #define EXPORTTUPLESTREAM_H_
 #include "common/ids.h"
 #include "common/tabletuple.h"
+#include "common/StreamBlock.h"
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
 #include <cassert>
 namespace voltdb {
-
-class StreamBlock;
 
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
@@ -35,12 +34,18 @@ class StreamBlock;
 //Necessary for very large rows
 const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
 
-class ExportTupleStream : public voltdb::TupleStreamBase {
+class VoltDBEngine;
+
+class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
+    friend class ExportStreamBlock;
+    friend class StreamBlock;
+
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
-                      const std::string &tableName, const std::vector<std::string> &columnNames);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
+                      std::string signature, const std::string &tableName,
+                      const std::vector<std::string> &columnNames);
 
     virtual ~ExportTupleStream() {
     }
@@ -53,7 +58,7 @@ public:
     }
 
     int64_t getSequenceNumber() {
-        return m_exportSequenceNumber;
+        return m_nextSequenceNumber;
     }
 
     /** Set the total number of bytes used and starting sequence number for new buffer (for rejoin/recover) */
@@ -61,7 +66,7 @@ public:
         assert(m_uso == 0);
         m_uso = count;
         // this is for start sequence number of stream block
-        m_exportSequenceNumber = seqNo + 1;
+        m_nextSequenceNumber = seqNo + 1;
         //Extend the buffer chain to replace any existing stream blocks with a new one
         //with the correct sequence number
         extendBufferChain(0);
@@ -74,31 +79,67 @@ public:
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return s_mdSchemaSize; }
 
-    int64_t debugAllocatedBytesInEE() const {
+    int64_t testAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
         int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
-    void pushStreamBuffer(StreamBlock *block, bool sync);
+    void pushStreamBuffer(ExportStreamBlock *block, bool sync);
     void pushEndOfStream();
 
     /** write a tuple to the stream */
-    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
+    virtual size_t appendTuple(
+            VoltDBEngine* engine,
             int64_t spHandle,
             int64_t seqNo,
             int64_t uniqueId,
-            int64_t timestamp,
             const TableTuple &tuple,
             int partitionColumn,
             ExportTupleStream::Type type);
+
+    /** Close Txn and send full buffers with committed data to the top end. */
+    void commit(VoltDBEngine* engine, int64_t spHandle, int64_t uniqueId);
+    inline void rollbackExportTo(size_t mark, int64_t seqNo) {
+        // make the stream of tuples contiguous outside of actual system failures
+        assert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
+        m_nextSequenceNumber = seqNo;
+        TupleStreamBase::rollbackBlockTo(mark);
+        m_currBlock->truncateExportTo(mark, seqNo);
+    }
 
     size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;
     size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
     void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
+    void appendToList(ExportTupleStream** oldest, ExportTupleStream** newest);
+    void stitchToNextNode(ExportTupleStream* next);
+    void removeFromFlushList(VoltDBEngine* engine, bool moveToTail);
+
+    /** age out committed data */
+    inline bool flushTimerExpired(int64_t timeInMillis) {
+        return (timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));
+    }
+    virtual bool periodicFlush(int64_t timeInMillis,
+                               int64_t lastComittedSpHandle);
+    virtual void extendBufferChain(size_t minLength);
+
     virtual int partitionId() { return m_partitionId; }
     void setNew() { m_new = true; }
+    bool isNew() { return m_new; }
+
+    inline ExportTupleStream* getNextFlushStream() const {
+        return m_nextFlushStream;
+    }
+
+    inline bool testFlushPending() {
+        return m_flushPending;
+    }
+
+    inline int64_t testFlushBuffCreateTime() {
+        return m_lastFlush;
+    }
+
 
 public:
     // Computed size for metadata columns
@@ -120,6 +161,14 @@ private:
     const std::string &m_tableName;
     const std::vector<std::string> &m_columnNames;
     const int32_t m_ddlSchemaSize;
+
+    int64_t m_nextSequenceNumber;
+    int64_t m_committedSequenceNumber;
+
+    // Used to track what streams have partial blocks that could be flushed
+    bool m_flushPending;
+    ExportTupleStream* m_nextFlushStream;
+    ExportTupleStream* m_prevFlushStream;
 
     // Buffer version (used for proper decoding of buffers by standalone processors)
     static const uint8_t s_EXPORT_BUFFER_VERSION;
