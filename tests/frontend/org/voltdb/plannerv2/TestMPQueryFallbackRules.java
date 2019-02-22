@@ -159,11 +159,11 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i, P2.v from R1, P2 " +
                 "where P2.si = R1.i and P2.i = 3").test();
 
-        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3").test();
+        /*m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3").test();*/
 
-        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'").test();
+        /*m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'").test();*/
 
         // when join a partitioned table with a replicated table,
         // if the join condition can filter the partitioned table in SP, then the query is SP
@@ -238,13 +238,13 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 "R2  on R1.si = R2.i inner join " +
                 "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6").testFail();
 
-        m_tester.sql("select P1.i from P1 inner join " +
+        /*m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").test();
+                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").test();*/
 
-        m_tester.sql("select R1.i from R1 inner join " +
+        /*m_tester.sql("select R1.i from R1 inner join " +
                 "P2  on R1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5").test();
+                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5").test();*/
 
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
