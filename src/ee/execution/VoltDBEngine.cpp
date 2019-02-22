@@ -2191,6 +2191,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
             nextStreamToFlush = nextStreamToFlush->getNextFlushStream();
             if (!m_oldestExportStreamWithPendingRows->periodicFlush(timeInMillis, lastCommittedSpHandle)) {
                 // If periodicFlush returns false, it means there is an MP txn in progress that prevented the flush
+                m_oldestExportStreamWithPendingRows->resetFlushLinkages();
                 m_oldestExportStreamWithPendingRows->appendToList(&oldestUnflushed, &newestUnflushed);
             }
             m_oldestExportStreamWithPendingRows = nextStreamToFlush;
@@ -2200,10 +2201,16 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
             break;
         }
     }
-    if (nextStreamToFlush && newestUnflushed) {
-        // We stopped flushing in the middle of the list. If there are any skipped streams stitch them together
-        assert(m_oldestExportStreamWithPendingRows);
-        newestUnflushed->stitchToNextNode(m_oldestExportStreamWithPendingRows);
+    if (newestUnflushed) {
+        if (nextStreamToFlush) {
+            // We stopped flushing in the middle of the list. If there are any skipped streams stitch them together
+            assert(m_oldestExportStreamWithPendingRows);
+            newestUnflushed->stitchToNextNode(m_oldestExportStreamWithPendingRows);
+        }
+        else {
+            // We went through the whole list but skipped streams in the middle of an MP.
+            m_newestExportStreamWithPendingRows = newestUnflushed;
+        }
         m_oldestExportStreamWithPendingRows = oldestUnflushed;
     }
     //On Tick do cleanup of dropped streams.
