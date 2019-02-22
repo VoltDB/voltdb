@@ -19,6 +19,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -397,6 +398,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * - currentCounter = Value of monotonic counter at PBD segment creation
      * - previousCounter = Value of monotonic counter at previous PBD segment creation
      *
+     * @param deleteEmpty true if must delete empty PBD files
      * @throws IOException
      */
     private void parseFiles(boolean deleteEmpty) throws IOException {
@@ -415,22 +417,32 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
 
-                if (!fname.startsWith(m_nonce + "_")) {
-                    continue;
-                }
-
-                if (file.length() == 0) {
-                    // Old PBD file that was truncated to 0 instead of being deleted.
-                    // Gluster FS bug required to leave those files around, but the
-                    // new file naming scheme always create unique file names so
-                    // now we can delete those files.
+                // Parse the pbd file name and delete files that have a non conforming name.
+                String rootname = fname.substring(0, fname.lastIndexOf("."));
+                String[] parts = rootname.split("_");
+                if (parts.length < 3) {
+                    // Note: same file may be deleted from different PBDs
                     deleteStalePbdFile(file);
                     continue;
                 }
 
-                String rootname = fname.substring(0, fname.lastIndexOf("."));
-                String[] parts = rootname.split("_");
-                if (parts.length < 3) {
+                /// Reconstruct nonce in case it has '_' characters
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < parts.length - 2; i++) {
+                    if (i > 0) sb.append("_");
+                    if (parts[i].isEmpty()) continue;
+                    sb.append(parts[i]);
+                }
+
+                // Is this one of our PBD files?
+                String nonce = sb.toString();
+                if (!m_nonce.equals(nonce)) {
+                    // Not my PBD
+                    continue;
+                }
+
+                // From now on we're dealing with one of our PBD files
+                if (file.length() == 0) {
                     deleteStalePbdFile(file);
                     continue;
                 }
@@ -473,7 +485,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 Deque<Deque<Long>> sequences = sequencer.getSequences();
                 if (sequences.size() > 1) {
                     // FIXME: reject this case for now
-                    // FIXME: we should select the sequence that has the oldest entry and delete
+                    // FIXME: we could select the sequence that has the oldest entry and delete
                     // the other files
                     throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
                 }
@@ -504,16 +516,27 @@ public class PersistentBinaryDeque implements BinaryDeque {
     /**
      * Delete a PBD segment that was identified as 'stale' i.e. produced by earlier VoltDB releases
      *
+     * Note that this file may be concurrently deleted from multiple instances so we ignore
+     * NoSuchFileException.
+     *
      * @param file
      * @throws IOException
      */
     private void deleteStalePbdFile(File file) throws IOException {
-        PBDSegment.setFinal(file, false);
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + file.getName()
+        try {
+            PBDSegment.setFinal(file, false);
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Segment " + file.getName()
                 + " (final: " + PBDSegment.isFinal(file) + "), will be closed and deleted during init");
+            }
+            file.delete();
+        } catch (Exception e) {
+            if (e instanceof NoSuchFileException) {
+                // Concurrent delete, noop
+            } else {
+                throw e;
+            }
         }
-        file.delete();
     }
 
     /**
