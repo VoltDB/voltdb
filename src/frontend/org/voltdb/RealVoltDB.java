@@ -210,6 +210,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -1256,6 +1257,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
+
+                // The partition id list must be in sorted order
+                assert(Ordering.natural().isOrdered(partitions));
 
                 // persist the merged settings
                 m_config.m_recoveredPartitions = Joiner.on(",").join(partitions);
