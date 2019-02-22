@@ -184,7 +184,7 @@ public:
     bool checkTargetFlushTime(int64_t target) {
         if (!m_engine->streamsToFlush() || !m_wrapper->testFlushPending()) return -1;
         int64_t expectedUniqueId = UniqueId::makeIdFromComponents(target + VOLT_EPOCH_IN_MILLIS, 0, 0);
-        return m_wrapper->testFlushBuffCreateTime() == UniqueId::ts(expectedUniqueId);
+        return m_wrapper->testFlushBuffCreateTime() == UniqueId::tsInMillis(expectedUniqueId);
     }
 
     bool testNoStreamsToFlush() {
