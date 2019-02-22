@@ -34,7 +34,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.json_voltpatches.JSONArray;
@@ -217,7 +216,7 @@ public class AbstractTopology {
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
-            return String.format("Host %d sph:%d ha:%s (Partitions %s)",
+            return String.format("Host %d ha:%s (Partitions %s)",
                     id, haGroup, String.join(",", partitionIdStrings));
         }
 
