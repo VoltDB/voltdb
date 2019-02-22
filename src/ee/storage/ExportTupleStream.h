@@ -112,6 +112,10 @@ public:
     size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
     void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
+    inline void resetFlushLinkages() {
+        m_nextFlushStream = NULL;
+        m_prevFlushStream = NULL;
+    }
     void appendToList(ExportTupleStream** oldest, ExportTupleStream** newest);
     void stitchToNextNode(ExportTupleStream* next);
     void removeFromFlushList(VoltDBEngine* engine, bool moveToTail);
