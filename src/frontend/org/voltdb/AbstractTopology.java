@@ -103,6 +103,14 @@ public class AbstractTopology {
             this.hostIds = ImmutableSortedSet.copyOf(hostIds);
         }
 
+        public ImmutableSortedSet<Integer> getHostIds(){
+            return hostIds;
+        }
+
+        public int getLeaderHostId() {
+            return leaderHostId;
+        }
+
         @Override
         public String toString() {
             String[] hostIdStrings = hostIds.stream().map(id -> String.valueOf(id)).toArray(String[]::new);
@@ -190,6 +198,10 @@ public class AbstractTopology {
             return partitions.stream()
                     .map(p -> p.id)
                     .collect(Collectors.toList());
+        }
+
+        public ImmutableSortedSet<Partition> getPartitions() {
+            return partitions;
         }
 
         public int getleaderCount() {
