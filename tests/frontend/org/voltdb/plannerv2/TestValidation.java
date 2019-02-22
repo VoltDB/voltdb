@@ -119,7 +119,15 @@ public class TestValidation extends Plannerv2TestCase {
         m_tester.sql("select abs(null) from R1").test();
         m_tester.sql("select power(null, null) from R1").test();
         m_tester.sql("select power(abs(null), abs(null)) from R1").test();
-        m_tester.sql("select abs(abs(abs(null)");
+        m_tester.sql("select abs(abs(abs(null))) from R1").test();
+    }
+
+    // ENG-15222 allow null to appear as function parameter
+    public void testQuestionMarkAsFunctionParameter() {
+        m_tester.sql("select abs(?) from R1").test();
+        m_tester.sql("select power(?, ?) from R1").test();
+        m_tester.sql("select power(abs(?), abs(?)) from R1").test();
+        m_tester.sql("select abs(abs(abs(?))) from R1").test();
     }
 
     // TODO ENG-15353: allow null to appear in operands
