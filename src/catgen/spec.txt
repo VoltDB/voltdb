@@ -18,6 +18,7 @@ begin Cluster                      "A set of connected hosts running one or more
   string drConsumerSslPropertyFile "Path to DR consumer property file containing path to trust store and the trust store password"
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
   int preferredSource              "The cluster id from which this joining cluster should request snapshot"
+  string schemaCheckMode           "Whether remote db schema compatibility check should be strict or flexible"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"

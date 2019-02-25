@@ -14,32 +14,28 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <string>
+#include "common/serializeio.h"
+#include "storage/DRTableNotFoundException.h"
 
-#ifndef DRTUPLESTREAMUNDOACTION_H
-#define DRTUPLESTREAMUNDOACTION_H
+using namespace voltdb;
 
-#include "common/UndoReleaseAction.h"
+DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string message) :
+    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND, message),
+    m_hash(hash)
+{ }
 
-namespace voltdb {
-
-class DRTupleStreamUndoAction : public UndoOnlyAction {
-public:
-DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
-    : m_stream(stream), m_mark(mark), m_cost(cost)
-    {
-        assert(stream);
-    }
-
-    void undo() {
-        m_stream->rollbackDrTo(m_mark, m_cost);
-    }
-
-private:
-    AbstractDRTupleStream *m_stream;
-    size_t m_mark;
-    size_t m_cost;
-};
-
+void DRTableNotFoundException::p_serialize(ReferenceSerializeOutput *output) const {
+    SerializableEEException::p_serialize(output);
+    output->writeLong(m_hash);
 }
 
-#endif
+const std::string
+DRTableNotFoundException::message() const
+{
+    std::string msg = SerializableEEException::message();
+    msg.append(" [");
+    msg.append((char *) m_hash);
+    msg.append("]");
+    return msg;
+}

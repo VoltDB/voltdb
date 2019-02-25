@@ -509,9 +509,21 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint ||
-            suspect instanceof TimeToLive)
+            suspect instanceof Constraint)
         {
+            return null;
+        }
+        else if (suspect instanceof TimeToLive) {
+            Column column = ((TimeToLive) suspect).getTtlcolumn();
+            Table table = (Table) column.getParent();
+            // view table can not have ttl columns
+            if (m_inStrictMatViewDiffMode) {
+                return "May not dynamically add TTl on materialized view's columns.";
+            }
+            // stream table can not have ttl columns
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return "May not dynamically add TTL on stream table's columns.";
+            }
             return null;
         }
 

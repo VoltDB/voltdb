@@ -26,6 +26,7 @@ set $PREV drMasterHost ""
 set $PREV drConsumerSslPropertyFile ""
 set $PREV drFlushInterval 0
 set $PREV preferredSource 0
+set $PREV schemaCheckMode ""
 add /clusters#cluster databases database
 set /clusters#cluster/databases#database schema "+QFUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMXDQ1NEQ1MDRDNEY1OTQ1NDU1MzIwMjgyMBECPDRDNDE1MzU0NUY0RTQxNEQBNCQ1NjQxNTI0MzQ4AQg8MjgzMjMwMjkyMDRFNEY1NAEIHDU1NEM0QzJDEUYEMjAJaBA1RjQ5NAEiMDk0RTU0NDU0NzQ1NTIBMgg0RjUBGE46AAhENDEFfAUsokIAFDAyOTNCCg=="
 set $PREV isActiveActiveDRed false
