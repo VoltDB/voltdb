@@ -54,6 +54,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SQLStmt;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNonTransactionalProcedure;
@@ -1366,7 +1367,7 @@ public class VoltCompiler {
             "the catalog.");
         }
 
-        if (VoltTypeUtil.TABLE_TYPE.isStream(tableref.getTabletype())) {
+        if (TableType.isStream(tableref.getTabletype())) {
             // streams cannot have tuple limits
             if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
                 throw new VoltCompilerException("Streams cannot have row limits configured");
@@ -1398,7 +1399,7 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-        if (tableref.getIndexes().size() > 0 && VoltTypeUtil.TABLE_TYPE.isStream(tableref.getTabletype())) {
+        if (tableref.getIndexes().size() > 0 && TableType.isStream(tableref.getTabletype())) {
             compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");

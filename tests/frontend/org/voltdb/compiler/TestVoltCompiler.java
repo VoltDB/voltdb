@@ -45,6 +45,7 @@ import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -3636,13 +3637,13 @@ public class TestVoltCompiler extends TestCase {
                 ddl
                 );
         Table t = getTableInfoFor(db, "e");
-        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.STREAM_VIEW_ONLY.get());
+        assert(t.getTabletype() == TableType.STREAM_VIEW_ONLY.get());
 
         t = getTableInfoFor(db, "e1");
-        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.STREAM.get());
+        assert(t.getTabletype() == TableType.STREAM.get());
 
         t = getTableInfoFor(db, "ttl");
-        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.PERSISTENT_MIGRATE.get());
+        assert(t.getTabletype() == TableType.PERSISTENT_MIGRATE.get());
 
     }
     public void testBadDropStream() throws Exception {

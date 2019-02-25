@@ -521,7 +521,7 @@ public class CatalogDiffEngine {
                 return "May not dynamically add TTl on materialized view's columns.";
             }
             // stream table can not have ttl columns
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table) ) {
                 return "May not dynamically add TTL on stream table's columns.";
             }
             return null;
@@ -1032,7 +1032,7 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Table) {
             if (field.equals("signature") ||
-                field.equals("tuplelimit"))
+                field.equals("tuplelimit") || field.equals("tableType"))
                 return null;
 
             // Always allow disabling DR on table

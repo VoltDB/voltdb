@@ -47,6 +47,7 @@ import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -678,7 +679,7 @@ public class DDLCompiler {
                 for (VoltXMLElement subNode : tableXML.children) {
                     if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
                         final String migrationTarget = subNode.attributes.get("migrationTarget");
-                        if (migrationTarget != null) {
+                        if (!StringUtil.isEmpty(migrationTarget)) {
                             tableXML.attributes.put("export", migrationTarget);
                         }
                         break;
@@ -941,10 +942,12 @@ public class DDLCompiler {
                 else {
                     m_tracker.removePartition(tableName);
                 }
-                if (!StringUtil.isEmpty(export)) {
-                    m_tracker.addExportedTable(tableName, export, isStream);
-                } else {
-                    m_tracker.removeExportedTable(tableName, isStream);
+                if (isStream) {
+                    if (!StringUtil.isEmpty(export)) {
+                        m_tracker.addExportedTable(tableName, export, isStream);
+                    } else {
+                        m_tracker.removeExportedTable(tableName, isStream);
+                    }
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
@@ -1284,7 +1287,7 @@ public class DDLCompiler {
         final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
-        table.setTabletype(VoltTypeUtil.TABLE_TYPE.PERSISTENT.get());
+        table.setTabletype(TableType.PERSISTENT.get());
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
@@ -1307,9 +1310,9 @@ public class DDLCompiler {
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
         if (isStream) {
             if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
-                table.setTabletype(VoltTypeUtil.TABLE_TYPE.STREAM.get());
+                table.setTabletype(TableType.STREAM.get());
             } else {
-                table.setTabletype(VoltTypeUtil.TABLE_TYPE.STREAM_VIEW_ONLY.get());
+                table.setTabletype(TableType.STREAM_VIEW_ONLY.get());
             }
         }
         // map of index replacements for later constraint fixup
@@ -1388,7 +1391,7 @@ public class DDLCompiler {
             final String migrationTarget = ttlNode.attributes.get("migrationTarget");
             if (migrationTarget != null) {
                 ttl.setMigrationtarget(migrationTarget);
-                table.setTabletype(VoltTypeUtil.TABLE_TYPE.PERSISTENT_MIGRATE.get());
+                table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
             }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
