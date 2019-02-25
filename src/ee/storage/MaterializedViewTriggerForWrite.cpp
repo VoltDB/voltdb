@@ -490,7 +490,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                                  // If the Index Column type is VALUE_TYPE_POINT, it is a **CoveringCellIndex**
                                  // for GEOGRAPHY type. This index is to accelerate queries that use the
                                  // CONTAINS function which tests to see if a point is contained by a polygon.
-                                 // But NOT for value comparison, so we can't use it.
+                                 // But NOT for value comparison, so we can't use it here.
                                  m_indexForMinMax[minMaxAggIdx]->getKeySchema()->getColumnInfo(
                                          static_cast<int>(m_groupByColumnCount))->getVoltType() !=
                                  VALUE_TYPE_POINT) {
