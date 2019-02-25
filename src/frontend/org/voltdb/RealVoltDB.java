@@ -517,7 +517,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            Map<Integer, String> hostGroups = null;
             int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (isRejoin || m_joining) {
                 numberOfNodes = m_messenger.getLiveHostIds().size();
@@ -526,9 +525,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 managedPathsEmptyCheck();
             }
 
-            if (!isRejoin && !m_joining) {
-                hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
-            }
+            final Map<Integer, String> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
