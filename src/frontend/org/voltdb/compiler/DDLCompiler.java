@@ -1284,7 +1284,7 @@ public class DDLCompiler {
         final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
-
+        table.setTabletype(VoltTypeUtil.TABLE_TYPE.PERSISTENT.get());
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
@@ -1307,9 +1307,9 @@ public class DDLCompiler {
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
         if (isStream) {
             if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
-                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get());
+                table.setTabletype(VoltTypeUtil.TABLE_TYPE.STREAM.get());
             } else {
-                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.VIEW_ONLY_STREAM.get());
+                table.setTabletype(VoltTypeUtil.TABLE_TYPE.STREAM_VIEW_ONLY.get());
             }
         }
         // map of index replacements for later constraint fixup
@@ -1388,7 +1388,7 @@ public class DDLCompiler {
             final String migrationTarget = ttlNode.attributes.get("migrationTarget");
             if (migrationTarget != null) {
                 ttl.setMigrationtarget(migrationTarget);
-                table.setStreamtype(VoltTypeUtil.TABLE_STREAM_EXTENSION.MIGRATE_TABLE.get());
+                table.setTabletype(VoltTypeUtil.TABLE_TYPE.PERSISTENT_MIGRATE.get());
             }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {

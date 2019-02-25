@@ -39,6 +39,7 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.rights.GranteeManager;
 import org.hsqldb_voltpatches.rights.Right;
@@ -329,18 +330,6 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
-/*
-    CompiledStatementInterface compileAlter() {
-
-        CompiledStatementInterface cs = null;
-        read();
-        String sql = getStatement(getParsePosition(), endStatementTokensAlter);
-
-        cs = new CompiledStatementSchema(sql, StatementCodes.ALTER_TYPE, null);
-
-        return cs;
-    }
-*/
     Statement compileDrop() {
 
         int      objectTokenType;
@@ -1001,6 +990,9 @@ public class ParserDDL extends ParserRoutine {
         if (t.getTTL() == null) {
             throw Error.error(ErrorCode.X_42501);
         }
+        if (!StringUtil.isEmpty(t.getTTL().migrationTarget)) {
+            throw unexpectedToken("May not drop migration target");
+        }
         Object[] args = new Object[] {
             t.getName(),
             Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
@@ -1020,7 +1012,7 @@ public class ParserDDL extends ParserRoutine {
         String ttlColumn = "";
         int batchSize = 1000;
         int maxFrequency = 1;
-        String stream = "";
+        String migrationTarget = "";
         read();
         if (token.tokenType != Tokens.TTL) {
             throw unexpectedToken();
@@ -1065,7 +1057,7 @@ public class ParserDDL extends ParserRoutine {
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
         if (token.tokenType == Tokens.MAX_FREQUENCY) {
@@ -1078,7 +1070,7 @@ public class ParserDDL extends ParserRoutine {
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
         if (token.tokenType == Tokens.BATCH_SIZE) {
@@ -1090,16 +1082,16 @@ public class ParserDDL extends ParserRoutine {
         }
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
         if (token.tokenType == Tokens.MIGRATE) {
-            stream = readMigrateTarget();
+            migrationTarget = readMigrateTarget();
         }
         read();
 
       if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         } else {
             throw unexpectedToken();
         }
@@ -1121,12 +1113,12 @@ public class ParserDDL extends ParserRoutine {
         return token.tokenString;
     }
     private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
-            int batchSize, int maxFrequency, String streamName) {
+            int batchSize, int maxFrequency, String migrationTargetName) {
         if (!alter) {
-            table.addTTL(value, unit, column, batchSize, maxFrequency, streamName);
+            table.addTTL(value, unit, column, batchSize, maxFrequency, migrationTargetName);
         } else {
             // The migration target can not be altered
-            if (table.getTTL() != null && table.getTTL().stream != null && !table.getTTL().stream.equalsIgnoreCase(streamName)){
+            if (table.getTTL() != null && !StringUtil.isEmpty(table.getTTL().migrationTarget) && !table.getTTL().migrationTarget.equalsIgnoreCase(migrationTargetName)){
                 throw unexpectedToken("The migration target can not be altered.");
             }
         }
@@ -1138,7 +1130,7 @@ public class ParserDDL extends ParserRoutine {
                 column,
                 batchSize,
                 maxFrequency,
-                streamName,
+                migrationTargetName,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
             };

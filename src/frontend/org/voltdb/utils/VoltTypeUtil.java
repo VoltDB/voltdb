@@ -359,15 +359,15 @@ public abstract class VoltTypeUtil {
         return vt;
     }
 
-    public static enum TABLE_STREAM_EXTENSION {
-        NO_STREAM(0),              // Regular PersistentTable
-        VIEW_ONLY_STREAM(1),       // StreamTable without ExportTupleStream (Views only)
-        EXPORT_STREAM(2),          // StreamTable with ExportTupleStream
-        MIGRATE_TABLE(3),          // PersistentTable with associated Stream for migrating DELETES
-        EXPORT_TABLE(4);           // PersistentTable with associated Stream for leaking INSERTS
+    public static enum TABLE_TYPE {
+        PERSISTENT(0),              // Regular PersistentTable
+        STREAM_VIEW_ONLY(1),        // StreamTable without ExportTupleStream (Views only)
+        STREAM(2),                  // StreamTable with ExportTupleStream
+        PERSISTENT_MIGRATE(3),      // PersistentTable with associated Stream for migrating DELETES
+        PERSISTENT_EXPORT(4);       // PersistentTable with associated Stream for leaking INSERTS
 
         final int type;
-        TABLE_STREAM_EXTENSION(int type) {
+        TABLE_TYPE(int type) {
             this.type = type;
         }
         public int get() {
@@ -375,7 +375,7 @@ public abstract class VoltTypeUtil {
         }
 
         public static boolean isStream(int e) {
-            return (e ==EXPORT_STREAM.get() || e == VIEW_ONLY_STREAM.get());
+            return (e ==STREAM.get() || e == STREAM_VIEW_ONLY.get());
         }
     }
 }

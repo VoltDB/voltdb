@@ -3636,13 +3636,13 @@ public class TestVoltCompiler extends TestCase {
                 ddl
                 );
         Table t = getTableInfoFor(db, "e");
-        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.VIEW_ONLY_STREAM.get());
+        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.STREAM_VIEW_ONLY.get());
 
         t = getTableInfoFor(db, "e1");
-        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.EXPORT_STREAM.get());
+        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.STREAM.get());
 
         t = getTableInfoFor(db, "ttl");
-        assert(t.getStreamtype() == VoltTypeUtil.TABLE_STREAM_EXTENSION.MIGRATE_TABLE.get());
+        assert(t.getTabletype() == VoltTypeUtil.TABLE_TYPE.PERSISTENT_MIGRATE.get());
 
     }
     public void testBadDropStream() throws Exception {
@@ -3912,7 +3912,15 @@ public class TestVoltCompiler extends TestCase {
               "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
+
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "alter table ttl drop TTL;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
