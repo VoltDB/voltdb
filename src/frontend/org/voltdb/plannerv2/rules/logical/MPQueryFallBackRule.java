@@ -59,7 +59,6 @@ public class MPQueryFallBackRule extends RelOptRule {
             // TODO: the exception thrown here could be too early, e.g. the result is used as a child of a join,
             // which will change MP decision to SP at that point.
             RelDistributionUtils.checkedFallBack(! RelDistributionUtils.isCalcScanSP(tableScan, calc));
-            call.transformTo(calc.copy(calc.getTraitSet().replace(tableScan.getTable().getDistribution()), calc.getInputs()));
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);

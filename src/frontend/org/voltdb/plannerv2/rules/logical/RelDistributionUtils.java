@@ -510,10 +510,12 @@ final class RelDistributionUtils {
                         return false; // No equal-filter found
                     }
                     final boolean outerTableHasEqValue =
-                            outerFilter.entrySet().stream().anyMatch(entry ->
-                                    entry.getKey().equals(outerPartColumn));
+                            outerPartColumn != null &&
+                                    outerFilter.entrySet().stream().anyMatch(entry ->
+                                            entry.getKey().equals(outerPartColumn));
                     final boolean innerTableHasEqValue =
-                            innerFilter.entrySet().stream().anyMatch(entry ->
+                            innerPartColumn != null &&
+                                    innerFilter.entrySet().stream().anyMatch(entry ->
                                     entry.getKey().equals(innerPartColumn + outerTableColumns));
                     if (outerTableHasEqValue || innerTableHasEqValue) {
                         // Has an equal-filter on partitioned column
@@ -524,7 +526,8 @@ final class RelDistributionUtils {
                         (outerTableHasEqValue ? outerFilter.entrySet() : innerFilter.entrySet())
                                 .stream().flatMap(entry -> {
                             final int columnIndex = entry.getKey();
-                            if (outerPartColumn == columnIndex || innerPartColumn == columnIndex - outerTableColumns) {
+                            if (outerPartColumn != null && outerPartColumn == columnIndex ||
+                                    innerPartColumn != null && innerPartColumn == columnIndex - outerTableColumns) {
                                 return Stream.of(entry.getValue());
                             } else {
                                 return Stream.empty();
@@ -597,7 +600,7 @@ final class RelDistributionUtils {
     }
 
     static boolean isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
-        final RelDistribution dist = scan.getTable().getDistribution();
+        final RelDistribution dist = scan.getTable().getDistribution(); // distribution for the scanned table
         switch (dist.getType()) {
             case SINGLETON:
                 return true;
@@ -612,7 +615,10 @@ final class RelDistributionUtils {
                     final RexLiteral literal = matchedColumnLiteral(
                             calc.getProgram().getCondition(), calc.getProgram().getExprList(), dist.getKeys().get(0));
                     if (literal != null) {
-                        dist.setPartitionEqualValue(literal);
+                        scan.getTraitSet().replace(dist);
+                        calc.getTraitSet().replace(dist);
+                        scan.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).setPartitionEqualValue(literal);
+                        calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).setPartitionEqualValue(literal);
                     }
                     return literal != null;
                 }

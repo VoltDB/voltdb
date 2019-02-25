@@ -157,7 +157,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         /*m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
                 "ON P1.i = P2.i AND P1.i = P1.si AND P1.si = 34").pass();*/
 
-        // Two partitioned table joined that results in MP (or sometimes unplan-nable query):
+        // Two partitioned table joined that results in MP (or sometimes un-plannable query):
         m_tester.sql("select P1.i, P2.v from P1, P2 " +
                 "where P2.si = P1.i and P2.v = 'foo'").fail();
 
@@ -189,11 +189,11 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i, P2.v from R1, P2 " +
                 "where P2.si = R1.i and P2.i = 3").pass();
 
-        /*m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3").test();*/
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3").pass();
 
-        /*m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'").test();*/
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'").pass();
 
         // when join a partitioned table with a replicated table,
         // if the join condition can filter the partitioned table in SP, then the query is SP
@@ -248,6 +248,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     }
 
     public void testMultiWayJoinWithFilter() {
+        m_tester.sql("select P1.i from P1 inner join " +
+                "P2  on P1.si = P2.i inner join " +
+                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo' and P2.i = 5").fail();
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
                 "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'").pass();
