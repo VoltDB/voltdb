@@ -822,7 +822,7 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
@@ -1709,19 +1709,9 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
-                        throw new RuntimeException("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "DR Conflicts cannot be handled.");
-                    } else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "Export target " + targetName + " will be disabled.");
-                    }
+                    hostLog.info("Export configuration enabled and provided for export target " + targetName
+                            + " in deployment file however no export tables are assigned to the this target. "
+                            + "Export target " + targetName + " will be disabled.");
                 }
                 continue;
             }
@@ -2322,7 +2312,7 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType, boolean isPlaceHolderCatalog) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -2377,6 +2367,15 @@ public abstract class CatalogUtil {
                 // consumer should be enabled even without connection source for XDCR
                 cluster.setDrconsumerenabled(true);
                 cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            }
+            if (!isPlaceHolderCatalog && dr.getRole() == DrRoleType.XDCR) {
+                CatalogMap<Table> tables = db.getTables();
+                if (tables.get(DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) == null
+                        || tables.get(DR_CONFLICTS_REPLICATED_EXPORT_TABLE) == null) {
+                    throw new RuntimeException("The XDCR role cannot be changed on an existing database. "
+                            + "Save the contents, initialize a new instance with the desired role, "
+                            + "and restore the contents.");
+                }
             }
         } else {
             cluster.setDrrole(DrRoleType.NONE.value());
