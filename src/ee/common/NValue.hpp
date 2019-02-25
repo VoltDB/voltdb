@@ -1715,7 +1715,7 @@ private:
     }
 
     NValue castAsGeographyPoint() const {
-        VOLT_ERROR_STACK();
+
         NValue retval(VALUE_TYPE_POINT);
         if (isNull()) {
             retval.setNull();
