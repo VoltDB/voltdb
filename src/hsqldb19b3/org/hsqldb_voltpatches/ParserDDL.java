@@ -1117,9 +1117,19 @@ public class ParserDDL extends ParserRoutine {
         if (!alter) {
             table.addTTL(value, unit, column, batchSize, maxFrequency, migrationTargetName);
         } else {
-            // The migration target can not be altered
-            if (table.getTTL() != null && !StringUtil.isEmpty(table.getTTL().migrationTarget) && !table.getTTL().migrationTarget.equalsIgnoreCase(migrationTargetName)){
-                throw unexpectedToken("The migration target cannot be altered.");
+            // The migration target can not be added via alter
+            if (table.getTTL() != null) {
+                final String oldTarget = table.getTTL().migrationTarget;
+                if (StringUtil.isEmpty(oldTarget) && !StringUtil.isEmpty(migrationTargetName)) {
+                    throw unexpectedToken("The migration target cannot be added.");
+                }
+
+                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equals(migrationTargetName)) {
+                    throw unexpectedToken("The migration target cannot be added.");
+                }
+
+            } else if (!StringUtil.isEmpty(migrationTargetName)) {
+                throw unexpectedToken("The migration target cannot be added.");
             }
         }
 

@@ -765,6 +765,9 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
         Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
         verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATION TO TARGET X;");
+        assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
     }
 
     public void testAlterStreamTTL() throws IOException {

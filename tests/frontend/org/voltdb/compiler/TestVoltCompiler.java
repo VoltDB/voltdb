@@ -3914,7 +3914,7 @@ public class TestVoltCompiler extends TestCase {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
 
-        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
               "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
