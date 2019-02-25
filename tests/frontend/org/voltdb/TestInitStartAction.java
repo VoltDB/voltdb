@@ -35,6 +35,8 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.Map.Entry;
@@ -46,6 +48,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.voltcore.utils.VoltUnsafe;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.catalog.Catalog;
@@ -59,6 +62,7 @@ import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.io.CharStreams;
 import com.google_voltpatches.common.reflect.ClassPath;
 import com.google_voltpatches.common.reflect.ClassPath.ClassInfo;
+import org.voltdb_testprocs.fakeusecase.greetings.GetGreetingBase;
 
 /** Tests starting the server with init + start without a schema,
  * and 'init --schema --classes'.
@@ -459,13 +463,22 @@ final public class TestInitStartAction {
         System.out.println("Creating a .jar file using all of the classes associated with this test.");
         InMemoryJarfile originalInMemoryJar = new InMemoryJarfile();
         VoltCompiler compiler = new VoltCompiler(false, false);
-        ClassPath classpath = ClassPath.from(this.getClass().getClassLoader());
+        // Start with JAVA 9, the appClassLoader no longer an instance of java.net.URLClassLoader
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
         int classesFound = 0;
-        for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
-            compiler.addClassToJar(originalInMemoryJar, myclass.load());
-            classesFound++;
+        if (VoltUnsafe.isJava8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                compiler.addClassToJar(originalInMemoryJar, myclass.load());
+                classesFound++;
+            }
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                compiler.addClassToJar(originalInMemoryJar, Class.forName(packageName + "." + myclass.getName()));
+                classesFound++;
+            }
         }
+
         // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify this assert also.
         assertEquals(5, classesFound);
 
@@ -494,12 +507,19 @@ final public class TestInitStartAction {
         System.out.println("Creating a .jar file using all of the classes associated with this test.");
         InMemoryJarfile originalInMemoryJar = new InMemoryJarfile();
         VoltCompiler compiler = new VoltCompiler(false, false);
-        ClassPath classpath = ClassPath.from(this.getClass().getClassLoader());
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         int classesFound = 0;
-        for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
-            compiler.addClassToJar(originalInMemoryJar, myclass.load());
-            classesFound++;
+        if (VoltUnsafe.isJava8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                compiler.addClassToJar(originalInMemoryJar, myclass.load());
+                classesFound++;
+            }
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                compiler.addClassToJar(originalInMemoryJar, Class.forName(packageName + "." + myclass.getName()));
+                classesFound++;
+            }
         }
         // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify this assert also.
         assertEquals(5, classesFound);
