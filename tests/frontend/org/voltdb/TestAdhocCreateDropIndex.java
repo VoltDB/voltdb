@@ -527,20 +527,27 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                 "PRIMARY KEY (ID)\n" +
                 ");\n" +
                 "CREATE INDEX IDX_R21_POLY ON R21 (POLYGON);\n";
-        createSchema(config, ddl, 2, 1, 0);
-        startSystem(config);
-        Stream.of(
-                "insert into R21 (ID) values -9355;",
-                "CREATE VIEW DV1 (POLYGON) AS SELECT MIN(POLYGON) FROM R21;",
-                "insert into R21 (ID, POLYGON) values 84, PolygonFromText('POLYGON((0.0 0.0, 0.0 -64.0, 51.0 0.0, 0.0 0.0))');",
-                "UPDATE R21 SET POLYGON = POLYGON;")
-                .forEachOrdered(stmt -> {
-                    try {
-                        m_client.callProcedure("@AdHoc", stmt);
-                    } catch (IOException | ProcCallException e) {
-                        fail("Query \"" + stmt + "\" should have worked fine");
-                    }
-                });
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "insert into R21 (ID) values -9355;",
+                    "CREATE VIEW DV1 (POLYGON) AS SELECT MIN(POLYGON) FROM R21;",
+                    "insert into R21 (ID, POLYGON) values 84, PolygonFromText('POLYGON((0.0 0.0, 0.0 -64.0, 51.0 0.0, 0.0 0.0))');",
+                    "UPDATE R21 SET POLYGON = POLYGON;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
     }
 
     private void createSchema(VoltDB.Configuration config,
