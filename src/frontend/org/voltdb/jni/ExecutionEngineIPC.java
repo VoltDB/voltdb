@@ -438,6 +438,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     getBytes(signatureLength).get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
                     long startSequenceNumber = getBytes(8).getLong();
+                    long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
@@ -447,6 +448,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             partitionId,
                             signature,
                             startSequenceNumber,
+                            committedSequenceNumber,
                             tupleCount,
                             uniqueId,
                             genId,

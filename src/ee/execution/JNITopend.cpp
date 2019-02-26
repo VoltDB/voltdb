@@ -553,6 +553,7 @@ void JNITopend::pushExportBuffer(
                 partitionId,
                 signatureString,
                 block->startSequenceNumber(),
+                block->getCommittedSequenceNumber(),
                 block->getRowCount(),
                 block->lastSpUniqueId(),
                 generationId,

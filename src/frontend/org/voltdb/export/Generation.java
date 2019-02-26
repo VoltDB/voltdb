@@ -36,7 +36,8 @@ public interface Generation {
     public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDone(int partitionId, String signature);
 
-    public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
+    public void pushExportBuffer(int partitionId, String signature,
+                                long seqNo, long committedSeqNo, int tupleCount,
                                  long uniqueId, long genId, ByteBuffer buffer, boolean sync);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, boolean isRejoin,

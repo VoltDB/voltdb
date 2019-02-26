@@ -46,16 +46,19 @@ import org.voltdb.iv2.UniqueIdGenerator;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 20; //sequence number(8) + row count(4) + uniqueId(8)
+    // start seq number(8) + committed seq number (8) + row count(4) + uniqueId (8)
+    public static final int HEADER_SIZE = 28; //sequence number(8) + row count(4) + uniqueId(8)
     public static final int SEQUENCE_NUMBER_OFFSET = 0;
-    public static final int ROW_NUMBER_OFFSET = 8;
-    public static final int UNIQUE_ID_OFFSET = 12;
+    public static final int COMMIT_SEQUENCE_NUMBER_OFFSET = 8;
+    public static final int ROW_NUMBER_OFFSET = 16;
+    public static final int UNIQUE_ID_OFFSET = 20;
 
-    StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, int rowCount,
-            long uniqueId, boolean isPersisted) {
+    StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, long committedSequenceNumber,
+            int rowCount, long uniqueId, boolean isPersisted) {
         m_buffer = fcont;
         m_schema = schemaCont;
         m_startSequenceNumber = startSequenceNumber;
+        m_committedSequenceNumber = committedSequenceNumber;
         m_rowCount = rowCount;
         m_uniqueId = uniqueId;
         // The first 20 bytes are space for us to store the sequence number, row count and uniqueId
@@ -91,6 +94,11 @@ public class StreamBlock {
 
     long lastSequenceNumber() {
         return m_startSequenceNumber + m_rowCount - 1;
+    }
+
+
+    long committedSequenceNumber() {
+        return m_committedSequenceNumber;
     }
 
     /**
@@ -143,6 +151,7 @@ public class StreamBlock {
     }
 
     private final long m_startSequenceNumber;
+    private long m_committedSequenceNumber;
     private final int m_rowCount;
     private final long m_uniqueId;
     private final long m_totalSize;
@@ -186,10 +195,18 @@ public class StreamBlock {
      */
     BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
+<<<<<<< HEAD
         m_buffer.b().putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
         m_buffer.b().putInt(ROW_NUMBER_OFFSET, rowCount());
         m_buffer.b().putLong(UNIQUE_ID_OFFSET, uniqueId());
         m_buffer.b().position(SEQUENCE_NUMBER_OFFSET);
+=======
+        m_buffer.b().putLong(0, startSequenceNumber());
+        m_buffer.b().putLong(8, committedSequenceNumber());
+        m_buffer.b().putInt(16, rowCount());
+        m_buffer.b().putLong(20, uniqueId());
+        m_buffer.b().position(0);
+>>>>>>> Added a committedSequenceNumber pushed from EE down to AckingContainer
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
     }

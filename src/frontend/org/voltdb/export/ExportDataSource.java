@@ -654,6 +654,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long startSequenceNumber,
+            long committedSequenceNumber,
             int tupleCount,
             long uniqueId,
             long genId,
@@ -691,7 +692,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, null, startSequenceNumber, tupleCount, uniqueId, false);
+                        },
+                        null,
+                        startSequenceNumber,
+                        committedSequenceNumber,
+                        tupleCount, uniqueId, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -732,6 +737,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long startSequenceNumber,
+            final long committedSequenceNumber,
             final int tupleCount,
             final long uniqueId,
             final long genId,
@@ -746,7 +752,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, false);
+                pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                        tupleCount, uniqueId, genId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -760,7 +767,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                                    tupleCount, uniqueId, genId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -1028,7 +1036,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.getSchemaContainer(),
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1);
+                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
+                                first_unpolled_block.committedSequenceNumber());
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1043,13 +1052,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public class AckingContainer extends BBContainer {
         final long m_lastSeqNo;
+        final long m_commitSeqNo;
         final BBContainer m_backingCont;
         final BBContainer m_schemaCont;
         long m_startTime = 0;
 
-        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq) {
+        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq) {
             super(cont.b());
             m_lastSeqNo = seq;
+            m_commitSeqNo = commitSeq;
             m_backingCont = cont;
             m_schemaCont = schemaCont;
         }
@@ -1819,6 +1830,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * column length(4)
          *
          */
+        @Override
         public void serialize(ByteBuffer buf) throws IOException {
             buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
             buf.putLong(m_catalogContext.m_genId);
@@ -1839,8 +1851,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
 
+        @Override
         public void cancel() {}
 
+        @Override
         public int getSerializedSize() throws IOException {
             int size = 0;
             // column name length, name, type, length
