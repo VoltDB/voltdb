@@ -21,10 +21,8 @@ import static org.voltdb.common.Constants.AUTH_HANDSHAKE;
 import static org.voltdb.common.Constants.AUTH_HANDSHAKE_VERSION;
 import static org.voltdb.common.Constants.AUTH_SERVICE_NAME;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -55,6 +53,7 @@ import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -775,9 +774,10 @@ public class AuthSystem {
     }
 
     public class KerberosAuthenticationRequest extends AuthenticationRequest {
-        private SocketChannel m_socket;
-        public KerberosAuthenticationRequest(final SocketChannel socket) {
-            m_socket = socket;
+        private final MessagingChannel m_channel;
+
+        public KerberosAuthenticationRequest(final MessagingChannel channel) {
+            m_channel = channel;
         }
         @Override
         protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
@@ -795,21 +795,19 @@ public class AuthSystem {
                     + 4 // service name length
                     + m_principalName.length;
 
-            final ByteBuffer bb = ByteBuffer.allocate(4096);
+            final ByteBuffer writeBuffer = ByteBuffer.allocate(4096);
 
             /*
              * write the service principal response. This gives the connecting client
              * the service principal name form which it constructs the GSS context
              * used in the client/service authentication handshake
              */
-            bb.putInt(msgSize-4).put(AUTH_HANDSHAKE_VERSION).put(AUTH_SERVICE_NAME);
-            bb.putInt(m_principalName.length);
-            bb.put(m_principalName);
-            bb.flip();
+            writeBuffer.putInt(msgSize-4).put(AUTH_HANDSHAKE_VERSION).put(AUTH_SERVICE_NAME);
+            writeBuffer.putInt(m_principalName.length);
+            writeBuffer.put(m_principalName);
+            writeBuffer.flip();
 
-            while (bb.hasRemaining()) {
-                m_socket.write(bb);
-            }
+            m_channel.writeMessage(writeBuffer);
 
             String authenticatedUser = Subject.doAs(m_loginCtx.getSubject(), new PrivilegedAction<String>() {
                 /**
@@ -828,31 +826,15 @@ public class AuthSystem {
 
                         while (!context.isEstablished()) {
                             // read in the next packet size
-                            bb.clear().limit(4);
-                            while (bb.hasRemaining()) {
-                                if (m_socket.read(bb) == -1) throw new EOFException();
-                            }
-                            bb.flip();
+                            ByteBuffer readBuffer = m_channel.readMessage();
 
-                            int msgSize = bb.getInt();
-                            if (msgSize > bb.capacity() || msgSize <= 0) {
-                                authLogger.warn("Authentication packet not within alloted size");
-                                return null;
-                            }
-                            // read the initiator (client) context token
-                            bb.clear().limit(msgSize);
-                            while (bb.hasRemaining()) {
-                                if (m_socket.read(bb) == -1) throw new EOFException();
-                            }
-                            bb.flip();
-
-                            byte version = bb.get();
+                            byte version = readBuffer.get();
                             if (version != AUTH_HANDSHAKE_VERSION) {
                                 authLogger.warn("Encountered unexpected authentication protocol version " + version);
                                 return null;
                             }
 
-                            byte tag = bb.get();
+                            byte tag = readBuffer.get();
                             if (tag != AUTH_HANDSHAKE) {
                                 authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
                                 return null;
@@ -860,17 +842,16 @@ public class AuthSystem {
 
                             // process the initiator (client) context token. If it returns a non empty token
                             // transmit it to the initiator
-                            token = context.acceptSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+                            token = context.acceptSecContext(readBuffer.array(),
+                                    readBuffer.arrayOffset() + readBuffer.position(), readBuffer.remaining());
                             if (token != null) {
-                                msgSize = 4 + 1 + 1 + token.length;
-                                bb.clear().limit(msgSize);
-                                bb.putInt(msgSize-4).put(AUTH_HANDSHAKE_VERSION).put(AUTH_HANDSHAKE);
-                                bb.put(token);
-                                bb.flip();
+                                int msgSize = 4 + 1 + 1 + token.length;
+                                writeBuffer.clear().limit(msgSize);
+                                writeBuffer.putInt(msgSize-4).put(AUTH_HANDSHAKE_VERSION).put(AUTH_HANDSHAKE);
+                                writeBuffer.put(token);
+                                writeBuffer.flip();
 
-                                while (bb.hasRemaining()) {
-                                    m_socket.write(bb);
-                                }
+                                m_channel.writeMessage(writeBuffer);
                             }
                         }
                         // at this juncture we an established security context between
@@ -886,38 +867,23 @@ public class AuthSystem {
                         // same as the one that initiated,
                         if (context.getTargName() != null && context.getSrcName().equals(context.getTargName())) {
                             // read in the next packet size
-                            bb.clear().limit(4);
-                            while (bb.hasRemaining()) {
-                                if (m_socket.read(bb) == -1) throw new EOFException();
-                            }
+                            ByteBuffer readData = m_channel.readMessage();
 
-                            bb.flip();
-                            int msgSize = bb.getInt();
-                            if (msgSize > bb.capacity() || msgSize <= 0) {
-                                authLogger.warn("Authentication packet not within alloted size");
-                                return null;
-                            }
-                            // read the initiator (client) context token
-                            bb.clear().limit(msgSize);
-                            while (bb.hasRemaining()) {
-                                if (m_socket.read(bb) == -1) throw new EOFException();
-                            }
-                            bb.flip();
-
-                            byte version = bb.get();
+                            byte version = readData.get();
                             if (version != AUTH_HANDSHAKE_VERSION) {
                                 authLogger.warn("Encountered unexpected authentication protocol version " + version);
                                 return null;
                             }
 
-                            byte tag = bb.get();
+                            byte tag = readData.get();
                             if (tag != AUTH_HANDSHAKE) {
                                 authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
                                 return null;
                             }
                             MessageProp mprop = new MessageProp(0, true);
                             DelegatePrincipal delegate = new DelegatePrincipal(
-                                    context.unwrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop)
+                                    context.unwrap(readData.array(), readData.arrayOffset() + readData.position(),
+                                            readData.remaining(), mprop)
                                 );
                             if (delegate.getId() != System.identityHashCode(AuthSystem.this)) {
                                 return null;
