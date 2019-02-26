@@ -22,6 +22,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -250,6 +251,7 @@ public class PlannerTool {
         // Add RelDistributions.ANY trait to the rel tree.
         transformed = VoltRelUtil.addTraitRecursively(transformed, RelDistributions.ANY);
 
+
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
@@ -260,6 +262,8 @@ public class PlannerTool {
         RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet()
                 .replace(VoltPhysicalRel.CONVENTION)
                 .replace(RelDistributions.ANY);
+        // Reset partition equal value after a query is planned.
+        RelDistributions.ANY.setPartitionEqualValue(null);
 
         // Apply physical conversion rules.
         transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),

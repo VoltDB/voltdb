@@ -248,9 +248,6 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     }
 
     public void testMultiWayJoinWithFilter() {
-        m_tester.sql("select P1.i from P1 inner join " +
-                "P2  on P1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo' and P2.i = 5").fail();
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
                 "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'").pass();

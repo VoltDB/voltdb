@@ -51,8 +51,6 @@ public abstract class AbstractVoltTableScan extends TableScan {
         super(cluster, traitSet, table);
         Preconditions.checkNotNull(voltTable, "VoltTable cannot be null.");
         this.m_voltTable = voltTable;
-        // Makes sure that distribution set up in previous query does not pollute current one.
-        table.getDistribution().setPartitionEqualValue(null);
     }
 
     /**

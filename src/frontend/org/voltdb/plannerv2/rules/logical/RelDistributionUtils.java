@@ -356,13 +356,6 @@ final class RelDistributionUtils {
         return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
     }
 
-    private static void cleanseTableScan(RelNode node) {
-        if (node instanceof VoltLogicalTableScan) {
-            final RelDistribution dist = getDistribution(node);
-            dist.setPartitionEqualValue(null);
-        }
-    }
-
     private static Pair<Map<Integer, RexLiteral>, Map<Integer, RexLiteral>> fillColumnLiteralEqualPredicates(
             RelNode outer, RelNode inner, int outerRelColumns, RexCall joinCond, Set<Integer> joinColumns) {
         final Map<Integer, RexLiteral> outerFilter, innerFilter;
@@ -398,6 +391,11 @@ final class RelDistributionUtils {
         return Pair.of(outerFilter, innerFilter);
     }
 
+    private static void setPartitionEqualKey(RelNode node, RexLiteral literal) {
+        node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE)
+                .setPartitionEqualValue(literal);
+    }
+
     /**
      * Check whether the given join relation is SP.
      * If it is SP, and contains partitioned tables, (which implies that there is a
@@ -408,11 +406,6 @@ final class RelDistributionUtils {
      * @return true if the result of the join is SP, and sets the distribution trait for all partitioned relations.
      */
     static boolean checkSPAndPropogateDistribution(VoltLogicalJoin join, RelNode outer, RelNode inner) {
-        // NOTE: we MUST cleanse the table scans to get rid of partitionEqualValue that got propagated inside,
-        // because for multi-join, the result of outer join tree will set its partition equal value, which gets
-        // propagated to inner table scan.
-        cleanseTableScan(outer);
-        cleanseTableScan(inner);
         final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
         final Integer outerPartColumn = getPartitionColumn(outer), innerPartColumn = getPartitionColumn(inner);
         final boolean outerIsPartitioned = outerPartColumn != null,
@@ -498,9 +491,9 @@ final class RelDistributionUtils {
                             // propagate distribution equal-value to the other unset table scan, for the case that
                             // both outer/inner are partitioned, but only one has partition equal value set.
                             if (isOuterPartitionedSP) {
-                                innerDist.setPartitionEqualValue(outerDist.getPartitionEqualValue());
+                                setPartitionEqualKey(inner, outerDist.getPartitionEqualValue());
                             } else {
-                                outerDist.setPartitionEqualValue(innerDist.getPartitionEqualValue());
+                                setPartitionEqualKey(outer, innerDist.getPartitionEqualValue());
                             }
                         }
                         return true;
@@ -534,10 +527,10 @@ final class RelDistributionUtils {
                             }
                         }).findAny().ifPresent(value -> {
                             if (innerIsPartitioned) {
-                                innerDist.setPartitionEqualValue(value);
+                                setPartitionEqualKey(inner, value);
                             }
                             if (outerIsPartitioned) {
-                                outerDist.setPartitionEqualValue(value);
+                                setPartitionEqualKey(outer, value);
                             }
                         });
                     } else {    // no equal-filter on partition column
@@ -601,27 +594,38 @@ final class RelDistributionUtils {
 
     static boolean isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
         final RelDistribution dist = scan.getTable().getDistribution(); // distribution for the scanned table
+        final RelDistribution calcDist = calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         switch (dist.getType()) {
             case SINGLETON:
                 return true;
             case RANDOM_DISTRIBUTED:        // View
                 return false;
             case HASH_DISTRIBUTED:
+                final boolean isSP;
                 if (dist.getPartitionEqualValue() != null) {    // equal value already present
-                    return true;
+                    isSP = true;
                 } else if (calc.getProgram().getCondition() == null) {
-                    return false;
+                    isSP = false;
                 } else {    // find equal value in calc node
                     final RexLiteral literal = matchedColumnLiteral(
                             calc.getProgram().getCondition(), calc.getProgram().getExprList(), dist.getKeys().get(0));
                     if (literal != null) {
-                        scan.getTraitSet().replace(dist);
-                        calc.getTraitSet().replace(dist);
-                        scan.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).setPartitionEqualValue(literal);
-                        calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).setPartitionEqualValue(literal);
+                        if (calcDist.getPartitionEqualValue() != null &&
+                                ! calcDist.getPartitionEqualValue().equals(literal)) {
+                            isSP = false;   // Calc's distribution key had already been set to a different value
+                        } else {
+                            scan.getTraitSet().replace(dist);
+                            calc.getTraitSet().replace(dist);
+                            setPartitionEqualKey(scan, literal);
+                            setPartitionEqualKey(calc, literal);
+                            isSP = true;
+                        }
+                    } else {
+                        isSP = false;
                     }
-                    return literal != null;
                 }
+                // TODO: set Calc's distribution trait type to be HASH_DISTRIBUTED, and add keys to partition columns.
+                return isSP;
             default:
                 return false;
         }
