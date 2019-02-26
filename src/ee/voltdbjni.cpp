@@ -1337,7 +1337,7 @@ jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject)
     jclass fdesc = env->GetObjectClass(fdObject);
     // poke the "fd" field with the file descriptor
     jfieldID field_fd = env->GetFieldID(fdesc, "fd", "I");
-    return env-> GetIntField(fdesc, field_fd);
+    return env-> GetIntField(fdObject, field_fd);
 }
 
 /*
