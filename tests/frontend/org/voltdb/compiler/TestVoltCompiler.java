@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -68,6 +70,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTypeUtil;
 
 import junit.framework.TestCase;
 
@@ -95,7 +98,7 @@ public class TestVoltCompiler extends TestCase {
                      "alter table ttl USING TTL 20 ON COLUMN a;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10;\n" +
                      "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n" +
                      "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
@@ -3469,6 +3472,19 @@ public class TestVoltCompiler extends TestCase {
         return table.getPartitioncolumn().getName();
     }
 
+    private String getColumnInfoFor(Database db, String tableName, String columnName) {
+        Table table = getTableInfoFor(db, tableName);
+        if (table == null) {
+            return null;
+        }
+        for (Column column: table.getColumns()) {
+            if (column.getName().equalsIgnoreCase(columnName)) {
+                return columnName;
+            }
+        }
+        return null;
+
+    }
     private  MaterializedViewInfo getViewInfoFor(Database db, String tableName, String viewName) {
         Table table = db.getTables().getIgnoreCase(tableName);
         if (table == null) {
@@ -3594,6 +3610,42 @@ public class TestVoltCompiler extends TestCase {
         assertNull(getTableInfoFor(db, "User_LoginLastTime"));
     }
 
+    public void testAlterStream() throws Exception {
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "ALTER STREAM e DROP COLUMN D2 ;\n" +
+                "ALTER STREAM e ADD COLUMN D4 VARCHAR(1);\n" +
+                "ALTER STREAM e ALTER COLUMN D4 INTEGER;\n"
+                );
+        // test drop, add and modify column
+        assertNull(getColumnInfoFor(db, "e", "D2"));
+        assertNotNull(getColumnInfoFor(db, "e", "D4"));
+        Table t = getTableInfoFor(db, "e");
+        for (Column c : t.getColumns()) {
+            if ("D4".equalsIgnoreCase(c.getName())) {
+                assert(c.getType() == Types.SMALLINT);
+            }
+        }
+    }
+
+    public void testDDLCompilerStreamType() throws Exception {
+        String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+                " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+        Database db = checkDDLAgainstGivenSchema(null,
+                "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER);\n",
+                "CREATE STREAM e1 PARTITION ON COLUMN D1 EXPORT TO TARGET T(D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                ddl
+                );
+        Table t = getTableInfoFor(db, "e");
+        assert(t.getTabletype() == TableType.STREAM_VIEW_ONLY.get());
+
+        t = getTableInfoFor(db, "e1");
+        assert(t.getTabletype() == TableType.STREAM.get());
+
+        t = getTableInfoFor(db, "ttl");
+        assert(t.getTabletype() == TableType.PERSISTENT_MIGRATE.get());
+
+    }
     public void testBadDropStream() throws Exception {
         // non-existent stream
         badDDLAgainstSimpleSchema(".+object not found: E1.*",
@@ -3841,6 +3893,35 @@ public class TestVoltCompiler extends TestCase {
                                    "which is not supported.*",
                                    ddl,
                                    "create index faulty on alpha(id = (select id + id from alpha));");
+    }
+
+    public void testDDLCompilerNibbleExport() throws Exception {
+        String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+                " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET NO_TEST;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "alter table ttl drop TTL;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

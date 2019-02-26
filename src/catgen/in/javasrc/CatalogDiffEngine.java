@@ -521,7 +521,7 @@ public class CatalogDiffEngine {
                 return "May not dynamically add TTl on materialized view's columns.";
             }
             // stream table can not have ttl columns
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table) ) {
                 return "May not dynamically add TTL on stream table's columns.";
             }
             return null;
@@ -625,7 +625,7 @@ public class CatalogDiffEngine {
                 return "May not dynamically add, drop, or rename materialized view columns.";
             }
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
-                return "May not dynamically add, drop, or rename export table columns.";
+                m_requiresNewExportGeneration = true;
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
@@ -765,11 +765,6 @@ public class CatalogDiffEngine {
         }
 
         if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
-            Column column = (Column)suspect;
-            Table table = (Table)column.getParent();
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
-                return null;
-            }
             String tableName = parent.getTypeName();
             retval = new TablePopulationRequirements(tableName);
             retval.addTableName(tableName);
@@ -939,8 +934,18 @@ public class CatalogDiffEngine {
             suspect instanceof GroupRef ||
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
-            suspect instanceof PlanFragment ||
-            suspect instanceof TimeToLive) {
+            suspect instanceof PlanFragment) {
+            return null;
+        }
+
+        if (suspect instanceof TimeToLive) {
+            TimeToLive current = (TimeToLive)suspect;
+            if (prevType != null) {
+                TimeToLive previous = (TimeToLive)prevType;
+                if (previous.getMigrationtarget() == null && current.getMigrationtarget() != null) {
+                    m_requiresNewExportGeneration= true;
+                }
+            }
             return null;
         }
 
@@ -1027,7 +1032,7 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Table) {
             if (field.equals("signature") ||
-                field.equals("tuplelimit"))
+                field.equals("tuplelimit") || field.equals("tableType"))
                 return null;
 
             // Always allow disabling DR on table
@@ -1052,7 +1057,8 @@ public class CatalogDiffEngine {
             // now assume parent is a Table
             Table table = (Table) parent;
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
-                return "May not dynamically change the columns of export tables.";
+                m_requiresNewExportGeneration = true;
+                return null;
             }
 
             if (field.equals("index")) {
@@ -1200,11 +1206,6 @@ public class CatalogDiffEngine {
             // table name
             entry.addTableName(suspect.getTypeName());
 
-            // for now, no changes to export tables
-            if (CatalogUtil.isTableExportOnly(db, prevTable)) {
-                return null;
-            }
-
             // allowed changes to a table
             if (field.equalsIgnoreCase("isreplicated")) {
                 // error message
@@ -1233,11 +1234,6 @@ public class CatalogDiffEngine {
         if (prevType instanceof Column) {
             Table table = (Table) prevType.getParent();
             Database db = (Database) table.getParent();
-
-            // for now, no changes to export tables
-            if (CatalogUtil.isTableExportOnly(db, table)) {
-                return null;
-            }
 
             String tableName = table.getTypeName();
             Column column = (Column)prevType;

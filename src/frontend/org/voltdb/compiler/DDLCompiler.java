@@ -44,8 +44,10 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -94,6 +96,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
+import org.voltdb.utils.VoltTypeUtil;
 
 
 
@@ -661,6 +664,31 @@ public class DDLCompiler {
         }
     }
 
+    private void processTableExportStatement(DDLStatement stmt, Database db, boolean alterTable) throws VoltCompilerException {
+        String statement = stmt.statement;
+        Matcher statementMatcher;
+        if (alterTable) {
+            statementMatcher = SQLParser.matchAlterTTL(statement);
+        } else {
+            statementMatcher = SQLParser.matchCreateTable(statement);
+        }
+        if (statementMatcher.matches()) {
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                for (VoltXMLElement subNode : tableXML.children) {
+                    if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
+                        final String migrationTarget = subNode.attributes.get("migrationTarget");
+                        if (!StringUtil.isEmpty(migrationTarget)) {
+                            tableXML.attributes.put("export", migrationTarget);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
@@ -907,17 +935,19 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 String drTable = e.attributes.get("drTable");
+                final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
                 else {
                     m_tracker.removePartition(tableName);
                 }
-                if (export != null) {
-                    m_tracker.addExportedTable(tableName, export);
-                }
-                else {
-                    m_tracker.removeExportedTable(tableName);
+                if (isStream) {
+                    if (!StringUtil.isEmpty(export)) {
+                        m_tracker.addExportedTable(tableName, export, isStream);
+                    } else {
+                        m_tracker.removeExportedTable(tableName, isStream);
+                    }
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
@@ -1257,7 +1287,7 @@ public class DDLCompiler {
         final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
-
+        table.setTabletype(TableType.PERSISTENT.get());
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
@@ -1277,8 +1307,14 @@ public class DDLCompiler {
         // But the index creation needs to know if the table is replicated, and coerce
         // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
-        table.setIsreplicated(! node.attributes.containsKey("partitioncolumn"));
-
+        table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
+        if (isStream) {
+            if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
+                table.setTabletype(TableType.STREAM.get());
+            } else {
+                table.setTabletype(TableType.STREAM_VIEW_ONLY.get());
+            }
+        }
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
 
@@ -1352,6 +1388,11 @@ public class DDLCompiler {
             ttl.setBatchsize(ttlValue);
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
+            final String migrationTarget = ttlNode.attributes.get("migrationTarget");
+            if (migrationTarget != null) {
+                ttl.setMigrationtarget(migrationTarget);
+                table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
+            }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
                     ttl.setTtlcolumn(col);
@@ -2140,6 +2181,14 @@ public class DDLCompiler {
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {
                     processCreateStreamStatement(stmt, db, whichProcs);
+                }
+
+                boolean createTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                boolean alterTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.ALTER) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                if (createTable || alterTable) {
+                    processTableExportStatement(stmt, db, alterTable);
                 }
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
