@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -328,8 +329,11 @@ public abstract class CatalogSchemaTools {
                     table_sb.append(ttl.getTtlunit());
                 }
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
-                table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
+                table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
+                if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
+                    table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
+                }
             }
             table_sb.append(";\n");
         }
@@ -593,7 +597,7 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, table.getStream(),
+                        toSchema(sb, table, null, TableType.isStream(table.getTabletype()),
                                 (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL

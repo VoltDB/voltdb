@@ -263,7 +263,7 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (table.getStream())
+        else if (TableType.isStream(table.getTabletype()))
         {
             type = "EXPORT";
         }

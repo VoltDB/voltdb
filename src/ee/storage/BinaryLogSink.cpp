@@ -18,6 +18,7 @@
 #include "BinaryLogSink.h"
 
 #include "ConstraintFailureException.h"
+#include "DRTableNotFoundException.h"
 #include "persistenttable.h"
 #include "streamedtable.h"
 #include "tablefactory.h"
@@ -40,6 +41,9 @@
 #include <crc/crc32c.h>
 
 #include <string>
+
+#define throwDRTableNotFoundException(tableHash, ...) \
+do { char _msg_[1024]; snprintf(_msg_, 1024, __VA_ARGS__); throw DRTableNotFoundException(tableHash, _msg_); } while (false)
 
 namespace voltdb {
 
@@ -493,8 +497,8 @@ inline void truncateTable(boost::unordered_map<int64_t, PersistentTable*> &table
         VoltDBEngine *engine, bool replicatedTableOperation, int64_t tableHandle, std::string *tableName) {
     boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
     if (tableIter == tables.end()) {
-        throwSerializableEEException("Unable to find table %s hash %jd while applying binary log for truncate record",
-                                     tableName->c_str(), (intmax_t)tableHandle);
+        throwDRTableNotFoundException(tableHandle, "Unable to find table %s hash %jd while applying binary log for truncate record",
+                                      tableName->c_str(), (intmax_t) tableHandle);
     }
 
     PersistentTable *table = tableIter->second;
@@ -904,8 +908,8 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert record",
-                                         (intmax_t)tableHandle);
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log insert record",
+                                          (intmax_t) tableHandle);
         }
         PersistentTable *table = tableIter->second;
 
@@ -943,7 +947,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log delete record",
                                          (intmax_t)tableHandle);
         }
         PersistentTable *table = tableIter->second;
@@ -999,7 +1003,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
+            throwDRTableNotFoundException(tableHandle, "Unable to find table hash %jd while applying a binary log update record",
                                          (intmax_t)tableHandle);
         }
         PersistentTable *table = tableIter->second;

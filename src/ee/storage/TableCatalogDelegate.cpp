@@ -291,9 +291,6 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                        bool isXDCR,
                                                        int tableAllocationTargetSize,
                                                        bool forceNoDR) {
-    // Create a persistent table for this table in our catalog
-    int32_t tableId = catalogTable.relativeIndex();
-
     // get an array of table column names
     const int numColumns = static_cast<int>(catalogTable.columns().size());
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
@@ -394,7 +391,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
+    bool exportEnabled = tableTypePeristentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, catalogTable);
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();

@@ -440,8 +440,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -484,8 +484,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated block of log data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -520,8 +520,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -584,8 +584,8 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -624,8 +624,8 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -702,8 +702,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     tables[42] = customerTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -742,8 +742,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;

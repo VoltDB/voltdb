@@ -162,6 +162,8 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_isLowestSite(false),
       m_partitionId(-1),
       m_hashinator(NULL),
+      m_oldestExportStreamWithPendingRows(NULL),
+      m_newestExportStreamWithPendingRows(NULL),
       m_isActiveActiveDREnabled(false),
       m_currentInputDepId(-1),
       m_stringPool(16777216, 2),
@@ -199,6 +201,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    assert(exportFlushTimeout > 0);
     s_exportFlushTimeout = exportFlushTimeout;
 
     // Instantiate our catalog - it will be populated later on by load()
@@ -505,12 +508,12 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         size_t drBufferChange = size_t(0);
         if (hasDRBinaryLog) {
             if (m_drStream) {
-                drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+                drBufferChange = m_drStream->getUso() - m_drStream->getCommittedUso();
                 assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
                 drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
             }
             if (m_drReplicatedStream) {
-                size_t drReplicatedStreamBufferChange = m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+                size_t drReplicatedStreamBufferChange = m_drReplicatedStream->getUso() - m_drReplicatedStream->getCommittedUso();
                 assert(drReplicatedStreamBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
                 drBufferChange += drReplicatedStreamBufferChange- DRTupleStream::BEGIN_RECORD_SIZE;
             }
@@ -704,11 +707,11 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
 
     if (isEmptyDRTxn) {
         if (m_executorContext->drStream()) {
-            m_executorContext->drStream()->rollbackTo(m_executorContext->drStream()->m_committedUso, SIZE_MAX, SIZE_MAX);
+            m_executorContext->drStream()->rollbackDrTo(m_executorContext->drStream()->getCommittedUso(), SIZE_MAX);
         }
         if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->rollbackTo(m_executorContext->drReplicatedStream()->m_committedUso,
-                                                                SIZE_MAX, SIZE_MAX);
+            m_executorContext->drReplicatedStream()->rollbackDrTo(m_executorContext->drReplicatedStream()->getCommittedUso(),
+                                                                SIZE_MAX);
         }
     }
     else {
@@ -794,10 +797,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     // Set DR flag based on current catalog state
     catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
     m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
-    m_executorContext->drStream()->m_flushInterval = catalogCluster->drFlushInterval();
+    m_executorContext->drStream()->setFlushInterval(catalogCluster->drFlushInterval());
     if (m_executorContext->drReplicatedStream()) {
-        m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
-        m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
+        m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
+        m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
@@ -1516,10 +1519,10 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
     // Set DR flag based on current catalog state
     auto catalogCluster = m_catalog->clusters().get("cluster");
     m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
-    m_executorContext->drStream()->m_flushInterval = catalogCluster->drFlushInterval();
+    m_executorContext->drStream()->setFlushInterval(catalogCluster->drFlushInterval());
     if (m_executorContext->drReplicatedStream()) {
-        m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
-        m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
+        m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
+        m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
 
     if (updateCatalogDatabaseReference() == false) {
@@ -1583,7 +1586,7 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
         if (entry.second) {
             m_exportingStreams[entry.first] = NULL;
             m_exportingDeletedStreams[entry.first] = entry.second;
-            entry.second->pushEndOfStream();
+            entry.second->removeFromFlushList(this, false);
         }
     }
 }
@@ -2192,6 +2195,11 @@ std::string VoltDBEngine::dumpCurrentHashinator() const {
     return m_hashinator.get()->debug();
 }
 
+void VoltDBEngine::setStreamFlushTarget(int64_t targetTime, StreamedTable* table) {
+
+}
+
+
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     #if !defined(NDEBUG) && defined(MACOSX)
@@ -2206,13 +2214,44 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     #endif
     m_executorContext->setupForTick(lastCommittedSpHandle);
     //Push tuples for exporting streams.
-    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
-        table.second->flushOldTuples(timeInMillis);
+    ExportTupleStream* oldestUnflushed = NULL;
+    ExportTupleStream* newestUnflushed = NULL;
+    ExportTupleStream* nextStreamToFlush = m_oldestExportStreamWithPendingRows;
+    while (nextStreamToFlush) {
+        // While flush interval is global, we can stop the list processing when the flush timeout
+        // is exceeded
+        if (nextStreamToFlush->flushTimerExpired(timeInMillis)) {
+            // Get next stream before the flush because a successful flush sets next and prev to NULL
+            nextStreamToFlush = nextStreamToFlush->getNextFlushStream();
+            if (!m_oldestExportStreamWithPendingRows->periodicFlush(timeInMillis, lastCommittedSpHandle)) {
+                // If periodicFlush returns false, it means there is an MP txn in progress that prevented the flush
+                m_oldestExportStreamWithPendingRows->resetFlushLinkages();
+                m_oldestExportStreamWithPendingRows->appendToList(&oldestUnflushed, &newestUnflushed);
+            }
+            m_oldestExportStreamWithPendingRows = nextStreamToFlush;
+        }
+        else {
+            // We tried to flush a stream that has not yet hit it's flush timer
+            break;
+        }
+    }
+    if (newestUnflushed) {
+        if (nextStreamToFlush) {
+            // We stopped flushing in the middle of the list. If there are any skipped streams stitch them together
+            assert(m_oldestExportStreamWithPendingRows);
+            newestUnflushed->stitchToNextNode(m_oldestExportStreamWithPendingRows);
+        }
+        else {
+            // We went through the whole list but skipped streams in the middle of an MP.
+            m_newestExportStreamWithPendingRows = newestUnflushed;
+        }
+        m_oldestExportStreamWithPendingRows = oldestUnflushed;
     }
     //On Tick do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
+            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }
@@ -2227,13 +2266,27 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    BOOST_FOREACH (LabeledStream table, m_exportingTables) {
-        table.second->flushOldTuples(-1L);
+    ExportTupleStream* oldestUnflushed = NULL;
+    ExportTupleStream* newestUnflushed = NULL;
+    ExportTupleStream* nextStreamToFlush = m_oldestExportStreamWithPendingRows;
+    while (nextStreamToFlush) {
+        // Get next stream before the flush because a successful flush sets next and prev to NULL
+        nextStreamToFlush = nextStreamToFlush->getNextFlushStream();
+        if (!m_oldestExportStreamWithPendingRows->periodicFlush(-1, lastCommittedSpHandle)) {
+            m_oldestExportStreamWithPendingRows->appendToList(&oldestUnflushed, &newestUnflushed);
+        }
+        m_oldestExportStreamWithPendingRows = nextStreamToFlush;
     }
+    // A quiesce should be transactional but in case we ever do this from the middle of an MP txn
+    // reinstate all streams that failed the flush into the next flush list.
+    m_oldestExportStreamWithPendingRows = oldestUnflushed;
+    m_newestExportStreamWithPendingRows = newestUnflushed;
+
     //On quiesce do cleanup of dropped streams.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
         if (entry.second) {
             entry.second->periodicFlush(-1L, lastCommittedSpHandle);
+            entry.second->pushEndOfStream();
             delete entry.second;
         }
     }
@@ -2716,7 +2769,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         uint8_t drProtocolVersion = static_cast<uint8_t >(taskInfo.readInt());
         // create or delete dr replicated stream as needed
         if (m_drReplicatedStream == NULL && m_isLowestSite) {
-            m_drReplicatedStream = new DRTupleStream(16383, m_drStream->m_defaultCapacity, drProtocolVersion);
+            m_drReplicatedStream = new DRTupleStream(16383, m_drStream->getDefaultCapacity(), drProtocolVersion);
         }
         m_drStream->setDrProtocolVersion(drProtocolVersion);
         m_executorContext->setDrStream(m_drStream);

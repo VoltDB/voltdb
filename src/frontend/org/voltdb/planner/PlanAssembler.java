@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -193,7 +194,7 @@ public class PlanAssembler {
      */
     private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
         for (Table table : tableList) {
-            if (table.getMaterializer() != null && !table.getMaterializer().getStream()) {
+            if (table.getMaterializer() != null && !TableType.isStream(table.getMaterializer().getTabletype())) {
                 return true;
             }
         }
@@ -209,7 +210,7 @@ public class PlanAssembler {
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (table.getStream()) {
+            if (TableType.isStream(table.getTabletype())) {
                 return true;
             }
         }

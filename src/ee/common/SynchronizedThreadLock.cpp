@@ -224,7 +224,46 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
 }
 
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-        PersistentTable *table, PersistentTable *deletedTable) {
+        PersistentTable *table) {
+    if (synchronized) {
+        assert(isInSingleThreadMode());
+        // For shared replicated table, in the same host site with lowest id
+        // will create the actual undo action, other sites register a dummy
+        // undo action as placeholder. Note that since we only touch quantum memory
+        // we don't need to switch to the lowest site context when registering the undo action.
+        UndoReleaseAction* realUndoAction = action->getSynchronizedUndoAction(uq);
+        UndoQuantumReleaseInterest* realReleaseInterest;
+        UndoQuantumReleaseInterest* dummyReleaseInterest;
+        if (table && table->isNewReleaseInterest(uq->getUndoToken())) {
+            assert(table->isReplicatedTable());
+            dummyReleaseInterest = table->getDummyReplicatedInterest();
+            realReleaseInterest = table->getReplicatedInterest();
+        }
+        else {
+            if (table) {
+                assert(table->isReplicatedTable());
+            }
+            dummyReleaseInterest = NULL;
+            realReleaseInterest = NULL;
+        }
+        uq->registerSynchronizedUndoAction(realUndoAction, realReleaseInterest);
+        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
+            UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+            VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
+            if (uq != currUQ) {
+                UndoReleaseAction* dummyUndoAction = action->getDummySynchronizedUndoAction(currUQ);
+                currUQ->registerSynchronizedUndoAction(dummyUndoAction, dummyReleaseInterest);
+            }
+        }
+    } else {
+        assert(!table || !table->isReplicatedTable());
+        uq->registerUndoAction(action, table);
+    }
+}
+
+// Prevent compaction due to previously deleted rows from being done on a truncated table.
+void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+        PersistentTable *deletedTable) {
     if (synchronized) {
         assert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
@@ -235,29 +274,21 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             UndoReleaseAction* undoAction;
-            UndoQuantumReleaseInterest *releaseInterest = NULL;
             UndoQuantumReleaseInterest *removeReleaseInterest = NULL;
             if (uq == currUQ) {
                 undoAction = action->getSynchronizedUndoAction(currUQ);
-                if (table) {
-                    releaseInterest = table->getReplicatedInterest();
-                }
-                if (deletedTable != NULL) {
-                    removeReleaseInterest = deletedTable->getReplicatedInterest();
-                }
+                removeReleaseInterest = deletedTable->getReplicatedInterest();
             } else {
                 undoAction = action->getDummySynchronizedUndoAction(currUQ);
-                if (table) {
-                    releaseInterest = table->getDummyReplicatedInterest();
-                }
-                if (deletedTable != NULL) {
-                    removeReleaseInterest = deletedTable->getDummyReplicatedInterest();
-                }
+                removeReleaseInterest = deletedTable->getDummyReplicatedInterest();
             }
-            currUQ->registerUndoAction(undoAction, releaseInterest, removeReleaseInterest);
+            currUQ->registerUndoAction(undoAction);
+            assert(removeReleaseInterest);
+            currUQ->unregisterReleaseInterest(removeReleaseInterest);
         }
     } else {
-        uq->registerUndoAction(action, table, deletedTable);
+        uq->registerUndoAction(action);
+        uq->unregisterReleaseInterest(deletedTable);
     }
 }
 

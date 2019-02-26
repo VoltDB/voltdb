@@ -22,14 +22,30 @@
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
-#include "common/StreamBlock.h"
 #include "common/Topend.h"
+#include "common/TupleSchema.h"
+#include "common/types.h"
+#include "common/NValue.hpp"
+#include "common/ValuePeeker.hpp"
+#include "common/tabletuple.h"
+#include "common/ExportSerializeIo.h"
+#include "common/StreamBlock.h"
+#include "storage/TupleStreamException.h"
+
+#include <cstdio>
+#include <limits>
+#include <iostream>
+#include <ctime>
+#include <utility>
+#include <math.h>
 #include <deque>
 #include <cassert>
 namespace voltdb {
 
 class Topend;
+const int MAX_BUFFER_AGE = 4000;
 
+template <class SB>
 class TupleStreamBase {
 public:
 
@@ -54,29 +70,39 @@ public:
     void setDefaultCapacityForTest(size_t capacity);
     virtual void setSecondaryCapacity(size_t capacity) {}
 
+    inline int64_t getUso() const { return m_uso; }
+    inline int64_t getCommittedUso() const { return m_committedUso; }
+    inline size_t getDefaultCapacity() const { return m_defaultCapacity; }
+
+    inline int64_t getFlushInterval() const {
+        return m_flushInterval;
+    }
+    inline void setFlushInterval(int64_t flushInterval) {
+        m_flushInterval = flushInterval;
+    }
+
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
+    void rollbackBlockTo(size_t mark);
 
-    /** age out committed data */
-    virtual void periodicFlush(int64_t timeInMillis,
-                               int64_t lastComittedSpHandle);
+    /** age out committed data; returns true if m_currBlock is now empty */
+    virtual bool periodicFlush(int64_t timeInMillis,
+                               int64_t lastComittedSpHandle) = 0;
 
-    void extendBufferChain(size_t minLength);
-    virtual void pushStreamBuffer(StreamBlock *block, bool sync) = 0;
+    virtual void extendBufferChain(size_t minLength) = 0;
+    void commonExtendBufferChain(size_t blockSize, size_t startUso);
+    virtual void pushStreamBuffer(SB *block, bool sync) = 0;
     void pushPendingBlocks();
-    void discardBlock(StreamBlock *sb);
+    void discardBlock(SB *sb);
 
-    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
+    const SB* getCurrBlockForTest() const {
+        return m_currBlock;
+    }
 
-    virtual void handleOpenTransaction(StreamBlock *oldBlock) {}
-
-    /** Send committed data to the top end. */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId, bool sync, bool flush);
-
+protected:
     /** time interval between flushing partially filled buffers */
     int64_t m_flushInterval;
 
-    /** timestamp of most recent flush() */
+    /** timestamp of most recent flush() for DR last buffer create time for Export */
     int64_t m_lastFlush;
 
     /** size of buffer requested from the top-end */
@@ -94,10 +120,10 @@ public:
     size_t m_uso;
 
     /** Current block */
-    StreamBlock *m_currBlock;
+    SB *m_currBlock;
 
     /** Blocks not yet committed and pushed to the top-end */
-    std::deque<StreamBlock*> m_pendingBlocks;
+    std::deque<SB*> m_pendingBlocks;
 
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openSpHandle;
@@ -116,15 +142,190 @@ public:
     int64_t m_committedUniqueId;
 
     size_t m_headerSpace;
-
-    /**
-     * The number of Export Tuples applied to the Export Stream Block in the current txn;
-     * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
-     */
-    int64_t m_uncommittedTupleCount;
-
-    int64_t m_exportSequenceNumber;
 };
+
+template <class SB>
+TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
+                                     size_t extraHeaderSpace /*= 0*/,
+                                     int maxBufferSize /*= -1*/)
+    : m_flushInterval(MAX_BUFFER_AGE),
+      m_lastFlush(0),
+      m_defaultCapacity(defaultBufferSize),
+      m_maxCapacity( (maxBufferSize < defaultBufferSize) ? defaultBufferSize : maxBufferSize),
+      m_uso(0),
+      m_currBlock(NULL),
+      // snapshot restores will call load table which in turn
+      // calls appendTupple with LONG_MIN transaction ids
+      // this allows initial ticks to succeed after rejoins
+      m_openSpHandle(0),
+      m_openUniqueId(0),
+      m_openTransactionUso(0),
+      m_committedSpHandle(0),
+      m_committedUso(0),
+      m_committedUniqueId(0),
+      m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
+{}
+
+template <class SB>
+void TupleStreamBase<SB>::setDefaultCapacityForTest(size_t capacity)
+{
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    {
+        throwFatalException("setDefaultCapacity only callable before "
+                            "TupleStreamBase is used");
+    }
+    cleanupManagedBuffers();
+    if (m_maxCapacity < capacity || m_maxCapacity == m_defaultCapacity) {
+        m_maxCapacity = capacity;
+    }
+    m_defaultCapacity = capacity;
+    extendBufferChain(m_defaultCapacity);
+}
+
+
+
+/*
+ * Essentially, shutdown.
+ */
+template <class SB>
+void TupleStreamBase<SB>::cleanupManagedBuffers()
+{
+    SB *sb = NULL;
+
+    discardBlock(m_currBlock);
+    m_currBlock = NULL;
+
+    while (m_pendingBlocks.empty() != true) {
+        sb = m_pendingBlocks.front();
+        m_pendingBlocks.pop_front();
+        discardBlock(sb);
+    }
+}
+
+template <class SB>
+void TupleStreamBase<SB>::pushPendingBlocks()
+{
+    while (!m_pendingBlocks.empty()) {
+        SB* block = m_pendingBlocks.front();
+        //std::cout << "m_committedUso(" << m_committedUso << "), block->uso() + block->offset() == "
+        //<< (block->uso() + block->offset()) << std::endl;
+
+        // check that the entire remainder is committed
+        if (m_committedUso >= (block->uso() + block->offset()))
+        {
+            //The block is handed off to the topend which is responsible for releasing the
+            //memory associated with the block data. The metadata is deleted here.
+            pushStreamBuffer(block, false);
+            delete block;
+            m_pendingBlocks.pop_front();
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+/*
+ * Discard all data with a uso gte mark
+ */
+template <class SB>
+void TupleStreamBase<SB>::rollbackBlockTo(size_t mark)
+{
+    if (mark > m_uso) {
+        throwFatalException("Truncating the future: mark %jd, current USO %jd.",
+                            (intmax_t)mark, (intmax_t)m_uso);
+    } else if (mark < m_committedUso) {
+        throwFatalException("Truncating committed tuple data: mark %jd, committed USO %jd, current USO %jd, open spHandle %jd, committed spHandle %jd.",
+                            (intmax_t)mark, (intmax_t)m_committedUso, (intmax_t)m_uso, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
+    }
+
+    // back up the universal stream counter
+    m_uso = mark;
+
+    // working from newest to oldest block, throw
+    // away blocks that are fully after mark; truncate
+    // the block that contains mark.
+    if (m_currBlock != NULL) {
+        if (m_currBlock->uso() >= mark) {
+            SB *sb = NULL;
+            discardBlock(m_currBlock);
+            m_currBlock = NULL;
+            while (m_pendingBlocks.empty() != true) {
+                sb = m_pendingBlocks.back();
+                m_pendingBlocks.pop_back();
+                if (sb->uso() >= mark) {
+                    discardBlock(sb);
+                }
+                else {
+                    m_currBlock = sb;
+                    break;
+                }
+            }
+            if (m_currBlock == NULL) {
+                extendBufferChain(m_defaultCapacity);
+            }
+        }
+        if (m_uso == m_committedUso) {
+            m_openSpHandle = m_committedSpHandle;
+            m_openUniqueId = m_committedUniqueId;
+        }
+    }
+}
+
+/*
+ * Correctly release and delete a managed buffer that won't
+ * be handed off
+ */
+template <class SB>
+void TupleStreamBase<SB>::discardBlock(SB *sb)
+{
+    if (sb != NULL) {
+        delete [] sb->rawPtr();
+        delete sb;
+    }
+}
+
+/*
+ * Allocate another buffer, preserving the current buffer's content in
+ * the pending queue.
+ */
+template <class SB>
+void TupleStreamBase<SB>::commonExtendBufferChain(size_t blockSize, size_t startUso)
+{
+    if (m_maxCapacity < blockSize) {
+        // exportxxx: rollback instead?
+        throwFatalException("Default capacity is less than required buffer size.");
+    }
+
+    if (m_currBlock) {
+        if (m_currBlock->offset() > 0) {
+            m_pendingBlocks.push_back(m_currBlock);
+            m_currBlock = NULL;
+        }
+        // fully discard empty blocks. makes valgrind/testcase
+        // conclusion easier.
+        else {
+            discardBlock(m_currBlock);
+            m_currBlock = NULL;
+        }
+    }
+
+    if (blockSize == 0) {
+        throw TupleStreamException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
+
+    char *buffer = new char[blockSize];
+    if (!buffer) {
+        throwFatalException("Failed to claim managed buffer for Export.");
+    }
+    m_currBlock = new SB(buffer, m_headerSpace, blockSize, startUso);
+    if (blockSize > m_defaultCapacity) {
+        m_currBlock->setType(LARGE_STREAM_BLOCK);
+    }
+}
 
 }
 
