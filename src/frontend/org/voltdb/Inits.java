@@ -783,12 +783,12 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-                if (catalog != null) {
-                    m_statusTracker.set(NodeState.RECOVERING);
-                }
+
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others.
                 if (catalog != null) {
+                    m_statusTracker.set(NodeState.RECOVERING);
+
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
