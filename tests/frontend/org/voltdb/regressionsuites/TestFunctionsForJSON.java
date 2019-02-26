@@ -578,7 +578,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6832, for various null values (in both parameters,
      *  with and without quotes), and related queries. */
-      // TODO commented in ENG-15222 because udf functions are not supported yet
+      // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
 //    public void testFIELDFunctionWithNullValues() throws Exception {
 //        Client client = getClient();
 //        loadJS1(client);
@@ -1393,7 +1393,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6879, for various null values (in various parameters,
      *  with and without quotes), and related queries. */
-      // TODO commented in ENG-15222 because udf functions are not supported yet
+      // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
 //    public void testSET_FIELDFunctionWithNullValues() throws Exception {
 //        Client client = getClient();
 //        loadJS1(client);

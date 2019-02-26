@@ -516,6 +516,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         subtestDECODEVeryLong();
         subtestDECODEInlineVarcharColumn_ENG5078();
         subtestDECODEAsInput();
+        // TODO ENG-15490 enable null & ? as UDF param
         // subtestDECODEWithNULL();
     }
 
@@ -2161,6 +2162,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select bitnot(-9223372036854775809) from R3", "numeric value out of range");
     }
 
+    // TODO ENG-15490 enable null & ? as UDF param
 //    public void testBitnotWithParam() throws Exception {
 //        System.out.println("STARTING test Bitnot with a parameter");
 //        Client client = getClient();
@@ -3242,10 +3244,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(expectedExceptionThrowed);
 
         // test null strings
-//        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];
-//        assertTrue(vt.advanceRow());
-//        vt.getLong(0);
-//        assertTrue(vt.wasNull());
+        // TODO ENG-15490 enable null & ? as UDF param
+        // vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];
+        // assertTrue(vt.advanceRow());
+        // vt.getLong(0);
+        // assertTrue(vt.wasNull());
 
         cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (201, NULL);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());

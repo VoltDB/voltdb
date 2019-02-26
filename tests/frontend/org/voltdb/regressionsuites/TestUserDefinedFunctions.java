@@ -598,11 +598,10 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
     }
 
-
-
     // Test more UDF's with two arguments; these UDF's have no null checking, so odd
     // things can happen, such as null plus one equals a number ...
-//
+    // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
+
 //    public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
 //        testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
 //    }

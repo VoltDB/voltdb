@@ -908,39 +908,39 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-//    public void testValidPolygonFromText() throws Exception {
-//        Client client = getClient();
-//        populateTables(client, true);
-//        // These should all fail.
-//        for (Border b : borders) {
-//            String expectedPattern = b.getMessage();
-//            String wkt = (b.getRegion() == null) ? "null" : ("'" + b.getRegion().toWKT() + "'");
-//            // Note that we only want one row, and we don't care what it is.
-//            //
-//            // It's unfortunate that we can't pass a parameter for wkt.  But
-//            // we need a parameterless sql string for verifyStmtFails.
-//            String sql = String.format("select validpolygonfromtext(%s) from borders where pk = 0",
-//                                       wkt);
-//            if (b.isValid() || b.isFixable()) {
-//                // If this is valid or else is fixable we expect
-//                // validpolygonfromtext to succeed.
-//                try {
-//                    ClientResponse cr = client.callProcedure("@AdHoc", sql);
-//                    assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//                } catch (ProcCallException ex) {
-//                    fail(String.format("Expected no exceptions in polygon %s: %s, but got %s",
-//                                       b.getName(),
-//                                       (wkt != null) ? wkt : "null",
-//                                       ex.getMessage()));
-//                }
-//            } else {
-//                // If this border is not valid and not fixable we
-//                // expect the select statement to fail with the
-//                // pattern in the border.
-//                verifyStmtFails(client, sql, expectedPattern);
-//            }
-//        }
-//    }
+    public void testValidPolygonFromText() throws Exception {
+        Client client = getClient();
+        populateTables(client, true);
+        // These should all fail.
+        for (Border b : borders) {
+            String expectedPattern = b.getMessage();
+            String wkt = (b.getRegion() == null) ? "null" : ("'" + b.getRegion().toWKT() + "'");
+            // Note that we only want one row, and we don't care what it is.
+            //
+            // It's unfortunate that we can't pass a parameter for wkt.  But
+            // we need a parameterless sql string for verifyStmtFails.
+            String sql = String.format("select validpolygonfromtext(%s) from borders where pk = 0",
+                                       wkt);
+            if (b.isValid() || b.isFixable()) {
+                // If this is valid or else is fixable we expect
+                // validpolygonfromtext to succeed.
+                try {
+                    ClientResponse cr = client.callProcedure("@AdHoc", sql);
+                    assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                } catch (ProcCallException ex) {
+                    fail(String.format("Expected no exceptions in polygon %s: %s, but got %s",
+                                       b.getName(),
+                                       (wkt != null) ? wkt : "null",
+                                       ex.getMessage()));
+                }
+            } else {
+                // If this border is not valid and not fixable we
+                // expect the select statement to fail with the
+                // pattern in the border.
+                verifyStmtFails(client, sql, expectedPattern);
+            }
+        }
+    }
 
     /**
      * Insert the polygons in the borders table, using validpolygonfromtext.  Some
@@ -1149,12 +1149,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client, true);
 
-//        verifyStmtFails(client, "select asText(?) from places order by pk",
-//                                "data type cast needed for parameter or null literal: "
-//                              + "input type to ASTEXT function is ambiguous");
-//        verifyStmtFails(client, "select asText(null) from places order by pk",
-//                                "data type cast needed for parameter or null literal: "
-//                              + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(?) from places order by pk",
+                                "data type cast needed for parameter or null literal: "
+                              + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(null) from places order by pk",
+                                "data type cast needed for parameter or null literal: "
+                              + "input type to ASTEXT function is ambiguous");
         verifyStmtFails(client, "select asText(pk) from borders order by pk",
                                 "incompatible data type in operation: "
                               + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
