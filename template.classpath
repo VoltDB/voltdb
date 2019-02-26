@@ -9,7 +9,7 @@
 	<classpathentry kind="src" path="third_party/java/src"/>
 	<classpathentry kind="lib" path="lib/commons-lang3-3.8.1.jar"/>
 	<classpathentry kind="lib" path="lib/jline-2.10.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/hamcrest-all-1.3.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/hamcrest-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
@@ -27,12 +27,17 @@
 	<classpathentry kind="lib" path="lib/protobuf-java-3.4.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
 	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
-	<classpathentry kind="lib" path="lib/owner-1.0.9.jar"/>
-	<classpathentry kind="lib" path="lib/owner-java8-1.0.9.jar"/>
+	<classpathentry kind="lib" path="lib/owner-1.0.10.jar"/>
+	<classpathentry kind="lib" path="lib/owner-java8-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/snmp4j-2.5.2.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.10.19.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/powermock-mockito-1.6.3-full.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/mockito-core-2.24.5.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-core-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-api-mockito2-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-api-support-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-reflect-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-module-junit4-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/powermock-module-junit4-common-2.0.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/objenesis-3.0.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
 
