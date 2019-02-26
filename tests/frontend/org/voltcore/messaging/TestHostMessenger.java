@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -1296,7 +1297,7 @@ public class TestHostMessenger {
             }
 
             @Override
-            public void detract(int hostId) {
+            public void detract(ZooKeeper zooKeeper, int hostId) {
             }
 
             @Override

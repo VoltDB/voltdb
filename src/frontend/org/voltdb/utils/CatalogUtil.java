@@ -822,7 +822,7 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
@@ -1179,8 +1179,9 @@ public abstract class CatalogUtil {
 
             boolean foundAdminUser = false;
             for (UsersType.User user : deployment.getUsers().getUser()) {
-                if (user.getRoles() == null)
+                if (user.getRoles() == null) {
                     continue;
+                }
 
                 for (String role : extractUserRoles(user)) {
                     if (role.equalsIgnoreCase(ADMIN)) {
@@ -1708,19 +1709,9 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
-                        throw new RuntimeException("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "DR Conflicts cannot be handled.");
-                    } else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "Export target " + targetName + " will be disabled.");
-                    }
+                    hostLog.info("Export configuration enabled and provided for export target " + targetName
+                            + " in deployment file however no export tables are assigned to the this target. "
+                            + "Export target " + targetName + " will be disabled.");
                 }
                 continue;
             }
@@ -1792,7 +1783,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
                 kafkaConfigs.add(importConfiguration);
@@ -1877,7 +1870,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
@@ -2288,12 +2283,16 @@ public abstract class CatalogUtil {
      */
     private static Set<String> extractUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<>();
-        if (user == null) return roles;
+        if (user == null) {
+            return roles;
+        }
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
-                if( role == null || role.trim().isEmpty()) continue;
+                if( role == null || role.trim().isEmpty()) {
+                    continue;
+                }
                 roles.add(role.trim().toLowerCase());
             }
         }
@@ -2313,7 +2312,7 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType, boolean isPlaceHolderCatalog) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -2327,6 +2326,7 @@ public abstract class CatalogUtil {
                 // Setting this for compatibility mode only, don't use in new code
                 db.setIsactiveactivedred(true);
             }
+            cluster.setSchemacheckmode(dr.getSchema().value());
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {
@@ -2335,13 +2335,11 @@ public abstract class CatalogUtil {
                 clusterId = clusterType.getId();
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
+            } else if (clusterType.getId().equals(dr.getId())) {
+                clusterId = clusterType.getId();
             } else {
-                if (clusterType.getId().equals(dr.getId())) {
-                    clusterId = clusterType.getId();
-                } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
-                            + "deprecated, please remove");
-                }
+                throw new RuntimeException("Detected two conflicting cluster ids in deployment file, "
+                        + "setting cluster id in DR tag is deprecated, please remove");
             }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
@@ -2365,11 +2363,18 @@ public abstract class CatalogUtil {
                     }
                 }
                 hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
-            } else {
-                if (dr.getRole() == DrRoleType.XDCR) {
-                    // consumer should be enabled even without connection source for XDCR
-                    cluster.setDrconsumerenabled(true);
-                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            } else if (dr.getRole() == DrRoleType.XDCR) {
+                // consumer should be enabled even without connection source for XDCR
+                cluster.setDrconsumerenabled(true);
+                cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            }
+            if (!isPlaceHolderCatalog && dr.getRole() == DrRoleType.XDCR) {
+                CatalogMap<Table> tables = db.getTables();
+                if (tables.get(DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) == null
+                        || tables.get(DR_CONFLICTS_REPLICATED_EXPORT_TABLE) == null) {
+                    throw new RuntimeException("The XDCR role cannot be changed on an existing database. "
+                            + "Save the contents, initialize a new instance with the desired role, "
+                            + "and restore the contents.");
                 }
             }
         } else {
@@ -2875,8 +2880,9 @@ public abstract class CatalogUtil {
      * by a LIMIT PARTITION ROWS constraint, or NULL if there isn't one. */
     public static String getLimitPartitionRowsDeleteStmt(Table table) {
         CatalogMap<Statement> map = table.getTuplelimitdeletestmt();
-        if (map.isEmpty())
+        if (map.isEmpty()) {
             return null;
+        }
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();

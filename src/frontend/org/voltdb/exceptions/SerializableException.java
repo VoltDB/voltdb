@@ -115,6 +115,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
             protected SerializableException deserializeException(ByteBuffer b) {
                 return new ReplicatedTableException(b);
             }
+        },
+        DrTableNotFoundException() {
+            @Override
+            protected SerializableException deserializeException(ByteBuffer b) {
+                return new DRTableNotFoundException(b);
+            }
         };
 
         abstract protected SerializableException deserializeException(ByteBuffer b);

@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.StartAction;
@@ -100,8 +101,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
         cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
-        cl.m_userSchema = m_userSchema;
-        cl.m_stagedClassesPath = m_stagedClassesPath;
+        cl.m_userSchemas = m_userSchemas;
+        cl.m_stagedClassesPaths = m_stagedClassesPaths;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -740,8 +741,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
-        if (m_userSchema != null) {
-            cmdline.add("schema"); cmdline.add(m_userSchema.getAbsolutePath());
+        if (m_userSchemas != null) {
+            cmdline.add("schema");
+            cmdline.add(m_userSchemas.stream().map(File::getAbsolutePath).collect(Collectors.joining(",")));
         }
 
         if (customCmdLn != null && !customCmdLn.trim().isEmpty())

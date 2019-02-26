@@ -210,6 +210,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -1233,7 +1234,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_config.m_restorePlacement) {
                         recoverPartitions = hostInfos.get(m_messenger.getHostId()).getRecoveredPartitions();
                     }
-                    partitions = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
+                    AbstractTopology recoveredTopo = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
+                    if (recoveredTopo != null) {
+                        topo = recoveredTopo;
+                        partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                    }
                     if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                 m_catalogContext.getNodeSettings().getLocalSitesCount(), m_messenger.getHostId(),
@@ -1252,6 +1257,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
+
+                // The partition id list must be in sorted order
+                assert(Ordering.natural().isOrdered(partitions));
 
                 // persist the merged settings
                 m_config.m_recoveredPartitions = Joiner.on(",").join(partitions);
@@ -1703,7 +1711,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @param recoverPartitions the partition placement to be recovered on this host
      * @return A list of partitions if recover effort is a success.
      */
-    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
+    private AbstractTopology recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
 
         long version = topology.version;
         if (!recoverPartitions.isEmpty()) {
@@ -1724,12 +1732,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         List<Integer> partitions = Lists.newArrayList(recoveredTopo.getPartitionIdList(m_messenger.getHostId()));
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
-            return partitions;
         }
         if (version < recoveredTopo.version && !recoverPartitions.isEmpty()) {
             consoleLog.info("Partition placement layout has been restored for rejoining.");
         }
-        return null;
+        return recoveredTopo;
     }
 
     @Override
@@ -2180,7 +2187,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             topology = AbstractTopology.getTopology(hostInfos, missingHosts, kfactor,
                     (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()));
-            List<Integer> partitions = Lists.newArrayList(topology.getPartitionIdList(m_messenger.getHostId()));
             String err;
             if ((err = topology.validateLayout(m_messenger.getLiveHostIds())) != null) {
                 hostLog.warn("Unable to find optimal placement layout. " + err);
@@ -2196,9 +2202,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
 
-            // verify the topology built on this host is same as the one from ZK
-            partitions.removeAll(Lists.newArrayList(topology.getPartitionIdList(m_messenger.getHostId())));
-            assert(partitions.isEmpty());
         }
         return topology;
     }
@@ -2470,7 +2473,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config, boolean isXCDR) {
-        if (config.m_userSchema == null && config.m_stagedClassesPath == null) {
+        if (config.m_userSchemas == null && config.m_stagedClassesPaths == null) {
             return; // nothing to do
         }
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
@@ -2482,8 +2485,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
 
         compiler.setInitializeDDLWithFiltering(true);
-        if (!compiler.compileFromSchemaAndClasses(config.m_userSchema, config.m_stagedClassesPath, stagedCatalogFH)) {
-            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
+        if (!compiler.compileFromSchemaAndClasses(config.m_userSchemas, config.m_stagedClassesPaths, stagedCatalogFH)) {
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchemas);
         }
     }
 

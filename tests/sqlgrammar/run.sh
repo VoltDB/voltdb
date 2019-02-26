@@ -392,8 +392,12 @@ function exit-with-code() {
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
     fi
-    if [[ $PRINT_ERROR_CODE -ne 0 ]]; then
-        echo "error code:" $errcode
+    if [[ -n "$TT_EXIT_CODE" && "$TT_EXIT_CODE" -ne "0" ]]; then
+        echo "TT_EXIT_CODE: $TT_EXIT_CODE"
+        errcode=$(($errcode|$TT_EXIT_CODE))
+    fi
+    if [[ "$errcode" -ne "0" || (-n "$PRINT_ERROR_CODE" && "$PRINT_ERROR_CODE" -ne "0") ]]; then
+        echo "\nError code:" $errcode
     fi
     exit $errcode
 }

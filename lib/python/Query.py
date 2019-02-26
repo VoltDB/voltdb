@@ -53,7 +53,7 @@ class VoltQueryClient(cmd.Cmd):
                     FastSerializer.VOLTTYPE_TIMESTAMP:
                         lambda x: datetime.fromtimestamp(x)}
 
-    def __init__(self, host, port, username = "", password = "", dump_file = None, client_ssl=False, ssl_config_file="", kerberos=False):
+    def __init__(self, host, port, username = "", password = "", dump_file = None, client_ssl=False, ssl_config_file=""):
         cmd.Cmd.__init__(self)
 
         self.__quiet = False
@@ -61,11 +61,11 @@ class VoltQueryClient(cmd.Cmd):
         # self.__usessl = ssl
         # self.__ssl_config_file = ssl_config_file
 
-        self.__initialize(host, port, username, password, client_ssl, ssl_config_file, dump_file, kerberos=kerberos)
+        self.__initialize(host, port, username, password, client_ssl, ssl_config_file, dump_file)
 
-    def __initialize(self, host, port, username, password, client_ssl, ssl_config_file, dump_file, kerberos=False):
+    def __initialize(self, host, port, username, password, client_ssl, ssl_config_file, dump_file):
         # if supportSSL:
-        self.fs = FastSerializer(host=host, port=port, username=username, password=password, ssl_config_file=ssl_config_file, dump_file_path=dump_file, kerberos=kerberos)
+        self.fs = FastSerializer(host=host, port=port, username=username, password=password, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
         # else:
         #     self.fs = FastSerializer(host=host, port=port, username=username, password=password, dump_file_path=dump_file)
 

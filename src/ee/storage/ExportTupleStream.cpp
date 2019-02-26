@@ -16,8 +16,9 @@
  */
 
 #include "storage/ExportTupleStream.h"
-
+#include "execution/VoltDBEngine.h"
 #include "common/TupleSchema.h"
+#include "common/UniqueId.hpp"
 
 #include <cstdio>
 #include <limits>
@@ -43,8 +44,9 @@ const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4
 const size_t ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE = 13; // Size of header before schema: Version(1) + GenerationId(8) + SchemaLen(4)
 const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
-ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
-                                     const std::string &tableName, const std::vector<std::string> &columnNames)
+ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
+                                     std::string signature, const std::string &tableName,
+                                     const std::vector<std::string> &columnNames)
     : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames) + s_FIXED_BUFFER_HEADER_SIZE + s_EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
@@ -52,8 +54,15 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
       m_generation(generation),
       m_tableName(tableName),
       m_columnNames(columnNames),
-      m_ddlSchemaSize(m_headerSpace - MAGIC_HEADER_SPACE_FOR_JAVA - s_FIXED_BUFFER_HEADER_SIZE - s_EXPORT_BUFFER_HEADER_SIZE)
+      m_ddlSchemaSize(m_headerSpace - MAGIC_HEADER_SPACE_FOR_JAVA - s_FIXED_BUFFER_HEADER_SIZE - s_EXPORT_BUFFER_HEADER_SIZE),
+      m_nextSequenceNumber(1),
+      m_committedSequenceNumber(0),
+      m_flushPending(false),
+      m_nextFlushStream(NULL),
+      m_prevFlushStream(NULL)
+
 {
+    extendBufferChain(m_defaultCapacity);
     m_new = true;
 }
 
@@ -72,11 +81,11 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
+size_t ExportTupleStream::appendTuple(
+        VoltDBEngine* engine,
         int64_t spHandle,
         int64_t seqNo,
         int64_t uniqueId,
-        int64_t timestamp,
         const TableTuple &tuple,
         int partitionColumn,
         ExportTupleStream::Type type)
@@ -84,8 +93,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     assert(m_columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
-    // update sequence number
-    m_exportSequenceNumber = seqNo;
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -96,11 +103,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 (intmax_t)m_openSpHandle, (intmax_t)spHandle
                 );
     }
-
-    //Most of the transaction id info and unique id info supplied to commit
-    //is nonsense since it isn't currently supplied with a transaction id
-    //but it is fine since export isn't currently using the info
-    commit(lastCommittedSpHandle, spHandle, uniqueId, false, m_new);
+    m_openSpHandle = spHandle;
+    m_openUniqueId = uniqueId;
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -109,7 +113,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
-    if ((m_currBlock->remaining() < tupleMaxLength) ) {
+    if ((m_currBlock->remaining() < tupleMaxLength)) {
         //If we can not fit the data get a new block with size that includes schemaSize as well.
         extendBufferChain(tupleMaxLength);
     }
@@ -146,7 +150,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // write metadata columns - data we always write this.
     io.writeLong(spHandle);
-    io.writeLong(timestamp);
+    io.writeLong(UniqueId::ts(uniqueId));
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
     io.writeLong(m_siteId);
@@ -154,8 +158,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
-
-    m_uncommittedTupleCount++;
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -171,7 +173,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
-    m_exportSequenceNumber++;
+    assert(seqNo > 0 && m_nextSequenceNumber == seqNo);
+    m_nextSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
 //    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " sequence number " << seqNo
@@ -179,6 +182,109 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //Not new anymore as we have new transaction after UAC
     m_new = false;
     return startingUso;
+}
+
+void ExportTupleStream::appendToList(ExportTupleStream** oldest, ExportTupleStream** newest)
+{
+    assert(!m_prevFlushStream && !m_nextFlushStream);
+    if (*oldest == NULL) {
+        *oldest = this;
+    }
+    else {
+        m_prevFlushStream = *newest;
+        m_prevFlushStream->m_nextFlushStream = this;
+    }
+    *newest = this;
+}
+
+void ExportTupleStream::stitchToNextNode(ExportTupleStream* next)
+{
+    m_nextFlushStream = next;
+    next->m_prevFlushStream = this;
+}
+
+void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTail)
+{
+    if (m_flushPending) {
+        if (m_nextFlushStream) {
+            // We are not at the tail so move this stream to the tail.
+            if (m_prevFlushStream) {
+                // Remove myself from the middle of the flush list
+                assert(m_prevFlushStream->m_nextFlushStream == this);
+                m_prevFlushStream->m_nextFlushStream = m_nextFlushStream;
+                assert(m_nextFlushStream->m_prevFlushStream == this);
+                m_nextFlushStream->m_prevFlushStream = m_prevFlushStream;
+            }
+            else {
+                // Remove myself from the beginning of the flush list
+                m_nextFlushStream->m_prevFlushStream = NULL;
+                *engine->getOldestExportStreamWithPendingRowsForAssignment() = m_nextFlushStream;
+            }
+            if (moveToTail) {
+                m_prevFlushStream = *engine->getNewestExportStreamWithPendingRowsForAssignment();
+                assert(m_prevFlushStream->m_nextFlushStream == NULL);
+                m_prevFlushStream->m_nextFlushStream = this;
+                *engine->getNewestExportStreamWithPendingRowsForAssignment() = this;
+            }
+            else {
+                m_prevFlushStream = NULL;
+                m_flushPending = false;
+            }
+            m_nextFlushStream = NULL;
+        }
+        else {
+            // If this node is at the end of the list do nothing
+            assert(*engine->getNewestExportStreamWithPendingRowsForAssignment() == this);
+            assert(m_nextFlushStream == NULL);
+            if (!moveToTail) {
+                // Removing the end Node
+                if (m_prevFlushStream) {
+                    m_prevFlushStream->m_nextFlushStream = NULL;
+                    *engine->getNewestExportStreamWithPendingRowsForAssignment() = m_prevFlushStream;
+                    m_prevFlushStream = NULL;
+                }
+                else {
+                    // End node is also the beginning node
+                    *engine->getOldestExportStreamWithPendingRowsForAssignment() = NULL;
+                    *engine->getNewestExportStreamWithPendingRowsForAssignment() = NULL;
+                }
+                m_flushPending = false;
+            }
+        }
+    }
+    else {
+        if (moveToTail) {
+            appendToList(engine->getOldestExportStreamWithPendingRowsForAssignment(),
+                    engine->getNewestExportStreamWithPendingRowsForAssignment());
+            m_flushPending = true;
+        }
+    }
+}
+
+/*
+ * Handoff fully committed blocks to the top end.
+ *
+ * This is the only function that should modify m_openSpHandle,
+ * m_openTransactionUso.
+ */
+void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId)
+{
+    assert(currentSpHandle == m_openSpHandle && uniqueId == m_openUniqueId);
+
+    if (m_uso != m_committedUso) {
+        m_committedUso = m_uso;
+        m_committedUniqueId = m_openUniqueId;
+        // Advance the tip to the new transaction.
+        m_committedSpHandle = m_openSpHandle;
+        if (m_currBlock->startSequenceNumber() > m_committedSequenceNumber) {
+            // Started a new block so reset the flush timeout
+            m_lastFlush = UniqueId::tsInMillis(m_committedUniqueId);
+            removeFromFlushList(engine, true);
+        }
+        m_committedSequenceNumber = m_nextSequenceNumber-1;
+
+        pushPendingBlocks();
+    }
 }
 
 //Computes full schema size includes metadata columns.
@@ -263,7 +369,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + dataSz;                   // non-null tuple data
 }
 
-void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
+void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block, bool sync) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
@@ -276,3 +382,62 @@ void ExportTupleStream::pushEndOfStream() {
                     m_partitionId,
                     m_signature);
 }
+
+/*
+ * Create a new buffer and flush all pending committed data.
+ * Creating a new buffer will push all queued data into the
+ * pending list for commit to operate against.
+ */
+bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
+                                      int64_t lastCommittedSpHandle)
+{
+    // negative timeInMillis instructs a mandatory flush
+    assert(timeInMillis < 0 || (timeInMillis - m_lastFlush > s_exportFlushTimeout));
+    if (!m_currBlock || m_currBlock->lastSequenceNumber() > m_committedSequenceNumber) {
+        // There is no buffer or the (MP) transaction has not been committed to the buffer yet
+        // so don't release the buffer yet
+        if (timeInMillis < 0) {
+            // Send a null buffer with the sync flag
+            pushStreamBuffer(NULL, true);
+        }
+        return false;
+    }
+
+    if (m_currBlock) {
+        // Note that if the block is empty the lastSequenceNumber will be startSequenceNumber-1;
+        assert(m_currBlock->lastSequenceNumber() == m_committedSequenceNumber);
+        // Any blocks before the current block should have been sent already by the commit path
+        assert(m_pendingBlocks.empty());
+        if (m_flushPending) {
+            assert(m_currBlock->getRowCount() > 0);
+            // Most paths move a block to m_pendingBlocks and then use pushPendingBlocks (comment from there)
+            // The block is handed off to the topend which is responsible for releasing the
+            // memory associated with the block data. The metadata is deleted here.
+            pushStreamBuffer(m_currBlock, timeInMillis < 0);
+            delete m_currBlock;
+            m_currBlock = NULL;
+            extendBufferChain(0);
+            m_prevFlushStream = NULL;
+            m_nextFlushStream = NULL;
+            m_flushPending = false;
+        } else {
+            if (timeInMillis < 0) {
+                pushStreamBuffer(NULL, true);
+            }
+        }
+
+        return true;
+    }
+    // periodicFlush should only be called if this ExportTupleStream was registered with the engine by commit()
+    assert(false);
+    return false;
+}
+
+void ExportTupleStream::extendBufferChain(size_t minLength) {
+    size_t blockSize = (minLength <= m_defaultCapacity) ? m_defaultCapacity : m_maxCapacity;
+    TupleStreamBase::commonExtendBufferChain(blockSize, m_uso);
+
+    m_currBlock->recordStartSequenceNumber(m_nextSequenceNumber);
+}
+
+

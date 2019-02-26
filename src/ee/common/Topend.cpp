@@ -63,19 +63,19 @@ namespace voltdb {
 
     int64_t DummyTopend::getFlushedExportBytes(int32_t partitionId, std::string signature) {
         int64_t bytes = 0;
-        for (int ii = 0; ii < blocks.size(); ii++) {
-            bytes += blocks[ii]->rawLength();
+        for (int ii = 0; ii < exportBlocks.size(); ii++) {
+            bytes += exportBlocks[ii]->rawLength();
         }
         return bytes;
     }
 
-    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) {
-        if (sync) {
+    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block, bool sync) {
+        if (sync && !block) {
             return;
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
@@ -87,17 +87,17 @@ namespace voltdb {
     }
 
     // only used for EE Test, ignore the committedSpHandle for now
-    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         return pushDRBufferRetval;
     }
 
-    void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) {
+    void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {
         partitionIds.push(partitionId);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(new DrStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
     }
 
