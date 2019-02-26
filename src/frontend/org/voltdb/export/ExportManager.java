@@ -685,6 +685,7 @@ public class ExportManager
             int partitionId,
             String signature,
             long startSequenceNumber,
+            long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
             long bufferPtr,
@@ -694,6 +695,7 @@ public class ExportManager
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
+            long lastSeqNo = startSequenceNumber + tupleCount - 1;
             ExportGeneration generation = instance.m_generation.get();
             if (generation == null) {
                 if (buffer != null) {
@@ -701,7 +703,8 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
+            generation.pushExportBuffer(partitionId, signature,
+                    startSequenceNumber, committedSequenceNumber,
                     (int)tupleCount, uniqueId, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread

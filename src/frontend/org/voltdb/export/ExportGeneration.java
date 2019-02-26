@@ -676,7 +676,8 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void pushExportBuffer(int partitionId, String signature,
-            long startSequenceNumber, int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
+            long startSequenceNumber, long committedSequenceNumber,
+            int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -698,7 +699,8 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);
+        source.pushExportBuffer(startSequenceNumber, committedSequenceNumber,
+                tupleCount, uniqueId, buffer, sync);
     }
 
     private void cleanup(final HostMessenger messenger) {

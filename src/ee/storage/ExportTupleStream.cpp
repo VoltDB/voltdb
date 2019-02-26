@@ -40,7 +40,7 @@ const size_t ExportTupleStream::s_mdSchemaSize = (19 + 21 + 27 + 17 + 12 + 21 //
                                                                 + ExportTupleStream::METADATA_COL_CNT // Volt Type byte
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)) // Int for column names string size
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t))); // column length colInfo->length
-const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4) + uniqueId(8)
+const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 20; // committedSequenceNumber(8) + row count(4) + uniqueId(8)
 const size_t ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE = 13; // Size of header before schema: Version(1) + GenerationId(8) + SchemaLen(4)
 const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
@@ -75,8 +75,7 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
 }
 
 /*
- * If SpHandle represents a new transaction, commit previous data.
- * Always serialize the supplied tuple in to the stream.
+ * Serialize the supplied tuple in to the stream.
  * Return m_uso before this invocation - this marks the point
  * in the stream the caller can rollback to if this append
  * should be rolled back.
@@ -282,6 +281,7 @@ void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, in
             removeFromFlushList(engine, true);
         }
         m_committedSequenceNumber = m_nextSequenceNumber-1;
+        m_currBlock->setCommittedSequenceNumber(m_committedSequenceNumber);
 
         pushPendingBlocks();
     }

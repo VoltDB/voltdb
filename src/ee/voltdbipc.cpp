@@ -1618,11 +1618,13 @@ void VoltDBIPC::pushExportBuffer(
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->startSequenceNumber());
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCount());
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = htonll(block->lastSpUniqueId());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = htonll(block->getRowCount());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = htonll(block->lastSpUniqueId());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = 0;
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = 0;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = 0;
     }
     index += 24;
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =

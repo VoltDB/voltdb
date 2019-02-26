@@ -121,12 +121,14 @@ public class StreamBlockQueue {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long seqNo = cont.b().getLong(0);
-            int tupleCount = cont.b().getInt(8);
-            long uniqueId = cont.b().getLong(12);
+            long committedSeqNo = cont.b().getLong(8);
+            int tupleCount = cont.b().getInt(16);
+            long uniqueId = cont.b().getLong(20);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 seqNo,
+                committedSeqNo,
                 tupleCount,
                 uniqueId,
                 true);
@@ -341,6 +343,7 @@ public class StreamBlockQueue {
         assert(m_memoryDeque.isEmpty());
         return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
 
+            @Override
             public ExportSequenceNumberTracker scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 b.order(ByteOrder.LITTLE_ENDIAN);

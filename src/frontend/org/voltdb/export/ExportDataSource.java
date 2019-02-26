@@ -633,6 +633,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long startSequenceNumber,
+            long committedSequenceNumber,
             int tupleCount,
             long uniqueId,
             ByteBuffer buffer,
@@ -669,7 +670,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, startSequenceNumber, tupleCount, uniqueId, false);
+                        },
+                        startSequenceNumber,
+                        committedSequenceNumber,
+                        tupleCount, uniqueId, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -705,6 +709,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long startSequenceNumber,
+            final long committedSequenceNumber,
             final int tupleCount,
             final long uniqueId,
             final ByteBuffer buffer,
@@ -718,7 +723,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, false);
+                pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                        tupleCount, uniqueId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -732,7 +738,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                                    tupleCount, uniqueId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -999,7 +1006,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1);
+                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
+                                first_unpolled_block.committedSequenceNumber());
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1014,12 +1022,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public class AckingContainer extends BBContainer {
         final long m_lastSeqNo;
+        final long m_commitSeqNo;
         final BBContainer m_backingCont;
         long m_startTime = 0;
 
-        public AckingContainer(BBContainer cont, long seq) {
+        public AckingContainer(BBContainer cont, long seq, long commitSeq) {
             super(cont.b());
             m_lastSeqNo = seq;
+            m_commitSeqNo = commitSeq;
             m_backingCont = cont;
         }
 
