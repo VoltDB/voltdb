@@ -961,7 +961,7 @@ public class AbstractTopology {
         TopologyBuilder builder = addPartitionsToHosts(hostInfos, missingHosts, kfactor, 0);
         AbstractTopology topo = new AbstractTopology(EMPTY_TOPOLOGY, builder);
         if (restorePartition && hostInfos.size() == topo.getHostCount()) {
-            topo = mutateRestorePartitionsForRecovery(topo, hostInfos);
+            topo = mutateRestorePartitionsForRecovery(topo, hostInfos, missingHosts);
         }
         return topo;
     }
@@ -1073,7 +1073,7 @@ public class AbstractTopology {
     }
 
     private static AbstractTopology mutateRestorePartitionsForRecovery(AbstractTopology topology,
-            Map<Integer, HostInfo> hostInfos) {
+            Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts) {
         Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
         hostInfos.forEach((k, v) -> {
             Set<Integer> partitions = v.getRecoveredPartitions();
@@ -1085,7 +1085,6 @@ public class AbstractTopology {
         if (restoredPartitionsByHosts.isEmpty()) {
             return topology;
         }
-
         Map<Integer, Partition> allPartitions = Maps.newHashMap(topology.partitionsById);
         Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
         for (Map.Entry<Set<Integer>, List<Integer>> entry : restoredPartitionsByHosts.entrySet()) {
@@ -1125,7 +1124,7 @@ public class AbstractTopology {
         });
         ImmutableMap.Builder<Integer, Host> hostsByIdBuilder = ImmutableMap.builder();
         partitionsByHost.forEach((k, v) -> {
-            hostsByIdBuilder.put(k, new Host(k, topology.hostsById.get(k).haGroup, ImmutableSortedSet.copyOf(v), false));
+            hostsByIdBuilder.put(k, new Host(k, topology.hostsById.get(k).haGroup, ImmutableSortedSet.copyOf(v), missingHosts.contains(k)));
         });
         return new AbstractTopology(topology, hostsByIdBuilder.build(), ImmutableMap.copyOf(allPartitions));
     }
