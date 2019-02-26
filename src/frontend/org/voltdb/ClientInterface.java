@@ -698,7 +698,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!VoltDB.instance().rejoining()) {
                 AuthenticationRequest arq;
                 if (ap == AuthProvider.KERBEROS) {
-                    arq = context.authSystem.new KerberosAuthenticationRequest(socket);
+                    arq = context.authSystem.new KerberosAuthenticationRequest(messagingChannel);
                 } else {
                     arq = context.authSystem.new HashAuthenticationRequest(username, password);
                 }

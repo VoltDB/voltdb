@@ -415,7 +415,7 @@ public class ConnectionUtil {
                     throw new IOException("Wire protocol format violation error");
                 }
                 String servicePrincipal = SerializationHelper.getString(loginResponse);
-                loginResponse = performAuthenticationHandShake(aChannel, subject, servicePrincipal);
+                loginResponse = performAuthenticationHandShake(messagingChannel, subject, servicePrincipal);
                 loginResponseCode = loginResponse.get();
             }
 
@@ -474,10 +474,11 @@ public class ConnectionUtil {
 
 
     private final static void establishSecurityContext(
-            final SocketChannel channel, GSSContext context, Optional<DelegatePrincipal> delegate)
+            final MessagingChannel channel, GSSContext context, Optional<DelegatePrincipal> delegate)
                     throws IOException, GSSException {
 
-        ByteBuffer bb = ByteBuffer.allocate(4096);
+        ByteBuffer writeBuffer = ByteBuffer.allocate(4096);
+        ByteBuffer readBuffer = writeBuffer;
         byte [] token;
         int msgSize = 0;
 
@@ -485,56 +486,37 @@ public class ConnectionUtil {
          * Establishing a kerberos secure context, requires a handshake conversation
          * where client, and server exchange and use tokens generated via calls to initSecContext
          */
-        bb.limit(msgSize);
+        writeBuffer.limit(msgSize);
         while (!context.isEstablished()) {
-            token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            token = context.initSecContext(readBuffer.array(), readBuffer.arrayOffset() + readBuffer.position(),
+                    readBuffer.remaining());
+
             if (token != null) {
                 msgSize = 4 + 1 + 1 + token.length;
-                bb.clear().limit(msgSize);
-                bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
-                bb.put(token).flip();
+                writeBuffer.clear().limit(msgSize);
+                writeBuffer.putInt(msgSize - 4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+                writeBuffer.put(token).flip();
 
-                while (bb.hasRemaining()) {
-                    channel.write(bb);
-                }
+                channel.writeMessage(writeBuffer);
             }
-            if (!context.isEstablished()) {
-                bb.clear().limit(4);
 
-                while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) {
-                        throw new EOFException();
-                    }
-                }
-                bb.flip();
+            if (context.isEstablished()) {
+                break;
+            }
 
-                msgSize = bb.getInt();
-                if (msgSize > bb.capacity()) {
-                    throw new IOException("Authentication packet exceeded alloted size");
-                }
-                if (msgSize <= 0) {
-                    throw new IOException("Wire Protocol Format error 0 or negative message length prefix");
-                }
-                bb.clear().limit(msgSize);
+            readBuffer = channel.readMessage();
 
-                while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) {
-                        throw new EOFException();
-                    }
-                }
-                bb.flip();
+            byte version = readBuffer.get();
+            if (version != Constants.AUTH_HANDSHAKE_VERSION) {
+                throw new IOException("Encountered unexpected authentication protocol version " + version);
+            }
 
-                byte version = bb.get();
-                if (version != Constants.AUTH_HANDSHAKE_VERSION) {
-                    throw new IOException("Encountered unexpected authentication protocol version " + version);
-                }
-
-                byte tag = bb.get();
-                if (tag != Constants.AUTH_HANDSHAKE) {
-                    throw new IOException("Encountered unexpected authentication protocol tag " + tag);
-                }
+            byte tag = readBuffer.get();
+            if (tag != Constants.AUTH_HANDSHAKE) {
+                throw new IOException("Encountered unexpected authentication protocol tag " + tag);
             }
         }
+
 
         if (!context.getMutualAuthState()) {
             throw new IOException("Authentication Handshake Failed");
@@ -548,25 +530,25 @@ public class ConnectionUtil {
         if (delegate.isPresent()) {
             MessageProp mprop = new MessageProp(0, true);
 
-            bb.clear().limit(delegate.get().wrappedSize());
-            delegate.get().wrap(bb);
-            bb.flip();
+            writeBuffer.clear().limit(delegate.get().wrappedSize());
+            delegate.get().wrap(writeBuffer);
+            writeBuffer.flip();
 
-            token = context.wrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop);
+            token = context.wrap(writeBuffer.array(), writeBuffer.arrayOffset() + writeBuffer.position(), writeBuffer.remaining(), mprop);
 
             msgSize = 4 + 1 + 1 + token.length;
-            bb.clear().limit(msgSize);
-            bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
-            bb.put(token).flip();
+            writeBuffer.clear().limit(msgSize);
+            writeBuffer.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+            writeBuffer.put(token).flip();
 
-            while (bb.hasRemaining()) {
-                channel.write(bb);
+            while (writeBuffer.hasRemaining()) {
+                channel.writeMessage(writeBuffer);
             }
         }
     }
 
     private final static ByteBuffer performAuthenticationHandShake(
-            final SocketChannel channel, final Subject subject,
+            final MessagingChannel channel, final Subject subject,
             final String serviceName) throws IOException {
 
         try {
@@ -614,7 +596,6 @@ public class ConnectionUtil {
             });
         } catch (SecurityException ex) {
             // if we get here the authentication handshake failed.
-            try { channel.close(); } catch (Exception ignoreIt) {}
             // PriviledgedActionException is the first wrapper. The runtime from Throwables would be
             // the second wrapper
             Throwable cause = ex.getCause();
@@ -630,28 +611,10 @@ public class ConnectionUtil {
             }
         }
 
-        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-        while (lengthBuffer.hasRemaining()) {
-            if (channel.read(lengthBuffer) == -1) {
-                channel.close();
-                throw new EOFException();
-            }
-        }
-        lengthBuffer.flip();
-        int responseSize = lengthBuffer.getInt();
-
-        ByteBuffer loginResponse = ByteBuffer.allocate(responseSize);
-        while (loginResponse.hasRemaining()) {
-            if (channel.read(loginResponse) == -1) {
-                channel.close();
-                throw new EOFException();
-            }
-        }
-        loginResponse.flip();
+        ByteBuffer loginResponse = channel.readMessage();
 
         byte version = loginResponse.get();
         if (version != (byte)0) {
-            channel.close();
             throw new IOException("Encountered unexpected version for the login response message: " + version);
         }
         return loginResponse;
