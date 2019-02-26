@@ -269,8 +269,8 @@ public class AuthSystem {
          * @return true if the user has permission and false otherwise
          */
         public boolean hasPermission(Permission... perms) {
-            for (int i = 0; i < perms.length;i++) {
-                if (m_permissions.contains(perms[i])) {
+            for (Permission perm : perms) {
+                if (m_permissions.contains(perm)) {
                     return true;
                 }
             }
@@ -884,9 +884,7 @@ public class AuthSystem {
 
                         // read the delegate user if the Volt's accepting service principal is the
                         // same as the one that initiated,
-                        if (   context.getTargName() != null
-                            && context.getSrcName().equals(context.getTargName())
-                            ) {
+                        if (context.getTargName() != null && context.getSrcName().equals(context.getTargName())) {
                             // read in the next packet size
                             bb.clear().limit(4);
                             while (bb.hasRemaining()) {
@@ -932,16 +930,19 @@ public class AuthSystem {
                         return authenticateUserName;
 
                     } catch (IOException|GSSException ex) {
-                        Throwables.propagate(ex);
+                        Throwables.throwIfUnchecked(ex);
+                        throw new RuntimeException(ex);
                     } finally {
-                        if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
+                        if (context != null) {
+                            try { context.dispose(); } catch (Exception ignoreIt) {}
+                        }
                     }
-                    return null;
                 }
             });
 
-            if (authenticatedUser == null)
+            if (authenticatedUser == null) {
                 return false;
+            }
 
             final AuthUser user = m_users.get(authenticatedUser);
             if (user == null) {
