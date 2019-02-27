@@ -167,25 +167,15 @@ namespace voltdb
         ExportStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
             StreamBlock(data, headerSize, capacity, uso),
             m_rowCount(0),
-<<<<<<< HEAD
-            m_startSequenceNumber(0)
-=======
-            m_needsSchema(true),
             m_startSequenceNumber(0),
             m_committedSequenceNumber(-1L)
->>>>>>> Added a committedSequenceNumber pushed from EE down to AckingContainer
         {}
 
         ExportStreamBlock(ExportStreamBlock* other) :
             StreamBlock(other),
             m_rowCount(other->m_rowCount),
-<<<<<<< HEAD
-            m_startSequenceNumber(other->m_startSequenceNumber)
-=======
-            m_needsSchema(other->m_needsSchema),
             m_startSequenceNumber(other->m_startSequenceNumber),
             m_committedSequenceNumber(other->m_committedSequenceNumber)
->>>>>>> Added a committedSequenceNumber pushed from EE down to AckingContainer
         {}
 
         ~ExportStreamBlock()
