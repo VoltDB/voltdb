@@ -262,8 +262,6 @@ public class PlannerTool {
         RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet()
                 .replace(VoltPhysicalRel.CONVENTION)
                 .replace(RelDistributions.ANY);
-        // Reset partition equal value after a query is planned.
-        RelDistributions.ANY.setPartitionEqualValue(null);
 
         // Apply physical conversion rules.
         transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),

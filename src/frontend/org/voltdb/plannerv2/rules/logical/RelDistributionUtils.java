@@ -5,6 +5,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
@@ -16,7 +17,6 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -58,16 +58,16 @@ final class RelDistributionUtils {
                             final Pair<Integer, Integer> columnPair = getJoiningColumns((RexCall) node);
                             if (columnPair != null) {
                                 final Integer fst = columnPair.getFirst(), snd = columnPair.getSecond();
-                                final AtomicBoolean updated = new AtomicBoolean(false);
+                                boolean updated = false;
                                 for (Set<Integer> entry : r) {
                                     if (entry.contains(fst) || entry.contains(snd)) {
                                         entry.add(fst);
                                         entry.add(snd);
-                                        updated.set(true);
+                                        updated = true;
                                         break;
                                     }
                                 }
-                                if (! updated.get()) {
+                                if (! updated) {
                                     r.add(new HashSet<Integer>() {{
                                         add(columnPair.getFirst());
                                         add(columnPair.getSecond());
@@ -95,51 +95,54 @@ final class RelDistributionUtils {
      * @param call Condition to check
      * @return (ColumnIndex, Literal) when the condition is in this form.
      */
-    private static Pair<Integer, RexLiteral> getColumnValuePairs(RexCall call) {
+    private static Stream<Pair<Integer, RexNode>> getColumnValuePairs(RexCall call) {
         if (call.isA(SqlKind.EQUALS)) {
-            final RexNode left = call.getOperands().get(0), right = call.getOperands().get(1);
-            if (left instanceof RexInputRef && right.isA(SqlKind.LITERAL) ||
-                    right instanceof RexInputRef && left.isA(SqlKind.LITERAL)) {
+            final RexNode left = uncast(call.getOperands().get(0)), right = uncast(call.getOperands().get(1));
+            if (left instanceof RexInputRef && RexUtil.isLiteral(right) ||
+                    right instanceof RexInputRef && RexUtil.isLiteral(left)) {
                 final int col;
-                final RexLiteral literal;
+                final RexNode literal;
                 if (right.isA(SqlKind.LITERAL)) {
                     col = ((RexInputRef) left).getIndex();
-                    literal = (RexLiteral) right;
+                    literal = right;
                 } else {
                     col = ((RexInputRef) right).getIndex();
-                    literal = (RexLiteral) left;
+                    literal = left;
                 }
-                return Pair.of(col, literal);
+                return Stream.of(Pair.of(col, literal));
             }
         }
-        return null;
+        return Stream.empty();
     }
 
     /**
      * Collects all the conjunction of ColumnRef = Literal forms.
-     * e.g. foo.i = 1 AND foo.j = 'foo' AND bar.k = 0, with foo(i int, j varchar), bar(i int, i int), gives:
+     * e.g. foo.i = 1 AND foo.j = 'foo' AND bar.k = 0, with foo(i int, j varchar), bar(i int, k int), gives:
      * {(0, 1), (1, 'foo'), (1, 0)}.
      * @param call condition to be checked
      * @return A collection of column literal values.
      */
-    private static Map<Integer, RexLiteral> getAllColumnValuePairs(RexCall call) {
+    private static Map<Integer, RexNode> getAllColumnValuePairs(RexCall call) {
         if (call.isA(SqlKind.AND)) {
             return call.getOperands().stream().flatMap(entry -> {
                 if (entry instanceof RexCall) {
-                    final Pair<Integer, RexLiteral> p = getColumnValuePairs((RexCall) entry);
-                    if (p != null) {
-                        return Stream.of(p);
-                    }
+                    return getColumnValuePairs((RexCall) entry);
+                } else {
+                    return Stream.empty();
                 }
-                return Stream.empty();
             }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond, (a, b) -> a));
         } else {
-            final Map<Integer, RexLiteral> m = new HashMap<>();
-            final Pair<Integer, RexLiteral> p = getColumnValuePairs(call);
-            if (p != null) {
-                m.put(p.getFirst(), p.getSecond());
-            }
+            final Map<Integer, RexNode> m = new HashMap<>();
+            getColumnValuePairs(call).findAny().ifPresent(p -> m.put(p.getFirst(), p.getSecond()));
             return m;
+        }
+    }
+
+    private static RexNode uncast(RexNode node) {
+        if (node.isA(SqlKind.CAST)) {
+            return ((RexCall) node).getOperands().get(0);
+        } else {
+            return node;
         }
     }
 
@@ -155,7 +158,8 @@ final class RelDistributionUtils {
         if (! joinCondition.isA(SqlKind.EQUALS)) {
             return null;
         } else {
-            final RexNode leftConj = joinCondition.getOperands().get(0), rightConj = joinCondition.getOperands().get(1);
+            final RexNode leftConj = uncast(joinCondition.getOperands().get(0)),
+                    rightConj = uncast(joinCondition.getOperands().get(1));
             if (!(leftConj instanceof RexInputRef) || !(rightConj instanceof RexInputRef)) {
                 return null;
             } else {
@@ -185,7 +189,7 @@ final class RelDistributionUtils {
         } else {
             assert vscan instanceof VoltLogicalJoin;
             final VoltLogicalJoin join = (VoltLogicalJoin) vscan;
-            checkSPAndPropogateDistribution(join, join.getLeft(), join.getRight());
+            isJoinSP(join, join.getLeft(), join.getRight());
             return null;
         }
     }
@@ -196,13 +200,18 @@ final class RelDistributionUtils {
      * @return partition column
      */
     private static Integer getPartitionColumn(RelNode tbl) {
+        final RelDistribution dist;
         if (tbl instanceof TableScan) {
-            final RelDistribution dist = tbl.getTable().getDistribution();
-            if (dist.getKeys().isEmpty()) {
-                return null;
-            } else {
-                return dist.getKeys().get(0);
-            }
+            dist = tbl.getTable().getDistribution();
+        } else {
+            dist = tbl.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        }
+        if (dist.getKeys().isEmpty()) {
+            return null;
+        } else {
+            return dist.getKeys().get(0);
+        }
+        /*
         } else if (tbl instanceof VoltLogicalJoin) {    // join tree with a child being a join node
             final List<Integer> keys =
                     tbl.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getKeys();
@@ -218,28 +227,29 @@ final class RelDistributionUtils {
             return getPartitionColumn(((HepRelVertex) tbl).getCurrentRel());
         } else {
             return null;    // TODO
-        }
+        } */
     }
 
     private static Integer getColumnIndex(RexNode node) {
-        if (node.isA(SqlKind.INPUT_REF)) {
-            return ((RexInputRef) node).getIndex();
-        } else if (node.isA(SqlKind.CAST) && ((RexCall) node).getOperands().get(0).isA(SqlKind.LOCAL_REF)) {
-            return ((RexLocalRef) ((RexCall) node).getOperands().get(0)).getIndex();
+        final RexNode src = uncast(node);
+        if (src.isA(SqlKind.INPUT_REF)) {
+            return ((RexInputRef) src).getIndex();
+        } else if (src.isA(SqlKind.LOCAL_REF)) {
+            return ((RexLocalRef) src).getIndex();
         } else {
             return null;
         }
     }
     private static void addColumnIndexAndLiteral(
-            Map<Integer, RexLiteral> map, RexNode node1, RexNode node2) {
-        final RexLiteral literal;
+            Map<Integer, RexNode> map, RexNode node1, RexNode node2) {
+        final RexNode literal;
         final Integer index;
         if (node1.isA(SqlKind.LITERAL)) {
-            literal = (RexLiteral) node1;
+            literal = node1;
             index = getColumnIndex(node2);
         } else if (node2.isA(SqlKind.LITERAL)) {
             index = getColumnIndex(node1);
-            literal = (RexLiteral) node2;
+            literal = node2;
         } else {
             index = null;
             literal = null;
@@ -255,21 +265,21 @@ final class RelDistributionUtils {
      * @param exprs the list of expressions that @param condRef refers to
      * @return a collection of all {column index => literal value} pairs.
      */
-    private static Map<Integer, RexLiteral> getEqualValuePredicate(RexLocalRef condRef, List<RexNode> exprs) {
+    private static Map<Integer, RexNode> getEqualValuePredicate(RexLocalRef condRef, List<RexNode> exprs) {
         final RexNode condDeref = exprs.get(condRef.getIndex());
         if (condDeref.isA(SqlKind.EQUALS)) {
             final RexCall call = (RexCall) condDeref;
-            RexNode left = call.getOperands().get(0), right = call.getOperands().get(1);
+            RexNode left = uncast(call.getOperands().get(0)), right = uncast(call.getOperands().get(1));
             assert left.isA(SqlKind.LOCAL_REF) && right.isA(SqlKind.LOCAL_REF);
             left = exprs.get(((RexLocalRef) left).getIndex());
             right = exprs.get(((RexLocalRef) right).getIndex());
-            final Map<Integer, RexLiteral> m = new HashMap<>();
+            final Map<Integer, RexNode> m = new HashMap<>();
             addColumnIndexAndLiteral(m, left, right);
             return m;
         } else if (condDeref.isA(SqlKind.AND)) {
             return ((RexCall) (condDeref)).getOperands().stream().flatMap(node -> {
                 if (node instanceof RexLocalRef) {
-                    final Map<Integer, RexLiteral> r = getEqualValuePredicate((RexLocalRef) node, exprs);
+                    final Map<Integer, RexNode> r = getEqualValuePredicate((RexLocalRef) node, exprs);
                     if (! r.isEmpty()) {
                         assert r.size() == 1;
                         return r.entrySet().stream();
@@ -287,7 +297,7 @@ final class RelDistributionUtils {
      * @param calc calc node under inspection
      * @return the collection
      */
-    static Map<Integer, RexLiteral> calcCondition(Calc calc) {
+    static Map<Integer, RexNode> calcCondition(Calc calc) {
         final RexProgram prog = calc.getProgram();
         return getEqualValuePredicate(prog.getCondition(), prog.getExprList());
     }
@@ -350,15 +360,12 @@ final class RelDistributionUtils {
     }
 
     static RelDistribution getDistribution(RelNode node) {
-        if (node instanceof VoltLogicalTableScan) {
-            return node.getTable().getDistribution();
-        }
         return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
     }
 
-    private static Pair<Map<Integer, RexLiteral>, Map<Integer, RexLiteral>> fillColumnLiteralEqualPredicates(
+    private static Pair<Map<Integer, RexNode>, Map<Integer, RexNode>> fillColumnLiteralEqualPredicates(
             RelNode outer, RelNode inner, int outerRelColumns, RexCall joinCond, Set<Integer> joinColumns) {
-        final Map<Integer, RexLiteral> outerFilter, innerFilter;
+        final Map<Integer, RexNode> outerFilter, innerFilter;
         if (outer instanceof Calc) {
             outerFilter = calcCondition((Calc) outer);
         } else {
@@ -380,7 +387,7 @@ final class RelDistributionUtils {
                         return IntStream.of(index);
                     }
                 }).forEach(col -> {
-                    final Map.Entry<Integer, RexLiteral> ret =
+                    final Map.Entry<Integer, RexNode> ret =
                             new AbstractMap.SimpleEntry<>(col, literal);
                     if (col < outerRelColumns) {
                         outerFilter.put(ret.getKey(), ret.getValue());
@@ -391,9 +398,23 @@ final class RelDistributionUtils {
         return Pair.of(outerFilter, innerFilter);
     }
 
-    private static void setPartitionEqualKey(RelNode node, RexLiteral literal) {
-        node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE)
-                .setPartitionEqualValue(literal);
+    static final class JoinState {
+        final private boolean m_isSP;
+        final private RexNode m_literal;
+        public JoinState(boolean isSP, RexNode literal) {
+            m_isSP = isSP;
+            m_literal = literal;
+        }
+        public boolean isSP() {
+            return m_isSP;
+        }
+        public RexNode getLiteral() {
+            return m_literal;
+        }
+    }
+
+    private static RexNode literalOr(RexNode left, RexNode right) {
+        return left == null ? right : left;
     }
 
     /**
@@ -405,25 +426,28 @@ final class RelDistributionUtils {
      * @param inner inner relation
      * @return true if the result of the join is SP, and sets the distribution trait for all partitioned relations.
      */
-    static boolean checkSPAndPropogateDistribution(VoltLogicalJoin join, RelNode outer, RelNode inner) {
+    static JoinState isJoinSP(VoltLogicalJoin join, RelNode outer, RelNode inner) {
         final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
         final Integer outerPartColumn = getPartitionColumn(outer), innerPartColumn = getPartitionColumn(inner);
         final boolean outerIsPartitioned = outerPartColumn != null,
                 innerIsPartitioned = innerPartColumn != null,
                 outerHasPartitionKey = outerDist.getPartitionEqualValue() != null,
                 innerHasPartitionKey = innerDist.getPartitionEqualValue() != null;
+        final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());
         switch (join.getJoinType()) {
             case INNER:
                 if (outerIsPartitioned || innerIsPartitioned) {
                     if (join.getCondition().isA(SqlKind.LITERAL)) {
                         assert join.getCondition().isAlwaysFalse() || join.getCondition().isAlwaysTrue();
-                        if (join.getCondition().isAlwaysFalse()) {
-                            return true;        // TODO: could join condition ever be false?
+                        if (join.getCondition().isAlwaysFalse()) {        // TODO: could join condition ever be false?
+                            return new JoinState(true, srcLitera);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
-                            return outerHasPartitionKey &&
-                                    outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue());
+                            return new JoinState(
+                                    outerHasPartitionKey &&
+                                            outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue()),
+                                    srcLitera);
                         } else {
-                            return outerHasPartitionKey || innerHasPartitionKey;
+                            return new JoinState(outerHasPartitionKey || innerHasPartitionKey, srcLitera);
                         }
                     }
                     assert join.getCondition() instanceof RexCall;
@@ -438,13 +462,13 @@ final class RelDistributionUtils {
                     if (equalPartitionColumns.isEmpty()) {
                         if (outerHasPartitionKey && ! innerIsPartitioned || innerHasPartitionKey && ! outerIsPartitioned) {
                             // The partitioned rel has equal key; the other rel is replicated --> SP
-                            return true;
+                            return new JoinState(true, srcLitera);
                         } else if (outerHasPartitionKey &&
                                 outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())) {
                             // Both relations are partitioned with keys, and they are equal --> SP
-                            return true;
+                            return new JoinState(true, srcLitera);
                         } else {
-                            return false;
+                            return new JoinState(false, srcLitera);
                         }
                     }
                     final Pair<Integer, Integer> cols = separateColumns(
@@ -453,13 +477,13 @@ final class RelDistributionUtils {
                     // Does not join on the partition column
                     if (outerPartColumn != null && outerPartColumn != outerJoiningCol ||
                             innerPartColumn != null && innerPartColumn != innerJoiningCol - outerTableColumns) {
-                        return false;
+                        return new JoinState(false, srcLitera);
                     }
                     // missing filters on table scans
-                    final Pair<Map<Integer, RexLiteral>, Map<Integer, RexLiteral>> r =
+                    final Pair<Map<Integer, RexNode>, Map<Integer, RexNode>> r =
                             fillColumnLiteralEqualPredicates(outer, inner, outerTableColumns,
                                     joinCondition, equalPartitionColumns);
-                    final Map<Integer, RexLiteral> outerFilter = r.getFirst(), innerFilter = r.getSecond();
+                    final Map<Integer, RexNode> outerFilter = r.getFirst(), innerFilter = r.getSecond();
                     if (joinColumnSets.isEmpty() ||
                             joinColumnSets.stream().noneMatch(set ->
                                     (outerPartColumn == null || set.contains(outerPartColumn)) &&
@@ -475,32 +499,25 @@ final class RelDistributionUtils {
                             // only one relation is partitioned. Depending on whether the partitioned table has
                             // the equal value set, it is either SP (if the equal value is set and not null), or
                             // MP (but VoltDB can handle it).
-                            return outerIsPartitioned && outerDist.getPartitionEqualValue() != null ||
-                                    innerIsPartitioned && innerDist.getPartitionEqualValue() != null;
+                            return new JoinState(
+                                    outerIsPartitioned && outerDist.getPartitionEqualValue() != null ||
+                                            innerIsPartitioned && innerDist.getPartitionEqualValue() != null,
+                                    srcLitera);
                         }
                     }
                     final boolean
-                            isOuterPartitionedSP = outerIsPartitioned && outerDist.getPartitionEqualValue() != null,
-                            isInnerPartitionedSP = innerIsPartitioned && innerDist.getPartitionEqualValue() != null;
+                            isOuterPartitionedSP = outerDist.getPartitionEqualValue() != null,
+                            isInnerPartitionedSP = innerDist.getPartitionEqualValue() != null;
                     if (isOuterPartitionedSP || isInnerPartitionedSP) {
                         // multiple join with either of:
                         // 1. a joining multi-partitioned SP node and a replicated table
                         // 2. both are joining multi-partitioned SP nodes
                         // then, the result is still SP
-                        if (isOuterPartitionedSP != isInnerPartitionedSP && outerIsPartitioned == innerIsPartitioned) {
-                            // propagate distribution equal-value to the other unset table scan, for the case that
-                            // both outer/inner are partitioned, but only one has partition equal value set.
-                            if (isOuterPartitionedSP) {
-                                setPartitionEqualKey(inner, outerDist.getPartitionEqualValue());
-                            } else {
-                                setPartitionEqualKey(outer, innerDist.getPartitionEqualValue());
-                            }
-                        }
-                        return true;
+                        return new JoinState(true, srcLitera);
                     }
                     // separate condFilter into outerFilter and innerFilter
                     if (outerFilter.isEmpty() && innerFilter.isEmpty()) {
-                        return false; // No equal-filter found
+                        return new JoinState(false, null); // No equal-filter found
                     }
                     final boolean outerTableHasEqValue =
                             outerPartColumn != null &&
@@ -509,37 +526,62 @@ final class RelDistributionUtils {
                     final boolean innerTableHasEqValue =
                             innerPartColumn != null &&
                                     innerFilter.entrySet().stream().anyMatch(entry ->
-                                    entry.getKey().equals(innerPartColumn + outerTableColumns));
+                                            entry.getKey().equals(innerPartColumn + outerTableColumns));
                     if (outerTableHasEqValue || innerTableHasEqValue) {
                         // Has an equal-filter on partitioned column
                         // NOTE: in case there are 2 equal predicated on each partitioned column each,
                         // we just take out the first one.
-                        // TODO: in that case, checking that they are equal or not, and optimize away is a
-                        // minor-usage case of optimization
-                        (outerTableHasEqValue ? outerFilter.entrySet() : innerFilter.entrySet())
-                                .stream().flatMap(entry -> {
-                            final int columnIndex = entry.getKey();
-                            if (outerPartColumn != null && outerPartColumn == columnIndex ||
-                                    innerPartColumn != null && innerPartColumn == columnIndex - outerTableColumns) {
-                                return Stream.of(entry.getValue());
-                            } else {
-                                return Stream.empty();
-                            }
-                        }).findAny().ifPresent(value -> {
-                            if (innerIsPartitioned) {
-                                setPartitionEqualKey(inner, value);
-                            }
-                            if (outerIsPartitioned) {
-                                setPartitionEqualKey(outer, value);
-                            }
-                        });
+                        return new JoinState(true,
+                                (outerTableHasEqValue ? outerFilter.entrySet() : innerFilter.entrySet())
+                                        .stream().flatMap(entry -> {
+                                    final int columnIndex = entry.getKey();
+                                    if (outerPartColumn != null && outerPartColumn == columnIndex ||
+                                            innerPartColumn != null && innerPartColumn == columnIndex - outerTableColumns) {
+                                        return Stream.of(entry.getValue());
+                                    } else {
+                                        return Stream.empty();
+                                    }
+                                }).findAny().orElse(null));
                     } else {    // no equal-filter on partition column
-                        return false;
+                        return new JoinState(false, srcLitera);
                     }
-                } // else Both are replicated: SP
-                return true;
+                } else { // else Both are replicated: SP
+                    return new JoinState(true, srcLitera);
+                }
             default: // Not inner-join type involving at least a partitioned table
-                return !outerIsPartitioned && !innerIsPartitioned;
+                return new JoinState(!outerIsPartitioned && !innerIsPartitioned, srcLitera);
+        }
+    }
+
+    /**
+     * Flattens a RexCall that likely refers to some local index(es) of a given list of references,
+     * so that the flattend RexCall does not refer to any external local references (but could refer to
+     * some column of some table).
+     *
+     * @param node RexCall to flatten
+     * @param ref list of reference to look up for local references
+     * @return flattened RexCall
+     */
+    private static RexNode flattenRexCall(RexNode node, List<RexNode> ref) {
+        final RexNode src = uncast(node);
+        if (src.isA(SqlKind.LOCAL_REF)) {
+            final int index = ((RexLocalRef) src).getIndex();
+            return flattenRexCall(ref.get(index), ref);
+        } else if (src instanceof RexCall) {
+            final RexCall call = (RexCall) src;
+            return call.clone(
+                    call.getType(),
+                    call.getOperands().stream().map(elt -> {
+                        final RexNode uncasted = uncast(elt);
+                        if (uncasted.isA(SqlKind.LOCAL_REF) ||
+                                uncasted instanceof RexCall) {
+                            return flattenRexCall(uncasted, ref);
+                        } else {
+                            return uncasted;
+                        }
+                    }).collect(Collectors.toList()));
+        } else {
+            return src;
         }
     }
 
@@ -554,21 +596,23 @@ final class RelDistributionUtils {
      * @param partitionCol partition column of the partition table
      * @return the literal if found, null otherwise.
      */
-    private static RexLiteral matchedColumnLiteral(RexNode cond, List<RexNode> src, int partitionCol) {
+    private static RexNode matchedColumnLiteral(RexNode cond, List<RexNode> src, int partitionCol) {
         if (cond.isA(SqlKind.LOCAL_REF)) {
             return matchedColumnLiteral(src.get(((RexLocalRef) cond).getIndex()), src, partitionCol);
         } else if (cond.isA(SqlKind.EQUALS)) {
             final RexCall eq = (RexCall) cond;
             final RexNode left = eq.getOperands().get(0), right = eq.getOperands().get(1);
             assert left.isA(SqlKind.LOCAL_REF) && right.isA(SqlKind.LOCAL_REF);
-            final RexNode derefLeft = src.get(((RexLocalRef) left).getIndex()),
-                    derefRight = src.get(((RexLocalRef) right).getIndex());
-            if (derefLeft.isA(SqlKind.INPUT_REF) && derefRight.isA(SqlKind.LITERAL) ||
-                    derefRight.isA(SqlKind.INPUT_REF) && derefLeft.isA(SqlKind.LITERAL)) {
+            final RexNode derefLeft = flattenRexCall(src.get(((RexLocalRef) left).getIndex()), src),
+                    derefRight = flattenRexCall(src.get(((RexLocalRef) right).getIndex()), src);
+            final boolean isLeftLiteral = RexUtil.isLiteral(derefLeft),
+                    isRightLiteral = RexUtil.isLiteral(derefRight);
+            if (derefLeft.isA(SqlKind.INPUT_REF) && isRightLiteral ||
+                    derefRight.isA(SqlKind.INPUT_REF) && isLeftLiteral) {
                 final int colIndex =
                         ((RexInputRef) (derefLeft.isA(SqlKind.INPUT_REF) ? derefLeft : derefRight)).getIndex();
                 if (colIndex == partitionCol) {
-                    return (RexLiteral) (derefLeft.isA(SqlKind.LITERAL) ? derefLeft : derefRight);
+                    return derefLeft.isA(SqlKind.INPUT_REF) ? derefRight : derefLeft;
                 } else {
                     return null;
                 }
@@ -578,7 +622,7 @@ final class RelDistributionUtils {
         } else if (cond.isA(SqlKind.AND)) {
             return ((RexCall) cond).getOperands().stream()
                     .flatMap(node -> {
-                        final RexLiteral result = matchedColumnLiteral(node, src, partitionCol);
+                        final RexNode result = matchedColumnLiteral(node, src, partitionCol);
                         if (result == null) {
                             return Stream.empty();
                         } else {
@@ -592,42 +636,40 @@ final class RelDistributionUtils {
         }
     }
 
-    static boolean isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
+    static Pair<Boolean, RexNode> isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
         final RelDistribution dist = scan.getTable().getDistribution(); // distribution for the scanned table
         final RelDistribution calcDist = calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         switch (dist.getType()) {
             case SINGLETON:
-                return true;
-            case RANDOM_DISTRIBUTED:        // View
-                return false;
+                return Pair.of(true, null);
             case HASH_DISTRIBUTED:
-                final boolean isSP;
                 if (dist.getPartitionEqualValue() != null) {    // equal value already present
-                    isSP = true;
+                    assert false;
+                    return Pair.of(true, dist.getPartitionEqualValue());
                 } else if (calc.getProgram().getCondition() == null) {
-                    isSP = false;
+                    return Pair.of(false, null);
                 } else {    // find equal value in calc node
-                    final RexLiteral literal = matchedColumnLiteral(
+                    final RexNode literal = matchedColumnLiteral(
                             calc.getProgram().getCondition(), calc.getProgram().getExprList(), dist.getKeys().get(0));
                     if (literal != null) {
                         if (calcDist.getPartitionEqualValue() != null &&
                                 ! calcDist.getPartitionEqualValue().equals(literal)) {
-                            isSP = false;   // Calc's distribution key had already been set to a different value
+                            // Calc's distribution key had already been set to a different value
+                            return Pair.of(false, calcDist.getPartitionEqualValue());
                         } else {
-                            scan.getTraitSet().replace(dist);
+                            /*scan.getTraitSet().replace(dist);
                             calc.getTraitSet().replace(dist);
                             setPartitionEqualKey(scan, literal);
-                            setPartitionEqualKey(calc, literal);
-                            isSP = true;
+                            setPartitionEqualKey(calc, literal);*/
+                            return Pair.of(true, literal);
                         }
                     } else {
-                        isSP = false;
+                        return Pair.of(false, null);
                     }
                 }
-                // TODO: set Calc's distribution trait type to be HASH_DISTRIBUTED, and add keys to partition columns.
-                return isSP;
+            case RANDOM_DISTRIBUTED:        // View
             default:
-                return false;
+                return Pair.of(false, null);
         }
     }
 }

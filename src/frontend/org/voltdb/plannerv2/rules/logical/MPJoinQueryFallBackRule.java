@@ -21,6 +21,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
@@ -48,18 +49,14 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         final VoltLogicalJoin join = call.rel(0);
         final RelNode outer = call.rel(1), inner = call.rel(2);
-        RelDistributionUtils.checkedFallBack(
-                ! RelDistributionUtils.checkSPAndPropogateDistribution(
-                        join, outer, inner));
+        final RelDistributionUtils.JoinState joinState = RelDistributionUtils.isJoinSP(join, outer, inner);
+        RelDistributionUtils.checkedFallBack(! joinState.isSP());
         // The query is SP, and the distributions of any partitioned tables had been set.
         final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
-                innerDist = RelDistributionUtils.getDistribution(inner);
-        if (outerDist == RelDistributions.SINGLETON && innerDist == RelDistributions.SINGLETON) {
-            call.transformTo(join.copy(join.getTraitSet().replace(RelDistributions.SINGLETON), join.getInputs()));
-        } else if (outerDist != RelDistributions.SINGLETON) {
-            call.transformTo(join.copy(join.getTraitSet().replace(outerDist), join.getInputs()));
-        } else {
-            call.transformTo(join.copy(join.getTraitSet().replace(innerDist), join.getInputs()));
-        }
+                innerDist = RelDistributionUtils.getDistribution(inner),
+                newDist = (outerDist == RelDistributions.SINGLETON || innerDist == RelDistributions.SINGLETON ?
+                        RelDistributions.SINGLETON : innerDist)
+                        .withPartitionEqualValue(joinState.getLiteral());
+        call.transformTo(join.copy(join.getTraitSet().replace(newDist), join.getInputs()));
     }
 }

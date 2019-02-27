@@ -39,9 +39,6 @@ public class VoltRelUtil {
      */
     public static RelNode addTraitRecursively(RelNode rel, RelTrait newTrait) {
         Preconditions.checkNotNull(rel);
-        if (newTrait instanceof RelDistribution) {  // cleanse partition value left over from RelDistributions.ANY
-            ((RelDistribution) newTrait).setPartitionEqualValue(null);
-        }
         RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);
     }

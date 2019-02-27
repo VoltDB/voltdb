@@ -19,11 +19,14 @@ package org.voltdb.plannerv2.rules.logical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rex.RexNode;
+import org.voltcore.utils.Pair;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
@@ -58,7 +61,15 @@ public class MPQueryFallBackRule extends RelOptRule {
             VoltLogicalTableScan tableScan = call.rel(1);
             // TODO: the exception thrown here could be too early, e.g. the result is used as a child of a join,
             // which will change MP decision to SP at that point.
-            RelDistributionUtils.checkedFallBack(! RelDistributionUtils.isCalcScanSP(tableScan, calc));
+            final Pair<Boolean, RexNode> r = RelDistributionUtils.isCalcScanSP(tableScan, calc);
+            RelDistributionUtils.checkedFallBack(! r.getFirst());
+            final RexNode literal = r.getSecond();
+            if (literal != null) {
+                final RelDistribution tableDist =
+                        tableScan.getTable().getDistribution().withPartitionEqualValue(literal);
+                final RelTraitSet calcTraitCopy = calc.getTraitSet().replace(tableDist);
+                call.transformTo(calc.copy(calcTraitCopy, calc.getInputs()));
+            }
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);
