@@ -1035,6 +1035,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final long m_commitSeqNo;
         final BBContainer m_backingCont;
         long m_startTime = 0;
+        long m_commitSpHandle = 0;
 
         public AckingContainer(BBContainer cont, long seq, long commitSeq) {
             super(cont.b());
@@ -1045,6 +1046,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public void updateStartTime(long startTime) {
             m_startTime = startTime;
+        }
+
+        public long getCommittedSeqNo() {
+            return m_commitSeqNo;
+        }
+
+        public void setCommittedSpHandle(long spHandle) {
+            m_commitSpHandle = spHandle;
         }
 
         @Override
@@ -1072,6 +1081,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 if (!m_es.isShutdown()) {
                                     setCommittedSeqNo(m_commitSeqNo);
                                     ackImpl(m_lastSeqNo);
+                                    if (m_commitSpHandle != 0) {
+                                        // FIXME: must call SysProc deleting acked rows
+                                        exportLog.info("XXX Got SPHandle " + m_commitSpHandle
+                                                + ", for seqNo " + m_commitSeqNo);
+                                    }
                                 }
                             } finally {
                                 forwardAckToOtherReplicas();
