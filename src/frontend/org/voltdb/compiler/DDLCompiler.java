@@ -96,7 +96,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
-import org.voltdb.utils.VoltTypeUtil;
 
 
 
@@ -1389,7 +1388,10 @@ public class DDLCompiler {
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
             final String migrationTarget = ttlNode.attributes.get("migrationTarget");
-            if (migrationTarget != null) {
+            if (!StringUtil.isEmpty(migrationTarget)) {
+                if (table.getIsreplicated()) {
+                    throw m_compiler.new VoltCompilerException("'MIGRATE TO TARGET' is not supported for replicated table:" + table.getTypeName());
+                }
                 ttl.setMigrationtarget(migrationTarget);
                 table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
             }
