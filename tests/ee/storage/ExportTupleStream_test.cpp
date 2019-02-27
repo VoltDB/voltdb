@@ -312,6 +312,13 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     boost::shared_ptr<ExportStreamBlock> results2 = m_topend.exportBlocks.front();
     EXPECT_EQ(results2->uso(), 0);
 
+    os.str(""); os << "startSequenceNumber expected: " << 1 << ", actual: " << results2->startSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results2->startSequenceNumber() == 1, os.str().c_str());
+    os.str(""); os << "lastSequenceNumber expected: " << 2 << ", actual: " << results2->lastSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results2->lastSequenceNumber() == 2, os.str().c_str());
+    os.str(""); os << "committedSequenceNumber expected: " << 2 << ", actual: " << results2->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results2->getCommittedSequenceNumber() == 2, os.str().c_str());
+
     // Push 3 rows
     for (cnt = 3; cnt < 6; cnt++) {
         appendTuple(cnt-1, cnt, cnt);
@@ -320,6 +327,12 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     ASSERT_TRUE(checkTargetFlushTime(3));
     periodicFlush(-1, 5);
     ASSERT_TRUE(testNoStreamsToFlush());
+
+    boost::shared_ptr<ExportStreamBlock> results3 = m_topend.exportBlocks.back();
+    os.str(""); os << "lastSequenceNumber expected: " << 5 << ", actual: " << results3->lastSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results3->lastSequenceNumber() == 5, os.str().c_str());
+    os.str(""); os << "committedSequenceNumber expected: " << 5 << ", actual: " << results3->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results3->getCommittedSequenceNumber() == 5, os.str().c_str());
 
     // 3 rows - 2 blocks (2, 3)
     allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
@@ -451,6 +464,11 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
+
+    // The first buffer should not have any committed sequence numbers
+    std::ostringstream os;
+    os.str(""); os << "committedSequenceNumber expected: " << -1L << ", actual: " << results->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == -1L, os.str().c_str());
 }
 
 
@@ -488,6 +506,15 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     m_topend.exportBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
+
+    // The first buffer should contain the whole transaction
+    std::ostringstream os;
+    os.str(""); os << "startSequenceNumber expected: " << 1 << ", actual: " << results->startSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->startSequenceNumber() == 1, os.str().c_str());
+    os.str(""); os << "lastSequenceNumber expected: " << m_tuplesToFill << ", actual: " << results->lastSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->lastSequenceNumber() == m_tuplesToFill, os.str().c_str());
+    os.str(""); os << "committedSequenceNumber expected: " << m_tuplesToFill << ", actual: " << results->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == m_tuplesToFill, os.str().c_str());
 }
 
 /**
