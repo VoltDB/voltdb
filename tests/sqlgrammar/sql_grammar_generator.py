@@ -965,8 +965,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                             continue
 
                     # Normal 'show' command case
-                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
-                                                      sql_contains_echo_substring)
+                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
+                                                  sql_contains_echo_substring)
                     break
 
                 # Invalid 'show' commands return a simple error message; also, once again, these commands
@@ -1341,6 +1341,8 @@ if __name__ == "__main__":
                             ['ORDER BY parsed with strange child node type'],
                             ['Materialized view', 'joins multiple tables'],
                             ['Mismatched columns', 'in common table expression'],
+                            ['Materialized view only supports INNER JOIN'],
+                            ['windowed function call and GROUP BY in a single query is not supported'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
