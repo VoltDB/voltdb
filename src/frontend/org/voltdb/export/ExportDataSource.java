@@ -1237,15 +1237,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
                         setCommittedSeqNo(seq);
                         ackImpl(seq);
-
-                        // FIXME: remove
-                        if (m_lastReleasedSeqNo != m_committedSeqNo) {
-                            exportLog.info("XXX ack mismatch - released " + m_lastReleasedSeqNo
-                                    + ", committed " + m_committedSeqNo);
-                        } else {
-                            exportLog.info("YYY ack match - released " + m_lastReleasedSeqNo
-                                    + ", committed " + m_committedSeqNo);
-                        }
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
