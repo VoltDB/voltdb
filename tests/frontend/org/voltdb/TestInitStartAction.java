@@ -579,16 +579,27 @@ final public class TestInitStartAction {
         InMemoryJarfile inMemoryJar1 = new InMemoryJarfile();
         InMemoryJarfile inMemoryJar2 = new InMemoryJarfile();
         VoltCompiler compiler = new VoltCompiler(false, false);
-        ClassPath classpath = ClassPath.from(this.getClass().getClassLoader());
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
+        ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         int classesFound = 0;
-        for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
-            if (myclass.getSimpleName().startsWith("Get")) {
-                compiler.addClassToJar(inMemoryJar1, myclass.load());
-            } else {
-                compiler.addClassToJar(inMemoryJar2, myclass.load());
+        if (VoltUnsafe.isJava8) {
+            for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
+                if (myclass.getSimpleName().startsWith("Get")) {
+                    compiler.addClassToJar(inMemoryJar1, myclass.load());
+                } else {
+                    compiler.addClassToJar(inMemoryJar2, myclass.load());
+                }
+                classesFound++;
             }
-            classesFound++;
+        } else {
+            for (ClassInfo myclass : classpath.getTopLevelClasses()) {
+                if (myclass.getSimpleName().startsWith("Get")) {
+                    compiler.addClassToJar(inMemoryJar1,  Class.forName(packageName + "." + myclass.getName()));
+                } else {
+                    compiler.addClassToJar(inMemoryJar2,  Class.forName(packageName + "." + myclass.getName()));
+                }
+                classesFound++;
+            }
         }
         // check that classes were found and loaded. If another test modifies "fakeusecase.greetings" it should modify
         // this assert also.
