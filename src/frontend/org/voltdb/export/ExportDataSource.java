@@ -113,6 +113,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private long m_firstUnpolledSeqNo = 1L; // sequence number starts from 1
     private long m_lastReleasedSeqNo = 0L;
+
+    // The committed sequence number is the sequence number of the last row
+    // of the last committed transaction pushed up from the EE, and acknowledged by
+    // the export client.
+    private long m_committedSeqNo = 0L;
+
+    // Null value for last committed sequence number in EE buffer
+    // See {@code ExportStreamBlock} in EE code.
+    public static long NULL_COMMITTED_SEQNO = -1L;
+
     // End sequence number of most recently pushed export buffer
     private long m_lastPushedSeqNo = 0L;
     // Relinquish export master after this sequence number
@@ -1060,10 +1070,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              m_backingCont.discard();
                             try {
                                 if (!m_es.isShutdown()) {
+                                    setCommittedSeqNo(m_commitSeqNo);
                                     ackImpl(m_lastSeqNo);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_lastSeqNo);
+                                forwardAckToOtherReplicas();
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1081,10 +1092,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void forwardAckToOtherReplicas() {
-        forwardAckToOtherReplicas(m_lastReleasedSeqNo);
-    }
-
-    private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
             return;
@@ -1101,7 +1108,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(seq);
+            buf.putLong(m_committedSeqNo);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1109,7 +1116,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 mbx.send(siteId, bpm);
             }
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + seq
+                exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                        + " with sequence number " + m_committedSeqNo
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
@@ -1139,7 +1147,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_partitionId);
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
-                    buf.putLong(m_lastReleasedSeqNo);
+                    buf.putLong(m_committedSeqNo);
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1147,7 +1155,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         mbx.send(siteId, bpm);
                     }
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + m_lastReleasedSeqNo
+                        exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                                + " with sequence number " + m_committedSeqNo
                                 + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                                 + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                     }
@@ -1156,7 +1165,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long seq) {
+    /**
+     * Entry point for receiving acknowledgments from remote entities.
+     *
+     * @param seq acknowledged sequence number, ALWAYS last row of a transaction, or 0.
+     */
+    public void remoteAck(final long seq) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1178,7 +1192,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
+                        setCommittedSeqNo(seq);
                         ackImpl(seq);
+
+                        // FIXME: remove
+                        if (m_lastReleasedSeqNo != m_committedSeqNo) {
+                            exportLog.info("XXX ack mismatch - released " + m_lastReleasedSeqNo
+                                    + ", committed " + m_committedSeqNo);
+                        } else {
+                            exportLog.info("YYY ack match - released " + m_lastReleasedSeqNo
+                                    + ", committed " + m_committedSeqNo);
+                        }
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -1243,7 +1267,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private void sendGiveMastershipMessage(int newLeaderHostId, long curSeq) {
+    private void sendGiveMastershipMessage(int newLeaderHostId) {
         if (m_runEveryWhere) {
             return;
         }
@@ -1258,7 +1282,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(curSeq);
+            buf.putLong(m_committedSeqNo);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1268,7 +1292,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     mbx.send(siteId, bpm);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug(toString() + " send GIVE_MASTERSHIP message to " +
-                                CoreUtils.hsIdToString(siteId) + " curruent sequence number " + curSeq);
+                                CoreUtils.hsIdToString(siteId)
+                                + " with sequence number " + m_committedSeqNo);
                     }
                     break;
                 }
@@ -1650,12 +1675,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
                     " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
-                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_lastPushedSeqNo " + m_lastPushedSeqNo);
+                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_committedSeqNo " + m_committedSeqNo +
+                    " m_lastPushedSeqNo " + m_lastPushedSeqNo);
         }
         // time to give away leadership
         if (seq >= m_seqNoToDrain) {
             if (m_newLeaderHostId != null) {
-                sendGiveMastershipMessage(m_newLeaderHostId, seq);
+                sendGiveMastershipMessage(m_newLeaderHostId);
             } else {
                 sendGapQuery();
             }
@@ -1700,5 +1726,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // should not happen since the operation is verified prior to this call
         }
         return false;
+    }
+
+    private void setCommittedSeqNo(long committedSeqNo) {
+        if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
+        if (committedSeqNo > m_committedSeqNo) {
+            m_committedSeqNo  = committedSeqNo;
+        }
     }
 }

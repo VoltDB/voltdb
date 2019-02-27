@@ -507,7 +507,7 @@ public class TestExportDataSource extends TestCase {
                 TEST_DIR.getAbsolutePath());
         try {
             //Ack before push
-            s.ack(100);
+            s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
@@ -521,7 +521,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
             //Ack after push beyond size...last segment kept.
-            s.ack(110);
+            s.remoteAck(110);
             sz = s.sizeInBytes();
             assertEquals(0, sz);
             listing = getSortedDirectoryListingSegments();
@@ -537,7 +537,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
             //Low ack should have no effect.
-            s.ack(100);
+            s.remoteAck(100);
             sz = s.sizeInBytes();
             assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
@@ -566,7 +566,7 @@ public class TestExportDataSource extends TestCase {
             s.unacceptMastership();
 
             //Last segment is always kept.
-            s.ack(2000);
+            s.remoteAck(2000);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();

@@ -283,7 +283,7 @@ public class ExportGeneration implements Generation {
                                             " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                             " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                                 }
-                                eds.ack(seqNo);
+                                eds.remoteAck(seqNo);
                             } catch (RejectedExecutionException ignoreIt) {
                                 // ignore it: as it is already shutdown
                             }
@@ -296,7 +296,7 @@ public class ExportGeneration implements Generation {
                                             " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                             " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                                 }
-                                eds.ack(ackSeqNo);
+                                eds.remoteAck(ackSeqNo);
                             } catch (RejectedExecutionException ignoreIt) {
                                 // ignore it: as it is already shutdown
                             }
