@@ -1345,6 +1345,7 @@ if __name__ == "__main__":
                             ['windowed function call and GROUP BY in a single query is not supported'],
                             ['materialized view does not support self-join'],
                             ['Windowed RANK function call expressions require an ORDER BY specification'],
+                            ['Invalid catalog update', 'another one is in progress'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
