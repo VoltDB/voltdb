@@ -24,14 +24,69 @@ make_statefulset() {
 }
 
 
+find_files() {
+    # takes a comma-separated list of file paths, which may include Unix-style wildcards (*?[ch-ranges])
+    # returns a comma separated list of all matching files, following links
+    files=`find -H ${@//,/\  } -maxdepth 1 -type f -print`
+    echo $files
+}
+
+build_configmap_cmd() {
+    I=0
+    for f in $@
+    do
+        echo -n "--from-file=${f} "
+        let I+=1
+    done
+    if [[ $I -gt 1 ]]; then
+        FNS=""
+        for f in $@
+        do
+            FNS+="`basename ${f}`,"
+        done
+        ORDERFILE=`mktemp`
+        echo "$FNS" | sed -e 's/,$//' > $ORDERFILE
+        echo -n "--from-file=.loadorder=$ORDERFILE"
+    fi
+    echo -n ""
+}
+
+
+delete_configmap_ifexists() {
+    set +e  # don't check errors, may not exist
+    kubectl delete configmap $1
+    set -e
+}
+
+
 make_configmap() {
+
+    MAPNAME=${CLUSTER_NAME}-init-classes
+    delete_configmap_ifexists $MAPNAME
+    CONFIG_MAP_ARGS=""
+    TYPE=classes
+    if [ ! -z "${CLASSES_FILES}" ]; then
+        files=`find_files "${CLASSES_FILES}"`
+        CONFIG_MAP_ARGS=`build_configmap_cmd "$files"`
+    fi
+    # create classes configmap, even if it is empty
+    kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
+
+    MAPNAME=${CLUSTER_NAME}-init-schema
+    delete_configmap_ifexists $MAPNAME
+    CONFIG_MAP_ARGS=""
+    TYPE=schema
+    if [ ! -z "${SCHEMA_FILES}" ]; then
+        files=`find_files "${SCHEMA_FILES}"`
+        CONFIG_MAP_ARGS=`build_configmap_cmd "$files"`
+    fi
+    # create schema configmap, even if it is empty
+    kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
+
     MAPNAME=${CLUSTER_NAME}-init-configmap
-    set +e
-    kubectl delete configmap $MAPNAME
+    delete_configmap_ifexists $MAPNAME
     CONFIG_MAP_ARGS=""
     [ ! -z "${DEPLOYMENT_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=deployment=${DEPLOYMENT_FILE}"
-    [ ! -z "${CLASSES_JAR}" ] && CONFIG_MAP_ARGS+=" --from-file=classes=${CLASSES_JAR}"
-    [ ! -z "${SCHEMA_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=schema=${SCHEMA_FILE}"
     [ ! -z "${LICENSE_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=license=${LICENSE_FILE}"
     [ ! -z "${LOG4J_CONFIG_PATH}" ] && CONFIG_MAP_ARGS+=" --from-file=log4jcfg=${LOG4J_CONFIG_PATH}"
 
@@ -48,11 +103,11 @@ make_configmap() {
     [ ! -z "${LOG4J_CONFIG_PATH}"  ] && echo "LOG4J_CONFIG_PATH=\"/etc/voltdb/log4jcfg\"" >> ${PROP_FILE}
     [ ! -z "${VOLTDB_OPTS}" ] && echo "VOLTDB_OPTS=${VOLTDB_OPTS}"                    >> ${PROP_FILE}
     grep VOLTDB_HEAPMAX         ${CFG_FILE} >> ${PROP_FILE}
-    cat ${PROP_FILE}
+    #cat ${PROP_FILE}
 
     kubectl create configmap ${CLUSTER_NAME}-run-env --from-env-file=${PROP_FILE}
 
-    #rm -f ${PROP_FILE}
+    rm -f ${PROP_FILE}
 }
 
 
