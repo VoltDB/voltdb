@@ -270,4 +270,37 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
+    public void testCreateZeroColumnTable() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            try {
+                // this ddl try to create a zero length table, which is not allowed.
+                m_client.callProcedure("@AdHoc",
+                        "create table T();");
+            } catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("zero-column table is not allowed"));
+                assertFalse(findTableInSystemCatalogResults("T"));
+                return;
+            }
+            fail("create zero length table should fail.");
+        } finally {
+            teardownSystem();
+        }
+    }
+
 }

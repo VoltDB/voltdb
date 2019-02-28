@@ -1331,6 +1331,11 @@ public class ParserDDL extends ParserRoutine {
             }
         }
 
+        // zero-column table is not allowed
+        if (table.getColumnCount() == 0) {
+            throw Error.error(ErrorCode.X_47002);
+        }
+
         if (token.tokenType == Tokens.ON) {
             if (!table.isTemp()) {
                 throw unexpectedToken();
