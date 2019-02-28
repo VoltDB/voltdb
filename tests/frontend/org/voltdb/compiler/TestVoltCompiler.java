@@ -3912,11 +3912,12 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
               "partition table ttl on column a;\n" +
-              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "dr table ttl;";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
 
-        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
               "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +

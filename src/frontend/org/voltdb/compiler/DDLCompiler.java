@@ -679,7 +679,7 @@ public class DDLCompiler {
                     if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
                         final String migrationTarget = subNode.attributes.get("migrationTarget");
                         if (!StringUtil.isEmpty(migrationTarget)) {
-                            tableXML.attributes.put("export", migrationTarget);
+                            tableXML.attributes.put("migrateExport", migrationTarget);
                         }
                         break;
                     }
@@ -934,6 +934,8 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 String drTable = e.attributes.get("drTable");
+                String migrateTarget = e.attributes.get("migrateExport");
+                export = StringUtil.isEmpty(export) ? migrateTarget : export;
                 final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
@@ -941,12 +943,10 @@ public class DDLCompiler {
                 else {
                     m_tracker.removePartition(tableName);
                 }
-                if (isStream) {
-                    if (!StringUtil.isEmpty(export)) {
-                        m_tracker.addExportedTable(tableName, export, isStream);
-                    } else {
-                        m_tracker.removeExportedTable(tableName, isStream);
-                    }
+                if (!StringUtil.isEmpty(export)) {
+                    m_tracker.addExportedTable(tableName, export, isStream);
+                } else {
+                    m_tracker.removeExportedTable(tableName, isStream);
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
