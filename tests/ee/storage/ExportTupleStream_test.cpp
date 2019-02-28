@@ -148,7 +148,7 @@ public:
         int64_t seqNo;
     } rollbackMarker;
 
-    rollbackMarker appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId, int64_t seqNo) {
+    rollbackMarker appendTuple(int64_t currentTxnId, int64_t seqNo) {
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
             int value = rand();
@@ -275,7 +275,7 @@ protected:
 TEST_F(ExportTupleStreamTest, DoOneTuple) {
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 2, 1);
+    appendTuple(2, 1);
     commit(2);
     ASSERT_TRUE(checkTargetFlushTime(2));
     periodicFlush(-1, 2);
@@ -303,7 +303,7 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     int cnt = 0;
     // Push 2 rows to fill the block less thn half
     for (cnt = 1; cnt < 3; cnt++) {
-        appendTuple(cnt-1, cnt, cnt);
+        appendTuple(cnt, cnt);
         commit(cnt);
     }
 
@@ -327,7 +327,7 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 
     // Push 3 rows
     for (cnt = 3; cnt < 6; cnt++) {
-        appendTuple(cnt-1, cnt, cnt);
+        appendTuple(cnt, cnt);
         commit(cnt);
     }
     ASSERT_TRUE(checkTargetFlushTime(3));
@@ -374,7 +374,7 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 TEST_F(ExportTupleStreamTest, FarFutureFlush) {
     std::ostringstream os;
     for (int i = 1; i < 3; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
     ASSERT_TRUE(checkTargetFlushTime(1));
@@ -382,7 +382,7 @@ TEST_F(ExportTupleStreamTest, FarFutureFlush) {
     ASSERT_TRUE(testNoStreamsToFlush());
 
     for (int i = 100; i < 103; i++) {
-        appendTuple(i-1, i, i-97);
+        appendTuple(i, i-97);
         commit(i);
     }
     // Make sure the flushTime is based on the first txn of the buffer
@@ -416,7 +416,7 @@ TEST_F(ExportTupleStreamTest, Fill) {
 
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= m_tuplesToFill; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
     // We shouldn't yet get a buffer because we haven't forced the
@@ -424,7 +424,7 @@ TEST_F(ExportTupleStreamTest, Fill) {
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, drop in one more (this will push the previous buffer with committed Txns
-    appendTuple(m_tuplesToFill, m_tuplesToFill + 1, m_tuplesToFill + 1);
+    appendTuple(m_tuplesToFill + 1, m_tuplesToFill + 1);
     ASSERT_TRUE(checkTargetFlushTime(1));
     ASSERT_FALSE(m_topend.receivedExportBuffer);
     commit(m_tuplesToFill + 1);
@@ -445,14 +445,14 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
 
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= m_tuplesToFill; i++) {
-        appendTuple(0, 1, i);
+        appendTuple(1, i);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // now, drop in one more on the same TXN ID
-    appendTuple(0, 1, m_tuplesToFill+1);
+    appendTuple(1, m_tuplesToFill+1);
 
     // We shouldn't yet get a buffer because we haven't closed the current
     // transaction
@@ -461,7 +461,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
     commit(1);
 
     // now, finally drop in a tuple that should not affect the flush time of the new buffer
-    appendTuple(1, 2, m_tuplesToFill+2);
+    appendTuple(2, m_tuplesToFill+2);
     ASSERT_TRUE(checkTargetFlushTime(1));
 
 
@@ -488,7 +488,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= m_tuplesToFill; i++)
     {
-        appendTuple(0, 1, i);
+        appendTuple(1, i);
     }
     commit(1);
     // We shouldn't yet get a buffer because we haven't forced the
@@ -498,7 +498,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // now, drop in one more on a new TXN ID.  This should commit
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
-    rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, m_tuplesToFill+1);
+    rollbackMarker lastAppendTupleMarker = appendTuple(2, m_tuplesToFill+1);
     ASSERT_FALSE(m_topend.receivedExportBuffer);
     rollbackExportTo(lastAppendTupleMarker);
     ASSERT_FALSE(m_topend.receivedExportBuffer);
@@ -532,7 +532,7 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
     // fill several buffers
     for (int i = 0; i <= (m_tuplesToFill + 10) * 3; i++)
     {
-        appendTuple(1, 2, i+1);
+        appendTuple(2, i+1);
     }
     // We shouldn't yet get a buffer even though we've filled a bunch because
     // the transaction is still open.
@@ -546,13 +546,13 @@ TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
  */
 TEST_F(ExportTupleStreamTest, RollbackFirstTupleForNewTxn) {
 
-    rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, 1);
+    rollbackMarker lastAppendTupleMarker = appendTuple(2, 1);
     ASSERT_TRUE(testNoStreamsToFlush());
     // rollback the first tuple
     rollbackExportTo(lastAppendTupleMarker);
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 3, 1);
+    appendTuple(3, 1);
     commit(3);
     ASSERT_TRUE(checkTargetFlushTime(3));
     periodicFlush(-1, 3);
@@ -573,12 +573,12 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTupleForNewTxn) {
  */
 TEST_F(ExportTupleStreamTest, RollbackFirstTupleAndRestartTxn) {
 
-    rollbackMarker lastAppendTupleMarker = appendTuple(1, 2, 1);
+    rollbackMarker lastAppendTupleMarker = appendTuple(2, 1);
     // rollback the first tuple
     rollbackExportTo(lastAppendTupleMarker);
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 2, 1);
+    appendTuple(2, 1);
     commit(2);
     ASSERT_TRUE(checkTargetFlushTime(2));
     periodicFlush(-1, 2);
@@ -603,12 +603,12 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
 
     // append a bunch of tuples
     for (int i = 1; i <= m_tuplesToFill - 1; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
 
     // add another and roll it back and flush
-    rollbackMarker lastAppendTupleMarker = appendTuple(m_tuplesToFill - 1, m_tuplesToFill, m_tuplesToFill);
+    rollbackMarker lastAppendTupleMarker = appendTuple(m_tuplesToFill, m_tuplesToFill);
     rollbackExportTo(lastAppendTupleMarker);
     // have not finished filling the first buffer yet so the flush should still be the first txn
     ASSERT_TRUE(checkTargetFlushTime(1));
@@ -631,7 +631,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferRowByRow)
 {
     // append a bunch of tuples
     for (int i = 1; i <= 3; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
 
@@ -641,7 +641,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferRowByRow)
     // Only support row by row rollback in export
     for (int i = 0; i < (m_tuplesToFill + 10) * 2; i++)
     {
-        appendedTuples.push(appendTuple(10, 11, 4+i));
+        appendedTuples.push(appendTuple(11, 4+i));
     }
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
@@ -669,17 +669,17 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferByTxn)
 {
     // append a bunch of tuples
     for (int i = 1; i <= 3; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
 
     // now, fill a couple of buffers with tuples from a single transaction
-    rollbackMarker lastAppendTupleMarker = appendTuple(10, 11, 4);
+    rollbackMarker lastAppendTupleMarker = appendTuple(11, 4);
 
     // Only support row by row rollback in export
     for (int i = 1; i < (m_tuplesToFill + 10) * 2; i++)
     {
-        appendTuple(10, 11, 4+i);
+        appendTuple(11, 4+i);
     }
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
@@ -703,7 +703,7 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
 {
     // append a bunch of tuples
     for (int i = 1; i <= 3; i++) {
-        appendTuple(i-1, i, i);
+        appendTuple(i, i);
         commit(i);
     }
     // now, fill a couple of buffers with tuples from a single transaction
@@ -721,7 +721,7 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
     int64_t seqNo;
     for (int i = 4; i < (m_tuplesToFill + 1) * 2; i++)
     {
-        appendTuple(10, 11, i);
+        appendTuple(11, i);
 
         if (i == m_tuplesToFill + 1) {
             mark = m_wrapper->bytesUsed();
@@ -742,10 +742,19 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
     EXPECT_EQ(results->getRowCount(), m_tuplesToFill);
+
+    // First buffer should have last committed txn == 3
+    std::ostringstream os;
+    os.str(""); os << "committedSequenceNumber expected: " << 3 << ", actual: " << results->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == 3, os.str().c_str());
+
     results = m_topend.exportBlocks.front();
     EXPECT_EQ(results->uso(), m_tupleSize * m_tuplesToFill);
     EXPECT_EQ(results->offset(), (m_tupleSize * 1));
     EXPECT_EQ(results->getRowCount(), 1);
+
+    os.str(""); os << "committedSequenceNumber expected: " << 11 << ", actual: " << results->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == 11, os.str().c_str());
 }
 
 int main() {
