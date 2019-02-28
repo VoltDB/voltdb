@@ -1389,9 +1389,6 @@ public class DDLCompiler {
             ttl.setMaxfrequency(ttlValue);
             final String migrationTarget = ttlNode.attributes.get("migrationTarget");
             if (!StringUtil.isEmpty(migrationTarget)) {
-                if (table.getIsreplicated()) {
-                    throw m_compiler.new VoltCompilerException("'MIGRATE TO TARGET' is not supported for replicated table:" + table.getTypeName());
-                }
                 ttl.setMigrationtarget(migrationTarget);
                 table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
             }

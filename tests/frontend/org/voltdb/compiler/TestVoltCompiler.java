@@ -3901,31 +3901,42 @@ public class TestVoltCompiler extends TestCase {
                 " USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
-        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
               "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
               "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET NO_TEST;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
+        // can not alter target
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
-              "partition table ttl on column a;\n" +
               "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "partition table ttl on column a;\n" +
               "dr table ttl;";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
 
-        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+        // can not create target via alter
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
-        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
               "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
               "partition table ttl on column a;\n" +
               "alter table ttl drop TTL;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
+
+        // can not drop target
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+              "partition table ttl on column a;\n";
+                pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
