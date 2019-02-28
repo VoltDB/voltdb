@@ -49,6 +49,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -244,8 +245,13 @@ public class ExportGeneration implements Generation {
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
+
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 Table table = ti.getTable();
+                if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
                 addDataSources(table, hostId, localPartitionsToSites, processor);
                 createdSources = true;
                 exportedTables.add(table.getTypeName());
