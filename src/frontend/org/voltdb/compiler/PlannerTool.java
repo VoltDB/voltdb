@@ -256,6 +256,11 @@ public class PlannerTool {
         // As of 9.0, only SP AdHoc queries are using this new planner.
         transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
+        final RelDistribution distribution = transformed.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        if (! distribution.getIsSP()) { // defer SP/MP detection outside MP_FALLBACK phase
+            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+        }
+
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
         // See RelDistributions.RelDistributionImpl.satisfies()

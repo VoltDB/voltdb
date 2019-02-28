@@ -17,12 +17,14 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptSchema;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
@@ -43,11 +45,25 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
      * @param table      The corresponding relational dataset in a {@link RelOptSchema}.
      * @param voltTable  VoltDB translatable table
      */
-    public VoltLogicalTableScan(RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelOptTable table,
-            VoltTable voltTable) {
-       super(cluster, traitSet, table, voltTable);
+    public VoltLogicalTableScan(
+            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable) {
+        super(cluster, convert(table, voltTable, traitSet), table, voltTable);
+    }
+
+    private static RelTraitSet convert(RelOptTable table, VoltTable voltTable, RelTraitSet traitSet) {
+        if (traitSet.getTrait(RelDistributionTraitDef.INSTANCE) == null) {
+            return traitSet;
+        } else {
+            final Integer partitionColumn = voltTable.getPartitionColumn();
+            final List<Integer> keys = new ArrayList<>();
+            if (partitionColumn != null) {
+                keys.add(partitionColumn);
+            }
+            return traitSet.replace(traitSet.getTrait(RelDistributionTraitDef.INSTANCE)
+                    .with(table.getDistribution().getType(), keys, null,
+                            // For replicated table, partitionColumn == null => SP
+                            partitionColumn == null));
+        }
     }
 
     @Override public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {

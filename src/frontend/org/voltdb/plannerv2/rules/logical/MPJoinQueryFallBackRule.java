@@ -21,7 +21,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
@@ -50,13 +49,16 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         final VoltLogicalJoin join = call.rel(0);
         final RelNode outer = call.rel(1), inner = call.rel(2);
         final RelDistributionUtils.JoinState joinState = RelDistributionUtils.isJoinSP(join, outer, inner);
-        RelDistributionUtils.checkedFallBack(! joinState.isSP());
+        //RelDistributionUtils.checkedFallBack(! joinState.isSP());
         // The query is SP, and the distributions of any partitioned tables had been set.
         final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
-                innerDist = RelDistributionUtils.getDistribution(inner),
-                newDist = (outerDist == RelDistributions.SINGLETON || innerDist == RelDistributions.SINGLETON ?
-                        RelDistributions.SINGLETON : innerDist)
-                        .withPartitionEqualValue(joinState.getLiteral());
+                innerDist = RelDistributionUtils.getDistribution(inner);
+        final boolean isEitherParitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED ||
+                innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final RelDistribution intermediate =
+                isEitherParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
+        final RelDistribution newDist = intermediate
+                .with(joinState.getLiteral(), joinState.isSP());
         call.transformTo(join.copy(join.getTraitSet().replace(newDist), join.getInputs()));
     }
 }

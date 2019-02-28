@@ -80,6 +80,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("SELECT si + 1 FROM P1 WHERE 7 = i").pass();
         m_tester.sql("SELECT max(v) FROM P1 WHERE 7 = i").pass();
 
+        // equal condition involves SQL functions
+        m_tester.sql("SELECT P4.j FROM P4, P5 WHERE P5.i = P4.i AND P4.i = LOWER('foO') || 'bar'").pass();
+
         // equal condition on partition key with ORs
         m_tester.sql("select si, v from P1 where 7=si or i=2").fail();
 
@@ -147,15 +150,13 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 "ON P2.i = P1.i AND P1.i = 34 AND 34 = P2.i").pass();
 
         m_tester.sql("select P1.i, P2.v from P1 inner join P2 " +
-                "ON P2.i = P1.i AND P1.i = 34 AND P2.i = 43").pass();   // as long as the AND conjunctions contain the partition equal-key
+                "ON P2.i = P1.i AND P1.i = 34 AND P2.i = 43").pass();
 
-        // TODO: the WHERE condition does not appear in the calc/scan nodes of MPQueryFallBackRule.
-        /*m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
-                "ON P1.i = P2.i AND P2.v = 'foo' WHERE 0 = P1.i").pass();*/
+        m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
+                "ON P1.i = P2.i AND P2.v = 'foo' WHERE 0 = P1.i").pass();
 
-        // TODO: see TODO in RelDistributionUtil.matchedColumnLiteral()
-        /*m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
-                "ON P1.i = P2.i AND P1.i = P1.si AND P1.si = 34").pass();*/
+        m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
+                "ON P1.i = P2.i AND P1.i = P1.si AND P1.si = 34").pass();
 
         // Two partitioned table joined that results in MP (or sometimes un-plannable query):
         m_tester.sql("select P1.i, P2.v from P1, P2 " +
@@ -279,12 +280,11 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
                 "P1.i = 0 AND P2.i = 0 and P3.i = 0").pass();
 
+        m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
+                "P1.i = 0 AND P2.i = 0 and P3.i = 1").fail();
+
         m_tester.sql("select P1.si, R1.i, P2.si, P3.si FROM P1, R1, P2, P3 WHERE " +
                 "P1.i = 0 AND P2.i = 0 and P3.i = 0").pass();
-
-        // TODO
-        /*m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
-                "P1.i = 0 AND P2.i = 0 AND P3.i = P1.i").pass();*/
 
         m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
                 "P1.i = 0 AND P2.i = 0 OR P3.i = 0").fail();
@@ -293,24 +293,20 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 "P2.i = 0 AND P3.i = 0").fail();
 
 
-        // TODO: distribution key got wrongly propagated
-        /*m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
+        m_tester.sql("select P1.si, P2.si, P3.si FROM P1, P2, P3 WHERE " +
                 "P1.i = 0 AND P2.i = 0 and P3.i = 1").fail();
 
-        // TODO:
-        /*m_tester.sql("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2 ON P1.si = R2.i AND P1.i = 4 inner join " +
-                "P2 ON R2.i = P2.v WHERE P2.i = 4 OR P2.v <> 'foo'").fail();*/
+                "P2 ON R2.i = P2.v WHERE P2.i = 4 OR P2.v <> 'foo'").fail();
 
-        // TODO: the P1.i = 4 condition is not pushed UP to join-condition, and is missing in
-        // the calc/scan nodes of MPQueryFallBackRule.
-        /*m_tester.sql("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").pass();*/
+                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").pass();
 
-        /*m_tester.sql("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "P2  on R1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5").pass();*/
+                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5").pass();
 
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +

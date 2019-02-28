@@ -26,10 +26,7 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.*;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -192,28 +189,29 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class MPFallbackTester extends LogicalRulesTester {
-        @Override public void pass() throws AssertionError {
-            super.pass();
+        private RelDistribution transform() {
             m_transformedNode = VoltRelUtil.addTraitRecursively(m_transformedNode, RelDistributions.ANY);
             m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK, m_transformedNode);
+            return m_transformedNode.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        }
+
+        @Override public void pass() throws AssertionError {
+            super.pass();
+            final RelDistribution distribution = transform();
+            assertTrue("Got SINGLETON distribution without partition equal value",
+                    distribution.getIsSP());
         }
 
         @Override public void fail() {
-            try {
-                pass();
-            }
-            catch (PlannerFallbackException e){
-                assertEquals("MP query not supported in Calcite planner.", e.getMessage());
-                // we got the exception, we are good.
-                return;
-            }
-            catch (RuntimeException e) {
-                assertTrue(e.getMessage().startsWith("Error while applying rule"));
-                // we got the exception, we are good.
-                return;
-            }
-            PlannerTestCase.fail("Expected fallback.");
+            super.pass();
+            final RelDistribution distribution = transform();
+            assertFalse("Expected fall back:\nGot distribution type " +
+                            distribution.getType().name() +
+                            " with partition equal value = " +
+                            (distribution.getPartitionEqualValue() == null ? "null" :
+                                    distribution.getPartitionEqualValue().toString()),
+                    distribution.getIsSP());
         }
     }
 
