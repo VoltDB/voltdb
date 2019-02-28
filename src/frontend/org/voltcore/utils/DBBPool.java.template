@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google_voltpatches.common.base.Preconditions;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
-// import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -48,29 +47,6 @@ public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
     private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
-
-/*
-    private static Class clsDirectBuffer;
-    private static MethodHandle mhDirectBufferCleaner;
-    private static MethodHandle mhCleanerClean;
-    private static MethodHandle mhDirectBufferAddress;
-
-    static {
-        try {
-            clsDirectBuffer = Class.forName("sun.nio.ch.DirectBuffer");
-            Method mDirectBufferCleaner = clsDirectBuffer.getMethod("cleaner");
-            Method mDirectBufferAddress = clsDirectBuffer.getMethod("address");
-            mhDirectBufferCleaner = MethodHandles.lookup().unreflect(mDirectBufferCleaner);
-            mhDirectBufferAddress = MethodHandles.lookup().unreflect(mDirectBufferAddress);
-            Method mCleanerClean = mDirectBufferCleaner.getReturnType().getMethod("clean");
-            mhCleanerClean = MethodHandles.lookup().unreflect(mCleanerClean);
-            ByteBuffer buf = ByteBuffer.allocateDirect(1);
-            cleanByteBuffer(buf);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
-        }
-*/
 
 #ifndef NO_MEMCHECK
 
@@ -114,15 +90,6 @@ public final class DBBPool {
         final public long address() {
             checkUseAfterFree();
             return ((DirectBuffer)b).address();
-            /*
-            try {
-                long address = (long) mhDirectBufferAddress.bindTo(b).invoke();
-                return address;
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }*/
         }
 
         public void discard() {
@@ -604,19 +571,6 @@ public final class DBBPool {
     private static void cleanByteBuffer(ByteBuffer buf) {
         if (buf == null) return;
         if (!buf.isDirect()) return;
-        /*
-        try {
-            Object cleaner = mhDirectBufferCleaner.bindTo(buf).invoke();
-            if (cleaner != null) {
-                mhCleanerClean.bindTo(cleaner).invoke();
-            } else {
-                deleteCharArrayMemory((long) mhDirectBufferAddress.bindTo(buf).invoke());
-            }
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }*/
         final DirectBuffer dbuf = (DirectBuffer) buf;
         if (!VoltUnsafe.cleanDirectBuffer(buf)) {
             deleteCharArrayMemory(dbuf.address());
