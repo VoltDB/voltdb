@@ -82,7 +82,6 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTypeUtil;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
