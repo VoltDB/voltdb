@@ -23,11 +23,6 @@
 
 package org.voltdb.export;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -41,9 +36,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.utils.VoltFile;
 
-public class TestStreamBlockQueue {
+import junit.framework.TestCase;
+
+public class TestStreamBlockQueue extends TestCase {
 
     private final static String TEST_DIR = "/tmp/" + System.getProperty("user.name");
 
@@ -54,6 +54,7 @@ public class TestStreamBlockQueue {
     private StreamBlockQueue m_sbq;
 
     private static long g_seqNo = 0;
+    private MockVoltDB m_mockVoltDB;
     private static ByteBuffer getFilledBuffer(byte fillValue) {
         //8 bytes is magic prefix space
         ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2 + StreamBlock.HEADER_SIZE);
@@ -70,22 +71,68 @@ public class TestStreamBlockQueue {
         return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), null, g_seqNo, 1, 0L, false);
     }
 
+    @Before
+    public void setUp() throws Exception {
+        m_mockVoltDB = new MockVoltDB();
+        m_mockVoltDB.addTable("TableName", false);
+        m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        g_seqNo = 0;
+        File testDir = new File(TEST_DIR);
+        if (testDir.exists()) {
+            for (File f : testDir.listFiles()) {
+                VoltFile.recursivelyDelete(f);
+            }
+            testDir.delete();
+        }
+        testDir.mkdir();
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName");
+        defaultBuffer.clear();
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        try {
+            m_mockVoltDB.shutdown(null);
+            m_sbq.close();
+        } finally {
+            try {
+                File testDir = new File(TEST_DIR);
+                if (testDir.exists()) {
+                    for (File f : testDir.listFiles()) {
+                        f.delete();
+                    }
+                    testDir.delete();
+                }
+            } finally {
+                m_sbq = null;
+            }
+        }
+        System.gc();
+        System.gc();
+        System.gc();
+        System.runFinalization();
+    }
+
     @Test
     public void testOfferCloseReopen() throws Exception {
+        StreamBlock sb = null;
         assertTrue(m_sbq.isEmpty());
-        StreamBlock sb = getStreamBlockWithFill((byte)1);
+        sb = getStreamBlockWithFill((byte)1);
         m_sbq.offer(sb, null, false);
         StreamBlock fromPeek = m_sbq.peek();
         assertEquals(sb.startSequenceNumber(), fromPeek.startSequenceNumber());
         assertEquals(sb.totalSize(), fromPeek.totalSize());
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
-        m_sbq.close();
+        m_sbq.close(); // sb is also discarded here
         System.gc();
         System.gc();
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE);
+
+        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE, "TableName");
         sb = m_sbq.peek();
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
@@ -371,7 +418,7 @@ public class TestStreamBlockQueue {
         m_sbq = null;
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName");
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;
@@ -534,43 +581,4 @@ public class TestStreamBlockQueue {
         assertTrue(m_sbq.isEmpty());
 
     }
-
-    @Before
-    public void setUp() throws Exception {
-        g_seqNo = 0;
-        File testDir = new File(TEST_DIR);
-        if (testDir.exists()) {
-            for (File f : testDir.listFiles()) {
-                VoltFile.recursivelyDelete(f);
-            }
-            testDir.delete();
-        }
-        testDir.mkdir();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE);
-        defaultBuffer.clear();
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        try {
-            m_sbq.close();
-        } finally {
-            try {
-                File testDir = new File(TEST_DIR);
-                if (testDir.exists()) {
-                    for (File f : testDir.listFiles()) {
-                        f.delete();
-                    }
-                    testDir.delete();
-                }
-            } finally {
-                m_sbq = null;
-            }
-        }
-        System.gc();
-        System.gc();
-        System.gc();
-        System.runFinalization();
-    }
-
 }

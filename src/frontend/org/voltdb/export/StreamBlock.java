@@ -58,7 +58,8 @@ public class StreamBlock {
         m_startSequenceNumber = startSequenceNumber;
         m_rowCount = rowCount;
         m_uniqueId = uniqueId;
-        // The first 12 bytes are space for us to store the sequence number and row count if we end up persisting
+        // The first 20 bytes are space for us to store the sequence number, row count and uniqueId
+        // if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
         //The first 8 bytes are space for us to store the sequence number if we end up persisting

@@ -36,7 +36,6 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.HybridCrc32;
 import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
-import org.voltdb.utils.PBDSegment.PBDSegmentReader;
 import org.voltdb.utils.PairSequencer.CyclicSequenceException;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -136,13 +135,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 if (m_closed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
-                assertions();
-
                 moveToValidSegment();
                 PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }
+                assert (segmentReader.readIndex() == 0);
                 long lastSegmentId = peekLastSegment().segmentIndex();
                 while (!segmentReader.hasMoreEntries()) {
                     if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
@@ -157,7 +155,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
                 BBContainer retcont = segmentReader.getSchema(ocf, checkCRC);
                 assert (retcont.b() != null);
-                return wrapRetCont(m_segment, retcont);
+                return retcont;
             }
         }
 
@@ -277,6 +275,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 assertions();
                 moveToValidSegment();
                 PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
+                // If cursor points to a deleted segment, looks for next segment until finds a valid one
+                long lastSegmentId = peekLastSegment().segmentIndex();
+                while (!m_segment.file().exists()) {
+                    // Tail segment should always exists
+                    if (m_segment.segmentIndex() == lastSegmentId) {
+                        throw new IOException("Tail segment file " + m_segment.file().getName() + " doesn't exist! ");
+                    }
+                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
+                }
+                // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }

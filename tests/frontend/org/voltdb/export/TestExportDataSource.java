@@ -147,6 +147,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addTable("RepTableName", false);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
                 VoltFile.recursivelyDelete(f);
@@ -212,7 +213,6 @@ public class TestExportDataSource extends TestCase {
 
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
@@ -312,7 +312,6 @@ public class TestExportDataSource extends TestCase {
 
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
@@ -391,7 +390,6 @@ public class TestExportDataSource extends TestCase {
 
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
@@ -498,7 +496,6 @@ public class TestExportDataSource extends TestCase {
 
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
-        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
