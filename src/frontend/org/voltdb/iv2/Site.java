@@ -1772,16 +1772,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, -1, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logs[])
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logs[])
             throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
         paramBuffer.put(logs);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, remoteTxnUniqueId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

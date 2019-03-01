@@ -253,8 +253,7 @@ public class SysprocFragmentTask extends FragmentTaskBase
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 addDependencyToFragment(currentFragResponse);
                 break;
-            }
-            catch (final SerializableException e) {
+            } catch (final SerializableException e) {
                 // Note that with SerializableException, the error code here might get changed before
                 // the client/user sees it. It really just needs to indicate failure.
                 //
