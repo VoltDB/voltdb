@@ -2136,6 +2136,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSavePartitionedAndRestoreReplicatedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSavePartitionedAndRestoreReplicatedTable()
     throws Exception
     {
