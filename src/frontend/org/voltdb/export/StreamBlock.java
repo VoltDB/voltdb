@@ -195,18 +195,11 @@ public class StreamBlock {
      */
     BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
-<<<<<<< HEAD
         m_buffer.b().putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
+        m_buffer.b().putLong(COMMIT_SEQUENCE_NUMBER_OFFSET, committedSequenceNumber());
         m_buffer.b().putInt(ROW_NUMBER_OFFSET, rowCount());
         m_buffer.b().putLong(UNIQUE_ID_OFFSET, uniqueId());
         m_buffer.b().position(SEQUENCE_NUMBER_OFFSET);
-=======
-        m_buffer.b().putLong(0, startSequenceNumber());
-        m_buffer.b().putLong(8, committedSequenceNumber());
-        m_buffer.b().putInt(16, rowCount());
-        m_buffer.b().putLong(20, uniqueId());
-        m_buffer.b().position(0);
->>>>>>> Added a committedSequenceNumber pushed from EE down to AckingContainer
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
     }
