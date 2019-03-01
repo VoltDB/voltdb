@@ -156,6 +156,9 @@ public class ExportBenchmark {
         @Option(desc="How many tuples to insert for each procedure call (default = 1)")
         int multiply = 1;
 
+        @Option(desc="How many targets to divide the multiplier into (default = 1)")
+        int targets = 1;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -373,7 +376,8 @@ public class ExportBenchmark {
                             new NullCallback(),
                             "InsertExport",
                             rowId.getAndIncrement(),
-                            config.multiply);
+                            config.multiply,
+                            config.targets);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -406,7 +410,8 @@ public class ExportBenchmark {
                         new ExportCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
-                        config.multiply);
+                        config.multiply,
+                        config.targets);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
