@@ -18,6 +18,7 @@ begin Cluster                      "A set of connected hosts running one or more
   string drConsumerSslPropertyFile "Path to DR consumer property file containing path to trust store and the trust store password"
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
   int preferredSource              "The cluster id from which this joining cluster should request snapshot"
+  string schemaCheckMode           "Whether remote db schema compatibility check should be strict or flexible"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
@@ -166,6 +167,7 @@ begin Table                                  "A table (relation) in the database
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
   TimeToLive* timeToLive                     "Time to live"
+  int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"
@@ -174,6 +176,7 @@ begin TimeToLive javaonly             "Time to Live (TTL), limits the life span 
   Column? ttlColumn                   "A column used to determine the duration of data"
   int batchSize                       "Number of tuples to be deleted in a batch. default: 1000"
   int maxFrequency                    "Maximal number of times of deleting batchSize rows per second.default: 1"
+  string migrationTarget              "The target where the data are migrated to"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"

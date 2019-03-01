@@ -53,39 +53,37 @@ public:
      * write an insert or delete record to the stream
      * for active-active conflict detection purpose, write full row image for delete records.
      * */
-    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId,
-                       TableTuple &tuple,
-                       DRRecordType type);
+    virtual size_t appendTuple(char *tableHandle,
+                               int partitionColumn,
+                               int64_t spHandle,
+                               int64_t uniqueId,
+                               TableTuple &tuple,
+                               DRRecordType type);
 
     /**
      * write an update record to the stream
      * for active-active conflict detection purpose, write full before image for update records.
      * */
-    virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId,
-                       TableTuple &oldTuple,
-                       TableTuple &newTuple);
+    virtual size_t appendUpdateRecord(char *tableHandle,
+                                      int partitionColumn,
+                                      int64_t spHandle,
+                                      int64_t uniqueId,
+                                      TableTuple &oldTuple,
+                                      TableTuple &newTuple);
 
-    virtual size_t truncateTable(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       std::string tableName,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId);
+    virtual size_t truncateTable(char *tableHandle,
+                                 std::string tableName,
+                                 int partitionColumn,
+                                 int64_t spHandle,
+                                 int64_t uniqueId);
 
     virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId);
 
-    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
+    virtual void extendBufferChain(size_t minLength);
+    bool checkOpenTransaction(DrStreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds()
     {
@@ -106,8 +104,12 @@ public:
             m_drProtocolVersion = drProtocolVersion;
     }
 
+    const uint64_t getOpenUniqueIdForTest() const {
+        return m_openUniqueId;
+    }
+
 private:
-    bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
+    bool transactionChecks(int64_t spHandle, int64_t uniqueId);
 
     void writeRowTuple(TableTuple& tuple,
             size_t rowHeaderSz,
@@ -149,13 +151,12 @@ private:
 class MockDRTupleStream : public DRTupleStream {
 public:
     MockDRTupleStream(int partitionId) : DRTupleStream(partitionId, 1024) {}
-    size_t appendTuple(int64_t lastCommittedSpHandle,
-                           char *tableHandle,
-                           int partitionColumn,
-                           int64_t spHandle,
-                           int64_t uniqueId,
-                           TableTuple &tuple,
-                           DRRecordType type)
+    size_t appendTuple(char *tableHandle,
+                       int partitionColumn,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       TableTuple &tuple,
+                       DRRecordType type)
     {
         return 0;
     }
@@ -163,14 +164,13 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync) {}
     void pushEndOfStream() {}
 
-    void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo) {}
+    void rollbackDrTo(size_t mark, size_t drRowCost) {}
 
-    size_t truncateTable(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       std::string tableName,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId)
+    size_t truncateTable(char *tableHandle,
+                         std::string tableName,
+                         int partitionColumn,
+                         int64_t spHandle,
+                         int64_t uniqueId)
     {
         return 0;
     }

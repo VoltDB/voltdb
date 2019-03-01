@@ -563,24 +563,12 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
         verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
-
-        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
-        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
-        catOriginal = getExportCatalogForTable("A", "addtablecolumn1", t1);
-        catUpdated = getExportCatalogForTable("A", "addtablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
         verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
-
-        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
-        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
-        catOriginal = getExportCatalogForTable("A", "droptablecolumn1", t1);
-        catUpdated = getExportCatalogForTable("A", "droptablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testModifyTableColumn() throws IOException {
@@ -611,13 +599,6 @@ public class TestCatalogDiffs extends TestCase {
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
-
-        // fail - change export schema if non-empty
-        t1 = TableHelper.quickTable("(VARCHAR35)");
-        t2 = TableHelper.quickTable("(VARCHAR34)");
-        catOriginal = getExportCatalogForTable("A", "modtablecolumn1", t1);
-        catUpdated = getExportCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testModifyVarcharColumns() throws IOException {
@@ -775,7 +756,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated1 = catalogForJar(testDir + File.separator + "testAlterTableTTL21.jar");
         verifyDiff(catUpdated, catUpdated1, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL22.jar"));
         Catalog catUpdated2 = catalogForJar(testDir + File.separator + "testAlterTableTTL22.jar");
         verifyDiff(catUpdated1, catUpdated2, false, null, true, false, true);
@@ -784,6 +765,40 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
         Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
         verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATION TO TARGET X;");
+        assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
+    }
+
+    public void testAlterStreamTTL() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a stream
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE STREAM A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterStreamTTL1.jar");
+
+        // add TTL, not supported, failed in DiffEngine
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterStreamTTL2.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testAlterViewTTL() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW B (CC1, CC2) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL1.jar"));
+        catalogForJar(testDir + File.separator + "testAlterStreamTTL1.jar");
+
+        // add TTL, not supported
+        builder.addLiteralSchema("\nALTER TABLE B USING TTL 20 MINUTES ON COLUMN CC2;");
+        assertFalse("Failed to reject alter TTL on view table", builder.compile(testDir + File.separator + "testAlterStreamTTL2.jar"));
     }
 
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
@@ -1393,6 +1408,27 @@ public class TestCatalogDiffs extends TestCase {
 
         verifyDiff(catOriginal, catUpdated);
     }
+
+    public void testAlterStream() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "stream1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "stream1.jar");
+
+        builder.addLiteralSchema("\nALTER STREAM e ADD COLUMN D4 VARCHAR(1);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "stream2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "stream2.jar");
+
+        verifyDiff(catOriginal, catUpdated, true, false, true, true, false, false);
+
+        builder.addLiteralSchema("\nALTER STREAM e ALTER COLUMN D4 INTEGER;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "stream3.jar"));
+        Catalog catUpdated1 = catalogForJar(testDir + File.separator + "stream3.jar");
+
+        verifyDiff(catUpdated, catUpdated1, true, false, true, true, false, false);
+    }
+
 
     public void testRemoveDRTableColumn() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();

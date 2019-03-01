@@ -15,31 +15,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DRTUPLESTREAMUNDOACTION_H
-#define DRTUPLESTREAMUNDOACTION_H
+#ifndef DRTABLENOTFOUNDEXCEPTION_H_
+#define DRTABLENOTFOUNDEXCEPTION_H_
 
-#include "common/UndoReleaseAction.h"
+#include "common/SerializableEEException.h"
 
-namespace voltdb {
-
-class DRTupleStreamUndoAction : public UndoOnlyAction {
+/*
+ * Generated when a DR table cannot be found for table hash found in binary log.
+ */
+class DRTableNotFoundException : public voltdb::SerializableEEException {
 public:
-DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
-    : m_stream(stream), m_mark(mark), m_cost(cost)
-    {
-        assert(stream);
-    }
+    DRTableNotFoundException(int64_t hash, std::string message);
 
-    void undo() {
-        m_stream->rollbackDrTo(m_mark, m_cost);
-    }
+    virtual const std::string message() const;
+    virtual ~DRTableNotFoundException() throw() { };
 
-private:
-    AbstractDRTupleStream *m_stream;
-    size_t m_mark;
-    size_t m_cost;
+protected:
+    void p_serialize(voltdb::ReferenceSerializeOutput *output) const;
+
+    int64_t m_hash;
 };
 
-}
-
-#endif
+#endif /* DRTABLENOTFOUNDEXCEPTION_H_ */
