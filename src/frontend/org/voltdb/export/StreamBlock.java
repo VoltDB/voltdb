@@ -46,10 +46,15 @@ import org.voltdb.iv2.UniqueIdGenerator;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
+    public static final int HEADER_SIZE = 20; //sequence number(8) + row count(4) + uniqueId(8)
+    public static final int SEQUENCE_NUMBER_OFFSET = 0;
+    public static final int ROW_NUMBER_OFFSET = 8;
+    public static final int UNIQUE_ID_OFFSET = 12;
 
-    StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
-        m_buffer = cont;
+    StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, int rowCount,
+            long uniqueId, boolean isPersisted) {
+        m_buffer = fcont;
+        m_schema = schemaCont;
         m_startSequenceNumber = startSequenceNumber;
         m_rowCount = rowCount;
         m_uniqueId = uniqueId;
@@ -70,6 +75,10 @@ public class StreamBlock {
         if (count == 0) {
             m_buffer.discard();
             m_buffer = null;
+            if (m_schema != null) {
+                m_schema.discard();
+                m_schema = null;
+            }
         } else if (count < 0) {
             VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
         }
@@ -137,6 +146,7 @@ public class StreamBlock {
     private final long m_uniqueId;
     private final long m_totalSize;
     private BBContainer m_buffer;
+    private BBContainer m_schema;
     // index of the last row that has been released.
     private int m_releaseOffset = -1;
 
@@ -149,6 +159,14 @@ public class StreamBlock {
     BBContainer unreleasedContainer() {
         m_refCount.incrementAndGet();
         return getRefCountingContainer(m_buffer.b().slice().asReadOnlyBuffer());
+    }
+
+    BBContainer getSchemaContainer() {
+        if (m_schema == null) {
+            return null;
+        }
+        m_refCount.incrementAndGet();
+        return getRefCountingContainer(m_schema.b().slice().asReadOnlyBuffer());
     }
 
     private BBContainer getRefCountingContainer(ByteBuffer buf) {
@@ -167,10 +185,10 @@ public class StreamBlock {
      */
     BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
-        m_buffer.b().putLong(0, startSequenceNumber());
-        m_buffer.b().putInt(8, rowCount());
-        m_buffer.b().putLong(12, uniqueId());
-        m_buffer.b().position(0);
+        m_buffer.b().putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
+        m_buffer.b().putInt(ROW_NUMBER_OFFSET, rowCount());
+        m_buffer.b().putLong(UNIQUE_ID_OFFSET, uniqueId());
+        m_buffer.b().position(SEQUENCE_NUMBER_OFFSET);
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
     }

@@ -1530,8 +1530,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
         return false;
     }
 
-    markAllExportingStreamsNew();
-
     std::map<std::string, ExportTupleStream*> purgedStreams;
     processCatalogDeletes(timestamp, false, purgedStreams);
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
@@ -1587,16 +1585,6 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
             m_exportingStreams[entry.first] = NULL;
             m_exportingDeletedStreams[entry.first] = entry.second;
             entry.second->removeFromFlushList(this, false);
-        }
-    }
-}
-
-void
-VoltDBEngine::markAllExportingStreamsNew() {
-    //Mark all streams new so that schema is sent on next tuple.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        if (entry.second != NULL) {
-            entry.second->setNew();
         }
     }
 }
