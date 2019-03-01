@@ -391,7 +391,6 @@ public class ProcedureRunner {
                     log.trace("invoked");
                 }
                 catch (InvocationTargetException itex) {
-                    //itex.printStackTrace();
                     Throwable ex = itex.getCause();
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
@@ -1330,6 +1329,8 @@ public class ProcedureRunner {
                 "VOLTDB ERROR: " + msg);
        if (status == ClientResponse.TXN_MISPARTITIONED) {
            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       } else if (status == ClientResponse.DR_TABLE_HASH_NOT_FOUND) {
+           ((DRTableNotFoundException) e).setClientResponseResults(response);
        }
 
        return response;

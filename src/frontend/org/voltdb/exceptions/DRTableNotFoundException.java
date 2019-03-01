@@ -19,6 +19,11 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
+
 /**
  * Exception thrown by native Execution Engine
  * when a table cannot be found for DR table hash that come from the remote cluster
@@ -26,7 +31,8 @@ import java.nio.ByteBuffer;
 public class DRTableNotFoundException extends SerializableException {
     public static final long serialVersionUID = 0L;
 
-    private long m_hash;
+    private long m_hash; // the hash value from the remote cluster for which it failed
+    private long m_remoteTxnUniqueId; // the remote cluster's txn id
 
     public DRTableNotFoundException() {
         super();
@@ -35,6 +41,7 @@ public class DRTableNotFoundException extends SerializableException {
     public DRTableNotFoundException(ByteBuffer b) {
         super(b);
         this.m_hash = b.getLong();
+        this.m_remoteTxnUniqueId = b.getLong();
     }
 
     @Override
@@ -42,13 +49,27 @@ public class DRTableNotFoundException extends SerializableException {
         return SerializableExceptions.DrTableNotFoundException;
     }
 
+    public void setRemoteTxnUniqueId(long remoteTxnUniqueId) {
+        m_remoteTxnUniqueId = remoteTxnUniqueId;
+    }
+
+    public void setClientResponseResults(ClientResponseImpl cr) {
+        ColumnInfo[] resultColumns = new ColumnInfo[] {
+                new ColumnInfo("SOURCE_UNIQUEID", VoltType.BIGINT)
+        };
+        VoltTable result = new VoltTable(resultColumns);
+        result.addRow(m_remoteTxnUniqueId);
+        cr.setResultTables(new VoltTable[] { result });
+    }
+
     @Override
     protected int p_getSerializedSize() {
-        return 8;
+        return 16;
     }
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_hash);
+        b.putLong(m_remoteTxnUniqueId);
     }
 }

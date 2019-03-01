@@ -1705,7 +1705,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
         m_data.clear();
         m_data.putInt(Commands.ApplyBinaryLog.m_id);
         m_data.putLong(txnId);
@@ -1713,6 +1713,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putInt(remoteClusterId);
+        m_data.putLong(remoteTxnUniqueId);
         m_data.putLong(undoToken);
         m_data.put(logs.array());
 
