@@ -106,6 +106,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                     System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
                     System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
                     System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                    System.out.println("DEBUG:   test will run  : "+runFlakyTest);
                 }
                 if (!runFlakyTest) {
                     continue;

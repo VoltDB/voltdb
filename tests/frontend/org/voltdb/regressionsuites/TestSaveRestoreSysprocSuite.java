@@ -51,10 +51,14 @@ import java.util.zip.GZIPInputStream;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -89,6 +93,9 @@ import com.google_voltpatches.common.io.Files;
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
     private final static int TABLE_COUNT = 11;  // Must match schema used.
@@ -600,6 +607,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testRestoreWithDifferentTopology()
             throws IOException, InterruptedException, ProcCallException
     {
@@ -682,6 +690,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testRestoreWithGhostPartitionAndJoin()
             throws IOException, InterruptedException, ProcCallException
     {
@@ -798,6 +807,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      * prevents stale txnIds from being propagated into future snapshots of clusters with different
      * site counts.
      */
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testIgnoreTransactionIdsForRestore, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testIgnoreTransactionIdsForRestore()
     throws Exception
     {
@@ -882,6 +893,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     /*
      * Test that the original transaction ids are retrieved from the "Recovered" snapshot.
      */
+    @Test
     public void testPropagateTransactionIdsForRecover()
     throws Exception
     {
@@ -947,6 +959,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     //
     // Test that a replicated table can be distributed correctly
     //
+    @Test
     public void testDistributeReplicatedTable()
     throws Exception
     {
@@ -1038,6 +1051,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testQueueUserSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1123,6 +1137,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Test specific case where a user snapshot is queued
     // and then fails while queued. It shouldn't block future snapshots
     //
+    @Test
     public void testQueueFailedUserSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1191,6 +1206,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, false, TESTNONCE + "2");
     }
 
+    @Test
     public void testRestore12Snapshot()
     throws Exception
     {
@@ -1236,6 +1252,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
     }
 
+    @Test
     public void testRestoreFutureSnapshot()
     throws Exception
     {
@@ -1331,6 +1348,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
          */
     }
 
+    @Test
     public void testRestoreWithFailures() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1376,6 +1394,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     }
 
+    @Test
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -1453,6 +1472,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(fourthString.equals(results[0].getString(2)));
     }
 
+    @Test
     public void testTSVConversion() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1483,6 +1503,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         generateAndValidateTextFile( expectedText, false);
     }
 
+    @Test
     public void testCSVConversion() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1529,6 +1550,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateTextFile(expectedText, true, fis);
     }
 
+    @Test
     public void testBadSnapshotParams() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1653,6 +1675,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Also does some basic smoke tests
     // of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
     //
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSnapshotSave, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSnapshotSave() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1858,6 +1882,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         System.out.println("Created CSV snapshot");
     }
 
+    @Test
     public void testSnapshotSaveNonExistingTable() throws Exception {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
         System.out.println("Starting testSnapshotSaveNonExistingTable");
@@ -1895,6 +1920,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testPartialSnapshotSave() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1943,6 +1969,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testIdleOnlineSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1980,6 +2007,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, TESTNONCE);
     }
 
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSaveReplicatedAndRestorePartitionedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSaveReplicatedAndRestorePartitionedTable()
     throws Exception
     {
@@ -2106,6 +2135,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     }
 
+    @Test
     public void testSavePartitionedAndRestoreReplicatedTable()
     throws Exception
     {
@@ -2252,7 +2282,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         config.revertCompile();
     }
 
-
+    @Test
     public void testSaveAndRestoreReplicatedTable()
     throws Exception
     {
@@ -2366,6 +2396,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, TESTNONCE);
     }
 
+    @Test
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
@@ -2691,6 +2722,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     // Test that we fail properly when there are no savefiles available
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testRestoreMissingFiles, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
@@ -2740,6 +2773,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     // Test that we fail properly when the save files are corrupted
+    @Test
     public void testCorruptedFiles()
     throws Exception
     {
@@ -2810,6 +2844,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     // Test that a random corruption doesn't mess up the table. Not reproducible but useful for detecting
     // stuff we won't normally find
+    @Test
     public void testCorruptedFilesRandom()
     throws Exception
     {
@@ -2872,7 +2907,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-
+    @Test
     public void testRestoreMissingPartitionFile()
     throws Exception
     {
@@ -2914,6 +2949,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(resultTable.getString("ERR_MSG").equals("Save data contains no information for table PARTITION_TESTER"));
     }
 
+    @Test
     public void testRepartition()
     throws Exception
     {
@@ -2983,6 +3019,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         config.revertCompile();
     }
 
+    @Test
     public void testChangeDDL()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -3085,6 +3122,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         config.revertCompile();
     }
 
+    @Test
     public void testGoodChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -3157,6 +3195,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         config.revertCompile();
     }
 
+    @Test
     public void testBadChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
@@ -3225,6 +3264,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         config.revertCompile();
     }
 
+    @Test
     public void testRestoreHashinatorWithAddedPartition()
             throws IOException, InterruptedException, ProcCallException
     {
@@ -3338,6 +3378,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     //
     // Test that system always pick up the latest complete snapshot to recover
     //
+    @Test
     public void testRecoverPickupLatestSnapshot()
     throws Exception
     {
@@ -3407,6 +3448,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     //
     // Test that system always pick up the latest complete snapshot to recover
     //
+    @Test
     public void testRecoverFromShutdownSnapshot()
     throws Exception
     {
@@ -3502,6 +3544,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Test that system always pick up the latest complete snapshot to recover,
     // whether it is terminal snapshot or not
     //
+    @Test
     public void testRecoverShutdownSnapshotIsNotLatest()
     throws Exception
     {
@@ -3589,6 +3632,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // on one node, then do the recover, verify that system picks up the latest
     // snapshot.
     //
+    @Test
     public void testMinorityOfClusterMissingSnapshot()
     throws Exception
     {
@@ -3686,6 +3730,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // on two nodes, then do the recover, verify that system picks up the first
     // snapshot.
     //
+    @Test
     public void testMajorityOfClusterMissingSnapshot()
     throws Exception
     {
@@ -3781,6 +3826,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testRestoreResults()
     throws Exception
     {
@@ -3848,6 +3894,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testReplicatedTableCSVSnapshotStatus()
     throws Exception
     {

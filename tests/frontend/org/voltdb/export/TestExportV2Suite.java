@@ -27,10 +27,13 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
@@ -42,6 +45,9 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestExportV2Suite extends TestExportBaseSocketExport {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private static final int k_factor = 1;
 
     @Override
@@ -68,6 +74,8 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     /**
      * Multi-table test
      */
+    @Test
+    @Flaky(description="TestExportV2Suite.testExportMultiTable")
     public void testExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
@@ -104,6 +112,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         quiesceAndVerifyTarget(client, m_verifier);
     }
 
+    @Test
     public void testExportControlParams() throws Exception {
         System.out.println("testFlowControl");
         final Client client = getClient();

@@ -24,6 +24,10 @@
 package org.voltdb.exportclient;
 
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -33,8 +37,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 
-import junit.framework.TestCase;
-
+import org.junit.Rule;
+import org.junit.Test;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
@@ -49,8 +55,11 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-public class TestExportDecoderBase extends TestCase
+public class TestExportDecoderBase
 {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     class StubExportDecoder extends ExportDecoderBase
     {
         public StubExportDecoder(AdvertisedDataSource source)
@@ -154,6 +163,7 @@ public class TestExportDecoderBase extends TestCase
         return source;
     }
 
+    @Test
     public void testNullFlags() throws IOException
     {
         final int columnCount = COLUMN_TYPES.length;
@@ -177,6 +187,8 @@ public class TestExportDecoderBase extends TestCase
         }
     }
 
+    @Test
+    @Flaky(description="TestExportDecoderBase.testExportWriter")
     public void testExportWriter() throws IOException {
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
@@ -235,6 +247,7 @@ public class TestExportDecoderBase extends TestCase
         System.out.println(stringer.getBuffer().toString().trim());
     }
 
+    @Test
     public void testExportSchemaBlocks() throws IOException {
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
@@ -321,6 +334,7 @@ public class TestExportDecoderBase extends TestCase
     }
 
 
+    @Test
     public void testExportDecoderPartitioning() throws IOException {
         AdvertisedDataSource source = constructTestSource();
 
