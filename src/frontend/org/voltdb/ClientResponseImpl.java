@@ -120,17 +120,21 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     }
 
     private void setResults(byte status, VoltTable[] results, String statusString) {
+        setResultTables(results);
+
+        this.status = status;
+        this.statusString = statusString;
+        this.setProperly = true;
+    }
+
+    public void setResultTables(VoltTable[] results) {
         assert results != null;
         for (VoltTable result : results) {
             // null values are not permitted in results. If there is one, it will cause an
             // exception in writeExternal. This throws the exception sooner.
             assert result != null;
         }
-
-        this.status = status;
         this.results = results;
-        this.statusString = statusString;
-        this.setProperly = true;
     }
 
     public void setHashes(int[] hashes) {

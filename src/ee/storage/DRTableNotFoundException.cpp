@@ -26,8 +26,9 @@ DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string mes
 { }
 
 void DRTableNotFoundException::p_serialize(ReferenceSerializeOutput *output) const {
-    SerializableEEException::p_serialize(output);
     output->writeLong(m_hash);
+    // This is a placeholder for remote cluster's txn unique id that gets added in the java layer.
+    output->writeLong(-1);
 }
 
 const std::string
