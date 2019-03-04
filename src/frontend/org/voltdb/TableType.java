@@ -38,7 +38,11 @@ public enum TableType {
     }
 
     public static boolean isStream(int e) {
-        return (e ==STREAM.get() || e == STREAM_VIEW_ONLY.get());
+        return (e == STREAM.get() || e == STREAM_VIEW_ONLY.get());
+    }
+
+    public static boolean isPersistentMigrate(int e) {
+        return (e == PERSISTENT_MIGRATE.get());
     }
 }
 

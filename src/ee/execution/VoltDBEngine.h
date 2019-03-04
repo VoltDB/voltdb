@@ -491,14 +491,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Perform an action on behalf of Export.
          *
          * @param if syncAction is true, the stream offset being set for a table
-         * @param the catalog version qualified id of the table to which this action applies
+         * @param the reference to the USO of the next row inserted in the stream
+         * @param the reference to the sequenceNumber of the next inserted row
+         * @param the name of the stream we want to update the state for
          * @return the universal offset for any poll results
          * (results returned separately via QueryResults buffer)
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                             std::string tableSignature);
+                             std::string streamName);
 
-        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string tableSignature);
+        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string streamName);
 
         /**
          * Retrieve a hash code for the specified table
@@ -677,10 +679,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Map of table signatures to exporting stream wrappers.
          */
         std::map<std::string, ExportTupleStream*> m_exportingStreams;
-        /*
-         * Map of table signatures to exporting stream wrappers which are deleted.
-         */
-        std::map<std::string, ExportTupleStream*> m_exportingDeletedStreams;
 
         /*
          * Only includes non-materialized tables

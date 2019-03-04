@@ -795,14 +795,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long uso, long seqNo, int partitionId, String tableSignature);
+            long uso, long seqNo, int partitionId, String streamName);
 
     /**
      * Get the seqNo and offset for an export table.
-     * @param tableSignature the signature of the table being polled or acked.
+     * @param streamName the name of the stream being polled.
      * @return the response ExportMessage
      */
-    public abstract long[] getUSOForExportTable(String tableSignature);
+    public abstract long[] getUSOForExportTable(String streamName);
 
     /**
      * Calculate a hash code for a table.
@@ -1143,7 +1143,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckOffset The offset being ACKd.
-     * @param mTableSignature Signature of the table being acted against
+     * @param mStreamName Name of the stream being acted against
      * @return
      */
     protected native long nativeExportAction(
@@ -1151,7 +1151,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
-            byte mTableSignature[]);
+            byte mStreamName[]);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
@@ -1159,10 +1159,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Get the USO for an export table. This is primarily used for recovery.
      *
      * @param pointer Pointer to an engine instance
-     * @param tableId The table in question
+     * @param stream name of the stream we need state (USO + Seqno) from
      * @return The USO for the export table.
      */
-    public native long[] nativeGetUSOForExportTable(long pointer, byte mTableSignature[]);
+    public native long[] nativeGetUSOForExportTable(long pointer, byte streamName[]);
 
     /**
      * This code only does anything useful on MACOSX.

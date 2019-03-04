@@ -59,8 +59,7 @@ Table* TableFactory::getPersistentTable(
             char *signature,
             bool tableIsMaterialized,
             int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly,
+            TableType tableType,
             int tableAllocationTargetSize,
             int tupleLimit,
             int32_t compactionThreshold,
@@ -71,7 +70,7 @@ Table* TableFactory::getPersistentTable(
     StreamedTable *streamedTable = NULL;
     PersistentTable *persistentTable = NULL;
 
-    if (exportOnly) {
+    if (tableTypeIsExportStream(tableType)) {
         table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
@@ -93,7 +92,7 @@ Table* TableFactory::getPersistentTable(
                compactionThreshold);
 
     TableStats *stats;
-    if (exportOnly) {
+    if (tableTypeIsExportStream(tableType)) {
         stats = streamedTable->getTableStats();
     }
     else {
@@ -110,7 +109,7 @@ Table* TableFactory::getPersistentTable(
     configureStats(name, stats);
 
     // If a regular table with export enabled, create a companion streamed table
-    if (exportEnabled && !exportOnly) {
+    if (tableTypeIsPersistentWithLinkedStream(tableType)) {
         streamedTable = new StreamedTable(partitionColumn);
         initCommon(databaseId,
                    streamedTable,

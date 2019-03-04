@@ -525,7 +525,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

@@ -46,7 +46,26 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
       m_flushPending(false),
       m_nextFlushStream(NULL),
       m_prevFlushStream(NULL)
+{
+    extendBufferChain(m_defaultCapacity);
+    m_new = true;
+}
 
+ExportTupleStream::ExportTupleStream(const ExportTupleStream &otherStream,
+                                     const std::vector<std::string> &columnNames)
+    : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(otherStream.m_tableName, otherStream.m_columnNames) + s_FIXED_BUFFER_HEADER_SIZE + s_EXPORT_BUFFER_HEADER_SIZE),
+      m_partitionId(otherStream.m_partitionId),
+      m_siteId(otherStream.m_siteId),
+      m_signature(otherStream.m_signature),
+      m_generation(otherStream.m_generation),
+      m_tableName(otherStream.m_tableName),
+      m_columnNames(otherStream.m_columnNames),
+      m_ddlSchemaSize(m_headerSpace - MAGIC_HEADER_SPACE_FOR_JAVA - s_FIXED_BUFFER_HEADER_SIZE - s_EXPORT_BUFFER_HEADER_SIZE),
+      m_nextSequenceNumber(otherStream.m_nextSequenceNumber),
+      m_committedSequenceNumber(otherStream.m_committedSequenceNumber),
+      m_flushPending(otherStream.m_flushPending),
+      m_nextFlushStream(otherStream.m_nextFlushStream),
+      m_prevFlushStream(otherStream.m_prevFlushStream)
 {
     extendBufferChain(m_defaultCapacity);
 }

@@ -47,6 +47,9 @@ public:
                       std::string signature, const std::string &tableName,
                       const std::vector<std::string> &columnNames);
 
+    ExportTupleStream(const ExportTupleStream &otherStream,
+                      const std::vector<std::string> &columnNames);
+
     virtual ~ExportTupleStream() {
     }
 

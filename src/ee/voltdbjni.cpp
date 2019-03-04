@@ -1099,7 +1099,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * @param pollAction true if this call requests a poll
  * @param syncAction true if the stream offset being set for a table
  * @param ackOffset  if acking, the universal stream offset being acked/released
- * @param tableSignature    Signature of the table to which the Export action applies
+ * @param streamName    Name of the stream to which the Export action applies
  *
  * @return the universal stream offset for the last octet in any
  * returned poll results (returned via the query results buffer).  On
@@ -1113,20 +1113,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
-   jbyteArray tableSignature) {
+   jbyteArray streamName) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
+    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
+    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
             return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
-                                        signature);
+                                        streamNameStr);
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
@@ -1142,19 +1142,19 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Signature: (JLjava/lang/String;)[J
  */
 SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray tableSignature) {
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray streamName) {
 
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
-    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
-    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
+    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
+    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
+    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
     try {
         jlong data[2];
         size_t ackOffset;
         int64_t seqNo;
-        engine->getUSOForExportTable(ackOffset, seqNo, signature);
+        engine->getUSOForExportTable(ackOffset, seqNo, streamNameStr);
         data[0] = ackOffset;
         data[1] = seqNo;
         jlongArray retval = env->NewLongArray(2);
