@@ -49,6 +49,7 @@ public:
         , m_hiddenSizes(0)
         , m_hiddenAllowNullFlags(0)
         , m_hiddenInBytesFlags(0)
+        , m_hiddenColumnForMigrate(false)
     {
     }
 
@@ -63,6 +64,7 @@ public:
         , m_hiddenSizes(numHiddenCols)
         , m_hiddenAllowNullFlags(numHiddenCols)
         , m_hiddenInBytesFlags(numHiddenCols)
+        , m_hiddenColumnForMigrate(false)
     {
     }
 
@@ -96,10 +98,22 @@ public:
         m_hiddenInBytesFlags[index] = inBytes;
     }
 
+    /** Set the attributes of the index-th hidden column for the
+      *  schema to be built. */
+     void setHiddenColumnAtIndex(size_t index,
+                                 ValueType valueType,
+                                 int32_t colSize,
+                                 bool allowNull,
+                                 bool inBytes,
+                                 bool hiddenColumnForMigrate)
+     {
+         setHiddenColumnAtIndex(index, valueType, colSize, allowNull, inBytes);
+         m_hiddenColumnForMigrate = hiddenColumnForMigrate;
+     }
     /** Finally, build the schema with the attributes specified. */
     TupleSchema* build() const
     {
-        return TupleSchema::createTupleSchema(m_types,
+        TupleSchema* schema = TupleSchema::createTupleSchema(m_types,
                                               m_sizes,
                                               m_allowNullFlags,
                                               m_inBytesFlags,
@@ -107,6 +121,8 @@ public:
                                               m_hiddenSizes,
                                               m_hiddenAllowNullFlags,
                                               m_hiddenInBytesFlags);
+        schema->setHiddenColumnForMigrate(m_hiddenColumnForMigrate);
+        return schema;
     }
 
     /** A special build method for index keys, which use "headerless" tuples */
@@ -208,7 +224,7 @@ private:
     std::vector<int32_t> m_hiddenSizes;
     std::vector<bool> m_hiddenAllowNullFlags;
     std::vector<bool> m_hiddenInBytesFlags;
-
+    bool m_hiddenColumnForMigrate;
 };
 
 } // end namespace voltdb

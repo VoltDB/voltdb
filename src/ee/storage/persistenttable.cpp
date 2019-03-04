@@ -147,7 +147,10 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             bool ownsTupleSchema,
                                             int32_t compactionThreshold) {
     assert (schema != NULL);
-    if (m_drEnabled) {
+    uint16_t hiddenColumnCount = schema->hiddenColumnCount();
+    bool hiddenColumnForMigrate = schema->hasHiddenColumnForMigrate();
+    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !hiddenColumnForMigrate) ||
+        (hiddenColumnCount == 2 && hiddenColumnForMigrate))) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.

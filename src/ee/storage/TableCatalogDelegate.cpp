@@ -126,19 +126,23 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         // Column will be marked as not nullable in TupleSchema,
         // because we never expect a null value here, but this is not
         // actually enforced at runtime.
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++,
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex,
                                              VALUE_TYPE_BIGINT,
                                              8,      // field size in bytes
                                              false); // nulls not allowed
+        hiddenIndex++;
+        VOLT_DEBUG("Adding hidden column for dr table %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
     if (needsHiddenCountForView) {
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex++, VALUE_TYPE_BIGINT, 8, false);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, false);
+        hiddenIndex++;
+        VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
     if (needsHiddenColumnForMigration) {
-        VOLT_DEBUG("Adding hidden column for table %s index %d", catalogTable.name().c_str(), hiddenIndex);
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true);
+        VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, false, true);
     }
     return schemaBuilder.build();
 }

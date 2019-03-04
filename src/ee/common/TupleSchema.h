@@ -140,6 +140,12 @@ public:
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
 
+    /** Return true if there is a hidden column for migrate. */
+    inline bool hasHiddenColumnForMigrate() const;
+
+    /** set a hidden column for migrate. */
+    void setHiddenColumnForMigrate(bool hiddenColumnForMigrate);
+
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
         return m_isHeaderless;
@@ -261,6 +267,9 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
+    // hidden column for migrate
+    bool m_hasHiddenColumnForMigrate;
+
     /*
      * Data storage for:
      *   - An array of int16_t, containing the 0-based ordinal position
@@ -292,6 +301,10 @@ inline uint16_t TupleSchema::columnCount() const {
 
 inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
+}
+
+inline bool TupleSchema::hasHiddenColumnForMigrate() const {
+    return m_hasHiddenColumnForMigrate;
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {
