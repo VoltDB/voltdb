@@ -45,7 +45,7 @@ public final class Catalog extends CatalogType {
         m_clusters = new CatalogMap<Cluster>(this, this, "clusters", Cluster.class, 1);
         m_relativeIndex = 1;
     }
-    
+
     CatalogOperator getCatalogOperator() {
         return m_operator;
     }
