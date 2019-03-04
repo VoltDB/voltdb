@@ -3911,15 +3911,15 @@ public class TestVoltCompiler extends TestCase {
         // can not alter target
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
-        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a));\n" +
-              "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+              "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +
               "partition table ttl on column a;\n" +
               "dr table ttl;";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
 
         // can not create target via alter
-        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
               "USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATE TO TARGET TEST;\n" +

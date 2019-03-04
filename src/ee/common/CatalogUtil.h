@@ -22,6 +22,7 @@
 #include "catalog/connectortableinfo.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
+#include "common/types.h"
 
 /*
   Global helper functions for extracting more complex
@@ -30,42 +31,22 @@
 
 
 /**
- * A table is export only if any connector's table list marks it as
- * such. Search through the connector's table lists accordingly.
+ * A table is export only its catalog says so.
  */
-bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
-
-    // no export, no export only tables
-    if (database.connectors().size() == 0) {
-        return false;
-    }
-
-    // iterate through all connectors
-    std::map<std::string, catalog::Connector*>::const_iterator connIter;
-    for (connIter = database.connectors().begin();
-         connIter != database.connectors().end();
-         connIter++)
-    {
-        catalog::Connector *connector = connIter->second;
-
-        // iterate the connector tableinfo list looking for tableIndex matches
-        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-        for (it = connector->tableInfo().begin();
-             it != connector->tableInfo().end();
-             it++)
-        {
-            if (it->second->table()->relativeIndex() == tableIndex) {
-                return true;
-            }
-        }
-    }
-
-    return false;
+bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
+    return voltdb::tableTypeIsStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
+bool tableTypePersistentWithMigrateStream(catalog::Table const& catalogTable) {
+     return voltdb::tableTypePersistentWithMigrateStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+}
+
+bool tableTypePeristentWithLinkingStream(catalog::Table const& catalogTable) {
+     return voltdb::tableTypePeristentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+}
 
 /**
- * a table is only enable for export if explicitly listed in
+ * a table is only enabled for export if explicitly listed in
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
@@ -110,4 +91,3 @@ bool isTableMaterialized(const catalog::Table &table) {
 
 
 #endif
-

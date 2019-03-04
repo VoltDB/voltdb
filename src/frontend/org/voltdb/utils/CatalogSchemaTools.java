@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -111,7 +112,7 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
         }
         else {
-            if (isExportOnly) {
+            if (TableType.isStream(catalog_tbl.getTabletype())) {
                 table_sb.append("CREATE STREAM ").append(catalog_tbl.getTypeName());
                 if (streamPartitionColumn != null && viewQuery == null) {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
@@ -342,7 +343,8 @@ public abstract class CatalogSchemaTools {
         sb.append(table_sb.toString());
 
         // Partition Table for regular tables (non-streams)
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly
+                && TableType.isStream(catalog_tbl.getTabletype())) {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
         }
 
