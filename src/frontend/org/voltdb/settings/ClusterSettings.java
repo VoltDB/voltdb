@@ -31,6 +31,7 @@ public interface ClusterSettings extends Settings {
     // property keys
     public final static String HOST_COUNT = "org.voltdb.cluster.hostcount";
     public final static String CANGAMANGA = "dumy.cangamanga";
+    public final static String PARTITITON_IDS = "org.voltdb.host.partitions";
 
     @Key(HOST_COUNT)
     @DefaultValue("1")
@@ -39,6 +40,10 @@ public interface ClusterSettings extends Settings {
     @Key(CANGAMANGA)
     @DefaultValue("7")
     public int cangamanga();
+
+    @Key(PARTITITON_IDS)
+    @DefaultValue("")
+    public String partitionIds();
 
     public static ClusterSettings create(Map<?, ?>... imports) {
         return ConfigFactory.create(ClusterSettings.class, imports);

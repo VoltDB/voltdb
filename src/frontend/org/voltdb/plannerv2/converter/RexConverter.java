@@ -54,6 +54,8 @@ import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
 
+import static org.apache.calcite.rel.type.RelDataType.PRECISION_NOT_SPECIFIED;
+
 /**
  * The utility class that covert Calcite row expression node to Volt AbstractExpression.
  */
@@ -90,6 +92,9 @@ public class RexConverter {
     public static void setType(AbstractExpression ae, VoltType vt, int precision) {
 
         ae.setValueType(vt);
+        if (precision == PRECISION_NOT_SPECIFIED) {
+            precision = vt.getLengthInBytesForFixedTypes();
+        }
 
         if (vt.isVariableLength()) {
             int size;

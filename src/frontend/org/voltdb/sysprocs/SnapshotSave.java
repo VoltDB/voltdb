@@ -45,7 +45,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
@@ -59,11 +58,6 @@ import com.google_voltpatches.common.primitives.Longs;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
-
-    private static final int DEP_createSnapshotTargets = (int)
-        SysProcFragmentId.PF_createSnapshotTargets | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEP_createSnapshotTargetsResults = (int)
-        SysProcFragmentId.PF_createSnapshotTargetsResults;
 
     @Override
     public long[] getPlanFragmentIds()
@@ -93,7 +87,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 // progress.
                 SNAP_LOG.error("@SnapshotSave is called while another snapshot is still in progress");
                 result.addRow(context.getHostId(), hostname, null, "FAILURE", "SNAPSHOT IN PROGRESS");
-                return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargets, result);
             }
 
             // Tell each site to quiesce - bring the Export and DR system to a steady state with
@@ -157,12 +151,12 @@ public class SnapshotSave extends VoltSystemProcedure
                     ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), txnId);
                 }
             }
-            return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_createSnapshotTargets));
-            return new DependencyPair.TableDependencyPair(DEP_createSnapshotTargetsResults, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_createSnapshotTargets));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_createSnapshotTargetsResults, result);
         }
         assert (false);
         return null;
@@ -326,32 +320,13 @@ public class SnapshotSave extends VoltSystemProcedure
             String data,
             HashinatorSnapshotData hashinatorData)
     {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
         // TRAIL [SnapSave:2] 2 [MPI] Build & send create snapshot targets requests to all SP sites.
         // This fragment causes each execution node to create the files
         // that will be written to during the snapshot
         byte[] hashinatorBytes = (hashinatorData != null ? hashinatorData.m_serData : null);
         long hashinatorVersion = (hashinatorData != null ? hashinatorData.m_version : 0);
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
-        pfs[0].outputDepId = DEP_createSnapshotTargets;
-        pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_createSnapshotTargets,  SysProcFragmentId.PF_createSnapshotTargetsResults,
                 filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data,
-                hashinatorBytes, hashinatorVersion,
-                System.currentTimeMillis(), pathType);
-
-        // This fragment aggregates the results of creating those files
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_createSnapshotTargetsResults;
-        pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
-        pfs[1].inputDepIds = new int[] { DEP_createSnapshotTargets };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
-        return results;
+                hashinatorBytes, hashinatorVersion, System.currentTimeMillis(), pathType);
     }
 }

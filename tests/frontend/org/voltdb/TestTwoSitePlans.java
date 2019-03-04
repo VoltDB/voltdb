@@ -41,7 +41,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.FastDeserializer;
@@ -280,7 +279,7 @@ public class TestTwoSitePlans extends TestCase {
     public void testMultiSiteSelectAll() throws InterruptedException, ExecutionException {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
-        int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        int outDepId = 1;
         Future<FastDeserializer> ft = site1Thread.submit(new Callable<FastDeserializer>() {
             @Override
             public FastDeserializer call() throws Exception {

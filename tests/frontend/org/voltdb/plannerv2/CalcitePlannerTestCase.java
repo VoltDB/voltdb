@@ -116,8 +116,8 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
      *                  between Calcite plan result to Volt plan result.
      */
     protected void comparePlans(String sql, Map<String, String> ignoreMap) {
-        CompiledPlan calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
         CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, true);
+        CompiledPlan calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
 
         // Compare roots
         comparePlanTree(calcitePlan.rootPlanGraph, voltdbPlan.rootPlanGraph, ignoreMap);
@@ -131,7 +131,7 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
         compareCompiledPlans(calcitePlan, voltdbPlan);
     }
 
-    private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, Map<String, String> ignoreMap) {
+    protected void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, Map<String, String> ignoreMap) {
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlanNode);
         PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlanNode);
 
@@ -144,7 +144,7 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
         assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
     }
 
-    private void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
+    protected void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
         // Compare LIMIT/OFFSET
         assertEquals("Plans with different limit or offset", voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
         // Determinism

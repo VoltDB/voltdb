@@ -80,13 +80,12 @@ public class TestMaxSuite extends RegressionSuite {
         stringBuilder.append(") order by column0;");
         assert(stringBuilder.length() > Short.MAX_VALUE);        // previous limit
         assert(stringBuilder.length() < SQL_LITERAL_MAX_LENGTH); // new limit due to ENG-10059
-        // ENG-15258
-//        try {
-//            VoltTable result = client.callProcedure("@AdHoc", stringBuilder.toString()).getResults()[0];
-//            assertEquals(0, result.getRowCount());
-//        } catch(Exception ex) {
-//            fail();
-//        }
+        try {
+            VoltTable result = client.callProcedure("@AdHoc", stringBuilder.toString()).getResults()[0];
+            assertEquals(0, result.getRowCount());
+        } catch(Exception ex) {
+            fail();
+        }
     }
 
     public void testMaxIn() throws Exception {
@@ -107,18 +106,17 @@ public class TestMaxSuite extends RegressionSuite {
             }
         }
         stringBuilder.append(") order by column0;");
-        // ENG-15258
-//        resp = client.callProcedure("@AdHoc", stringBuilder.toString());
-//        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-//
-//        assertEquals(1, resp.getResults().length);
-//        VoltTable results = resp.getResults()[0];
-//        int rowCount = results.getRowCount();
-//        assertEquals(10, rowCount);
-//        assertEquals(2, results.getColumnCount());
-//        for (int i = 0; i < rowCount; i++) {
-//            assertEquals(i, results.fetchRow(i).getLong(0));
-//        }
+        resp = client.callProcedure("@AdHoc", stringBuilder.toString());
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
+        int rowCount = results.getRowCount();
+        assertEquals(10, rowCount);
+        assertEquals(2, results.getColumnCount());
+        for (int i = 0; i < rowCount; i++) {
+            assertEquals(i, results.fetchRow(i).getLong(0));
+        }
     }
 
     public void testMaxColumn() throws Exception {

@@ -64,6 +64,7 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -108,6 +109,8 @@ public class VoltDB {
 
     //Whatever the default timezone was for this locale before we replaced it
     public static final TimeZone REAL_DEFAULT_TIMEZONE;
+
+    public static final String DISABLE_PLACEMENT_RESTORE = "DISABLE_PLACEMENT_RESTORE";
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
@@ -325,10 +328,16 @@ public class VoltDB {
         public boolean m_safeMode = false;
 
         /** location of user supplied schema */
-        public File m_userSchema = null;
+        public List<File> m_userSchemas = null;
 
         /** location of user supplied classes and resources jar file */
-        public File m_stagedClassesPath = null;
+        public List<File> m_stagedClassesPaths = null;
+
+        /** Best effort to recover previous partition layout*/
+        public boolean m_restorePlacement = !Boolean.valueOf(System.getenv("DISABLE_PLACEMENT_RESTORE") == null ?
+                     Boolean.toString(Boolean.getBoolean("DISABLE_PLACEMENT_RESTORE")) : System.getenv("DISABLE_PLACEMENT_RESTORE"));
+;
+        public String m_recoveredPartitions = "";
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -688,32 +697,46 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
                 } else if (arg.equalsIgnoreCase("schema")) {
-                    m_userSchema = new File(args[++i].trim());
-                    if (!m_userSchema.exists()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " does not exist.");
-                        referToDocAndExit();
-                    }
-                    if (!m_userSchema.canRead()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " can't be read.");
-                        referToDocAndExit();
-                    }
-                    if (!m_userSchema.isFile()) {
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not an ordinary file.");
-                        referToDocAndExit();
+                    for (String schemaPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
+                        File userSchema = new File(schemaPath);
+                        if (!userSchema.exists()) {
+                            System.err.println("FATAL: Supplied schema file " + userSchema + " does not exist.");
+                            referToDocAndExit();
+                        }
+                        if (!userSchema.canRead()) {
+                            System.err.println("FATAL: Supplied schema file " + userSchema + " can't be read.");
+                            referToDocAndExit();
+                        }
+                        if (!userSchema.isFile()) {
+                            System.err
+                                    .println("FATAL: Supplied schema file " + userSchema + " is not an ordinary file.");
+                            referToDocAndExit();
+                        }
+                        if (m_userSchemas == null) {
+                            m_userSchemas = new ArrayList<>();
+                        }
+                        m_userSchemas.add(userSchema);
                     }
                 } else if (arg.equalsIgnoreCase("classes")) {
-                    m_stagedClassesPath = new File(args[++i].trim());
-                    if (!m_stagedClassesPath.exists()){
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " does not exist.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.canRead()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " can't be read.");
-                        referToDocAndExit();
-                    }
-                    if (!m_stagedClassesPath.isFile()) {
-                        System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
-                        referToDocAndExit();
+                    for (String jarPath : Splitter.on(",").trimResults().omitEmptyStrings().split(args[++i])) {
+                        File stagedJar = new File(jarPath);
+                        if (!stagedJar.exists()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " does not exist.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.canRead()) {
+                            System.err.println("FATAL: Supplied classes jar file " + stagedJar + " can't be read.");
+                            referToDocAndExit();
+                        }
+                        if (!stagedJar.isFile()) {
+                            System.err.println(
+                                    "FATAL: Supplied classes jar file " + stagedJar + " is not an ordinary file.");
+                            referToDocAndExit();
+                        }
+                        if (m_stagedClassesPaths == null) {
+                            m_stagedClassesPaths = new ArrayList<>();
+                        }
+                        m_stagedClassesPaths.add(stagedJar);
                     }
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
@@ -837,6 +860,7 @@ public class VoltDB {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
+                    .put(ClusterSettings.PARTITITON_IDS, m_recoveredPartitions)
                     .build();
         }
 

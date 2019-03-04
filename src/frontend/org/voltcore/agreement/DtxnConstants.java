@@ -18,13 +18,5 @@
 package org.voltcore.agreement;
 
 public abstract class DtxnConstants {
-
-    /** If the txn id is this, do a dump from the ExecSite */
-    public static final long DUMP_REQUEST_TXNID = -101;
-
-    /** Dtxn requires 1 dependency response per partition */
-    public static final int MULTIPARTITION_DEPENDENCY = 0x40000000;
-
     public static final long DUMMY_LAST_SEEN_TXN_ID = -1;
-
 }

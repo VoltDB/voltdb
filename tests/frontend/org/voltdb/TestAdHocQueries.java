@@ -446,42 +446,41 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
-    // ENG-15258
-//    @Test
-//    public void testAdHocLengthLimit() throws Exception {
-//        System.out.println("Starting testAdHocLengthLimit");
-//        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
-//
-//        env.setUp();
-//        // by pass valgrind due to ENG-7843
-//        if (env.isValgrind() || env.isMemcheckDefined()) {
-//            env.tearDown();
-//            System.out.println("Skipped testAdHocLengthLimit");
-//            return;
-//        }
-//        try {
-//            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
-//            int i = 0;
-//            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
-//                String randPhone = RandomStringUtils.randomNumeric(10);
-//                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
-//                assertEquals(1, result.getRowCount());
-//                adHocQueryTemp.append(randPhone);
-//                adHocQueryTemp.append(", ");
-//                i++;
-//            }
-//            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
-//            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
-//            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
-//            assert(i < Short.MAX_VALUE);
-//            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
-//            assertEquals(i, result.getRowCount());
-//        }
-//         finally {
-//            env.tearDown();
-//            System.out.println("Ending testAdHocLengthLimit");
-//        }
-//    }
+    @Test
+    public void testAdHocLengthLimit() throws Exception {
+        System.out.println("Starting testAdHocLengthLimit");
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+
+        env.setUp();
+        // by pass valgrind due to ENG-7843
+        if (env.isValgrind() || env.isMemcheckDefined()) {
+            env.tearDown();
+            System.out.println("Skipped testAdHocLengthLimit");
+            return;
+        }
+        try {
+            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
+            int i = 0;
+            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
+                String randPhone = RandomStringUtils.randomNumeric(10);
+                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
+                assertEquals(1, result.getRowCount());
+                adHocQueryTemp.append(randPhone);
+                adHocQueryTemp.append(", ");
+                i++;
+            }
+            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
+            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
+            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
+            assert(i < Short.MAX_VALUE);
+            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
+            assertEquals(i, result.getRowCount());
+        }
+         finally {
+            env.tearDown();
+            System.out.println("Ending testAdHocLengthLimit");
+        }
+    }
 
     // ENG-15263
 //    @Test

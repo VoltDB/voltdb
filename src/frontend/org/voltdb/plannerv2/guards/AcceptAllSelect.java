@@ -17,9 +17,9 @@
 
 package org.voltdb.plannerv2.guards;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Accepts all SELECT queries.
@@ -57,10 +57,10 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
         if (message.contains("No match found for function signature")) {
             return true;
         }
-        // TODO: select myUdf(NULL) from T; select myUdf(?) from T;
-        // will throw this exception, calcite try to infer the parameter types in function and disallow null and ? there
-        // @see #SqlValidatorImpl.inferUnknownTypes
-        // see ENG-15222
+        // TODO: select myUdf(NULL) from T; select myUdf(?) from T; will throw this exception
+        // Calcite will try to infer the parameter types in function
+        // works for non-Udf(null) see ENG-15222
+        // not works for Udf(null) see #SqlValidatorImpl.inferUnknownTypes
         if (message.contains("Illegal use of 'NULL'") || message.contains("Illegal use of dynamic parameter")) {
             return true;
         }

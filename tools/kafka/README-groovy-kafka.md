@@ -12,13 +12,9 @@ The first time you run one of the scripts it will download, cache, and
 use all the required dependency artifacts. For usage information
 invoke the scripts without any arguments
 
-* `kafka-offset-info.groovy` prints out topic partition offset
-  consumption statistics
-* `kafka-message-prober.groovy` prints out topic partition offset
+* `kafka10-message-prober.groovy` prints out topic partition offset
   consumption statistics, and reads from each topic partition about a
   thousand messages
-* `kafka-reset-consumer-offset.groovy` it can be used to reset the
-  consumer offset used by VoltDB importers.
 * `kafka10-offset-info.groovy` prints out topic partition offset
   consumption statistics from Kafka 10 cluster
 * `kafka10-reset-consumer-offset.groovy` it can be used to reset the

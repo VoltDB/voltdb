@@ -147,7 +147,7 @@ public class SysprocFragmentTask extends FragmentTaskBase
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         response.setRespBufferable(m_respBufferable);
-        response.setForOldLeader(m_fragmentMsg.isForOldLeader());
+        response.setExecutedOnPreviousLeader(m_fragmentMsg.isExecutedOnPreviousLeader());
         m_initiator.deliver(response);
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);

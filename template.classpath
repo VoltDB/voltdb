@@ -36,15 +36,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
 
-	<!--
-	export system still uses producer based on Kafka 8 API. So we need to include those
-	jars as long as export is not bundled like import.  Also, put K10 API on the Eclipse classpath to keep
-	it happy.  In the Ant build, it's limited to build-importers.xml (i.e., K10 is not on the product classpath).
-	Putting K10 ahead of K8 will eliminate the red squiggles.
-	-->
-    <classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
-    <classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
-	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
+     <classpathentry kind="lib" path="lib/kafka-clients-0.10.2.1.jar"/>
 
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
