@@ -118,7 +118,8 @@ public abstract class CatalogSchemaTools {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
                 }
                 //Default target means no target.
-                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME) &&
+                        TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
             } else {
@@ -343,8 +344,7 @@ public abstract class CatalogSchemaTools {
         sb.append(table_sb.toString());
 
         // Partition Table for regular tables (non-streams)
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly
-                && TableType.isStream(catalog_tbl.getTabletype())) {
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
         }
 
