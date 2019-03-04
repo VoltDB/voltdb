@@ -118,6 +118,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private long m_firstUnpolledSeqNo = 1L; // sequence number starts from 1
     private long m_lastReleasedSeqNo = 0L;
+
+    // The committed sequence number is the sequence number of the last row
+    // of the last committed transaction pushed up from the EE, and acknowledged by
+    // the export client.
+    private long m_committedSeqNo = 0L;
+
+    // Null value for last committed sequence number in EE buffer
+    // See {@code ExportStreamBlock} in EE code.
+    public static long NULL_COMMITTED_SEQNO = -1L;
+
     // End sequence number of most recently pushed export buffer
     private long m_lastPushedSeqNo = 0L;
     // Relinquish export master after this sequence number
@@ -132,7 +142,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Map<Long, QueryResponse> m_queryResponses = new HashMap<>();
 
     private volatile boolean m_closed = false;
-    private final StreamBlockQueue m_committedBuffers;
+    private final StreamBlockQueue m_buffers;
     private Runnable m_onMastership;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
@@ -234,8 +244,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         crc.update(m_signatureBytes);
         String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
 
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
-        m_gapTracker = m_committedBuffers.scanForGap();
+        m_buffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_gapTracker = m_buffers.scanForGap();
         // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
 
@@ -380,8 +390,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(m_signatureBytes);
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
-        m_gapTracker = m_committedBuffers.scanForGap();
+        m_buffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_gapTracker = m_buffers.scanForGap();
          // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
         if (exportLog.isDebugEnabled()) {
@@ -443,11 +453,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
-        while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
-            StreamBlock sb = m_committedBuffers.peek();
+        while (!m_buffers.isEmpty() && releaseSeqNo >= m_buffers.peek().startSequenceNumber()) {
+            StreamBlock sb = m_buffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
-                    m_committedBuffers.pop();
+                    m_buffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
@@ -476,7 +486,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Truncating tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString() +
-                    ", m_committedBuffers.isEmpty() " + m_committedBuffers.isEmpty());
+                    ", m_buffers.isEmpty() " + m_buffers.isEmpty());
         }
         return;
     }
@@ -590,7 +600,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_buffers.sizeInBytes();
                 }
             }).get();
         } catch (RejectedExecutionException e) {
@@ -654,6 +664,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long startSequenceNumber,
+            long committedSequenceNumber,
             int tupleCount,
             long uniqueId,
             long genId,
@@ -691,7 +702,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, null, startSequenceNumber, tupleCount, uniqueId, false);
+                        },
+                        null,
+                        startSequenceNumber,
+                        committedSequenceNumber,
+                        tupleCount, uniqueId, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -716,7 +731,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                         VoltDB.instance().getCatalogContext(), m_tableName);
                 // check generation id change at every push to tell when to create new segment
-                m_committedBuffers.offer(sb, ds, genId != m_previousGenId);
+                m_buffers.offer(sb, ds, genId != m_previousGenId);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -732,6 +747,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long startSequenceNumber,
+            final long committedSequenceNumber,
             final int tupleCount,
             final long uniqueId,
             final long genId,
@@ -746,7 +762,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, false);
+                pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                        tupleCount, uniqueId, genId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -760,7 +777,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                                    tupleCount, uniqueId, genId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -798,7 +816,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     m_partitionId);
                             return;
                         }
-                        m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
+                        m_buffers.truncateToSequenceNumber(sequenceNumber);
                         // export data after truncation point will be regenerated by c/l replay
                         m_gapTracker.truncateAfter(sequenceNumber);
                         if (exportLog.isDebugEnabled()) {
@@ -825,7 +843,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void run() {
             try {
-                m_committedBuffers.sync(m_nofsync);
+                m_buffers.sync(m_nofsync);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -846,7 +864,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.closeAndDelete();
+                    m_buffers.closeAndDelete();
                     m_adFile.delete();
                     m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
@@ -866,7 +884,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.close();
+                    m_buffers.close();
                     m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e.getMessage(), e);
@@ -952,13 +970,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             cleanupEmptySource();
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
-            //outside of the m_committedBuffers critical section
+            //outside of the m_buffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
             //Inside this critical section do the work to find out
             //what block should be returned by the next poll.
             //Copying and sending the data will take place outside the critical section
             try {
-                Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+                Iterator<StreamBlock> iter = m_buffers.iterator();
                 long firstUnpolledSeq = m_firstUnpolledSeqNo;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("polling data from seqNo " + firstUnpolledSeq);
@@ -1028,7 +1046,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.getSchemaContainer(),
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1);
+                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
+                                first_unpolled_block.committedSequenceNumber());
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1043,13 +1062,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public class AckingContainer extends BBContainer {
         final long m_lastSeqNo;
+        final long m_commitSeqNo;
         final BBContainer m_backingCont;
         final BBContainer m_schemaCont;
         long m_startTime = 0;
+        long m_commitSpHandle = 0;
 
-        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq) {
+        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq) {
             super(cont.b());
             m_lastSeqNo = seq;
+            m_commitSeqNo = commitSeq;
             m_backingCont = cont;
             m_schemaCont = schemaCont;
         }
@@ -1063,6 +1085,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return null;
             }
             return m_schemaCont.b();
+        }
+
+        public long getCommittedSeqNo() {
+            return m_commitSeqNo;
+        }
+
+        public void setCommittedSpHandle(long spHandle) {
+            m_commitSpHandle = spHandle;
         }
 
         @Override
@@ -1091,10 +1121,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              }
                             try {
                                 if (!m_es.isShutdown()) {
+                                    setCommittedSeqNo(m_commitSeqNo);
                                     ackImpl(m_lastSeqNo);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_lastSeqNo);
+                                forwardAckToOtherReplicas();
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1113,10 +1144,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void forwardAckToOtherReplicas() {
-        forwardAckToOtherReplicas(m_lastReleasedSeqNo);
-    }
-
-    private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
             return;
@@ -1133,7 +1160,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(seq);
+            buf.putLong(m_committedSeqNo);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1141,7 +1168,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 mbx.send(siteId, bpm);
             }
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + seq
+                exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                        + " with sequence number " + m_committedSeqNo
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
@@ -1171,7 +1199,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_partitionId);
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
-                    buf.putLong(m_lastReleasedSeqNo);
+                    buf.putLong(m_committedSeqNo);
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1179,7 +1207,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         mbx.send(siteId, bpm);
                     }
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + m_lastReleasedSeqNo
+                        exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                                + " with sequence number " + m_committedSeqNo
                                 + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                                 + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                     }
@@ -1188,7 +1217,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long seq) {
+    /**
+     * Entry point for receiving acknowledgments from remote entities.
+     *
+     * @param seq acknowledged sequence number, ALWAYS last row of a transaction, or 0.
+     */
+    public void remoteAck(final long seq) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1210,6 +1244,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
+                        setCommittedSeqNo(seq);
                         ackImpl(seq);
                     }
                 } catch (Exception e) {
@@ -1237,7 +1272,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     // Discard dangling or dropped export data source when the buffer is empty
     private void cleanupEmptySource() throws IOException {
-        if ((!this.m_isInCatalog || m_status == StreamStatus.DROPPED) && m_committedBuffers.isEmpty()) {
+        if ((!this.m_isInCatalog || m_status == StreamStatus.DROPPED) && m_buffers.isEmpty()) {
             //Returning null indicates end of stream
             try {
                 if (m_pollFuture != null) {
@@ -1275,7 +1310,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private void sendGiveMastershipMessage(int newLeaderHostId, long curSeq) {
+    private void sendGiveMastershipMessage(int newLeaderHostId) {
         if (m_runEveryWhere) {
             return;
         }
@@ -1290,7 +1325,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(curSeq);
+            buf.putLong(m_committedSeqNo);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1300,7 +1335,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     mbx.send(siteId, bpm);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug(toString() + " send GIVE_MASTERSHIP message to " +
-                                CoreUtils.hsIdToString(siteId) + " curruent sequence number " + curSeq);
+                                CoreUtils.hsIdToString(siteId)
+                                + " with sequence number " + m_committedSeqNo);
                     }
                     break;
                 }
@@ -1682,12 +1718,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
                     " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
-                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_lastPushedSeqNo " + m_lastPushedSeqNo);
+                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_committedSeqNo " + m_committedSeqNo +
+                    " m_lastPushedSeqNo " + m_lastPushedSeqNo);
         }
         // time to give away leadership
         if (seq >= m_seqNoToDrain) {
             if (m_newLeaderHostId != null) {
-                sendGiveMastershipMessage(m_newLeaderHostId, seq);
+                sendGiveMastershipMessage(m_newLeaderHostId);
             } else {
                 sendGapQuery();
             }
@@ -1732,6 +1769,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // should not happen since the operation is verified prior to this call
         }
         return false;
+    }
+
+
+    private void setCommittedSeqNo(long committedSeqNo) {
+        if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
+        if (committedSeqNo > m_committedSeqNo) {
+            m_committedSeqNo  = committedSeqNo;
+        }
     }
 
     public static class StreamTableSchemaSerializer implements DeferredSerialization {
@@ -1819,6 +1864,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * column length(4)
          *
          */
+        @Override
         public void serialize(ByteBuffer buf) throws IOException {
             buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
             buf.putLong(m_catalogContext.m_genId);
@@ -1839,8 +1885,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
 
+        @Override
         public void cancel() {}
 
+        @Override
         public int getSerializedSize() throws IOException {
             int size = 0;
             // column name length, name, type, length
@@ -1859,6 +1907,5 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     4 + VOLT_EXPORT_OPERATION.length() + 1 + 4 +
                     size;
         }
-
     }
 }

@@ -685,6 +685,7 @@ public class ExportManager
             int partitionId,
             String signature,
             long startSequenceNumber,
+            long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
             long genId,
@@ -702,7 +703,8 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
+            generation.pushExportBuffer(partitionId, signature,
+                    startSequenceNumber, committedSequenceNumber,
                     (int)tupleCount, uniqueId, genId, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
