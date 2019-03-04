@@ -1627,7 +1627,7 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = 0;
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = 0;
     }
-    index += 24;
+    index += 32;
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
         sync ?
             static_cast<int8_t>(1) : static_cast<int8_t>(0);

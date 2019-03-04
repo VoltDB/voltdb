@@ -696,7 +696,6 @@ public class ExportManager
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
-            long lastSeqNo = startSequenceNumber + tupleCount - 1;
             ExportGeneration generation = instance.m_generation.get();
             if (generation == null) {
                 if (buffer != null) {
