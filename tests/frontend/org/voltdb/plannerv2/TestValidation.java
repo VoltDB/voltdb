@@ -116,28 +116,29 @@ public class TestValidation extends Plannerv2TestCase {
 
     // ENG-15222 allow null to appear as function parameter
     public void testNullAsFunctionParameter() {
-        m_tester.sql("select abs(null) from R1").test();
-        m_tester.sql("select power(null, null) from R1").test();
-        m_tester.sql("select power(abs(null), abs(null)) from R1").test();
-        m_tester.sql("select abs(abs(abs(null))) from R1").test();
+        m_tester.sql("select abs(null) from R1").pass();
+        m_tester.sql("select power(null, null) from R1").pass();
+        m_tester.sql("select power(abs(null), abs(null)) from R1").pass();
+        m_tester.sql("select abs(abs(abs(null))) from R1").pass();
     }
 
     // ENG-15222 allow null to appear as function parameter
     public void testQuestionMarkAsFunctionParameter() {
-        m_tester.sql("select abs(?) from R1").test();
-        m_tester.sql("select power(?, ?) from R1").test();
-        m_tester.sql("select power(abs(?), abs(?)) from R1").test();
-        m_tester.sql("select abs(abs(abs(?))) from R1").test();
+        m_tester.sql("select abs(?) from R1").pass();
+        m_tester.sql("select power(?, ?) from R1").pass();
+        m_tester.sql("select power(abs(?), abs(?)) from R1").pass();
+        m_tester.sql("select abs(abs(abs(?))) from R1").pass();
     }
 
     // TODO ENG-15353: allow null to appear in operands
     public void testNullAsOperand() {
-        //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").test();
-        //m_tester.sql("create table foo(i int, unique (1 + null));").test();
+        //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").pass();
+        //m_tester.sql("create table foo(i int, unique (1 + null));").pass();
     }
 
     public void testFullJoinWithoutColumnScope() {
         // TODO: fix this
-//        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").test();
+//        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").pass();
     }
 }
+
