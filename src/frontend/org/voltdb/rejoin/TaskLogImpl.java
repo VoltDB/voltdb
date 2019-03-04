@@ -31,7 +31,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 
 /**

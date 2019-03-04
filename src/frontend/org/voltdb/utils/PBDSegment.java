@@ -34,80 +34,6 @@ import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
 
-    /**
-     * Represents a reader for a segment. Multiple readers may be active
-     * at any point in time, reading from different locations in the segment.
-     */
-    public interface PBDSegmentReader {
-        /**
-         * Are there any more entries to read from this segment for this reader
-         *
-         * @return true if there are still more entries to be read. False otherwise.
-         * @throws IOException if the reader was closed or on any error trying to read from the segment file.
-         */
-        public boolean hasMoreEntries() throws IOException;
-
-        /**
-         * Have all the entries in this segment been read by this reader and
-         * acknowledged as ready for discarding.
-         *
-         * @return true if all entries have been read and discarded by this reader. False otherwise.
-         * @throws IOException if the reader was closed
-         */
-        public boolean allReadAndDiscarded() throws IOException;
-
-        /**
-         * Read the next entry from the segment for this reader.
-         * Returns null if all entries in this segment were already read by this reader.
-         *
-         * @param factory
-         * @param checkCRC
-         * @return BBContainer with the bytes read
-         * @throws IOException
-         */
-        public DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory,
-                boolean checkCRC) throws IOException;
-
-        public DBBPool.BBContainer getSchema(BinaryDeque.OutputContainerFactory factory,
-                boolean checkCRC) throws IOException;
-
-        //Don't use size in bytes to determine empty, could potentially
-        //diverge from object count on crash or power failure
-        //although incredibly unlikely
-        /**
-         * Returns the number of bytes that are left to read in this segment
-         * for this reader.
-         */
-        public int uncompressedBytesToRead();
-
-        /**
-         * Returns the current read offset for this reader in this segment.
-         */
-        public long readOffset();
-
-        /**
-         * Entry that this reader will read next.
-         * @return
-         */
-        public int readIndex();
-
-        /**
-         * Rewinds the read offset for this reader by the specified number of bytes.
-         */
-        public void rewindReadOffset(int byBytes);
-
-        /**
-         * Close this reader and release any resources.
-         * <code>getReader</code> will still return this reader until the segment is closed.
-         */
-        public void close() throws IOException;
-
-        /**
-         * Has this reader been closed.
-         */
-        public boolean isClosed();
-    }
-
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
     protected static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
@@ -312,8 +238,8 @@ public abstract class PBDSegment {
     ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
         if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
 
-        // Open for write because corrupted file may be truncated
-        openForWrite(false);
+//        // Open for write because corrupted file may be truncated
+//        openForWrite(false);
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
 
@@ -322,7 +248,6 @@ public abstract class PBDSegment {
         int initialEntryCount = getNumEntries(true);
         if (initialEntryCount == 0) {
             reader.close();
-            close();
             return tracker;
         }
         while (true) {

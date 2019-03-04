@@ -28,10 +28,10 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.VoltDB;
 import org.voltdb.export.ExportDataSource.StreamTableSchemaSerializer;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
 import org.voltdb.utils.VoltFile;
@@ -86,19 +86,6 @@ public class StreamBlockQueue {
     private final String m_path;
     private final String m_streamName;
     private BinaryDequeReader m_reader;
-
-    // For test
-    public StreamBlockQueue(String path, String nonce)
-            throws java.io.IOException {
-        m_streamName = null;
-        m_persistentDeque = new PersistentBinaryDeque( nonce, null, new VoltFile(path), exportLog);
-        m_path = path;
-        m_nonce = nonce;
-        m_reader = m_persistentDeque.openForRead(m_nonce);
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
-        }
-    }
 
     public StreamBlockQueue(String path, String nonce, String streamName)
             throws java.io.IOException {
