@@ -39,105 +39,106 @@ public class TestValidation extends Plannerv2TestCase {
 
     public void testTableColumn() {
         // valid columns
-        m_tester.sql("select i from R2").test();
-        m_tester.sql("select pk from R3").test();;
+        m_tester.sql("select i from R2").pass();
+        m_tester.sql("select pk from R3").pass();;
         // select a not exist column
-        m_tester.sql("select ^bad^ from R2").exception("Column 'BAD' not found in any table").test();
+        m_tester.sql("select ^bad^ from R2").exception("Column 'BAD' not found in any table").pass();
         // select a not exist column from another table
-        m_tester.sql("select ^pk^ from R2").exception("Column 'PK' not found in any table").test();
+        m_tester.sql("select ^pk^ from R2").exception("Column 'PK' not found in any table").pass();
         // well, this one's error message is a little misleading. But it is the expected behavior for calcite validator
-        m_tester.sql("select ^R3^.pk from R2").exception("Table 'R3' not found").test();
+        m_tester.sql("select ^R3^.pk from R2").exception("Table 'R3' not found").pass();
         // select a not exist table.column
-        m_tester.sql("select R2.^bad^ from R2").exception("Column 'BAD' not found in table 'R2'").test();
+        m_tester.sql("select R2.^bad^ from R2").exception("Column 'BAD' not found in table 'R2'").pass();
         // not exist column in where clause
-        m_tester.sql("select pk from R3 where ^bad^ < 0").exception("Column 'BAD' not found in any table").test();
+        m_tester.sql("select pk from R3 where ^bad^ < 0").exception("Column 'BAD' not found in any table").pass();
         // not exist table.column in where clause
-        m_tester.sql("select pk from R3 where R3.^bad^ < 0").exception("Column 'BAD' not found in table 'R3'").test();
+        m_tester.sql("select pk from R3 where R3.^bad^ < 0").exception("Column 'BAD' not found in table 'R3'").pass();
     }
 
     public void testTableName() {
         // valid table
-        m_tester.sql("select * from R3").test();
+        m_tester.sql("select * from R3").pass();
         // not exist table
-        m_tester.sql("select * from ^bad^").exception("Object 'BAD' not found").test();
+        m_tester.sql("select * from ^bad^").exception("Object 'BAD' not found").pass();
     }
 
     public void testCaseInsensitivity() {
-        m_tester.sql("select pK from R3").test();
-        m_tester.sql("select * from r3").test();
+        m_tester.sql("select pK from R3").pass();
+        m_tester.sql("select * from r3").pass();
     }
 
     public void testGroupBy() {
-        m_tester.sql("select i from R2 group by i").test();
-        m_tester.sql("select i + 1 from R2 group by i").test();
-        m_tester.sql("select i, count(*) from R2 group by i").test();
+        m_tester.sql("select i from R2 group by i").pass();
+        m_tester.sql("select i + 1 from R2 group by i").pass();
+        m_tester.sql("select i, count(*) from R2 group by i").pass();
 
-        m_tester.sql("select ^i^, count(*) from R2 group by i + 1").exception("Expression 'I' is not being grouped").test();
-        m_tester.sql("select i, ^ti^ from R2 group by i").exception("Expression 'TI' is not being grouped").test();
+        m_tester.sql("select ^i^, count(*) from R2 group by i + 1").exception("Expression 'I' is not being grouped").pass();
+        m_tester.sql("select i, ^ti^ from R2 group by i").exception("Expression 'TI' is not being grouped").pass();
     }
 
     public void testPartitionBy() {
-        m_tester.sql("select i, sum(i) over(partition by i + ti order by i) from R2").test();
+        m_tester.sql("select i, sum(i) over(partition by i + ti order by i) from R2").pass();
 
         m_tester.sql("select i, sum(i) over(partition by ^i + v^ order by i) from R2")
                 .exception("(?s)Cannot apply '\\+' to arguments of type '<INTEGER> \\+ <VARCHAR\\(32\\)>'.*")
-                .test();
+                .pass();
     }
 
     public void testFunctionArg() {
-        m_tester.sql("select sum(i) from R2").test();
+        m_tester.sql("select sum(i) from R2").pass();
 
         m_tester.sql("select ^sum()^ from R2")
                 .exception("Invalid number of arguments to function 'SUM'. Was expecting 1 arguments")
-                .test();
+                .pass();
         m_tester.sql("select ^sum(i, ti)^ from R2")
                 .exception("Invalid number of arguments to function 'SUM'. Was expecting 1 arguments")
-                .test();
+                .pass();
     }
 
     public void testType() {
-        m_tester.sql("select i from R2 where v > 1").test();
+        m_tester.sql("select i from R2 where v > 1").pass();
 
         m_tester.sql("select i from R2 where ^NOT v^")
                 .exception("Cannot apply 'NOT' to arguments of type 'NOT<VARCHAR\\(32\\)>'.*")
-                .test();
+                .pass();
         m_tester.sql("select ^True or i^ from R2")
                 .exception("Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*")
-                .test();
+                .pass();
     }
 
     public void testGroupByAlias() {
-        m_tester.sql("select i as foo, count(*) from R2 group by foo").test();
+        m_tester.sql("select i as foo, count(*) from R2 group by foo").pass();
     }
 
     public void testBangEqual() {
-        m_tester.sql("select i from R1 where i != 3").test();
+        m_tester.sql("select i from R1 where i != 3").pass();
     }
 
     // ENG-15222 allow null to appear as function parameter
     public void testNullAsFunctionParameter() {
-        m_tester.sql("select abs(null) from R1").test();
-        m_tester.sql("select power(null, null) from R1").test();
-        m_tester.sql("select power(abs(null), abs(null)) from R1").test();
-        m_tester.sql("select abs(abs(abs(null))) from R1").test();
+        m_tester.sql("select abs(null) from R1").pass();
+        m_tester.sql("select power(null, null) from R1").pass();
+        m_tester.sql("select power(abs(null), abs(null)) from R1").pass();
+        m_tester.sql("select abs(abs(abs(null))) from R1").pass();
     }
 
     // ENG-15222 allow null to appear as function parameter
     public void testQuestionMarkAsFunctionParameter() {
-        m_tester.sql("select abs(?) from R1").test();
-        m_tester.sql("select power(?, ?) from R1").test();
-        m_tester.sql("select power(abs(?), abs(?)) from R1").test();
-        m_tester.sql("select abs(abs(abs(?))) from R1").test();
+        m_tester.sql("select abs(?) from R1").pass();
+        m_tester.sql("select power(?, ?) from R1").pass();
+        m_tester.sql("select power(abs(?), abs(?)) from R1").pass();
+        m_tester.sql("select abs(abs(abs(?))) from R1").pass();
     }
 
     // TODO ENG-15353: allow null to appear in operands
     public void testNullAsOperand() {
-        //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").test();
-        //m_tester.sql("create table foo(i int, unique (1 + null));").test();
+        //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").pass();
+        //m_tester.sql("create table foo(i int, unique (1 + null));").pass();
     }
 
     public void testFullJoinWithoutColumnScope() {
         // TODO: fix this
-//        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").test();
+//        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").pass();
     }
 }
+

@@ -26,10 +26,7 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.*;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -118,7 +115,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
             return m_transformedNode;
         }
 
-        public void test() throws AssertionError {
+        public void pass() throws AssertionError {
             if (m_sap == null) {
                 throw new AssertionError("Need to specify a SQL statement.");
             }
@@ -129,8 +126,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
             }
         }
 
-        public void testFail() {
-            fail("Not implemented.");
+        public void fail() {
+            PlannerTestCase.fail("Not implemented.");
         }
 
         void checkEx(Exception ex) throws AssertionError {
@@ -150,8 +147,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class ValidationTester extends Tester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             try {
                 m_parsedNode = m_planner.parse(m_sap.sql);
                 m_validatedNode = m_planner.validate(m_parsedNode);
@@ -162,8 +159,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class ConversionTester extends ValidationTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             try {
                 m_root = m_planner.rel(m_validatedNode);
                 if (m_expectedPlan != null) {
@@ -176,8 +173,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class LogicalRulesTester extends ConversionTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             if (m_ruleSetIndex < 0) {
                 throw new AssertionError("Need to specify a planner phase.");
             }
@@ -192,34 +189,35 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class MPFallbackTester extends LogicalRulesTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        private RelDistribution transform() {
             m_transformedNode = VoltRelUtil.addTraitRecursively(m_transformedNode, RelDistributions.ANY);
             m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK, m_transformedNode);
+            return m_transformedNode.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         }
 
-        @Override public void testFail() {
-            try {
-                test();
-            }
-            catch (PlannerFallbackException e){
-                assertEquals("MP query not supported in Calcite planner.", e.getMessage());
-                // we got the exception, we are good.
-                return;
-            }
-            catch (RuntimeException e) {
-                assertTrue(e.getMessage().startsWith("Error while applying rule"));
-                // we got the exception, we are good.
-                return;
-            }
-            fail("Expected fallback.");
+        @Override public void pass() throws AssertionError {
+            super.pass();
+            final RelDistribution distribution = transform();
+            assertTrue("Got SINGLETON distribution without partition equal value",
+                    distribution.getIsSP());
+        }
+
+        @Override public void fail() {
+            super.pass();
+            final RelDistribution distribution = transform();
+            assertFalse("Expected fall back:\nGot distribution type " +
+                            distribution.getType().name() +
+                            " with partition equal value = " +
+                            (distribution.getPartitionEqualValue() == null ? "null" :
+                                    distribution.getPartitionEqualValue().toString()),
+                    distribution.getIsSP());
         }
     }
 
     public class PhysicalConversionRulesTester extends MPFallbackTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
             RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
                     replace(RelDistributions.ANY);
@@ -233,8 +231,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class InlineRulesTester extends PhysicalConversionRulesTester {
-        @Override public void test() throws AssertionError {
-            super.test();
+        @Override public void pass() throws AssertionError {
+            super.pass();
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
                     HepMatchOrder.ARBITRARY, m_transformedNode, true);
             if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal() && m_expectedTransform != null) {

@@ -137,6 +137,14 @@ public class VoltTable implements TranslatableTable {
         return false;
     }
 
+    @Override public Integer getPartitionColumn() {
+        if (m_catTable.getIsreplicated()) {
+            return null;
+        } else {
+            return m_catTable.getPartitioncolumn().getIndex();
+        }
+    }
+
     /**
      * @return the table information stored in the VoltDB catalog.
      */

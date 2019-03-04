@@ -21,12 +21,9 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
  * Rules that fallback a query with Join operator if it is multi-partitioned.
@@ -40,41 +37,28 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
             new MPJoinQueryFallBackRule(
                     operand(VoltLogicalJoin.class, RelDistributions.ANY,
                             some(operand(RelNode.class, any()),
-                                    operand(RelNode.class, any()))), "MPJoinQueryFallBackRule");
+                                    operand(RelNode.class, any()))),
+                    "MPJoinQueryFallBackRule");
 
     private MPJoinQueryFallBackRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);
     }
 
-    private RelDistribution getDistribution(RelNode node) {
-        if (node instanceof VoltLogicalTableScan) {
-            return node.getTable().getDistribution();
-        }
-        return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-    }
-
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalJoin join = call.rel(0);
-        RelDistribution leftDist = getDistribution(call.rel(1));
-        RelDistribution rightDist = getDistribution(call.rel(2));
-
-        if ((call.rel(1) instanceof VoltLogicalTableScan && leftDist != RelDistributions.SINGLETON) ||
-                (call.rel(2) instanceof VoltLogicalTableScan && rightDist != RelDistributions.SINGLETON)) {
-            // partitioned table without filter, throw
-            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-        }
-
-        if (leftDist != RelDistributions.SINGLETON && rightDist != RelDistributions.SINGLETON) {
-            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-        }
-
-        if (leftDist == RelDistributions.SINGLETON && rightDist == RelDistributions.SINGLETON) {
-            call.transformTo(join.copy(join.getTraitSet().replace(RelDistributions.SINGLETON), join.getInputs()));
-        } else if (leftDist != RelDistributions.SINGLETON) {
-            call.transformTo(join.copy(join.getTraitSet().replace(leftDist), join.getInputs()));
-        } else {
-            call.transformTo(join.copy(join.getTraitSet().replace(rightDist), join.getInputs()));
-        }
+        final VoltLogicalJoin join = call.rel(0);
+        final RelNode outer = call.rel(1), inner = call.rel(2);
+        final RelDistributionUtils.JoinState joinState = RelDistributionUtils.isJoinSP(join, outer, inner);
+        //RelDistributionUtils.checkedFallBack(! joinState.isSP());
+        // The query is SP, and the distributions of any partitioned tables had been set.
+        final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
+                innerDist = RelDistributionUtils.getDistribution(inner);
+        final boolean isEitherParitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED ||
+                innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final RelDistribution intermediate =
+                isEitherParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
+        final RelDistribution newDist = intermediate
+                .with(joinState.getLiteral(), joinState.isSP());
+        call.transformTo(join.copy(join.getTraitSet().replace(newDist), join.getInputs()));
     }
 }

@@ -40,6 +40,6 @@ public class TestRelConversion extends Plannerv2TestCase {
     public void testSimple() {
         m_tester.sql("select i from R2")
                 .plan("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}")
-                .test();
+                .pass();
     }
 }

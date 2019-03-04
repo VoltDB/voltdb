@@ -44,56 +44,56 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select si from Ri1")
                 .transform("VoltLogicalCalc(expr#0..3=[{inputs}], SI=[$t1])\n" +
                            "  VoltLogicalTableScan(table=[[public, RI1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScan() {
         m_tester.sql("select * from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithProjection() {
         m_tester.sql("select i, si from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithProjectionExpr() {
         m_tester.sql("select i * 5 from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[*($t0, $t6)], EXPR$0=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithFilter() {
         m_tester.sql("select i from R1 where i = 5")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithFilterParam() {
         m_tester.sql("select i from R1 where i = ? and v = ?")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[?0], expr#7=[=($t0, $t6)], expr#8=[?1], expr#9=[=($t5, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], $condition=[$t10])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithStringFilter() {
         m_tester.sql("select i from R1 where v = 'FOO1'")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['FOO1'], expr#7=[=($t5, $t6)], I=[$t0], $condition=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithFilterWithTypeConversion() {
         m_tester.sql("select i from R1 where si = 5")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[5], expr#8=[=($t6, $t7)], I=[$t0], $condition=[$t8])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     // Partition info are introduced in the physical plan phase. In logical plan phase there is no difference.
@@ -101,12 +101,12 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select * from P1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltLogicalTableScan(table=[[public, P1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select i from P1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                            "  VoltLogicalTableScan(table=[[public, P1]])\n")
-                .test();
+                .pass();
     }
 
     // Index info are introduced in the physical plan phase. In logical plan phase there is no difference.
@@ -114,7 +114,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select bi from RI1 where i > 45 and ti > 3")
                 .transform("VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[45], expr#5=[>($t0, $t4)], expr#6=[3], expr#7=[>($t3, $t6)], expr#8=[AND($t5, $t7)], BI=[$t2], $condition=[$t8])\n" +
                            "  VoltLogicalTableScan(table=[[public, RI1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithLimit() {
@@ -122,7 +122,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(limit=[5])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithLimitParam() {
@@ -130,7 +130,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(limit=[?0])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithFilterAndLimit() {
@@ -138,7 +138,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(limit=[5])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], I=[$t0], $condition=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOrderByAndLimitAndFilter() {
@@ -147,7 +147,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
                            "    VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5])\n" +
                            "      VoltLogicalTableScan(table=[[public, RI1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOffset() {
@@ -155,7 +155,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(offset=[1])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithLimitOffset() {
@@ -163,7 +163,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(limit=[5], offset=[1])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithLimitOffsetSort() {
@@ -172,7 +172,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "  VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOrderByAndFilter() {
@@ -180,13 +180,13 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select i, bi, si from R1 where si > 3 order by i")
                 .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], I=[$t0], BI=[$t3], SI=[$t1], $condition=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOrderBy() {
@@ -194,13 +194,13 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[DESC])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select bi, i, si from R1 order by i, si desc")
                 .transform("VoltLogicalSort(sort0=[$1], sort1=[$2], dir0=[ASC], dir1=[DESC])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], BI=[$t3], I=[$t0], SI=[$t1])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOrderByExpr() {
@@ -208,7 +208,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalSort(sort0=[$1], sort1=[$3], dir0=[ASC], dir1=[DESC])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[1], expr#7=[+($t1, $t6)], BI=[$t3], I=[$t0], SI=[$t1], EXPR$3=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testSeqScanWithOrderByAndLimit() {
@@ -217,7 +217,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "  VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], BI=[$t3], I=[$t0], SI=[$t1])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testIndexScanWithLimitOffset() {
@@ -225,54 +225,54 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalLimit(limit=[3], offset=[4])\n" +
                            "  VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5])\n" +
                            "    VoltLogicalTableScan(table=[[public, RI1]])\n")
-                .test();
+                .pass();
     }
 
     public void testConstIntExpr() {
         m_tester.sql("select 5 from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], EXPR$0=[$t6])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testBinaryIntExpr() {
         m_tester.sql("select 5 + i from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[+($t6, $t0)], EXPR$0=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testConstBinaryIntExpr() {
         m_tester.sql("select 5 + 5 from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[+($t6, $t6)], EXPR$0=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testConcatStringExpr() {
         m_tester.sql("select '55' || '22' from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['55'], expr#7=['22'], expr#8=[||($t6, $t7)], EXPR$0=[$t8])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select v || '22' from R1")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['22'], expr#7=[||($t5, $t6)], EXPR$0=[$t7])\n" +
                            "  VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testDatetimeConstExpr() {
         m_tester.sql("select TIMESTAMP '1969-07-20 20:17:40' from RTYPES")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1969-07-20 20:17:40], EXPR$0=[$t9])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
     }
 
     public void testBinaryDatetimeExpr() {
         m_tester.sql("select ts - INTERVAL '1' DAY from RTYPES")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[86400000], expr#10=[-($t6, $t9)], EXPR$0=[$t10])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
     }
 
     public void testCompareInExpr() {
@@ -280,31 +280,31 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select 1 from RTYPES where i IN (1, 2)")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1], expr#10=[=($t3, $t9)], expr#11=[2], expr#12=[=($t3, $t11)], expr#13=[OR($t10, $t12)], EXPR$0=[$t9], $condition=[$t13])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select 1 from RTYPES where i IN (1, ?, 3)")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1], expr#10=[=($t3, $t9)], expr#11=[?0], expr#12=[=($t3, $t11)], expr#13=[3], expr#14=[=($t3, $t13)], expr#15=[OR($t10, $t12, $t14)], EXPR$0=[$t9], $condition=[$t15])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
     }
 
     public void testCompareLikeExpr() {
         m_tester.sql("select 1 from RTYPES where vc LIKE 'ab%c'")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1], expr#10=['ab%c'], expr#11=[LIKE($t8, $t10)], EXPR$0=[$t9], $condition=[$t11])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select 1 from RTYPES where vc LIKE ?")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1], expr#10=[?0], expr#11=[LIKE($t8, $t10)], EXPR$0=[$t9], $condition=[$t11])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
     }
 
     public void testAbsExpr() {
         m_tester.sql("select abs(i) from RTYPES")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[ABS($t3)], EXPR$0=[$t9])\n" +
                            "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
-                .test();
+                .pass();
     }
 
     public void testAggr() {
@@ -312,47 +312,47 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[AVG($0)])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], TI=[$t2])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select avg(ti) from R1 group by i")
                 .transform("VoltLogicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1])\n" +
                            "  VoltLogicalAggregate(group=[{0}], EXPR$0=[AVG($1)])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select count(i) from R1 where ti > 3")
                 .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t2, $t6)], I=[$t0], $condition=[$t7])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select count(*) from R1")
                 .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[COUNT()])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], $f0=[$t6])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max(TI) from R1 group by SI having SI > 0")
                 .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t0, $t2)], EXPR$0=[$t1], $condition=[$t3])\n" +
                            "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], TI=[$t2])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max(TI), SI, min(TI), I from R1 group by SI, I having avg(BI) > max(BI)")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[>($t4, $t5)], EXPR$0=[$t2], SI=[$t0], EXPR$2=[$t3], I=[$t1], $condition=[$t6])\n" +
                            "  VoltLogicalAggregate(group=[{0, 1}], EXPR$0=[MAX($2)], EXPR$2=[MIN($2)], agg#2=[AVG($3)], agg#3=[MAX($3)])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0], TI=[$t2], BI=[$t3])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max(TI), SI, I, min(TI) from R1 group by I, SI having avg(BI) > 0 and si > 0")
                 .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[0], expr#6=[>($t4, $t5)], expr#7=[>($t1, $t5)], expr#8=[AND($t6, $t7)], EXPR$0=[$t2], SI=[$t1], I=[$t0], EXPR$3=[$t3], $condition=[$t8])\n" +
                            "  VoltLogicalAggregate(group=[{0, 1}], EXPR$0=[MAX($2)], EXPR$3=[MIN($2)], agg#2=[AVG($3)])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..3=[{exprs}])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max(TI), SI from R1 where I > 0 group by SI, I limit 3")
                 .transform("VoltLogicalLimit(limit=[3])\n" +
@@ -360,7 +360,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "    VoltLogicalAggregate(group=[{0, 1}], EXPR$0=[MAX($2)])\n" +
                            "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t0, $t6)], SI=[$t1], I=[$t0], TI=[$t2], $condition=[$t7])\n" +
                            "        VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max(TI), SI from R1 where I > 0 group by SI, I order by SI limit 3")
                 .transform("VoltLogicalLimit(limit=[3])\n" +
@@ -369,7 +369,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "      VoltLogicalAggregate(group=[{0, 1}], EXPR$0=[MAX($2)])\n" +
                            "        VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t0, $t6)], SI=[$t1], I=[$t0], TI=[$t2], $condition=[$t7])\n" +
                            "          VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testDistinct() {
@@ -377,7 +377,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalAggregate(group=[{0, 1}])\n" +
                            "  VoltLogicalCalc(expr#0..5=[{inputs}], TI=[$t2], I=[$t0])\n" +
                            "    VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select distinct max(TI) from R1 group by I")
                 .transform("VoltLogicalAggregate(group=[{0}])\n" +
@@ -385,14 +385,14 @@ public class TestLogicalRules extends Plannerv2TestCase {
                            "    VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
                            "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2])\n" +
                            "        VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select max (distinct (TI)) from R1 group by I")
                 .transform("VoltLogicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1])\n" +
                            "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX(DISTINCT $1)])\n" +
                            "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], TI=[$t2])\n" +
                            "      VoltLogicalTableScan(table=[[public, R1]])\n")
-                .test();
+                .pass();
     }
 
     public void testJoin() {
@@ -404,7 +404,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "    VoltLogicalTableScan(table=[[public, R1]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select R1.i, R2.v from R1 inner join R2 on R2.si = R1.i where R2.v = 'foo'")
                 .transform("VoltLogicalCalc(expr#0..12=[{inputs}], I=[$t0], V=[$t11])\n" +
@@ -412,7 +412,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "    VoltLogicalTableScan(table=[[public, R1]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=['foo'], expr#8=[=($t5, $t7)], proj#0..6=[{exprs}], $condition=[$t8])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select R2.si, R1.i from R1 inner join " +
                         "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i")
@@ -422,7 +422,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "      VoltLogicalTableScan(table=[[public, R1]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select R1.i from R1 inner join " +
                         "R2  on R1.si = R2.si where R1.I + R2.ti = 5")
@@ -430,7 +430,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "  VoltLogicalJoin(condition=[AND(=($1, $7), =(+($0, $8), 5))], joinType=[inner])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n" +
                         "    VoltLogicalTableScan(table=[[public, R2]])\n")
-                .test();
+                .pass();
     }
 
     public void testThreeWayJoin() {
@@ -446,7 +446,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "        VoltLogicalTableScan(table=[[public, R2]])\n" +
                         "    VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4])\n" +
                         "      VoltLogicalTableScan(table=[[public, R3]])\n")
-                .test();
+                .pass();
     }
 
     public void testSubqueriesJoin() {
@@ -463,7 +463,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "      VoltLogicalTableScan(table=[[public, R1]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
-                .test();
+                .pass();
     }
 
     public void testIntersect() {
@@ -475,22 +475,22 @@ public class TestLogicalRules extends Plannerv2TestCase {
     public void testInExpr() {
         m_tester.sql("select * from r1 where i in(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
                 .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[=($t0, $t6)], expr#8=[1], expr#9=[=($t0, $t8)], expr#10=[2], expr#11=[=($t0, $t10)], expr#12=[3], expr#13=[=($t0, $t12)], expr#14=[4], expr#15=[=($t0, $t14)], expr#16=[5], expr#17=[=($t0, $t16)], expr#18=[6], expr#19=[=($t0, $t18)], expr#20=[7], expr#21=[=($t0, $t20)], expr#22=[8], expr#23=[=($t0, $t22)], expr#24=[9], expr#25=[=($t0, $t24)], expr#26=[10], expr#27=[=($t0, $t26)], expr#28=[11], expr#29=[=($t0, $t28)], expr#30=[12], expr#31=[=($t0, $t30)], expr#32=[13], expr#33=[=($t0, $t32)], expr#34=[14], expr#35=[=($t0, $t34)], expr#36=[15], expr#37=[=($t0, $t36)], expr#38=[16], expr#39=[=($t0, $t38)], expr#40=[17], expr#41=[=($t0, $t40)], expr#42=[18], expr#43=[=($t0, $t42)], expr#44=[19], expr#45=[=($t0, $t44)], expr#46=[20], expr#47=[=($t0, $t46)], expr#48=[21], expr#49=[=($t0, $t48)], expr#50=[OR($t7, $t9, $t11, $t13, $t15, $t17, $t19, $t21, $t23, $t25, $t27, $t29, $t31, $t33, $t35, $t37, $t39, $t41, $t43, $t45, $t47, $t49)], proj#0..5=[{exprs}], $condition=[$t50])\n" +
-                        "  VoltLogicalTableScan(table=[[public, R1]])\n").test();
+                        "  VoltLogicalTableScan(table=[[public, R1]])\n").pass();
 
         m_tester.sql("select * from r3 where ii in(pk, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)")
                 .transform("VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=[=($t2, $t0)], expr#4=[1], expr#5=[=($t2, $t4)], expr#6=[2], expr#7=[=($t2, $t6)], expr#8=[3], expr#9=[=($t2, $t8)], expr#10=[4], expr#11=[=($t2, $t10)], expr#12=[5], expr#13=[=($t2, $t12)], expr#14=[6], expr#15=[=($t2, $t14)], expr#16=[7], expr#17=[=($t2, $t16)], expr#18=[8], expr#19=[=($t2, $t18)], expr#20=[9], expr#21=[=($t2, $t20)], expr#22=[10], expr#23=[=($t2, $t22)], expr#24=[11], expr#25=[=($t2, $t24)], expr#26=[12], expr#27=[=($t2, $t26)], expr#28=[13], expr#29=[=($t2, $t28)], expr#30=[14], expr#31=[=($t2, $t30)], expr#32=[15], expr#33=[=($t2, $t32)], expr#34=[16], expr#35=[=($t2, $t34)], expr#36=[17], expr#37=[=($t2, $t36)], expr#38=[18], expr#39=[=($t2, $t38)], expr#40=[19], expr#41=[=($t2, $t40)], expr#42=[20], expr#43=[=($t2, $t42)], expr#44=[21], expr#45=[=($t2, $t44)], expr#46=[OR($t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t21, $t23, $t25, $t27, $t29, $t31, $t33, $t35, $t37, $t39, $t41, $t43, $t45)], proj#0..2=[{exprs}], $condition=[$t46])\n" +
-                        "  VoltLogicalTableScan(table=[[public, R3]])\n").test();
+                        "  VoltLogicalTableScan(table=[[public, R3]])\n").pass();
     }
 
     public void testENG15245() {
         m_tester.sql("select CAST(border as VARCHAR) from R5")
                 .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select CAST(point as VARCHAR) from R5")
                 .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
-                .test();
+                .pass();
     }
 }
