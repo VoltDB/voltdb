@@ -242,6 +242,9 @@ public class ExportGeneration implements Generation {
         // Now create datasources based on the catalog (if already present will not be re-created).
         // Note that we create sources on disabled connectors.
 
+        Set<Integer> partitionsInUse =
+                localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet());
+
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
@@ -252,7 +255,7 @@ public class ExportGeneration implements Generation {
                     // Skip view-only streams
                     continue;
                 }
-                addDataSources(table, hostId, localPartitionsToSites, processor);
+                addDataSources(table, hostId, localPartitionsToSites, partitionsInUse, processor);
                 createdSources = true;
                 exportedTables.add(table.getTypeName());
             }
@@ -265,13 +268,11 @@ public class ExportGeneration implements Generation {
             currentTables.remove(table);
         }
         if (!currentTables.isEmpty()) {
-            onSourcesDone(currentTables);
+            removeDataSources(currentTables);
         }
 
         //Only populate partitions in use if export is actually happening
-        Set<Integer> partitionsInUse = createdSources ?
-                localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet()) : new HashSet<Integer>();
-        createAckMailboxesIfNeeded(messenger, partitionsInUse);
+        createAckMailboxesIfNeeded(messenger, createdSources ? partitionsInUse : new HashSet<Integer>());
     }
 
     // Mark a DataSource as dropped if its not present in the connectors.
@@ -639,47 +640,6 @@ public class ExportGeneration implements Generation {
         return new ArrayList<>();
     }
 
-    /**
-     * Close and delete the {@code ExportDataSource} instances that were dropped.
-     *
-     * Note that this method waits on the completion of the closeAndDelete calls on
-     * the {@code ExportDataSource} instances
-     *
-     * @param doneTables set of table names
-     */
-    private void onSourcesDone(Set<String> doneTables) {
-
-        List<ExportDataSource> doneSources = new LinkedList<>();
-        synchronized(m_dataSourcesByPartition) {
-            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
-
-                Map<String, ExportDataSource> sources = it.next();
-                for (String doneTable : doneTables) {
-                    ExportDataSource eds = sources.get(doneTable);
-                    if (eds == null) {
-                        continue;
-                    }
-                    doneSources.add(eds);
-                    sources.remove(doneTable);
-                }
-            }
-        }
-
-        //Do closings outside the synchronized block and wait for completion.
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (ExportDataSource source : doneSources) {
-            exportLog.info("Finished processing " + source);
-            tasks.add(source.closeAndDelete());
-        }
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            //Logging of errors  is done inside the tasks so nothing to do here
-            //intentionally not failing if there is an issue with close
-            exportLog.error("Error deleting export data sources", e);
-        }
-    }
-
     /*
      * Create a datasource based on an ad file
      */
@@ -708,8 +668,18 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
+    /**
+     * Add datasources for a catalog table in all partitions
+     *
+     * @param table
+     * @param hostId
+     * @param localPartitionsToSites
+     * @param partitionsInUse
+     * @param processor
+     */
     private void addDataSources(Table table, int hostId,
             List<Pair<Integer, Integer>> localPartitionsToSites,
+            Set<Integer> partitionsInUse,
             final ExportDataProcessor processor)
     {
         for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
@@ -742,14 +712,12 @@ public class ExportGeneration implements Generation {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
                         }
-
                         dataSourcesForPartition.put(key, exportDataSource);
+
                     } else {
                         // Associate any existing EDS to the export client in the new processor
-                        // and mark it as being in catalog
                         ExportDataSource eds = dataSourcesForPartition.get(key);
 
-                        eds.markInCatalog();
                         ExportClientBase client = processor.getExportClient(key);
                         if (client != null) {
                             // Associate to an existing export client
@@ -760,6 +728,10 @@ public class ExportGeneration implements Generation {
                             eds.setClient(null);
                             eds.setRunEveryWhere(true);
                         }
+
+                        // Mark in catalog and partition in use
+                        eds.markInCatalog();
+                        eds.setPartitionInUse(partitionsInUse.contains(partition));
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB(
@@ -769,6 +741,53 @@ public class ExportGeneration implements Generation {
             }
         }
     }
+
+    /**
+     * Close and delete the {@code ExportDataSource} instances that were dropped.
+     *
+     * Note that this method waits on the completion of the closeAndDelete calls on
+     * the {@code ExportDataSource} instances
+     *
+     * @param doneTables set of table names
+     */
+    private void removeDataSources(Set<String> doneTables) {
+
+        List<ExportDataSource> doneSources = new LinkedList<>();
+        synchronized(m_dataSourcesByPartition) {
+            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
+
+                Map<String, ExportDataSource> sources = it.next();
+                for (String doneTable : doneTables) {
+                    ExportDataSource eds = sources.get(doneTable);
+                    if (eds == null) {
+                        continue;
+                    }
+                    doneSources.add(eds);
+                    sources.remove(doneTable);
+                }
+            }
+        }
+
+        //Do closings outside the synchronized block and wait for completion.
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        for (ExportDataSource source : doneSources) {
+            exportLog.info("Finished processing " + source);
+            tasks.add(source.closeAndDelete());
+        }
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            //Logging of errors  is done inside the tasks so nothing to do here
+            //intentionally not failing if there is an issue with close
+            exportLog.error("Error deleting export data sources", e);
+        }
+    }
+
+    @Override
+    public void onSourceDrained(int partitionId, String tableName) {
+
+    }
+
 
     @Override
     public void pushExportBuffer(int partitionId, String signature,

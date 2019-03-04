@@ -34,6 +34,7 @@ public interface Generation {
     public void close(final HostMessenger messenger);
 
     public List<ExportStatsRow> getStats(boolean interval);
+    public void onSourceDrained(int partitionId, String tableName);
 
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
                                  long uniqueId, ByteBuffer buffer, boolean sync);

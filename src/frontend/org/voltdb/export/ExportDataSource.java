@@ -156,6 +156,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
+    private boolean m_partitionInUse;
 
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
 
@@ -173,7 +174,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public boolean canCoverGap() {
             return lastSeq != Long.MIN_VALUE;
         }
-
     }
 
     public static class ReentrantPollException extends ExecutionException {
@@ -389,6 +389,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private int getGenerationCatalogVersion() {
         return m_generation == null ? 0 : m_generation.getCatalogVersion();
+    }
+
+    public void setPartitionInUse(boolean partitionInUse) {
+        m_partitionInUse = partitionInUse;
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
