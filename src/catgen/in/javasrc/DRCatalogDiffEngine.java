@@ -157,6 +157,9 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if ("tuplelimit".equals(field)) {
                 return null;
             }
+            if ("tableType".equals(field)) {
+                return null;
+            }
         } else if (suspect instanceof Database) {
             if ("schema".equalsIgnoreCase(field) ||
                 "securityprovider".equalsIgnoreCase(field) ||
