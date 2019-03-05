@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 import org.junit.Test;
 import org.voltdb.catalog.Cluster;
 
-public class TestEELibraryLoader {
+public class TestNativeLibraryLoader {
 
     @Test
     public void testLoader() {

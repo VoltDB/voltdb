@@ -68,20 +68,24 @@ public class NativeLibraryLoader {
      * @return true if the library was loaded.
      */
     private static boolean load(String name, boolean mustSucceed, boolean useJavaLib) {
-        if (s_loadedLibs.contains(name) || ! VoltDB.getLoadLibVOLTDB()) {
+        if (s_loadedLibs.contains(name)) {
+            return true;
+        }
+        if (! VoltDB.getLoadLibVOLTDB()) {
             return false;
         }
         test64bit();
-        String versionString = VoltDB.instance().getEELibraryVersionString();
-        // This fallback is for test code only.
-        if (versionString == null) {
-            versionString = VoltDB.instance().getVersionString();
-        }
-        assert(versionString != null);
-        String fullLibName = name + "-" + versionString;
         StringBuilder msgBuilder = new StringBuilder("Loading VoltDB native library ");
-        msgBuilder.append(fullLibName);
+        String fullLibName = name;
         try {
+            String versionString = VoltDB.instance().getEELibraryVersionString();
+            // This fallback is for test code only.
+            if (versionString == null) {
+                versionString = VoltDB.instance().getVersionString();
+            }
+            assert(versionString != null);
+            fullLibName = name + "-" + versionString;
+            msgBuilder.append(fullLibName);
             File libFile = null;
             if (useJavaLib) {
                 msgBuilder.append(" from the system library location. ");
@@ -142,18 +146,19 @@ public class NativeLibraryLoader {
         // for now, arch is always x86_64
         String pathFormat = "/org/voltdb/native/%s/x86_64";
         String libPath = null;
-        if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("mac")) {
             libPath = String.format(pathFormat, "Mac");
-        } else if(System.getProperty("os.name").toLowerCase().contains("windows")) {
-            throw new RuntimeException("Unsupported system: " + System.getProperty("os.name"));
-        } else {
+        } else if (osName.contains("linux")) {
             libPath = String.format(pathFormat, "Linux");
+        } else {
+            throw new RuntimeException("Unsupported system: " + osName);
         }
 
         String libFileName = System.mapLibraryName(libname);
         if (NativeLibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
             // mapLibraryName does not give us the correct name on mac sometimes
-            if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+            if (osName.contains("mac")) {
                 libFileName = "lib" + libname + ".jnilib";
             }
             if (NativeLibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
@@ -202,7 +207,7 @@ public class NativeLibraryLoader {
         boolean success = extractedLibFile.setReadable(true) &&
                 extractedLibFile.setWritable(true, true) &&
                 extractedLibFile.setExecutable(true);
-        if (!success) {
+        if (! success) {
             String msg = "Could not update extracted lib file " + extractedLibFile + " to be rwx";
             s_hostLog.warn(msg);
             throw new RuntimeException(msg);
