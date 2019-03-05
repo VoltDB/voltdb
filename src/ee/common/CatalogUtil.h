@@ -47,13 +47,8 @@ bool tableTypePeristentWithLinkingStream(catalog::Table const& catalogTable) {
 
 /**
  * a table is only enabled for export if explicitly listed in
-<<<<<<< HEAD
- * a connector's table list and if export is enabled for the
- * database as a whole
-=======
  * a connector's table list (regardless of the enabled state of
  * the connector)
->>>>>>> ENG-15355, change life-cycle of PBD files
  */
 bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIndex) {
 

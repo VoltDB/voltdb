@@ -313,6 +313,7 @@ public class TestExportGeneration {
                 /*seqNo*/1L,
                 1,
                 0L,
+                System.currentTimeMillis(),
                 foo.duplicate(),
                 false
                 );

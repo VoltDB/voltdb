@@ -821,7 +821,7 @@ public class ExportGeneration implements Generation {
 
         //Do closing outside the synchronized block. Do not wait on future since
         // we're invoked from the source's executor thread.
-        exportLog.info("XXX Drained on unused partition " + partitionId + ": " + source);
+        exportLog.info("Drained on unused partition " + partitionId + ": " + source);
         source.closeAndDelete();
     }
 
