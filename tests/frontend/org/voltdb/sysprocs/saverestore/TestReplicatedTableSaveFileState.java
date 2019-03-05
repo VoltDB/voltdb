@@ -221,7 +221,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertFalse(test_plan[number_of_sites - 1].multipartition);
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[0],
                      TABLE_NAME);
-        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  CoreUtils.getHSIdFromHostAndSite( 3, 3));
+        assertEquals(3, test_plan[number_of_sites - 1].parameters.toArray()[1]);
 
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreReceiveResultTables);

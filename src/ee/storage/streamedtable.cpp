@@ -103,6 +103,15 @@ StreamedTable::~StreamedTable() {
     }
 }
 
+// Stream writes were done so commit all the writes
+void StreamedTable::notifyQuantumRelease() {
+    if (m_wrapper) {
+        assert(!m_wrapper->isNew());
+        m_wrapper->commit(m_executorContext->getContextEngine(),
+                m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
+    }
+}
+
 TableIterator  StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
@@ -145,11 +154,10 @@ bool StreamedTable::insertTuple(TableTuple &source)
             m_views[i]->processTupleInsert(source, true);
         }
         int64_t currSequenceNo = ++m_sequenceNo;
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+        mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
                                       m_executorContext->currentSpHandle(),
                                       currSequenceNo,
                                       m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
                                       source,
                                       partitionColumn(),
                                       ExportTupleStream::INSERT);
@@ -159,7 +167,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
             // With no active UndoLog, there is no undo support.
             return true;
         }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo));
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
     }
     else {
         // handle any materialized views even though we dont have any connector.
@@ -193,11 +201,12 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
-        m_wrapper->rollbackTo(mark, SIZE_MAX, seqNo);
+        m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
         m_sequenceNo--;
+        assert(seqNo == m_sequenceNo);
     }
 }
 

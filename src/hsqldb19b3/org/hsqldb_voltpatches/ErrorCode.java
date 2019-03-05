@@ -611,6 +611,7 @@ public interface ErrorCode {
     // A VoltDB extension to implement subquery syntax limitations
     int X_47000 = 7000;                                   // invalid WHERE expression
     int X_47001 = 7001;                                   // subquery WHERE expression with parent aggregates
+    int X_47002 = 7002;                                   // zero-column table is not allowed
 
     // End of VoltDB extension
     // Unknown Error: Catch-All - xxxx
