@@ -54,7 +54,9 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
             "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
             );
-
+    private static Set<String> s_filterListFields = Sets.newHashSet(
+            "tableType"
+            );
     private boolean m_isXDCR;
     private byte m_remoteClusterId;
 
@@ -80,11 +82,10 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             // compatibility mode is deprecated.
             db.writeCommandForField(sb, "isActiveActiveDRed", true);
         }
-
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
-                t.writeFieldCommands(sb, null);
+                t.writeFieldCommands(sb, null, s_filterListFields);
                 t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class), s_whiteListFields);
             }
         }
@@ -154,6 +155,9 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 return null;
             }
             if ("tuplelimit".equals(field)) {
+                return null;
+            }
+            if ("tableType".equals(field)) {
                 return null;
             }
         } else if (suspect instanceof Database) {

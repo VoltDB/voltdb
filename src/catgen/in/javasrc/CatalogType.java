@@ -281,6 +281,19 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
     }
 
+    void writeFieldCommands(StringBuilder sb, Set<String> whiteListFields, Set<String> filterListFields) {
+        int i = 0;
+        for (String field : getFields()) {
+            if (filterListFields != null && filterListFields.contains(field)) {
+                continue;
+            }
+            if (whiteListFields == null || whiteListFields.contains(field)) {
+                writeCommandForField(sb, field, i == 0);
+                ++i;
+            }
+        }
+    }
+
     void writeChildCommands(StringBuilder sb)  {
         writeChildCommands(sb, null, null);
     }
