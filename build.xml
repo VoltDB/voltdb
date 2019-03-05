@@ -125,6 +125,12 @@
     <os family="mac"/>
 </condition>
 
+<condition property="jar.nativelib.dir"
+    value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
+    else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
+    <isset property="os.mac"/>
+</condition>
+
 <!-- Default heap size for Volt server (MB)  -->
 <condition property="volt.server.memory" value="2048">
     <not><isset property="volt.server.memory"/></not>
@@ -628,6 +634,9 @@ DISTRIBUTION
             <exclude name="lib/python" />
             <exclude name="doc/tutorials/**" />
             <exclude name="voltdb/libvoltdb*" />
+            <exclude name="voltdb/libcatalog*" />
+            <!-- This will be packaged into the Jar, do not need to include it into the distribution. -->
+            <exclude name="lib/libcatalog*" />
         </fileset>
     </copy>
 
@@ -783,6 +792,8 @@ DISTRIBUTION
             <exclude name=".gitignore"/>
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
+            <exclude name="voltdb/libcatalog*"/>
+            <exclude name="lib/libcatalog*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
         </fileset>
     </copy>
@@ -817,20 +828,19 @@ DISTRIBUTION
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
+        <!-- Debugging in Eclipse will need this catalog library in the voltdb folder. -->
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
+        </fileset>
     </copy>
 
     <antcall target="call_strip_lib" />
 
     <!-- copy to dir where jar picks it up as well -->
-    <condition property="jar.nativelib.dir"
-        value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
-        else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
-        <isset property="os.mac"/>
-    </condition>
-
+    <!-- libcatalog is copied to ${jar.nativelib.dir} in the ee target (earlier than this) -->
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
-            <include name="libvoltdb*" />
+            <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
 
@@ -856,7 +866,7 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
@@ -1520,6 +1530,12 @@ NATIVE EE STUFF
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
+    <!-- GenerateEETests needs the catalog API library. -->
+    <copy todir="${jar.nativelib.dir}">
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
+        </fileset>
+    </copy>
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.

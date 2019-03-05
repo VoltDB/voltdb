@@ -74,8 +74,8 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogSerializer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
@@ -1622,7 +1622,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
             for (Table t : oldTables) {
                 if (t.getIsdred()) {
-                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    DRCatalogChange |= diffCmds.contains(CatalogSerializer.getDeleteDiffStatement(t, "tables"));
                     if (DRCatalogChange) {
                         break;
                     }

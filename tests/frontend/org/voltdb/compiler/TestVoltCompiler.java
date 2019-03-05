@@ -70,7 +70,6 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTypeUtil;
 
 import junit.framework.TestCase;
 
@@ -388,7 +387,15 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
+        StringBuilder ddl = new StringBuilder();
+        String ddlTemplate = "CREATE STREAM T%d PARTITION ON COLUMN ID (\n" +
+                "  CLIENT INTEGER NOT NULL,\n" +
+                "  ID INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  VAL INTEGER);";
+        for (int i = 0; i < 3; i++) {
+            ddl.append(String.format(ddlTemplate, i));
+        }
+        project.addLiteralSchema(ddl.toString());
         project.addExport(false /* disabled */);
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
@@ -410,9 +417,9 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
-        if (!MiscUtils.isPro()) {
-            return;
-        }// not supported in community
+        if (! MiscUtils.isPro()) {
+            return; // not supported in community
+        }
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
@@ -574,8 +581,9 @@ public class TestVoltCompiler extends TestCase {
 
         boolean found = false;
         for (VoltCompiler.Feedback fb : compiler.m_errors) {
-            if (fb.message.indexOf("Partition column") > 0)
+            if (fb.message.indexOf("Partition column") > 0) {
                 found = true;
+            }
         }
         assertTrue(found);
     }

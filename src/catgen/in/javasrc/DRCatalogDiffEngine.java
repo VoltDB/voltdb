@@ -24,13 +24,14 @@ package org.voltdb.catalog;
 import java.util.List;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dr2.DRProtocol;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Specialized CatalogDiffEngine that checks the following conditions:
@@ -43,20 +44,27 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     /* White list of fields that we care about for DR for table children classes.
        This is used only in serialize commands for DR method.
        There are duplicates added to the set because it lists all the fields per type */
-    private static Set<String> s_whiteListFields = Sets.newHashSet(
+    private static final Set<String> s_whiteListFields = ImmutableSet.of(
+            /* Table */
+            "isreplicated", "partitioncolumn", "materializer", "signature", "tuplelimit", "isDRed",
+            /* ColumnRef */
+            "index", "column",
             /* Column */
-            "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype", "aggregatetype", "matviewsource", "matview", "inbytes",
+            "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype",
+            "aggregatetype", "matviewsource", "matview", "inbytes",
             /* Index */
             "unique", "assumeUnique", "countable", "type", "expressionsjson", "predicatejson",
             /* Constraint */
             "type", "oncommit", "index", "foreignkeytable",
             /* Statement */
-            "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
-            "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
+            "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml",
+            "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail", "cost",
+            "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
             );
-    private static Set<String> s_filterListFields = Sets.newHashSet(
-            "tableType"
-            );
+
+    private static final Set<Class<? extends CatalogType>> s_whiteListChildren =
+            ImmutableSet.of(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
+
     private boolean m_isXDCR;
     private byte m_remoteClusterId;
 
@@ -64,6 +72,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         super(localCatalog, remoteCatalog);
     }
 
+    @Override
     protected void initialize(Catalog prev, Catalog next) {
         m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
         m_remoteClusterId = (byte) next.getClusters().get("cluster").getDrclusterid();
@@ -72,24 +81,22 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
         Cluster cluster = catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
-        StringBuilder sb = new StringBuilder();
+        CatalogSerializer serializer = new CatalogSerializer(s_whiteListFields, s_whiteListChildren);
 
         if (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION) {
-            cluster.writeCommandForField(sb, "drRole", true);
+            serializer.writeCommandForField(cluster, "drRole", true);
         } else {
             // The compatibility mode will not understand the new drRole field,
             // so use the old field name. We'll remove this in v7.1 when the
             // compatibility mode is deprecated.
-            db.writeCommandForField(sb, "isActiveActiveDRed", true);
+            serializer.writeCommandForField(db, "isActiveActiveDRed", true);
         }
         for (Table t : db.getTables()) {
-            if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
-                t.writeCreationCommand(sb);
-                t.writeFieldCommands(sb, null, s_filterListFields);
-                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class), s_whiteListFields);
+            if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isTableExportOnly(db, t)) {
+                t.accept(serializer);
             }
         }
-        String catalogCommands = sb.toString();
+        String catalogCommands = serializer.getResult();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
         // DR catalog exchange still uses the old gzip scheme for now, next time DR protocol version is bumped

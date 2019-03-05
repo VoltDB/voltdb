@@ -22,8 +22,6 @@
 package org.voltdb.catalog;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.Set;
 
 
 /**
@@ -34,6 +32,8 @@ import java.util.Set;
  * MUST BE THREAD SAFE, MUITIPLE THREADS ACCESS IT!
  */
 public abstract class CatalogType implements Comparable<CatalogType> {
+
+    private static final char MAP_SEPARATOR = '#';
 
     class CatalogReference<T extends CatalogType> {
 
@@ -60,7 +60,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         T resolve() {
             synchronized (m_lock) {
                 if (m_unresolvedPath != null) {
-                    m_value = (T) getCatalog().getItemForPath(m_unresolvedPath);
+                    m_value = (T) getCatalog().getCatalogOperator().getItemForPath(m_unresolvedPath);
                     m_unresolvedPath = null;
                 }
                 return m_value;
@@ -113,6 +113,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     Object m_attachment = null;
 
     /**
+     * Accept a {@link CatalogVisitor}.
+     * @param visitor the visitor.
+     */
+    public void accept(CatalogVisitor visitor) {
+        visitor.visit(this);
+    }
+
+    /**
      * Gets any annotation added to this instance.
      * @return Annotation object or null.
      */
@@ -136,24 +144,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_attachment = attachment;
     }
 
-    int getDepth() {
-        return m_parentMap.m_depth;
-    }
-
     /**
      * Get the full catalog path of this CatalogType instance
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        StringBuilder sb = new StringBuilder();
-        getCatalogPath(sb);
-        return sb.toString();
+        return m_parentMap.getPath() + MAP_SEPARATOR + m_typename;
     }
 
-    void getCatalogPath(StringBuilder sb) {
-        m_parentMap.getPath(sb);
-        sb.append(Catalog.MAP_SEPARATOR);
-        sb.append(m_typename);
+    String getParentMapName() {
+        return m_parentMap.m_name;
     }
 
     /**
@@ -233,83 +233,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     abstract void set(String field, String value);
-
-    void writeCreationCommand(StringBuilder sb) {
-        sb.append("add ");
-        m_parentMap.m_parent.getCatalogPath(sb);
-        sb.append(' ');
-        sb.append(m_parentMap.m_name);
-        sb.append(' ');
-        sb.append(m_typename);
-        sb.append("\n");
-    }
-
-    void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
-        sb.append("set ");
-        if (printFullPath) {
-            getCatalogPath(sb);
-            sb.append(' ');
-        }
-        else {
-            sb.append("$PREV "); // use caching to shrink output + speed parsing
-        }
-        sb.append(field).append(' ');
-        Object value = getField(field);
-        if (value == null) {
-            sb.append("null");
-        }
-        else if (value.getClass() == Integer.class)
-            sb.append(value);
-        else if (value.getClass() == Boolean.class)
-            sb.append(Boolean.toString((Boolean)value));
-        else if (value.getClass() == String.class)
-            sb.append("\"").append(value).append("\"");
-        else if (value instanceof CatalogType)
-            ((CatalogType)value).getCatalogPath(sb);
-        else
-            throw new CatalogException("Unsupported field type '" + value + "'");
-        sb.append("\n");
-    }
-
-    void writeFieldCommands(StringBuilder sb, Set<String> whiteListFields) {
-        int i = 0;
-        for (String field : getFields()) {
-            if (whiteListFields == null || whiteListFields.contains(field)) {
-                writeCommandForField(sb, field, i == 0);
-                ++i;
-            }
-        }
-    }
-
-    void writeFieldCommands(StringBuilder sb, Set<String> whiteListFields, Set<String> filterListFields) {
-        int i = 0;
-        for (String field : getFields()) {
-            if (filterListFields != null && filterListFields.contains(field)) {
-                continue;
-            }
-            if (whiteListFields == null || whiteListFields.contains(field)) {
-                writeCommandForField(sb, field, i == 0);
-                ++i;
-            }
-        }
-    }
-
-    void writeChildCommands(StringBuilder sb)  {
-        writeChildCommands(sb, null, null);
-    }
-
-    /**
-     * Write catalog commands of the children in the white list.
-     * @param whiteList A white list of CatalogType classes
-     */
-    void writeChildCommands(StringBuilder sb, Collection<Class<? extends CatalogType> > whiteList, Set<String> whiteListFields)  {
-        for (String childCollection : getChildCollections()) {
-            CatalogMap<? extends CatalogType> map = getCollection(childCollection);
-            if (whiteList == null || whiteList.contains(map.m_cls)) {
-                map.writeCommandsForMembers(sb, whiteListFields);
-            }
-        }
-    }
 
     @Override
     public int compareTo(CatalogType o) {

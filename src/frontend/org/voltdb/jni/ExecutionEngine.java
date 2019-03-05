@@ -228,7 +228,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         m_siteId = siteId;
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         if (statsAgent != null) {
