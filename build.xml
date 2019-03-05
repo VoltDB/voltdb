@@ -131,6 +131,12 @@
     <isset property="os.mac"/>
 </condition>
 
+<condition property="library.ext"
+    value=".jnilib"
+    else=".so">
+    <isset property="os.mac"/>
+</condition>
+
 <!-- Default heap size for Volt server (MB)  -->
 <condition property="volt.server.memory" value="2048">
     <not><isset property="volt.server.memory"/></not>
