@@ -228,6 +228,7 @@ def hang():
 
 
 def get_files_list(dir):
+    # skip files starting with .., such as ..data, that k8s puts in configmaps
     files = [f for f in os.listdir(dir) if not f.startswith('..')]
     if len(files) > 1:
         plf = os.path.join(dir, '.loadorder')
