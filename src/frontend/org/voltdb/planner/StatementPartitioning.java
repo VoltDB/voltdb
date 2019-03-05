@@ -499,7 +499,10 @@ public class StatementPartitioning implements Cloneable{
                     break;
                 }
             }
-        } else if (subqueryHasReceiveNode && scans.size() == 1) {
+        } else if (scans.size() == 1) {
+            // For query like "select * from (select DL_REGISTER_IP_CITY  from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;"
+            // There is no filter on the outer query,
+            // the inferredParameterIndex should be inferred from the subquery instead of uninitialized (-1).
             StmtTableScan tableScan = scans.iterator().next();
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
