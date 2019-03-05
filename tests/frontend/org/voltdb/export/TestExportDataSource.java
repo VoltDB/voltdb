@@ -116,6 +116,11 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
+        public void onSourceDrained(int partitionId, String tableName) {
+
+        }
+
+        @Override
         public void pushExportBuffer(int partitionId, String signature, long seqNo,
                 int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
         }

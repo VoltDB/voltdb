@@ -729,9 +729,8 @@ public class ExportGeneration implements Generation {
                             eds.setRunEveryWhere(true);
                         }
 
-                        // Mark in catalog and partition in use
-                        eds.markInCatalog();
-                        eds.setPartitionInUse(partitionsInUse.contains(partition));
+                        // Mark in catalog only if partition is in use
+                        eds.markInCatalog(partitionsInUse.contains(partition));
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB(
@@ -783,9 +782,42 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    /**
+     * The Export Data Source reports it is drained on an unused partition.
+     */
     @Override
     public void onSourceDrained(int partitionId, String tableName) {
 
+        assert(m_dataSourcesByPartition.containsKey(partitionId));
+        assert(m_dataSourcesByPartition.get(partitionId).containsKey(tableName));
+        ExportDataSource source;
+        synchronized(m_dataSourcesByPartition) {
+            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+
+            if (sources == null) {
+                exportLog.warn("Could not find export data sources for partition "
+                        + partitionId + ". The export cleanup stream is being discarded.");
+                return;
+            }
+
+            source = sources.get(tableName);
+            if (source == null) {
+                exportLog.warn("Could not find export data source for signature " + partitionId +
+                        " name " + tableName + ". The export cleanup stream is being discarded.");
+                return;
+            }
+
+            // Remove source and partition entry if empty
+            sources.remove(tableName);
+            if (sources.isEmpty()) {
+                m_dataSourcesByPartition.remove(partitionId);
+            }
+        }
+
+        //Do closing outside the synchronized block. Do not wait on future since
+        // we're invoked from the source's executor thread.
+        exportLog.info("XXX Drained on unused partition " + partitionId + ": " + source);
+        source.closeAndDelete();
     }
 
 

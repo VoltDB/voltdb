@@ -124,7 +124,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Map<Long, QueryResponse> m_queryResponses = new HashMap<>();
 
     private volatile boolean m_closed = false;
-    private final StreamBlockQueue m_committedBuffers;
+    private final StreamBlockQueue m_buffers;
     private Runnable m_onMastership;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
@@ -156,7 +156,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
-    private boolean m_partitionInUse;
 
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
 
@@ -209,8 +208,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         String nonce = m_tableName + "_" + partitionId;
 
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-        m_gapTracker = m_committedBuffers.scanForGap();
+        m_buffers = new StreamBlockQueue(overflowPath, nonce);
+        m_gapTracker = m_buffers.scanForGap();
         // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
 
@@ -351,8 +350,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         final String nonce = m_tableName + "_" + m_partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-        m_gapTracker = m_committedBuffers.scanForGap();
+        m_buffers = new StreamBlockQueue(overflowPath, nonce);
+        m_gapTracker = m_buffers.scanForGap();
          // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
         if (exportLog.isDebugEnabled()) {
@@ -375,8 +374,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_readyForPolling = readyForPolling;
     }
 
-    public void markInCatalog() {
-        m_isInCatalog = true;
+    public void markInCatalog(boolean inCatalog) {
+        m_isInCatalog = inCatalog;
     }
 
     public boolean inCatalog() {
@@ -389,10 +388,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private int getGenerationCatalogVersion() {
         return m_generation == null ? 0 : m_generation.getCatalogVersion();
-    }
-
-    public void setPartitionInUse(boolean partitionInUse) {
-        m_partitionInUse = partitionInUse;
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -425,11 +420,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
-        while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
-            StreamBlock sb = m_committedBuffers.peek();
+        while (!m_buffers.isEmpty() && releaseSeqNo >= m_buffers.peek().startSequenceNumber()) {
+            StreamBlock sb = m_buffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
-                    m_committedBuffers.pop();
+                    m_buffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
@@ -458,7 +453,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Truncating tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString() +
-                    ", m_committedBuffers.isEmpty() " + m_committedBuffers.isEmpty());
+                    ", m_committedBuffers.isEmpty() " + m_buffers.isEmpty());
         }
         return;
     }
@@ -561,7 +556,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_buffers.sizeInBytes();
                 }
             }).get();
         } catch (RejectedExecutionException e) {
@@ -639,8 +634,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // header space along is 8 bytes
             assert (buffer.capacity() > StreamBlock.HEADER_SIZE);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
-            // Drop already acked buffer
             final BBContainer cont = DBBPool.wrapBB(buffer);
+
+            // Drop already acked buffer
             if (isAcked(lastSequenceNumber)) {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
@@ -648,6 +644,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
                             " last released seq: " + m_lastReleasedSeqNo);
                 }
+                cont.discard();
+                return;
+            }
+
+            // We should never try to push data on a source that is not in catalog
+            if (!inCatalog()) {
+                exportLog.warn("Source not in catalog, dropping buffer. " +
+                        " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
+                        " last released seq: " + m_lastReleasedSeqNo);
                 cont.discard();
                 return;
             }
@@ -681,7 +686,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += newTuples;
                 m_tuplesPending.addAndGet((int)newTuples);
-                m_committedBuffers.offer(sb);
+                m_buffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -762,7 +767,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     m_partitionId);
                             return;
                         }
-                        m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
+                        m_buffers.truncateToSequenceNumber(sequenceNumber);
                         // export data after truncation point will be regenerated by c/l replay
                         m_gapTracker.truncateAfter(sequenceNumber);
                         if (exportLog.isDebugEnabled()) {
@@ -772,6 +777,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(sequenceNumber, isRejoin);
+                    // Need to handle drained source if truncate emptied the buffers
+                    handleDrainedSource();
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -789,7 +796,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void run() {
             try {
-                m_committedBuffers.sync(m_nofsync);
+                m_buffers.sync(m_nofsync);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -844,7 +851,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         ack.internalDiscard();
                     }
-                    m_committedBuffers.closeAndDelete();
+                    m_buffers.closeAndDelete();
                     m_adFile.delete();
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
@@ -861,7 +868,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.close();
+                    m_buffers.close();
                     m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e.getMessage(), e);
@@ -950,6 +957,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         try {
+            handleDrainedSource();
+
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
@@ -958,7 +967,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //what block should be returned by the next poll.
             //Copying and sending the data will take place outside the critical section
             try {
-                Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+                Iterator<StreamBlock> iter = m_buffers.iterator();
                 long firstUnpolledSeq = m_firstUnpolledSeqNo;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("polling data from seqNo " + firstUnpolledSeq);
@@ -1240,6 +1249,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (seq > 0) {
             try {
                 releaseExportBytes(seq);
+                handleDrainedSource();
                 mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
@@ -1248,7 +1258,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    /**
+     // Discard dangling data source when the buffer is empty
+     private void handleDrainedSource() throws IOException {
+         if (!inCatalog() && m_buffers.isEmpty()) {
+             //Returning null indicates end of stream
+             try {
+                 if (m_pollFuture != null) {
+                     m_pollFuture.set(null);
+                 }
+             } catch (RejectedExecutionException reex) {
+                 //We are closing source.
+             }
+             m_pollFuture = null;
+             m_generation.onSourceDrained(m_partitionId, m_tableName);
+             return;
+         }
+     }
+
+     /**
      * indicate the partition leader has been migrated away
      * prepare to give up the mastership,
      * has to drain existing PBD and then notify new leaders (through ack)

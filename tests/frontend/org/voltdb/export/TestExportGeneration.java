@@ -57,7 +57,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataSource.AckingContainer;
@@ -92,7 +91,7 @@ public class TestExportGeneration {
         testout_jar = m_tempRoot.getCanonicalPath() + File.separatorChar + "testout.jar";
 
         String schemaDDL =
-                "create stream e1 (id integer, f1 varchar(16)); ";
+                "create stream e1 export to target e1 (id integer, f1 varchar(16)); ";
 
         VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileDDLString(schemaDDL, testout_jar);
@@ -102,7 +101,7 @@ public class TestExportGeneration {
                 .getCatalog().getClusters().get("cluster")
                 .getDatabases().get("database")
                 .getConnectors();
-        Connector defaultConnector = m_connectors.get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        Connector defaultConnector = m_connectors.get("e1");
         defaultConnector.setEnabled(true);
 
         m_tableSignature = defaultConnector
@@ -138,7 +137,7 @@ public class TestExportGeneration {
         props.put("outdir", m_tempRoot.getAbsolutePath() + "/my_exports");
         Set<String> tables = new HashSet<>();
         tables.add("e1");
-        config.put(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, new Pair<>(props, tables));
+        config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
         return processor;
