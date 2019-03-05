@@ -125,6 +125,7 @@ public abstract class AbstractParsedStmt {
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
     private static final String DELETE_NODE_NAME = "delete";
+    private static final String MIGRATE_NODE_NAME = "migrate";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
     private static final String SWAP_NODE_NAME = "swap";
@@ -186,6 +187,8 @@ public abstract class AbstractParsedStmt {
         }
         else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
             retval = new ParsedSwapStmt(parent, paramValues, db);
+        } else if (stmtTypeElement.name.equalsIgnoreCase(MIGRATE_NODE_NAME)) {
+            retval = new ParsedMigrateStmt(parent, paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
