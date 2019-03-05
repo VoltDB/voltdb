@@ -561,7 +561,7 @@ public class TestFuzzMeshArbiter
     }
 
     @Test
-    @Flaky(isFlaky=false, description="TestFuzzMeshArbiter.testSimpleJoin: slightly flaky, fails rarely")
+    @Flaky(isFlaky=true, description="TestFuzzMeshArbiter.testSimpleJoin: slightly flaky, fails rarely")
     public void testSimpleJoin() throws InterruptedException {
         m_rejoinLog.info("testSimpleJoin");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.

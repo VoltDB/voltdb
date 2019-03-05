@@ -44,6 +44,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Matchers;
@@ -51,6 +52,8 @@ import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
@@ -64,6 +67,9 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(ExportToFileClient.class)
 public class TestExportToFileClient extends ExportClientTestBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
     private static MockVoltDB s_mockVoltDB = new MockVoltDB("foo", "bar");
 
@@ -579,6 +585,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
     }
 
     @Test
+    @Flaky(description="TestExportToFileClient.testFilenameUnbatchedUnique")
     public void testFilenameUnbatchedUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();

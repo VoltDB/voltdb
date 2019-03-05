@@ -91,7 +91,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             // compatibility mode is deprecated.
             serializer.writeCommandForField(db, "isActiveActiveDRed", true);
         }
-
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isTableExportOnly(db, t)) {
                 t.accept(serializer);
@@ -163,6 +162,9 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 return null;
             }
             if ("tuplelimit".equals(field)) {
+                return null;
+            }
+            if ("tableType".equals(field)) {
                 return null;
             }
         } else if (suspect instanceof Database) {

@@ -86,7 +86,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                     || !m_testPredicate.apply(name)) {
                 continue;
             }
-            Flaky flakyAnnotation = m.getAnnotation(Flaky.class);
+            Flaky flakyAnnotation = getFlakyAnnotation(m);
             if (flakyAnnotation != null) {
                 Method runFlakyTestMethod = null;
                 boolean runFlakyTest = true;
@@ -106,6 +106,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                     System.out.println("DEBUG:   flakyTestRunner   : "+flakyTestRunner);
                     System.out.println("DEBUG:   runFlakyTestMethod: "+runFlakyTestMethod);
                     System.out.println("DEBUG:   runFlakyTest      : "+runFlakyTest);
+                    System.out.println("DEBUG:   test will run  : "+runFlakyTest);
                 }
                 if (!runFlakyTest) {
                     continue;
@@ -148,6 +149,33 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         if (DEBUG) {
             System.out.println("DEBUG: Leaving  MultiConfigSuiteBuilder constructor(2)");
         }
+    }
+
+    /**
+     * Gets the @Flaky annotation associated with the specified <i>testMethod</i>,
+     * if any; but if none is found, it searches <i>testClass</i>'s super-class,
+     * and it's super-class, etc., for a @Flaky annotation associated with a Method
+     * of the same name. If no @Flaky annotation is found, returns <b>null</b>.
+     * @param testClass the class in which <i>testMethod</i> is found.
+     * @param testMethod the Method whose @Flaky annotation you wish to get.
+     * @return the @Flaky annotation associated with the <i>testMethod</i> and
+     * its <i>testClass</i>, or one if its super-classes.
+     */
+    private Flaky getFlakyAnnotation(Method testMethod) {
+        Flaky flakyAnnotation = testMethod.getAnnotation(Flaky.class);
+        if (flakyAnnotation == null) {
+            Class<?> testClass = testMethod.getDeclaringClass();
+            Class<?> superclass = testClass.getSuperclass();
+            if (superclass != null) {
+                try {
+                    Method superclassMethod = superclass.getMethod(testMethod.getName());
+                    return getFlakyAnnotation(superclassMethod);
+                } catch (Exception e) {
+                    // If there is no such method, we're done
+                }
+            }
+        }
+        return flakyAnnotation;
     }
 
     /**
