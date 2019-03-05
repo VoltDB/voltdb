@@ -174,7 +174,7 @@ public class ExportBenchmark {
                 }
             }
             if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
-            if (target.equals("other")) {
+            if (target.equals("other") && count == 0 ) {
                count = 10000000+40000;
                System.out.println("Using count mode with count: " + count);
             }
@@ -683,6 +683,7 @@ public class ExportBenchmark {
             System.err.println("Export client failed");
             System.exit(-1);
         } else {
+            System.out.println("Export client finished successfully");
             System.exit(0);
         }
 
