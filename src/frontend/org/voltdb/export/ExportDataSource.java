@@ -732,6 +732,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         VoltDB.instance().getCatalogContext(), m_tableName);
                 // check generation id change at every push to tell when to create new segment
                 m_buffers.offer(sb, ds, genId != m_previousGenId);
+                m_previousGenId = genId;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
