@@ -112,12 +112,19 @@ create table P3 (
     v varchar(32));
     partition table P3 on column i;
 
-create table P4 (
+create table P4(i varchar(8) not null, j float);
+PARTITION TABLE P4 ON COLUMN i;
+
+create table P5(j float, i varchar(8) not null, k varchar(8));
+PARTITION TABLE P5 ON COLUMN i;
+
+create table P6 (
     i integer not null,
     si smallint,
     ti integer not null,
     bi bigint);
-    partition table P4 on column ti;
+partition table P6 on column ti;
+
 
 create table PI1 (
     i integer not null PRIMARY KEY,

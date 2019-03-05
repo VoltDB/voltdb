@@ -19,6 +19,7 @@ package org.voltdb.plannerv2.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StatementPartitioning;
