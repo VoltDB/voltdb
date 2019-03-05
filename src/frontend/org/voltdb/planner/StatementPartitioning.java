@@ -500,6 +500,7 @@ public class StatementPartitioning implements Cloneable{
                 }
             }
         } else if (scans.size() == 1) {
+            // ENG-15117
             // For query like "select * from (select DL_REGISTER_IP_CITY  from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;"
             // There is no filter on the outer query,
             // the inferredParameterIndex should be inferred from the subquery instead of uninitialized (-1).
