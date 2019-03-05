@@ -92,7 +92,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select si, v from P1 where (7>si or ti=2) and i=2").pass();
         m_tester.sql("select si, v from P1 where (7>si or ti=2) or i=2").fail();
 
-        // equal condition with some expression that always TURE
+        // equal condition with some expression that always TRUE
         m_tester.sql("select si, v from P1 where (7=si and i=2) and 1=1").pass();
         m_tester.sql("select si, v from P1 where (7=si and i=2) and true").pass();
         m_tester.sql("select si, v from P1 where (7=si and i=2) or 1=1").fail();
@@ -121,7 +121,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select * from P1 where NOT ( NOT (i = 15 OR si = 16))").fail();
     }
 
-    public void testJoin() {
+    public void testJoinReplicatedTables() {
         m_tester.sql("select R1.i, R2.v from R1, R2 " +
                 "where R2.si = R1.i and R2.v = 'foo'").pass();
 
@@ -145,6 +145,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
                 "ON P1.i = P2.i WHERE P2.i = 34").pass();
+
+        m_tester.sql("select P1.i, P2.v FROM P1 INNER JOIN P2 " +
+                "USING(i) WHERE P2.i = 34").pass();
 
         m_tester.sql("select P1.i, P2.v from P1 inner join P2 " +
                 "ON P2.i = P1.i AND P1.i = 34 AND 34 = P2.i").pass();
@@ -337,6 +340,15 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 + "  (select * from P2 where i = 303) as t2 "
                 + "on t1.i = t2.i "
                 + "where t1.i = 3").pass();
+
+        m_tester.sql("select t1.v, t2.v from "
+                + "  (select si, v from R1 where v = 'foo') t1, "
+                + "  (select si, v from P2 where i = 303) t2").pass();
+
+        m_tester.sql("select t1.v, t2.v from "
+                + "  (select i, v from R1 where v = 'foo') t1 inner join "
+                + "  (select v, i from P2 where i = 303) t2 "
+                + " on t1.i = t2.i where t1.i = 4").pass();
 
         m_tester.sql("select RI1.bi from RI1, (select I from P2 order by I) P22 where RI1.i = P22.I").fail();
 
