@@ -49,7 +49,7 @@ public:
         , m_hiddenSizes(0)
         , m_hiddenAllowNullFlags(0)
         , m_hiddenInBytesFlags(0)
-        , m_hiddenColumnForMigrate(false)
+        , m_isTableWithStream(false)
     {
     }
 
@@ -64,7 +64,7 @@ public:
         , m_hiddenSizes(numHiddenCols)
         , m_hiddenAllowNullFlags(numHiddenCols)
         , m_hiddenInBytesFlags(numHiddenCols)
-        , m_hiddenColumnForMigrate(false)
+        , m_isTableWithStream(false)
     {
     }
 
@@ -105,10 +105,10 @@ public:
                                  int32_t colSize,
                                  bool allowNull,
                                  bool inBytes,
-                                 bool hiddenColumnForMigrate)
+                                 bool isTableWithStream)
      {
          setHiddenColumnAtIndex(index, valueType, colSize, allowNull, inBytes);
-         m_hiddenColumnForMigrate = hiddenColumnForMigrate;
+         m_isTableWithStream = isTableWithStream;
      }
     /** Finally, build the schema with the attributes specified. */
     TupleSchema* build() const
@@ -121,7 +121,7 @@ public:
                                               m_hiddenSizes,
                                               m_hiddenAllowNullFlags,
                                               m_hiddenInBytesFlags);
-        schema->setHiddenColumnForMigrate(m_hiddenColumnForMigrate);
+        schema->setTableWithStream(m_isTableWithStream);
         return schema;
     }
 
@@ -224,7 +224,7 @@ private:
     std::vector<int32_t> m_hiddenSizes;
     std::vector<bool> m_hiddenAllowNullFlags;
     std::vector<bool> m_hiddenInBytesFlags;
-    bool m_hiddenColumnForMigrate;
+    bool m_isTableWithStream;
 };
 
 } // end namespace voltdb

@@ -148,9 +148,9 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     assert (schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    bool hiddenColumnForMigrate = schema->hasHiddenColumnForMigrate();
-    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !hiddenColumnForMigrate) ||
-        (hiddenColumnCount == 2 && hiddenColumnForMigrate))) {
+    bool isTableWithStream = schema->isTableWithStream();
+    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithStream) ||
+        (hiddenColumnCount == 2 && isTableWithStream))) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.

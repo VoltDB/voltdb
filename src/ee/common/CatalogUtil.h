@@ -34,15 +34,15 @@
  * A table is export only its catalog says so.
  */
 bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
-    return voltdb::tableTypeIsStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+    return voltdb::isStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
-bool tableTypePersistentWithMigrateStream(catalog::Table const& catalogTable) {
-     return voltdb::tableTypePersistentWithMigrateStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+bool isTableWithMigrate(catalog::Table const& catalogTable) {
+     return voltdb::isTableWithMigrate(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
-bool tableTypePeristentWithLinkingStream(catalog::Table const& catalogTable) {
-     return voltdb::tableTypePeristentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+bool isTableWithExport(catalog::Table const& catalogTable) {
+     return voltdb::isTableWithExport(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
 /**

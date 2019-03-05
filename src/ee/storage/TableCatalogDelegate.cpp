@@ -81,7 +81,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
     bool needsHiddenCountForView = false;
-    bool needsHiddenColumnForMigration = tableTypePersistentWithMigrateStream(static_cast<TableType>(catalogTable.tableType()));
+    bool needsHiddenCloumnTableWithStream = isTableWithStream(static_cast<TableType>(catalogTable.tableType()));
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
 
     // only looking for potential existing table count(*) when this is a Materialized view table
@@ -103,7 +103,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // DR timestamp and hidden COUNT(*) should not appear at the same time
     assert(!(needsDRTimestamp && needsHiddenCountForView));
     int numHiddenColumns = (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0;
-    if (needsHiddenColumnForMigration) {
+    if (needsHiddenCloumnTableWithStream) {
          numHiddenColumns++;
     }
     TupleSchemaBuilder schemaBuilder(numColumns, numHiddenColumns);
@@ -140,9 +140,9 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
-    if (needsHiddenColumnForMigration) {
+    if (needsHiddenCloumnTableWithStream) {
         VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, false, true);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, true);
     }
     return schemaBuilder.build();
 }
@@ -402,7 +402,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = tableTypePeristentWithLinkingStream(static_cast<TableType>(catalogTable.tableType()));
+    bool exportEnabled = isTableWithExport(static_cast<TableType>(catalogTable.tableType()));
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, catalogTable);
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();

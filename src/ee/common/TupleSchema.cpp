@@ -325,9 +325,10 @@ std::string TupleSchema::ColumnInfo::debug() const {
     return buffer.str();
 }
 
-void TupleSchema::setHiddenColumnForMigrate(bool hiddenColumnForMigrate) {
-    m_hasHiddenColumnForMigrate = hiddenColumnForMigrate;
+void TupleSchema::setTableWithStream(bool isTableWithStream) {
+    m_isTableWithStream = isTableWithStream;
 }
+
 size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
     size_t bytes = sizeof(int32_t); // placeholder for tuple length
     int serializeColumnCount = m_columnCount;

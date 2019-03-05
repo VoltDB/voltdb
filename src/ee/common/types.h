@@ -621,16 +621,20 @@ enum TableType {
      PERSISTENT_EXPORT = 4,
 };
 
-inline bool tableTypeIsStream(TableType tableType) {
+inline bool isStream(TableType tableType) {
     return tableType == STREAM_VIEW_ONLY || tableType == STREAM;
 }
 
-inline bool tableTypePeristentWithLinkingStream(TableType tableType) {
+inline bool isTableWithExport(TableType tableType) {
     return tableType == PERSISTENT_EXPORT;
 }
 
-inline bool tableTypePersistentWithMigrateStream(TableType tableType) {
+inline bool isTableWithMigrate(TableType tableType) {
     return tableType == PERSISTENT_MIGRATE;
+}
+
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
 }
 
 // ------------------------------------------------------------------

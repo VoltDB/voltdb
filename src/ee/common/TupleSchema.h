@@ -140,11 +140,11 @@ public:
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
 
-    /** Return true if there is a hidden column for migrate. */
-    inline bool hasHiddenColumnForMigrate() const;
+    /** Return true if there is a hidden column on the table with stream. */
+    inline bool isTableWithStream() const;
 
     /** set a hidden column for migrate. */
-    void setHiddenColumnForMigrate(bool hiddenColumnForMigrate);
+    void setTableWithStream(bool isTableWithStream);
 
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
@@ -267,8 +267,8 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
-    // hidden column for migrate
-    bool m_hasHiddenColumnForMigrate;
+    // has a hidden column for table with stream
+    bool m_isTableWithStream;
 
     /*
      * Data storage for:
@@ -303,8 +303,8 @@ inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
 }
 
-inline bool TupleSchema::hasHiddenColumnForMigrate() const {
-    return m_hasHiddenColumnForMigrate;
+inline bool TupleSchema::isTableWithStream() const {
+    return m_isTableWithStream;
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {
