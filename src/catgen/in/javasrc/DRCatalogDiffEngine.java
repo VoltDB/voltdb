@@ -128,12 +128,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             return "Missing DR table " + suspect.getTypeName() + " on local cluster";
         }
 
-        // Only on local. We care only if it is XDCR.
-        if (ChangeType.DELETION == changeType && suspect instanceof Table && m_isXDCR) {
-            assert ((Boolean)suspect.getField("isDRed"));
-            return "Missing DR table " + suspect.getTypeName() + " on remote cluster " + m_remoteClusterId;
-        }
-
         if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
             return "Missing " + suspect + " from " + suspect.getParent() + " on " +
                 (ChangeType.ADDITION == changeType ? "local cluster" : "remote cluster " + m_remoteClusterId);
