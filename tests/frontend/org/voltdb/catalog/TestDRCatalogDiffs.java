@@ -91,21 +91,6 @@ public class TestDRCatalogDiffs {
     }
 
     @Test
-    public void testXDCRCatalogOneWayCompatibility() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;\n" +
-                "DR TABLE T2;";
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
     public void testMissingDRTableOnMaster() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
@@ -119,9 +104,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
@@ -138,9 +122,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
