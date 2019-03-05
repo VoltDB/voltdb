@@ -379,10 +379,15 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select I from R1 union select I from P1 where I = 1 union select II from R3").pass();
 
         // Two partitioned tables, both have equality filters based on their partitioning columns with
-        // equal partitioning values. Pass
-        m_tester.sql("select I from P1  where I = 1 union " +
-                     "select I from R1 union " +
-                     "select I from P2   where I = 1").pass();
+        // equal partitioning values. Positions of partitioning columns do not match. Pass
+        m_tester.sql("select I, SI from P1  where I = 1 union " +
+                     "select I, SI from R1 union " +
+                     "select SI, I from P2   where I = 1").pass();
+
+        // SP Join of two partitioned table and another partitioned table with
+        // compatible partitioning values
+        m_tester.sql("select P1.I, P2.SI from P1, P2  where P1.I = P2.I and P1.I = 1 union " +
+                "select SI, I from P3 where P3.I = 1").pass();
 
         // Two partitioned tables, both have equality filters based on their partitioning columns.
         // Two SetOps. Fail.
@@ -413,6 +418,11 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // Two SetOps. Fail.
         m_tester.sql("select I from P1  where I = 1 except " +
                      "(select I from R1 intersect select I from P2  where I = 2)").fail();
+
+        // SP Join of two partitioned table and another partitioned table with
+        // incompatible partitioning values
+        m_tester.sql("select P1.I, P2.SI from P1, P2  where P1.I = P2.I and P1.I = 1 union " +
+                "select SI, I from P3 where P3.I = 2").fail();
 
     }
 
