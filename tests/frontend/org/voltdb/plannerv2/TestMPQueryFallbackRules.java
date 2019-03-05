@@ -346,6 +346,10 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                 + "  (select si, v from P2 where i = 303) t2").pass();
 
         m_tester.sql("select t1.v, t2.v from "
+                + "  (select si, v from P1 where i = 300) t1, "
+                + "  (select si, v from P2 where i = 303) t2").fail();
+
+        m_tester.sql("select t1.v, t2.v from "
                 + "  (select i, v from R1 where v = 'foo') t1 inner join "
                 + "  (select v, i from P2 where i = 303) t2 "
                 + " on t1.i = t2.i where t1.i = 4").pass();
@@ -356,6 +360,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     }
 
     public void testIn() {
+        // NOTE: This is a good example that Calcite rewrites to table join operation.
+        m_tester.sql("select i from R1 where i in (select si from P1)").fail();
+
         // calcite will use equal to rewrite IN
         m_tester.sql("select * from P1 where i in (16)").pass();
 

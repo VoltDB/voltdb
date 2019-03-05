@@ -29,6 +29,8 @@ import org.voltcore.utils.Pair;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
+import java.util.HashSet;
+
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
  * the legacy planner.
@@ -61,9 +63,12 @@ public class MPQueryFallBackRule extends RelOptRule {
             // TODO: the exception thrown here could be too early, e.g. the result is used as a child of a join,
             // which will change MP decision to SP at that point.
             final Pair<Boolean, RexNode> r = RelDistributionUtils.isCalcScanSP(tableScan, calc);
-            final RelDistribution tableDist = tableScan.getTable().getDistribution()
-                    .with(r.getSecond(), r.getFirst());
-            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
+            final RelDistribution tableDist = tableScan.getTable().getDistribution();
+            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist.with(
+                    tableDist.getType(),
+                    RelDistributionUtils.adjustProjection(calc.getProgram(), new HashSet<>(tableDist.getKeys())),
+                    r.getSecond(), r.getFirst())),
+                    calc.getInputs()));
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);
