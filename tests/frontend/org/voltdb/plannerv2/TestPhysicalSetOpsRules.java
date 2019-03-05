@@ -49,7 +49,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
     }
 
     public void testSetOpsLimit() {
@@ -60,7 +60,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
                 .transform("VoltPhysicalLimit(split=[1], limit=[5], offset=[4])\n" +
@@ -70,7 +70,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "        VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
                            "        VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-               .test();
+               .pass();
     }
 
     public void testSetOpsOrderBy() {
@@ -81,7 +81,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-                .test();
+                .pass();
     }
 
     public void testIntersect() {
@@ -94,7 +94,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
     }
 
     public void testSetOpsWithExpressionSubqueiries() {
@@ -119,7 +119,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select si from R1 intersect (select si from R2 union select ii from R3)")
                 .transform("VoltPhysicalIntersect(all=[false])\n" +
@@ -130,7 +130,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "      VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
     }
 
     public void testExcept() {
@@ -142,7 +142,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
 
         m_tester.sql("select si from R1 except (select si from R2 except select ii from R3)")
                 .transform("VoltPhysicalMinus(all=[false])\n" +
@@ -153,7 +153,7 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
                            "      VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
-                .test();
+                .pass();
     }
 
     public void testSetOpsFilter() {
@@ -163,6 +163,6 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7], split=[1])\n" +
                            "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
-                .test();
+                .pass();
     }
 }

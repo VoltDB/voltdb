@@ -1,3 +1,19 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2019 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.plannerv2.rules.logical;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -444,6 +460,53 @@ final class RelDistributionUtils {
         final Set<T> intersected = new HashSet<>(left);
         intersected.retainAll(right);
         return ! intersected.isEmpty();
+    }
+
+    /**
+     * Check whether a given set op relation is SP.
+     * Set Op is SP if all of its children are SP and their partitioning values are
+     * either NULL (a child is a replicated scan) or equal each other (implies that there is a
+     * "WHERE partitionColumn = LITERAL_VALUE" for each child)
+     *
+     * @param setOpNodes SetOp children
+     * @return true if the result is SP.
+     */
+    public static JoinState isSetOpSP(List<RelNode> setOpNodes) {
+        JoinState initSetOpState = new JoinState(true, null, Sets.newHashSet());
+        JoinState finalSetOpState = setOpNodes.stream().reduce(
+                initSetOpState,
+                (currentState, nextChild) -> {
+                    final RelDistribution nextDist = getDistribution(nextChild);
+                    if (!currentState.isSP() || !nextDist.getIsSP()) {
+                        // Either accumulated state or the next child is a MP and the whole result is MP
+                        return new JoinState(false, currentState.getLiteral(), currentState.getPartCols());
+                    } else {
+                        // Accumulated state and the next child are both SP.
+                        // Make sure their partitioning values are compatible
+                        RexNode currentPartitioningValue = currentState.getLiteral();
+                        RexNode nextPartitioningValue = nextDist.getPartitionEqualValue();
+                        if (currentPartitioningValue != null && nextPartitioningValue != null) {
+                            if (currentPartitioningValue.equals(nextPartitioningValue)) {
+                                // Same partitioning value
+                                return currentState;
+                            } else {
+                                // Partitioning values do not match. SetOp is MP
+                                return new JoinState(false, currentPartitioningValue, currentState.getPartCols());
+                            }
+                        } else {
+                            if (currentPartitioningValue == null) {
+                                // All previous nodes were replicated and the next one is a MP with non-null
+                                // partitioning value
+                                return new JoinState(true, nextPartitioningValue, Sets.newHashSet(nextDist.getKeys()));
+                            } else {
+                                // The next child is replicated
+                                return currentState;
+                            }
+                        }
+                    }
+                },
+                (currentState, nextState) -> nextState);
+        return finalSetOpState;
     }
 
     /**
