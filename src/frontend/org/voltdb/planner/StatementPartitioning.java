@@ -499,6 +499,12 @@ public class StatementPartitioning implements Cloneable{
                     break;
                 }
             }
+        } else if (subqueryHasReceiveNode && scans.size() == 1) {
+            StmtTableScan tableScan = scans.iterator().next();
+            if (tableScan instanceof StmtSubqueryScan) {
+                StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
+                m_inferredParameterIndex = subScan.getScanPartitioning().getInferredParameterIndex();
+            }
         }
     }
 
