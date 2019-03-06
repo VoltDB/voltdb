@@ -308,7 +308,7 @@ public class TestLowImpactDelete extends TestCase {
         }
     }
 
-    @Test
+    //@Test
     public void testTimeToLive() throws InterruptedException {
         //load 500 rows
         for (int i = 0; i < 500; i++) {
