@@ -13,7 +13,7 @@
     must be defined in DDL.
 -->
 <deployment>
-    <cluster hostcount="1"/>
+    <cluster kfactor="0"/>
     <security enabled="true"/>
     <users>
         <user name="operator" password="mech" roles="ops,administrator" />

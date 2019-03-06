@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!--
+    By default, a voltdb cluster has no redundant copies
+    of the data (kfactor="0"). If any node crashes, the cluster
+    will crash.  The cluster can have higher availability by
+    storing copies of the data on multiple nodes.
+    
+
+    kfactor="1" creates 2 copies of the data among the nodes (you
+    must use at least kfactor + 1 nodes in your cluster).
+
+    Init a voltdbroot on each node with
+      voltdb init -C deployment-clusterWithRedundancy.xml
+
+    Start the cluster by typing on each node:
+      voltdb start -c $nodecount -H $comma-separated-nodelist
+    For example a 3 node cluster start command would be:
+      voltdb start -c 3 -H node1,node2,node3
+-->
+<deployment>
+   <cluster kfactor="1"/>
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+</deployment>
