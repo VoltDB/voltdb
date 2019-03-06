@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;

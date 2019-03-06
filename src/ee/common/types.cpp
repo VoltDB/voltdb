@@ -15,7 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <string>
+#include <map>
+#include <algorithm>
 
 #include "types.h"
 
@@ -25,6 +28,205 @@
 
 namespace voltdb {
 using namespace std;
+
+template<typename K, typename V>
+map<V, K> revert(map<K, V>const& original) {
+   map<V, K> reverted;
+   for(auto const& kv : original) {
+      reverted.emplace(make_pair(kv.second, kv.first));
+   }
+   return reverted;
+}
+
+template<typename K, typename V>
+inline V lookup(map<K, V> const& dictionary, K const& key, V const& defaultValue) {
+   auto const iter = dictionary.find(key);
+   return iter == dictionary.cend() ? defaultValue : iter->second;
+}
+
+template<typename K> // partial instantiatin
+inline string lookup(map<K, string> const& dictionary, K const& key, char const* defaultValue) {
+   auto const iter = dictionary.find(key);
+   return iter == dictionary.cend() ? defaultValue : iter->second;
+}
+
+// TODO: when upgrade boost library, use boost::bimap
+map<ValueType, string> const mapOfTypeName {
+   {VALUE_TYPE_TINYINT, "tinyint"},
+   {VALUE_TYPE_SMALLINT, "smallint"},
+   {VALUE_TYPE_INTEGER, "integer"},
+   {VALUE_TYPE_BIGINT, "bigint"},
+   {VALUE_TYPE_DOUBLE, "float"},
+   {VALUE_TYPE_VARCHAR, "varchar"},
+   {VALUE_TYPE_VARBINARY, "varbinary"},
+   {VALUE_TYPE_TIMESTAMP, "timestamp"},
+   {VALUE_TYPE_DECIMAL, "decimal"},
+   {VALUE_TYPE_BOOLEAN, "boolean"},
+   {VALUE_TYPE_POINT, "point"},
+   {VALUE_TYPE_GEOGRAPHY, "geography"},
+   {VALUE_TYPE_ADDRESS, "address"},
+   {VALUE_TYPE_INVALID, "INVALID"},
+   {VALUE_TYPE_NULL, "NULL"},
+   {VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC, "numeric"},
+   {VALUE_TYPE_ARRAY, "array"}
+};
+
+map<TableStreamType, string> const mapOfStreamTypeName {
+   {TABLE_STREAM_SNAPSHOT, "TABLE_STREAM_SNAPSHOT"},
+   {TABLE_STREAM_ELASTIC_INDEX, "TABLE_STREAM_ELASTIC_INDEX"},
+   {TABLE_STREAM_ELASTIC_INDEX_READ, "TABLE_STREAM_ELASTIC_INDEX_READ"},
+   {TABLE_STREAM_ELASTIC_INDEX_CLEAR, "TABLE_STREAM_ELASTIC_INDEX_CLEAR"},
+   {TABLE_STREAM_RECOVERY, "TABLE_STREAM_RECOVERY"},
+   {TABLE_STREAM_NONE, "TABLE_STREAM_NONE"}
+};
+
+map<string, ValueType> const mapToValueType {
+   {"INVALID", VALUE_TYPE_INVALID},
+   {"NULL", VALUE_TYPE_NULL},
+   {"NUMERIC", VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC},
+   {"TINYINT", VALUE_TYPE_TINYINT},
+   {"SMALLINT", VALUE_TYPE_SMALLINT},
+   {"INTEGER", VALUE_TYPE_INTEGER},
+   {"BIGINT", VALUE_TYPE_BIGINT},
+   {"FLOAT", VALUE_TYPE_DOUBLE},
+   {"VARCHAR", VALUE_TYPE_VARCHAR},
+   {"TIMESTAMP", VALUE_TYPE_TIMESTAMP},
+   {"DECIMAL", VALUE_TYPE_DECIMAL},
+   {"BOOLEAN", VALUE_TYPE_BOOLEAN},
+   {"ADDRESS", VALUE_TYPE_ADDRESS},
+   {"VARBINARY", VALUE_TYPE_VARBINARY},
+   {"POINT", VALUE_TYPE_POINT},
+   {"GEOGRAPHY", VALUE_TYPE_GEOGRAPHY},
+   {"ARRAY", VALUE_TYPE_ARRAY}
+};
+
+map<JoinType, string> const mapOfJoinType {
+   {JOIN_TYPE_INVALID, "INVALID"},
+   {JOIN_TYPE_INNER, "INNER"},
+   {JOIN_TYPE_LEFT, "LEFT"},
+   {JOIN_TYPE_FULL, "FULL"},
+   {JOIN_TYPE_RIGHT, "RIGHT"}
+};
+
+map<string, JoinType> const mapToJoinType = revert(mapOfJoinType);
+
+map<SortDirectionType, string> const mapOfSortDirectionType {
+   {SORT_DIRECTION_TYPE_INVALID, "INVALID"},
+   {SORT_DIRECTION_TYPE_ASC, "ASC"},
+   {SORT_DIRECTION_TYPE_DESC, "DESC"}
+};
+
+map<string, SortDirectionType> const mapToSortDirectionType = revert(mapOfSortDirectionType);
+
+map<PlanNodeType, string> const mapOfPlanNodeType {
+   {PLAN_NODE_TYPE_INVALID, "INVALID"},
+   {PLAN_NODE_TYPE_SEQSCAN, "SEQSCAN"},
+   {PLAN_NODE_TYPE_INDEXSCAN, "INDEXSCAN"},
+   {PLAN_NODE_TYPE_INDEXCOUNT, "INDEXCOUNT"},
+   {PLAN_NODE_TYPE_TABLECOUNT, "TABLECOUNT"},
+   {PLAN_NODE_TYPE_NESTLOOP, "NESTLOOP"},
+   {PLAN_NODE_TYPE_NESTLOOPINDEX, "NESTLOOPINDEX"},
+   {PLAN_NODE_TYPE_UPDATE, "UPDATE"},
+   {PLAN_NODE_TYPE_INSERT, "INSERT"},
+   {PLAN_NODE_TYPE_DELETE, "DELETE"},
+   {PLAN_NODE_TYPE_SWAPTABLES, "SWAPTABLES"},
+   {PLAN_NODE_TYPE_MIGRATE, "MIGRATE"},
+   {PLAN_NODE_TYPE_SEND, "SEND"},
+   {PLAN_NODE_TYPE_RECEIVE, "RECEIVE"},
+   {PLAN_NODE_TYPE_MERGERECEIVE, "MERGERECEIVE"},
+   {PLAN_NODE_TYPE_AGGREGATE, "AGGREGATE"},
+   {PLAN_NODE_TYPE_HASHAGGREGATE, "HASHAGGREGATE"},
+   {PLAN_NODE_TYPE_PARTIALAGGREGATE, "PARTIALAGGREGATE"},
+   {PLAN_NODE_TYPE_UNION, "UNION"},
+   {PLAN_NODE_TYPE_ORDERBY, "ORDERBY"},
+   {PLAN_NODE_TYPE_PROJECTION, "PROJECTION"},
+   {PLAN_NODE_TYPE_MATERIALIZE, "MATERIALIZE"},
+   {PLAN_NODE_TYPE_LIMIT, "LIMIT"},
+   {PLAN_NODE_TYPE_MATERIALIZEDSCAN, "MATERIALIZEDSCAN"},
+   {PLAN_NODE_TYPE_TUPLESCAN, "TUPLESCAN"},
+   {PLAN_NODE_TYPE_WINDOWFUNCTION, "WINDOWFUNCTION"},
+   {PLAN_NODE_TYPE_COMMONTABLE, "COMMONTABLE"}
+};
+
+map<string, PlanNodeType> const mapToPlanNodeType = revert(mapOfPlanNodeType);
+
+map<ExpressionType, string> const mapOfExpressionType {
+   {EXPRESSION_TYPE_INVALID, "INVALID"},
+   {EXPRESSION_TYPE_OPERATOR_PLUS, "OPERATOR_PLUS"},
+   {EXPRESSION_TYPE_OPERATOR_MINUS, "OPERATOR_MINUS"},
+   {EXPRESSION_TYPE_OPERATOR_MULTIPLY, "OPERATOR_MULTIPLY"},
+   {EXPRESSION_TYPE_OPERATOR_DIVIDE, "OPERATOR_DIVIDE"},
+   {EXPRESSION_TYPE_OPERATOR_CONCAT, "OPERATOR_CONCAT"},
+   {EXPRESSION_TYPE_OPERATOR_MOD, "OPERATOR_MOD"},
+   {EXPRESSION_TYPE_OPERATOR_CAST, "OPERATOR_CAST"},
+   {EXPRESSION_TYPE_OPERATOR_NOT, "OPERATOR_NOT"},
+   {EXPRESSION_TYPE_OPERATOR_IS_NULL, "OPERATOR_IS_NULL"},
+   {EXPRESSION_TYPE_OPERATOR_EXISTS, "OPERATOR_EXISTS"},
+   {EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, "OPERATOR_UNARY_MINUS"},
+   {EXPRESSION_TYPE_COMPARE_EQUAL, "COMPARE_EQUAL"},
+   {EXPRESSION_TYPE_COMPARE_NOTEQUAL, "COMPARE_NOT_EQUAL"},
+   {EXPRESSION_TYPE_COMPARE_LESSTHAN, "COMPARE_LESSTHAN"},
+   {EXPRESSION_TYPE_COMPARE_GREATERTHAN, "COMPARE_GREATERTHAN"},
+   {EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, "COMPARE_LESSTHANOREQUALTO"},
+   {EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO, "COMPARE_GREATERTHANOREQUALTO"},
+   {EXPRESSION_TYPE_COMPARE_LIKE, "COMPARE_LIKE"},
+   {EXPRESSION_TYPE_COMPARE_STARTSWITH, "COMPARE_STARTSWITH"},
+   {EXPRESSION_TYPE_COMPARE_IN, "COMPARE_IN"},
+   {EXPRESSION_TYPE_COMPARE_NOTDISTINCT, "COMPARE_NOTDISTINCT"},
+   {EXPRESSION_TYPE_CONJUNCTION_AND, "CONJUNCTION_AND"},
+   {EXPRESSION_TYPE_CONJUNCTION_OR, "CONJUNCTION_OR"},
+   {EXPRESSION_TYPE_VALUE_CONSTANT, "VALUE_CONSTANT"},
+   {EXPRESSION_TYPE_VALUE_PARAMETER, "VALUE_PARAMETER"},
+   {EXPRESSION_TYPE_VALUE_TUPLE, "VALUE_TUPLE"},
+   {EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS, "VALUE_TUPLE_ADDRESS"},
+   {EXPRESSION_TYPE_VALUE_SCALAR, "VALUE_SCALAR"},
+   {EXPRESSION_TYPE_VALUE_NULL, "VALUE_NULL"},
+   {EXPRESSION_TYPE_AGGREGATE_COUNT, "AGGREGATE_COUNT"},
+   {EXPRESSION_TYPE_AGGREGATE_COUNT_STAR, "AGGREGATE_COUNT_STAR"},
+   {EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT, "AGGREGATE_APPROX_COUNT_DISTINCT"},
+   {EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG, "AGGREGATE_VALS_TO_HYPERLOGLOG"},
+   {EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD, "AGGREGATE_HYPERLOGLOGS_TO_CARD"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, "AGGREGATE_WINDOWED_RANK"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK, "AGGREGATE_WINDOWED_DENSE_RANK"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER, "AGGREGATE_WINDOWED_ROW_NUMBER"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT, "AGGREGATE_WINDOWED_COUNT"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX, "AGGREGATE_WINDOWED_MAX"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN, "AGGREGATE_WINDOWED_MIN"},
+   {EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM, "AGGREGATE_WINDOWED_SUM"},
+   {EXPRESSION_TYPE_AGGREGATE_SUM, "AGGREGATE_SUM"},
+   {EXPRESSION_TYPE_AGGREGATE_MIN, "AGGREGATE_MIN"},
+   {EXPRESSION_TYPE_AGGREGATE_MAX, "AGGREGATE_MAX"},
+   {EXPRESSION_TYPE_AGGREGATE_AVG, "AGGREGATE_AVG"},
+   {EXPRESSION_TYPE_FUNCTION, "FUNCTION"},
+   {EXPRESSION_TYPE_VALUE_VECTOR, "VALUE_VECTOR"},
+   {EXPRESSION_TYPE_HASH_RANGE, "HASH_RANGE"},
+   {EXPRESSION_TYPE_OPERATOR_CASE_WHEN, "OPERATOR_CASE_WHEN"},
+   {EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, "OPERATOR_ALTERNATIVE"},
+   {EXPRESSION_TYPE_ROW_SUBQUERY, "ROW_SUBQUERY"},
+   {EXPRESSION_TYPE_SELECT_SUBQUERY, "SELECT_SUBQUERY"}
+};
+
+map<string, ExpressionType> const mapToExpressionType = revert(mapOfExpressionType);
+
+map<QuantifierType, string> const mapOfQuantifierType {
+   {QUANTIFIER_TYPE_NONE, "NONE"},
+   {QUANTIFIER_TYPE_ANY, "ANY"},
+   {QUANTIFIER_TYPE_ALL, "ALL"}
+};
+
+map<string, QuantifierType> const mapToQuantifierType = revert(mapOfQuantifierType);
+
+map<IndexLookupType, string> const mapOfIndexLookupType {
+   {INDEX_LOOKUP_TYPE_INVALID, "INVALID"},
+   {INDEX_LOOKUP_TYPE_EQ, "EQ"},
+   {INDEX_LOOKUP_TYPE_GT, "GT"},
+   {INDEX_LOOKUP_TYPE_GTE, "GTE"},
+   {INDEX_LOOKUP_TYPE_LT, "LT"},
+   {INDEX_LOOKUP_TYPE_LTE, "LTE"},
+   {INDEX_LOOKUP_TYPE_GEO_CONTAINS, "GEO_CONTAINS"}
+};
+
+map<string, IndexLookupType> const mapToIndexLookupType = revert(mapOfIndexLookupType);
 
 /** Testing utility */
 bool isNumeric(ValueType type) {
@@ -89,744 +291,71 @@ bool isVariableLengthType(ValueType type) {
 }
 
 string getTypeName(ValueType type) {
-    string ret;
-    switch (type) {
-        case (VALUE_TYPE_TINYINT):
-            ret = "tinyint";
-            break;
-        case (VALUE_TYPE_SMALLINT):
-            ret = "smallint";
-            break;
-        case (VALUE_TYPE_INTEGER):
-            ret = "integer";
-            break;
-        case (VALUE_TYPE_BIGINT):
-            ret = "bigint";
-            break;
-        case (VALUE_TYPE_DOUBLE):
-            ret = "double";
-            break;
-        case (VALUE_TYPE_VARCHAR):
-            ret = "varchar";
-            break;
-        case (VALUE_TYPE_VARBINARY):
-            ret = "varbinary";
-            break;
-        case (VALUE_TYPE_TIMESTAMP):
-            ret = "timestamp";
-            break;
-        case (VALUE_TYPE_DECIMAL):
-            ret = "decimal";
-            break;
-        case (VALUE_TYPE_BOOLEAN):
-            ret = "boolean";
-            break;
-        case (VALUE_TYPE_POINT):
-            ret = "point";
-            break;
-        case (VALUE_TYPE_GEOGRAPHY):
-            ret = "geography";
-            break;
-        case (VALUE_TYPE_ADDRESS):
-            ret = "address";
-            break;
-        case (VALUE_TYPE_INVALID):
-            ret = "INVALID";
-            break;
-        case (VALUE_TYPE_NULL):
-            ret = "NULL";
-            break;
-        case (VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC):
-            ret = "numeric";
-            break;
-        case (VALUE_TYPE_ARRAY):
-            ret = "array";
-            break;
-        default: {
-            char buffer[32];
-            snprintf(buffer, 32, "UNKNOWN[%d]", type);
-            ret = buffer;
-        }
-    }
-    return (ret);
+  return lookup(mapOfTypeName, type,
+         string("UNKNOWN[").append(to_string(type)).append("]"));
 }
 
 std::string tableStreamTypeToString(TableStreamType type) {
-    switch (type) {
-      case TABLE_STREAM_SNAPSHOT: {
-          return "TABLE_STREAM_SNAPSHOT";
-      }
-      case TABLE_STREAM_ELASTIC_INDEX: {
-          return "TABLE_STREAM_ELASTIC_INDEX";
-      }
-      case TABLE_STREAM_ELASTIC_INDEX_READ: {
-          return "TABLE_STREAM_ELASTIC_INDEX_READ";
-      }
-      case TABLE_STREAM_ELASTIC_INDEX_CLEAR: {
-          return "TABLE_STREAM_ELASTIC_INDEX_CLEAR";
-      }
-      case TABLE_STREAM_RECOVERY: {
-          return "TABLE_STREAM_RECOVERY";
-      }
-      case TABLE_STREAM_NONE: {
-          return "TABLE_STREAM_NONE";
-      }
-      default:
-          return "INVALID";
-    }
+   return lookup(mapOfStreamTypeName, type, "INVALID");
 }
 
 
-string valueToString(ValueType type)
-{
-    switch (type) {
-    case VALUE_TYPE_INVALID:
-        return "INVALID";
-    case VALUE_TYPE_NULL:
-        return "NULL";
-    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
-        return "NUMERIC";
-    case VALUE_TYPE_TINYINT:
-        return "TINYINT";
-    case VALUE_TYPE_SMALLINT:
-        return "SMALLINT";
-    case VALUE_TYPE_INTEGER:
-        return "INTEGER";
-    case VALUE_TYPE_BIGINT:
-        return "BIGINT";
-    case VALUE_TYPE_DOUBLE:
-        return "FLOAT";
-    case VALUE_TYPE_VARCHAR:
-        return "VARCHAR";
-    case VALUE_TYPE_TIMESTAMP:
-        return "TIMESTAMP";
-    case VALUE_TYPE_DECIMAL:
-        return "DECIMAL";
-    case VALUE_TYPE_BOOLEAN:
-        return "BOOLEAN";
-    case VALUE_TYPE_ADDRESS:
-        return "ADDRESS";
-    case VALUE_TYPE_VARBINARY:
-        return "VARBINARY";
-    case VALUE_TYPE_POINT:
-        return "POINT";
-    case VALUE_TYPE_GEOGRAPHY:
-        return "GEOGRAPHY";
-    case VALUE_TYPE_ARRAY:
-        return "ARRAY";
-    }
-    return "UNDEFINED";
+string valueToString(ValueType type) {
+   string result = getTypeName(type);
+   transform(result.begin(), result.end(), result.begin(), ::toupper);
+   return result;
 }
 
-ValueType stringToValue(string str )
-{
-    if (str == "INVALID") {
-        return VALUE_TYPE_INVALID;
-    } else if (str == "NULL") {
-        return VALUE_TYPE_NULL;
-    } else if (str == "NUMERIC") {
-        return VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC;
-    } else if (str == "TINYINT") {
-        return VALUE_TYPE_TINYINT;
-    } else if (str == "SMALLINT") {
-        return VALUE_TYPE_SMALLINT;
-    } else if (str == "INTEGER") {
-        return VALUE_TYPE_INTEGER;
-    } else if (str == "BIGINT") {
-        return VALUE_TYPE_BIGINT;
-    } else if (str == "FLOAT") {
-        return VALUE_TYPE_DOUBLE;
-    } else if (str == "VARCHAR") {
-        return VALUE_TYPE_VARCHAR;
-    } else if (str == "TIMESTAMP") {
-        return VALUE_TYPE_TIMESTAMP;
-    } else if (str == "DECIMAL") {
-        return VALUE_TYPE_DECIMAL;
-    } else if (str == "BOOLEAN") {
-        return VALUE_TYPE_BOOLEAN;
-    } else if (str == "ADDRESS") {
-        return VALUE_TYPE_ADDRESS;
-    } else if (str == "VARBINARY") {
-        return VALUE_TYPE_VARBINARY;
-    } else if (str == "POINT") {
-        return VALUE_TYPE_POINT;
-    } else if (str == "GEOGRAPHY") {
-        return VALUE_TYPE_GEOGRAPHY;
-    } else if (str == "ARRAY") {
-        return VALUE_TYPE_ARRAY;
-    }
-    else {
-        throwFatalException( "No conversion from string %s.", str.c_str());
-    }
-    return VALUE_TYPE_INVALID;
+ValueType stringToValue(string nam) {
+   return lookup(mapToValueType, nam, VALUE_TYPE_INVALID);
 }
 
-string joinToString(JoinType type)
-{
-    switch (type) {
-    case JOIN_TYPE_INVALID: {
-        return "INVALID";
-    }
-    case JOIN_TYPE_INNER: {
-        return "INNER";
-    }
-    case JOIN_TYPE_LEFT: {
-        return "LEFT";
-    }
-    case JOIN_TYPE_FULL: {
-        return "FULL";
-    }
-    case JOIN_TYPE_RIGHT: {
-        return "RIGHT";
-    }
-    }
-    return "INVALID";
+string joinToString(JoinType type) {
+   return lookup(mapOfJoinType, type, "INVALID");
 }
 
-JoinType stringToJoin(string str )
-{
-    if (str == "INVALID") {
-        return JOIN_TYPE_INVALID;
-    } else if (str == "INNER") {
-        return JOIN_TYPE_INNER;
-    } else if (str == "LEFT") {
-        return JOIN_TYPE_LEFT;
-    } else if (str == "FULL") {
-        return JOIN_TYPE_FULL;
-    } else if (str == "RIGHT") {
-        return JOIN_TYPE_RIGHT;
-    }
-    return JOIN_TYPE_INVALID;
+JoinType stringToJoin(string nam) {
+   return lookup(mapToJoinType, nam, JOIN_TYPE_INVALID);
 }
 
-string sortDirectionToString(SortDirectionType type)
-{
-    switch (type) {
-    case SORT_DIRECTION_TYPE_INVALID: {
-        return "INVALID";
-    }
-    case SORT_DIRECTION_TYPE_ASC: {
-        return "ASC";
-    }
-    case SORT_DIRECTION_TYPE_DESC: {
-        return "DESC";
-    }
-    }
-    return "INVALID";
+string sortDirectionToString(SortDirectionType type) {
+   return lookup(mapOfSortDirectionType, type, "INVALID");
 }
 
-SortDirectionType stringToSortDirection(string str )
-{
-    if (str == "INVALID") {
-        return SORT_DIRECTION_TYPE_INVALID;
-    } else if (str == "ASC") {
-        return SORT_DIRECTION_TYPE_ASC;
-    } else if (str == "DESC") {
-        return SORT_DIRECTION_TYPE_DESC;
-    }
-    return SORT_DIRECTION_TYPE_INVALID;
+SortDirectionType stringToSortDirection(string nam) {
+   return lookup(mapToSortDirectionType, nam, SORT_DIRECTION_TYPE_INVALID);
 }
 
-string planNodeToString(PlanNodeType type)
-{
-    switch (type) {
-    case PLAN_NODE_TYPE_INVALID: {
-        return "INVALID";
-    }
-    case PLAN_NODE_TYPE_SEQSCAN: {
-        return "SEQSCAN";
-    }
-    case PLAN_NODE_TYPE_INDEXSCAN: {
-        return "INDEXSCAN";
-    }
-    case PLAN_NODE_TYPE_INDEXCOUNT: {
-        return "INDEXCOUNT";
-    }
-    case PLAN_NODE_TYPE_TABLECOUNT: {
-        return "TABLECOUNT";
-    }
-    case PLAN_NODE_TYPE_NESTLOOP: {
-        return "NESTLOOP";
-    }
-    case PLAN_NODE_TYPE_NESTLOOPINDEX: {
-        return "NESTLOOPINDEX";
-    }
-    case PLAN_NODE_TYPE_UPDATE: {
-        return "UPDATE";
-    }
-    case PLAN_NODE_TYPE_INSERT: {
-        return "INSERT";
-    }
-    case PLAN_NODE_TYPE_DELETE: {
-        return "DELETE";
-    }
-    case PLAN_NODE_TYPE_SWAPTABLES: {
-        return "SWAPTABLES";
-    }
-    case PLAN_NODE_TYPE_MIGRATE: return "MIGRATE";
-    case PLAN_NODE_TYPE_SEND: {
-        return "SEND";
-    }
-    case PLAN_NODE_TYPE_RECEIVE: {
-        return "RECEIVE";
-    }
-    case PLAN_NODE_TYPE_MERGERECEIVE: {
-        return "MERGERECEIVE";
-    }
-    case PLAN_NODE_TYPE_AGGREGATE: {
-        return "AGGREGATE";
-    }
-    case PLAN_NODE_TYPE_HASHAGGREGATE: {
-        return "HASHAGGREGATE";
-    }
-    case PLAN_NODE_TYPE_PARTIALAGGREGATE: {
-        return "PARTIALAGGREGATE";
-    }
-    case PLAN_NODE_TYPE_UNION: {
-        return "UNION";
-    }
-    case PLAN_NODE_TYPE_ORDERBY: {
-        return "ORDERBY";
-    }
-    case PLAN_NODE_TYPE_PROJECTION: {
-        return "PROJECTION";
-    }
-    case PLAN_NODE_TYPE_MATERIALIZE: {
-        return "MATERIALIZE";
-    }
-    case PLAN_NODE_TYPE_LIMIT: {
-        return "LIMIT";
-    }
-    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
-        return "MATERIALIZEDSCAN";
-    }
-    case PLAN_NODE_TYPE_TUPLESCAN: {
-        return "TUPLESCAN";
-    }
-    case PLAN_NODE_TYPE_WINDOWFUNCTION: {
-        return "WINDOWFUNCTION";
-    }
-    case PLAN_NODE_TYPE_COMMONTABLE: {
-        return "COMMONTABLE";
-    }
-    } // END OF SWITCH
-    return "UNDEFINED";
+string planNodeToString(PlanNodeType type) {
+   return lookup(mapOfPlanNodeType, type, "UNDEFINED");
 }
 
-PlanNodeType stringToPlanNode(string str )
-{
-    if (str == "INVALID") {
-        return PLAN_NODE_TYPE_INVALID;
-    } else if (str == "SEQSCAN") {
-        return PLAN_NODE_TYPE_SEQSCAN;
-    } else if (str == "INDEXSCAN") {
-        return PLAN_NODE_TYPE_INDEXSCAN;
-    } else if (str == "INDEXCOUNT") {
-        return PLAN_NODE_TYPE_INDEXCOUNT;
-    } else if (str == "TABLECOUNT") {
-        return PLAN_NODE_TYPE_TABLECOUNT;
-    } else if (str == "NESTLOOP") {
-        return PLAN_NODE_TYPE_NESTLOOP;
-    } else if (str == "NESTLOOPINDEX") {
-        return PLAN_NODE_TYPE_NESTLOOPINDEX;
-    } else if (str == "UPDATE") {
-        return PLAN_NODE_TYPE_UPDATE;
-    } else if (str == "INSERT") {
-        return PLAN_NODE_TYPE_INSERT;
-    } else if (str == "DELETE") {
-        return PLAN_NODE_TYPE_DELETE;
-    } else if (str == "SWAPTABLES") {
-        return PLAN_NODE_TYPE_SWAPTABLES;
-    } else if (str == "SEND") {
-        return PLAN_NODE_TYPE_SEND;
-    } else if (str == "RECEIVE") {
-        return PLAN_NODE_TYPE_RECEIVE;
-    } else if (str == "MERGERECEIVE") {
-        return PLAN_NODE_TYPE_MERGERECEIVE;
-    } else if (str == "MIGRATE") {
-       return PLAN_NODE_TYPE_MIGRATE;
-    } else if (str == "AGGREGATE") {
-        return PLAN_NODE_TYPE_AGGREGATE;
-    } else if (str == "HASHAGGREGATE") {
-        return PLAN_NODE_TYPE_HASHAGGREGATE;
-    } else if (str == "PARTIALAGGREGATE") {
-        return PLAN_NODE_TYPE_PARTIALAGGREGATE;
-    } else if (str == "UNION") {
-        return PLAN_NODE_TYPE_UNION;
-    } else if (str == "ORDERBY") {
-        return PLAN_NODE_TYPE_ORDERBY;
-    } else if (str == "PROJECTION") {
-        return PLAN_NODE_TYPE_PROJECTION;
-    } else if (str == "MATERIALIZE") {
-        return PLAN_NODE_TYPE_MATERIALIZE;
-    } else if (str == "LIMIT") {
-        return PLAN_NODE_TYPE_LIMIT;
-    } else if (str == "MATERIALIZEDSCAN") {
-        return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
-    } else if (str == "TUPLESCAN") {
-        return PLAN_NODE_TYPE_TUPLESCAN;
-    } else if (str == "WINDOWFUNCTION") {
-        return PLAN_NODE_TYPE_WINDOWFUNCTION;
-    } else if (str == "COMMONTABLE") {
-        return PLAN_NODE_TYPE_COMMONTABLE;
-    }
-
-    return PLAN_NODE_TYPE_INVALID;
+PlanNodeType stringToPlanNode(string nam) {
+   return lookup(mapToPlanNodeType, nam, PLAN_NODE_TYPE_INVALID);
 }
 
-string expressionToString(ExpressionType type)
-{
-    switch (type) {
-    case EXPRESSION_TYPE_INVALID: {
-        return "INVALID";
-    }
-    case EXPRESSION_TYPE_OPERATOR_PLUS: {
-        return "OPERATOR_PLUS";
-    }
-    case EXPRESSION_TYPE_OPERATOR_MINUS: {
-        return "OPERATOR_MINUS";
-    }
-    case EXPRESSION_TYPE_OPERATOR_MULTIPLY: {
-        return "OPERATOR_MULTIPLY";
-    }
-    case EXPRESSION_TYPE_OPERATOR_DIVIDE: {
-        return "OPERATOR_DIVIDE";
-    }
-    case EXPRESSION_TYPE_OPERATOR_CONCAT: {
-        return "OPERATOR_CONCAT";
-    }
-    case EXPRESSION_TYPE_OPERATOR_MOD: {
-        return "OPERATOR_MOD";
-    }
-    case EXPRESSION_TYPE_OPERATOR_CAST: {
-        return "OPERATOR_CAST";
-    }
-    case EXPRESSION_TYPE_OPERATOR_NOT: {
-        return "OPERATOR_NOT";
-    }
-    case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
-        return "OPERATOR_IS_NULL";
-    }
-    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
-        return "OPERATOR_EXISTS";
-    }
-    case EXPRESSION_TYPE_OPERATOR_UNARY_MINUS: {
-        return "OPERATOR_UNARY_MINUS";
-    }
-    case EXPRESSION_TYPE_COMPARE_EQUAL: {
-        return "COMPARE_EQUAL";
-    }
-    case EXPRESSION_TYPE_COMPARE_NOTEQUAL: {
-        return "COMPARE_NOT_EQUAL";
-    }
-    case EXPRESSION_TYPE_COMPARE_LESSTHAN: {
-        return "COMPARE_LESSTHAN";
-    }
-    case EXPRESSION_TYPE_COMPARE_GREATERTHAN: {
-        return "COMPARE_GREATERTHAN";
-    }
-    case EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO: {
-        return "COMPARE_LESSTHANOREQUALTO";
-    }
-    case EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO: {
-        return "COMPARE_GREATERTHANOREQUALTO";
-    }
-    case EXPRESSION_TYPE_COMPARE_LIKE: {
-        return "COMPARE_LIKE";
-    }
-    case EXPRESSION_TYPE_COMPARE_STARTSWITH: {
-        return "COMPARE_STARTSWITH";
-    }
-    case EXPRESSION_TYPE_COMPARE_IN: {
-        return "COMPARE_IN";
-    }
-    case EXPRESSION_TYPE_COMPARE_NOTDISTINCT: {
-        return "COMPARE_NOTDISTINCT";
-    }
-    case EXPRESSION_TYPE_CONJUNCTION_AND: {
-        return "CONJUNCTION_AND";
-    }
-    case EXPRESSION_TYPE_CONJUNCTION_OR: {
-        return "CONJUNCTION_OR";
-    }
-    case EXPRESSION_TYPE_VALUE_CONSTANT: {
-        return "VALUE_CONSTANT";
-    }
-    case EXPRESSION_TYPE_VALUE_PARAMETER: {
-        return "VALUE_PARAMETER";
-    }
-    case EXPRESSION_TYPE_VALUE_TUPLE: {
-        return "VALUE_TUPLE";
-    }
-    case EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS: {
-        return "VALUE_TUPLE_ADDRESS";
-    }
-    case EXPRESSION_TYPE_VALUE_SCALAR: {
-        return "VALUE_SCALAR";
-    }
-    case EXPRESSION_TYPE_VALUE_NULL: {
-        return "VALUE_NULL";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_COUNT: {
-        return "AGGREGATE_COUNT";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR: {
-        return "AGGREGATE_COUNT_STAR";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT: {
-        return "AGGREGATE_APPROX_COUNT_DISTINCT";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG: {
-        return "AGGREGATE_VALS_TO_HYPERLOGLOG";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD: {
-        return "AGGREGATE_HYPERLOGLOGS_TO_CARD";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM: {
-        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_SUM: {
-        return "AGGREGATE_SUM";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_MIN: {
-        return "AGGREGATE_MIN";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_MAX: {
-        return "AGGREGATE_MAX";
-    }
-    case EXPRESSION_TYPE_AGGREGATE_AVG: {
-        return "AGGREGATE_AVG";
-    }
-    case EXPRESSION_TYPE_FUNCTION: {
-        return "FUNCTION";
-    }
-    case EXPRESSION_TYPE_VALUE_VECTOR: {
-        return "VALUE_VECTOR";
-    }
-    case EXPRESSION_TYPE_HASH_RANGE: {
-        return "HASH_RANGE";
-    }
-    case EXPRESSION_TYPE_OPERATOR_CASE_WHEN: {
-        return "OPERATOR_CASE_WHEN";
-    }
-    case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
-        return "OPERATOR_ALTERNATIVE";
-    }
-    case EXPRESSION_TYPE_ROW_SUBQUERY: {
-        return "ROW_SUBQUERY";
-    }
-    case EXPRESSION_TYPE_SELECT_SUBQUERY: {
-        return "SELECT_SUBQUERY";
-    }
-    }
-    return "INVALID";
+string expressionToString(ExpressionType type) {
+   return lookup(mapOfExpressionType, type, "INVALID");
 }
 
-ExpressionType stringToExpression(string str )
-{
-    if (str == "INVALID") {
-        return EXPRESSION_TYPE_INVALID;
-    } else if (str == "OPERATOR_PLUS") {
-        return EXPRESSION_TYPE_OPERATOR_PLUS;
-    } else if (str == "OPERATOR_MINUS") {
-        return EXPRESSION_TYPE_OPERATOR_MINUS;
-    } else if (str == "OPERATOR_MULTIPLY") {
-        return EXPRESSION_TYPE_OPERATOR_MULTIPLY;
-    } else if (str == "OPERATOR_DIVIDE") {
-        return EXPRESSION_TYPE_OPERATOR_DIVIDE;
-    } else if (str == "OPERATOR_CONCAT") {
-        return EXPRESSION_TYPE_OPERATOR_CONCAT;
-    } else if (str == "OPERATOR_MOD") {
-        return EXPRESSION_TYPE_OPERATOR_MOD;
-    } else if (str == "OPERATOR_CAST") {
-        return EXPRESSION_TYPE_OPERATOR_CAST;
-    } else if (str == "OPERATOR_NOT") {
-        return EXPRESSION_TYPE_OPERATOR_NOT;
-    } else if (str == "OPERATOR_IS_NULL") {
-        return EXPRESSION_TYPE_OPERATOR_IS_NULL;
-    } else if (str == "OPERATOR_UNARY_MINUS") {
-        return EXPRESSION_TYPE_OPERATOR_UNARY_MINUS;
-    } else if (str == "OPERATOR_EXISTS") {
-        return EXPRESSION_TYPE_OPERATOR_EXISTS;
-    } else if (str == "COMPARE_EQUAL") {
-        return EXPRESSION_TYPE_COMPARE_EQUAL;
-    } else if (str == "COMPARE_NOTEQUAL") {
-        return EXPRESSION_TYPE_COMPARE_NOTEQUAL;
-    } else if (str == "COMPARE_LESSTHAN") {
-        return EXPRESSION_TYPE_COMPARE_LESSTHAN;
-    } else if (str == "COMPARE_GREATERTHAN") {
-        return EXPRESSION_TYPE_COMPARE_GREATERTHAN;
-    } else if (str == "COMPARE_LESSTHANOREQUALTO") {
-        return EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO;
-    } else if (str == "COMPARE_GREATERTHANOREQUALTO") {
-        return EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO;
-    } else if (str == "COMPARE_LIKE") {
-        return EXPRESSION_TYPE_COMPARE_LIKE;
-    } else if (str == "COMPARE_STARTSWITH") {
-        return EXPRESSION_TYPE_COMPARE_STARTSWITH;
-    } else if (str == "COMPARE_IN") {
-        return EXPRESSION_TYPE_COMPARE_IN;
-    } else if (str == "COMPARE_NOTDISTINCT") {
-        return EXPRESSION_TYPE_COMPARE_NOTDISTINCT;
-    } else if (str == "CONJUNCTION_AND") {
-        return EXPRESSION_TYPE_CONJUNCTION_AND;
-    } else if (str == "CONJUNCTION_OR") {
-        return EXPRESSION_TYPE_CONJUNCTION_OR;
-    } else if (str == "VALUE_CONSTANT") {
-        return EXPRESSION_TYPE_VALUE_CONSTANT;
-    } else if (str == "VALUE_PARAMETER") {
-        return EXPRESSION_TYPE_VALUE_PARAMETER;
-    } else if (str == "VALUE_TUPLE") {
-        return EXPRESSION_TYPE_VALUE_TUPLE;
-    } else if (str == "VALUE_TUPLE_ADDRESS") {
-        return EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS;
-    } else if (str == "VALUE_SCALAR") {
-        return EXPRESSION_TYPE_VALUE_SCALAR;
-    } else if (str == "VALUE_NULL") {
-        return EXPRESSION_TYPE_VALUE_NULL;
-    } else if (str == "AGGREGATE_COUNT") {
-        return EXPRESSION_TYPE_AGGREGATE_COUNT;
-    } else if (str == "AGGREGATE_COUNT_STAR") {
-        return EXPRESSION_TYPE_AGGREGATE_COUNT_STAR;
-    } else if (str == "AGGREGATE_APPROX_COUNT_DISTINCT") {
-        return EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT;
-    } else if (str == "AGGREGATE_VALS_TO_HYPERLOGLOG") {
-        return EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG;
-    } else if (str == "AGGREGATE_HYPERLOGLOGS_TO_CARD") {
-        return EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD;
-    } else if (str == "AGGREGATE_WINDOWED_RANK") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK;
-    } else if (str == "AGGREGATE_WINDOWED_DENSE_RANK") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
-    } else if (str == "AGGREGATE_WINDOWED_ROW_NUMBER") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER;
-    } else if (str == "AGGREGATE_WINDOWED_COUNT") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT;
-    } else if (str == "AGGREGATE_WINDOWED_MAX") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX;
-    } else if (str == "AGGREGATE_WINDOWED_MIN") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN;
-    } else if (str == "AGGREGATE_WINDOWED_SUM") {
-        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM;
-    } else if (str == "AGGREGATE_SUM") {
-        return EXPRESSION_TYPE_AGGREGATE_SUM;
-    } else if (str == "AGGREGATE_MIN") {
-        return EXPRESSION_TYPE_AGGREGATE_MIN;
-    } else if (str == "AGGREGATE_MAX") {
-        return EXPRESSION_TYPE_AGGREGATE_MAX;
-    } else if (str == "AGGREGATE_AVG") {
-        return EXPRESSION_TYPE_AGGREGATE_AVG;
-    } else if (str == "FUNCTION") {
-        return EXPRESSION_TYPE_FUNCTION;
-    } else if (str == "VALUE_VECTOR") {
-        return EXPRESSION_TYPE_VALUE_VECTOR;
-    } else if (str == "HASH_RANGE") {
-        return EXPRESSION_TYPE_HASH_RANGE;
-    } else if (str == "OPERATOR_CASE_WHEN") {
-        return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
-    } else if (str == "OPERATOR_ALTERNATIVE") {
-        return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
-    } else if (str == "ROW_SUBQUERY") {
-        return EXPRESSION_TYPE_ROW_SUBQUERY;
-    } else if (str == "SELECT_SUBQUERY") {
-        return EXPRESSION_TYPE_SELECT_SUBQUERY;
-    } else if (str == "SELECT_SUBQUERY") {
-        return EXPRESSION_TYPE_SELECT_SUBQUERY;
-    }
-
-
-    return EXPRESSION_TYPE_INVALID;
+ExpressionType stringToExpression(string str) {
+   return lookup(mapToExpressionType, str, EXPRESSION_TYPE_INVALID);
 }
 
-string quantifierToString(QuantifierType type)
-{
-    switch (type) {
-    case QUANTIFIER_TYPE_NONE: {
-        return "NONE";
-    }
-    case QUANTIFIER_TYPE_ANY: {
-        return "ANY";
-    }
-    case QUANTIFIER_TYPE_ALL: {
-        return "ALL";
-    }
-    }
-    return "INVALID";
+string quantifierToString(QuantifierType type) {
+   return lookup(mapOfQuantifierType, type, "INVALID");
 }
 
-QuantifierType stringToQuantifier(string str )
-{
-    if (str == "ANY") {
-        return QUANTIFIER_TYPE_ANY;
-    } else if (str == "ALL") {
-        return QUANTIFIER_TYPE_ALL;
-    }
-    return QUANTIFIER_TYPE_NONE;
+QuantifierType stringToQuantifier(string nam) {
+   return lookup(mapToQuantifierType, nam, QUANTIFIER_TYPE_NONE);
 }
 
-string indexLookupToString(IndexLookupType type)
-{
-    switch (type) {
-    case INDEX_LOOKUP_TYPE_INVALID:
-        return "INVALID";
-    case INDEX_LOOKUP_TYPE_EQ:
-        return "EQ";
-    case INDEX_LOOKUP_TYPE_GT:
-        return "GT";
-    case INDEX_LOOKUP_TYPE_GTE:
-        return "GTE";
-    case INDEX_LOOKUP_TYPE_LT:
-        return "LT";
-    case INDEX_LOOKUP_TYPE_LTE:
-        return "LTE";
-    case INDEX_LOOKUP_TYPE_GEO_CONTAINS:
-        return "GEO_CONTAINS";
-    }
-    return "INVALID";
+string indexLookupToString(IndexLookupType type) {
+   return lookup(mapOfIndexLookupType, type, "INVALID");
 }
 
-IndexLookupType stringToIndexLookup(string str)
-{
-    if (str == "INVALID") {
-        return INDEX_LOOKUP_TYPE_INVALID;
-    }
-    if (str == "EQ") {
-        return INDEX_LOOKUP_TYPE_EQ;
-    }
-    if (str == "GT") {
-        return INDEX_LOOKUP_TYPE_GT;
-    }
-    if (str == "GTE") {
-        return INDEX_LOOKUP_TYPE_GTE;
-    }
-    if (str == "LT") {
-        return INDEX_LOOKUP_TYPE_LT;
-    }
-    if (str == "LTE") {
-        return INDEX_LOOKUP_TYPE_LTE;
-    }
-    if (str == "GEO_CONTAINS") {
-        return INDEX_LOOKUP_TYPE_GEO_CONTAINS;
-    }
-    return INDEX_LOOKUP_TYPE_INVALID;
+IndexLookupType stringToIndexLookup(string nam) {
+   return lookup(mapToIndexLookupType, nam, INDEX_LOOKUP_TYPE_INVALID);
 }
 
 /** takes in 0-F, returns 0-15 */
