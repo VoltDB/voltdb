@@ -46,6 +46,7 @@
 #include "plannodes/plannodeutil.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
+#include "plannodes/migratenode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"
@@ -147,7 +148,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // Migrate
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_MIGRATE):
-            throwSerializableEEException("INVALID plan node type?");
+            ret = new voltdb::MigratePlanNode();
             break;
         // ------------------------------------------------------------------
         // SwapTables
