@@ -1003,7 +1003,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     private Statement readTimeToLive(Table table, boolean alter) {
-        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 MIGRATE TO TARGET <TAGRET NAME>
+        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TAGRET NAME>
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
@@ -1060,6 +1060,23 @@ public class ParserDDL extends ParserRoutine {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
+        if (token.tokenType == Tokens.BATCH_SIZE) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            batchSize = (Integer)(token.tokenValue);
+        }
+
+        if (token.tokenType == Tokens.MIGRATE) {
+            migrationTarget = readMigrateTarget();
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+        }
+
         if (token.tokenType == Tokens.MAX_FREQUENCY) {
             read();
             if (token.tokenType != Tokens.X_VALUE) {
@@ -1068,18 +1085,10 @@ public class ParserDDL extends ParserRoutine {
             maxFrequency = (Integer)(token.tokenValue);
         }
 
-        read();
-        if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+        if (token.tokenType == Tokens.MIGRATE) {
+            migrationTarget = readMigrateTarget();
         }
 
-        if (token.tokenType == Tokens.BATCH_SIZE) {
-            read();
-            if (token.tokenType != Tokens.X_VALUE) {
-                throw unexpectedToken();
-            }
-            batchSize = (Integer)(token.tokenValue);
-        }
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
