@@ -1003,7 +1003,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     private Statement readTimeToLive(Table table, boolean alter) {
-        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TAGRET NAME>
+        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TARGET NAME>
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
