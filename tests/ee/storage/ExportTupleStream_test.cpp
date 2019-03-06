@@ -747,8 +747,8 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
     EXPECT_EQ(results->offset(), (m_tupleSize * 1));
     EXPECT_EQ(results->getRowCount(), 1);
 
-    os.str(""); os << "committedSequenceNumber expected: " << 11 << ", actual: " << results->getCommittedSequenceNumber();
-    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == 11, os.str().c_str());
+    os.str(""); os << "committedSequenceNumber expected: " << 14 << ", actual: " << results->getCommittedSequenceNumber();
+    ASSERT_TRUE_WITH_MESSAGE(results->getCommittedSequenceNumber() == 14, os.str().c_str());
 }
 
 int main() {
