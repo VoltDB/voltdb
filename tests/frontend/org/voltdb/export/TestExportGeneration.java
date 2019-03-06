@@ -311,6 +311,7 @@ public class TestExportGeneration {
                 m_part,
                 m_tableSignature,
                 /*seqNo*/1L,
+                1L,
                 1,
                 0L,
                 System.currentTimeMillis(),
