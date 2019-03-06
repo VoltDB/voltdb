@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -E
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2019 VoltDB Inc.
@@ -8,6 +8,13 @@
 # Functions to deploy VoltDB in Kubernetes, see the associated README
 # !!!! bash only !!!!
 
+
+err_report() {
+    echo "Exit on line $(caller)" >&2
+    exit 111
+}
+
+trap err_report ERR
 
 make_statefulset() {
     # customize the k8s voltdb-statefulset.yaml
@@ -26,70 +33,67 @@ make_statefulset() {
 }
 
 
-find_files() {
-    # takes a comma-separated list of file paths, which may include Unix-style wildcards (*?[ch-ranges])
+build_configmap_from_files() {
+    local MAPNAME=$1
+    shift 1
+    # Takes a comma-separated list of file paths, which may include Unix-style wildcards (*?[ch-ranges])
     # returns a comma separated list of all matching files, following links
-    echo $(ls ${@//,/ })
-}
-
-build_configmap_cmd() {
-    local I=0
-    for f in $@
-    do
-        echo -n "--from-file=${f} "
-        let I+=1
-    done
-    if [[ $I -gt 1 ]]; then
+    # nb. find may fail, inform user
+    if [[ -n $@ ]]; then
+        local FILES=$(find ${@//,/ } -type f -print)
+        local RC=$?
+        if [[ $RC -ne 0 ]]; then
+            echo "ERROR: create configmap '$MAPNAME' failed due to error(s)" >&2
+            exit 111
+        fi
+    fi
+    local ORDERFILE=$(mktemp)
+    local CONFIG_MAP_ARGS=""
+    if [[ -n $FILES ]]; then
+        [[ -n $FILES ]] && echo "Files found for configmap/$MAPNAME:"
         local FNS=""
-        for f in $@
+        for f in $FILES
         do
+            echo -e "\t$f"
+            CONFIG_MAP_ARGS+="--from-file=${f} "
             FNS+="$(basename ${f}),"
         done
-        ORDERFILE=$(mktemp)
         echo "$FNS" | sed -e 's/,$//' > $ORDERFILE
-        echo -n "--from-file=.loadorder=$ORDERFILE"
+        CONFIG_MAP_ARGS+="--from-file=.loadorder=$ORDERFILE"
     fi
-    echo -n ""
+    echo "Creating configmap '$MAPNAME'.."
+    # if there are no files, we create an empty configmap
+    kubectl_ifexists delete configmap "$MAPNAME"
+    kubectl create configmap "$MAPNAME" $CONFIG_MAP_ARGS
+    rm -f $ORDERFILE
 }
 
 
 kubectl_ifexists() {
-    [[ $OPTS =~ e ]] && set +e  # don't check errors, may not exist
-    kubectl get "$2"/"$3" &>/dev/null
-    RC=$?
-    if [[ $RC = 0 ]]; then
+    RC=0
+    if kubectl get "$2"/"$3" &>/dev/null; then
         kubectl $@
         RC=$?
     fi
-    [[ $OPTS =~ e ]] && set -e
     return $RC
 }
 
 
-make_configmap() {
+make_configmaps() {
 
+    # make classes configmap
+    # packages voltdb procedures/udf classes jar files
     MAPNAME=${CLUSTER_NAME}-init-classes
-    kubectl_ifexists delete configmap "$MAPNAME"
-    CONFIG_MAP_ARGS=""
-    TYPE=classes
-    if [[ -n ${CLASSES_FILES} ]]; then
-        files=$(find_files "${CLASSES_FILES}")
-        CONFIG_MAP_ARGS=$(build_configmap_cmd "$files")
-    fi
-    # create classes configmap, even if it is empty
-    kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
+    build_configmap_from_files $MAPNAME "${CLASSES_FILES}"
 
+    # make schema configmap
+    # packages voltdb ddl files
     MAPNAME=${CLUSTER_NAME}-init-schema
     kubectl_ifexists delete configmap "$MAPNAME"
-    CONFIG_MAP_ARGS=""
-    TYPE=schema
-    if [[ -n ${SCHEMA_FILES} ]]; then
-        files=$(find_files "${SCHEMA_FILES}")
-        CONFIG_MAP_ARGS=$(build_configmap_cmd "$files")
-    fi
-    # create schema configmap, even if it is empty
-    kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
+    build_configmap_from_files $MAPNAME "${SCHEMA_FILES}"
 
+    # make init configmap
+    # packages: deployment.xml, license.xml, log4j properties
     MAPNAME=${CLUSTER_NAME}-init-configmap
     kubectl_ifexists delete configmap "$MAPNAME"
     CONFIG_MAP_ARGS=""
@@ -99,10 +103,11 @@ make_configmap() {
 
     kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
 
+    # make runtime environment settings configmap
+    # packages voltdb runtime settings NODECOUNT, VOLTDB_OPTS, etc.
     MAPNAME=${CLUSTER_NAME}-run-env
     kubectl_ifexists delete configmap "$MAPNAME"
 
-    # build the runtime environment settings file
     PROP_FILE="$(mktemp)"
     CONFIG_MAP_ARGS="--from-env-file=${PROP_FILE}"
     [[ -n ${VOLTDB_INIT_ARGS} ]] && echo "VOLTDB_INIT_ARGS=${VOLTDB_INIT_ARGS}"     >> ${PROP_FILE}
@@ -151,15 +156,15 @@ build_image() {
 
 
 start_voltdb() {
-    if ! kubectl_ifexists scale statefulset ${CLUSTER_NAME} --replicas=$NODECOUNT; then
+    if kubectl_ifexists scale statefulset ${CLUSTER_NAME} --replicas=$NODECOUNT; then
         kubectl create -f ${CLUSTER_NAME}.yaml
     fi
     }
 
 
 stop_voltdb() {
-    # Quiesce the cluster, put it into admin mode, then scale it down
-    local PODS=$(kubectl get pods --no-headers=true | grep "$CLUSTER_NAME" )
+    # Quiesce the cluster, put it into admin mode, then scale it down to zero replicas (nodes)
+    local PODS=$(kubectl get pods --no-headers=true 2>/dev/null | grep "$CLUSTER_NAME" )
     RUNNING_POD=$(echo "$PODS" | grep Running | head -1 | cut -d\  -f1)
     if [[ -z $RUNNING_POD ]]; then
         echo "ERROR: no running pods for cluster '$CLUSTER_NAME' were found"
@@ -178,7 +183,7 @@ force_voltdb() {
 
     # !!! Your voltdb statefulset and its pod(s) will be forced to terminate ungracefully
 
-    for P in $(kubectl get pods | egrep "^$CLUSTER_NAME" | cut -d\  -f1)
+    for P in $(kubectl get pods --no-headers=true 2>/dev/null| egrep "^$CLUSTER_NAME" | cut -d\  -f1)
     do
         kubectl delete pods "$P" --grace-period=0 --force
     done
@@ -192,7 +197,7 @@ purge_persistent_claims() {
 
     # !!! You will loose your related persistent volumes (all your data), with no possibility of recovery
 
-    for P in $(kubectl get pvc | egrep "$CLUSTER_NAME" | cut -d\  -f1)
+    for P in $(kubectl get pvc 2>/dev/null | egrep "$CLUSTER_NAME" | cut -d\  -f1)
     do
         kubectl delete pvc $P
     done
@@ -213,8 +218,6 @@ usage() {
 
 
 # MAIN
-
-OPTS=$-
 
 # source the template settings
 if [[ ! -e "$1" ]]; then
@@ -249,7 +252,7 @@ do
                                     build_image
         ;;
         -M|--install-configmap)
-                                    make_configmap
+                                    make_configmaps
         ;;
         -C|--configure-voltdb)
                                     make_statefulset
