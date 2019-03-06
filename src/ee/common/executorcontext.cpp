@@ -121,7 +121,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_txnId(0),
     m_spHandle(0),
     m_uniqueId(0),
-    m_currentTxnTimestamp(0),
     m_currentDRTimestamp(0),
     m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024, siteId), // engine may be null in unit tests
     m_traceOn(false),
@@ -404,8 +403,7 @@ bool ExecutorContext::checkTransactionForDR() {
     bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
         if (m_externalStreamsEnabled && m_drStream && m_drStream->drStreamStarted()) {
-            if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                                 m_drStream->m_committedUso, 0));
@@ -413,8 +411,7 @@ bool ExecutorContext::checkTransactionForDR() {
             result = true;
         }
         if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
-            if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
-                    m_spHandle, m_uniqueId)) {
+            if (m_drReplicatedStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,

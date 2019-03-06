@@ -26,9 +26,8 @@ package org.voltdb.catalog;
 import java.io.IOException;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.Catalog;
 
-import junit.framework.*;
+import junit.framework.TestCase;
 
 public class TestCatalogSerialization extends TestCase {
 

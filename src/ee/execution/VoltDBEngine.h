@@ -385,6 +385,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Non-transactional work methods
         // -------------------------------------------------
 
+        /** Track the table that needs to be flushed at the target time */
+        void setStreamFlushTarget(int64_t targetTime, StreamedTable* table);
+
         /** Perform once per second, non-transactional work. */
         void tick(int64_t timeInMillis, int64_t lastCommittedSpHandle);
 
@@ -540,6 +543,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void setViewsEnabled(const std::string& viewNames, bool value);
 
+        virtual ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
+            return &m_newestExportStreamWithPendingRows;
+        }
+
+        virtual ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
+            return &m_oldestExportStreamWithPendingRows;
+        }
+
         void disableExternalStreams();
 
         bool externalStreamsEnabled();
@@ -660,6 +671,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Map of table signatures to exporting tables.
          */
         std::map<std::string, StreamedTable*> m_exportingTables;
+
+        /*
+         * Pointer to begin/end export streams that need to be flushed ordered by first row create time
+         */
+        ExportTupleStream* m_oldestExportStreamWithPendingRows;
+        ExportTupleStream* m_newestExportStreamWithPendingRows;
+
         /*
          * Map of table signatures to exporting stream wrappers.
          */

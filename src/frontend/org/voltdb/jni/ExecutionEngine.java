@@ -228,7 +228,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         m_siteId = siteId;
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         if (statsAgent != null) {
@@ -839,11 +839,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
      * @param remoteClusterId          The cluster id of producer cluster
+     * @param remoteTxnUniqueId        The unique id from the source cluster. This is currently passed
+     *                                 in only for MPs
      * @param undoToken                For undo
      * @throws EEException
      */
     public abstract long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long undoToken) throws EEException;
+            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException;
 
     /**
      * Execute an arbitrary non-transactional task that is described by the task id and

@@ -24,9 +24,10 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+
+import junit.framework.TestCase;
 
 public class TestCompressionService extends TestCase {
 

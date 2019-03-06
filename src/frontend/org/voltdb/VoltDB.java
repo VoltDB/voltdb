@@ -1117,7 +1117,7 @@ public class VoltDB {
 
     /* helper functions to access current configuration values */
     public static boolean getLoadLibVOLTDB() {
-        return !(m_config.m_noLoadLibVOLTDB);
+        return ! m_config.m_noLoadLibVOLTDB;
     }
 
     public static BackendTarget getEEBackendType() {

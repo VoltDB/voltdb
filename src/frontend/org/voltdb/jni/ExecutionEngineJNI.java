@@ -35,6 +35,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
@@ -280,15 +281,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
+        throw getExceptionFromError(errorCode);
+    }
+
+    private SerializableException getExceptionFromError(final int errorCode) {
         m_exceptionBuffer.clear();
         final int exceptionLength = m_exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
-            throw new EEException(errorCode);
+            return new EEException(errorCode);
         } else {
             m_exceptionBuffer.position(0);
             m_exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(m_exceptionBuffer);
+            return SerializableException.deserializeFromBuffer(m_exceptionBuffer);
         }
     }
 
@@ -743,11 +748,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
         long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
                 undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int) rowCount);
+            SerializableException exc = getExceptionFromError((int) rowCount);
+            if (exc instanceof DRTableNotFoundException) {
+                ((DRTableNotFoundException) exc).setRemoteTxnUniqueId(remoteTxnUniqueId);
+            }
+            throw exc;
         }
         return rowCount;
     }

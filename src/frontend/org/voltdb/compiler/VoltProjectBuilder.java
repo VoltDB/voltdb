@@ -49,7 +49,6 @@ import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.DrSchemaCheckType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -329,7 +328,6 @@ public class VoltProjectBuilder {
     private String m_drConsumerSslPropertyFile = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
-    private DrSchemaCheckType m_drSchemaCheckMode = DrSchemaCheckType.STRICT;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -840,10 +838,6 @@ public class VoltProjectBuilder {
         m_drRole = DrRoleType.XDCR;
     }
 
-    public void setDrSchemaCheckMode(DrSchemaCheckType mode) {
-        m_drSchemaCheckMode = mode;
-    }
-
     public boolean compile(final String jarPath) {
         return compile(jarPath, 1, 1, 0, null, 0) != null;
     }
@@ -1317,7 +1311,6 @@ public class VoltProjectBuilder {
         deployment.setDr(dr);
         dr.setListen(m_drProducerEnabled);
         dr.setRole(m_drRole);
-        dr.setSchema(m_drSchemaCheckMode);
         if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);

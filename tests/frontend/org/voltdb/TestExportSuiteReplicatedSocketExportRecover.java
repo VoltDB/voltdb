@@ -27,6 +27,10 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -43,6 +47,8 @@ import org.voltdb.utils.VoltFile;
  * @author akhanzode
  */
 public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     private static SocketExportTestServer m_serverSocket;
     private static LocalCluster config;
@@ -70,6 +76,8 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         } catch (Exception e) {}
     }
 
+    @Test
+    @Flaky(description="TestExportSuiteReplicatedSocketExportRecover.testExportReplicatedExportToSocketRecover")
     public void testExportReplicatedExportToSocketRecover() throws Exception {
         if (config.isValgrind()) {
             return;

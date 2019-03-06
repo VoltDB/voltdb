@@ -211,6 +211,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -1229,7 +1230,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_config.m_restorePlacement) {
                         recoverPartitions = hostInfos.get(m_messenger.getHostId()).getRecoveredPartitions();
                     }
-                    partitions = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
+                    AbstractTopology recoveredTopo = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group, recoverPartitions);
+                    if (recoveredTopo != null) {
+                        topo = recoveredTopo;
+                        partitions = Lists.newArrayList(topo.getPartitionIdList(m_messenger.getHostId()));
+                    }
                     if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                 m_catalogContext.getNodeSettings().getLocalSitesCount(), m_messenger.getHostId(),
@@ -1251,6 +1256,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_eligibleAsLeader = determineIfEligibleAsLeader(partitions, partitionGroupPeers, topo);
 
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
+
+                // The partition id list must be in sorted order
+                assert(Ordering.natural().isOrdered(partitions));
 
                 // persist the merged settings
                 m_config.m_recoveredPartitions = Joiner.on(",").join(partitions);
@@ -1681,7 +1689,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @param recoverPartitions the partition placement to be recovered on this host
      * @return A list of partitions if recover effort is a success.
      */
-    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
+    private AbstractTopology recoverPartitions(AbstractTopology topology, String haGroup, Set<Integer> recoverPartitions) {
 
         long version = topology.version;
         if (!recoverPartitions.isEmpty()) {
@@ -1702,12 +1710,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         List<Integer> partitions = Lists.newArrayList(recoveredTopo.getPartitionIdList(m_messenger.getHostId()));
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
-            return partitions;
         }
         if (version < recoveredTopo.version && !recoverPartitions.isEmpty()) {
             consoleLog.info("Partition placement layout has been restored for rejoining.");
         }
-        return null;
+        return recoveredTopo;
     }
 
     @Override

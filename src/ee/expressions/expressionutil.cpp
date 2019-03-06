@@ -100,97 +100,67 @@ subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vec
     return new SubqueryExpression(subqueryType, subqueryId, paramIdxs, otherParamIdxs, args);
 }
 
+template<typename OuterExtractor, typename InnerExtractor>
+inline AbstractExpression* subqueryComparisonFactory(ExpressionType const c,
+      AbstractExpression* outer, AbstractExpression* inner, QuantifierType quantifier) {
+   switch(c) {
+      case (EXPRESSION_TYPE_COMPARE_EQUAL):
+         return new VectorComparisonExpression<CmpEq, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+         return new VectorComparisonExpression<CmpNe, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+         return new VectorComparisonExpression<CmpLt, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+         return new VectorComparisonExpression<CmpGt, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+         return new VectorComparisonExpression<CmpLte, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+         return new VectorComparisonExpression<CmpGte, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+         return new VectorComparisonExpression<CmpNotDistinct, OuterExtractor, InnerExtractor>(
+               c, outer, inner, quantifier);
+      case (EXPRESSION_TYPE_COMPARE_LIKE):
+         // LIKE operator only works when inner relation is not a tuple
+      default:
+         char message[256];
+         snprintf(message, 256, "Invalid ExpressionType '%s' called"
+               " for VectorComparisonExpression",
+               expressionToString(c).c_str());
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+   }
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
-static AbstractExpression*
-subqueryComparisonFactory(PlannerDomValue obj,
-            ExpressionType c,
-            AbstractExpression *l,
-            AbstractExpression *r)
-{
-    QuantifierType quantifier = QUANTIFIER_TYPE_NONE;
-    if (obj.hasNonNullKey("QUANTIFIER")) {
-        quantifier = static_cast<QuantifierType>(obj.valueForKey("QUANTIFIER").asInt());
-    }
+static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
+      ExpressionType c, AbstractExpression *l, AbstractExpression *r) {
+   QuantifierType quantifier = QUANTIFIER_TYPE_NONE;
+   if (obj.hasNonNullKey("QUANTIFIER")) {
+      quantifier = static_cast<QuantifierType>(obj.valueForKey("QUANTIFIER").asInt());
+   }
+   SubqueryExpression const *l_subquery = dynamic_cast<SubqueryExpression*>(l);
+   SubqueryExpression const *r_subquery = dynamic_cast<SubqueryExpression*>(r);
 
-    SubqueryExpression *l_subquery =
-        dynamic_cast<SubqueryExpression*>(l);
-
-    SubqueryExpression *r_subquery =
-        dynamic_cast<SubqueryExpression*>(r);
-
-    // OK, here we go
-    if (l_subquery != NULL && r_subquery != NULL) {
-        switch (c) {
-        case (EXPRESSION_TYPE_COMPARE_EQUAL):
-            return new VectorComparisonExpression<CmpEq, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-            return new VectorComparisonExpression<CmpNe, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-            return new VectorComparisonExpression<CmpLt, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-            return new VectorComparisonExpression<CmpGt, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpLte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpGte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
-        default:
-            char message[256];
-            snprintf(message, 256, "Invalid ExpressionType '%s' called"
-                " for VectorComparisonExpression",
-                expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-    } else if (l_subquery != NULL) {
-        switch (c) {
-        case (EXPRESSION_TYPE_COMPARE_EQUAL):
-            return new VectorComparisonExpression<CmpEq, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-            return new VectorComparisonExpression<CmpNe, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-            return new VectorComparisonExpression<CmpLt, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-            return new VectorComparisonExpression<CmpGt, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpLte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpGte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
-        default:
-            char message[256];
-            snprintf(message, 256, "Invalid ExpressionType '%s' called"
-                " for VectorComparisonExpression",
-                expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-    } else {
-        assert(r_subquery != NULL);
-        switch (c) {
-        case (EXPRESSION_TYPE_COMPARE_EQUAL):
-            return new VectorComparisonExpression<CmpEq, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-            return new VectorComparisonExpression<CmpNe, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-            return new VectorComparisonExpression<CmpLt, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-            return new VectorComparisonExpression<CmpGt, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpLte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-            return new VectorComparisonExpression<CmpGte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-                return new VectorComparisonExpression<CmpNotDistinct, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
-        default:
-            char message[256];
-            snprintf(message, 256, "Invalid ExpressionType '%s' called"
-                " for VectorComparisonExpression",
-                expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-    }
+   // OK, here we go
+   if (l_subquery != NULL && r_subquery != NULL) {
+      return subqueryComparisonFactory<TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+   } else if (l_subquery != NULL) {
+      if (c == EXPRESSION_TYPE_COMPARE_LIKE) {
+         return new VectorComparisonExpression<CmpLike, TupleExtractor, NValueExtractor>(
+               c, l, r, quantifier);
+      } else {
+         return subqueryComparisonFactory<TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+      }
+   } else {
+      assert(r_subquery != NULL);
+      return subqueryComparisonFactory<NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+   }
 }
 
 static AbstractExpression*
