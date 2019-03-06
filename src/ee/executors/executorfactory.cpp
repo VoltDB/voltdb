@@ -88,6 +88,9 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_MIGRATE:
+        VOLT_ERROR("MIGRATE plan node type %d", (int) type);
+        return NULL;
     case PLAN_NODE_TYPE_INVALID:
         VOLT_ERROR("INVALID plan node type %d", (int) type);
         return NULL;

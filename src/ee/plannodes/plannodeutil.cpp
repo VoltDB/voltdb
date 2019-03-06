@@ -74,9 +74,8 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
     VOLT_TRACE("Creating an empty PlanNode of type '%s'", planNodeToString(type).c_str());
     voltdb::AbstractPlanNode* ret = NULL;
     switch (type) {
-        case (voltdb::PLAN_NODE_TYPE_INVALID): {
+        case (voltdb::PLAN_NODE_TYPE_INVALID):
             throwSerializableEEException("INVALID plan node type");
-        }
             break;
         // ------------------------------------------------------------------
         // SeqScan
@@ -143,6 +142,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_DELETE):
             ret = new voltdb::DeletePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Migrate
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MIGRATE):
+            throwSerializableEEException("INVALID plan node type?");
             break;
         // ------------------------------------------------------------------
         // SwapTables

@@ -23,64 +23,34 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
-public class DeletePlanNode extends AbstractOperationPlanNode {
+public class MigratePlanNode extends AbstractOperationPlanNode {
 
-    public enum Members {
-        TRUNCATE;
-    }
-
-    /** true if all tuples are deleted. */
-    boolean m_truncate = false;
-
-    public DeletePlanNode() {
+    public MigratePlanNode() {
         super();
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.DELETE;
-    }
-
-    public boolean isTruncate() {
-        return m_truncate;
-    }
-    public void setTruncate(boolean truncate) {
-        m_truncate = truncate;
+        return PlanNodeType.MIGRATE;
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.keySymbolValuePair(Members.TRUNCATE.name(), m_truncate);
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_truncate = jobj.getBoolean( Members.TRUNCATE.name() );
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        if (m_truncate) {
-            return "TRUNCATE TABLE " + m_targetTableName;
-        }
-        return "DELETE " + m_targetTableName;
+        return "MIGRATE " + m_targetTableName;
     }
 
     @Override
     public boolean isOrderDeterministic() {
-
-        /* This API seems like "not the right question" here.  DELETE nodes
-         * just return the one row, so order determinism is not really
-         * applicable.  Note however that INSERT nodes will return the
-         * order determinism of the SELECT statement in the case of INSERT INTO
-         * ... SELECT.  So just returning true here is a little inconsistent.
-         *
-         * Seems like we need a better way to model determinism for DML.  See
-         * ENG-7445.
-         */
-
         return true;
     }
 }

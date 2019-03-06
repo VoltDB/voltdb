@@ -363,6 +363,7 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_SWAPTABLES: {
         return "SWAPTABLES";
     }
+    case PLAN_NODE_TYPE_MIGRATE: return "MIGRATE";
     case PLAN_NODE_TYPE_SEND: {
         return "SEND";
     }
@@ -442,6 +443,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_RECEIVE;
     } else if (str == "MERGERECEIVE") {
         return PLAN_NODE_TYPE_MERGERECEIVE;
+    } else if (str == "MIGRATE") {
+       return PLAN_NODE_TYPE_MIGRATE;
     } else if (str == "AGGREGATE") {
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
