@@ -67,7 +67,7 @@ public class TestLowImpactDelete extends TestCase {
               + "    id BIGINT not null, \n"
               + "    ts TIMESTAMP not null, "
               + "    PRIMARY KEY (id) \n"
-              + " ) USING TTL 10 SECONDS ON COLUMN TS MAX_FREQUENCY 3 BATCH_SIZE 10; \n"
+              + " ) USING TTL 90 SECONDS ON COLUMN TS BATCH_SIZE 10 MAX_FREQUENCY 3; \n"
               + "PARTITION TABLE ttl ON COLUMN id;"
               + "CREATE INDEX ttlindex ON ttl (ts);"
 
@@ -86,8 +86,8 @@ public class TestLowImpactDelete extends TestCase {
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
         builder.addStmtProcedure("ttlcount", "select count(*) from ttl;");
         builder.setUseDDLSchema(true);
-        m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
-        m_cluster.setHasLocalServer(true);
+        m_cluster = new LocalCluster("fooxx.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
+        m_cluster.setHasLocalServer(false);
         m_cluster.compile(builder);
         m_cluster.startUp();
 
@@ -308,7 +308,7 @@ public class TestLowImpactDelete extends TestCase {
         }
     }
 
-    @Test
+    //@Test
     public void testTimeToLive() throws InterruptedException {
         //load 500 rows
         for (int i = 0; i < 500; i++) {
