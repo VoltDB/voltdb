@@ -26,6 +26,7 @@ package org.voltdb;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.voltdb.regressionsuites.RegressionSuite.assertContentOfTable;
 
 import java.io.File;
 import java.io.IOException;
@@ -937,6 +938,55 @@ public class TestAdHocQueries extends AdHocQueryTester {
             }
         }
         finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testENG15117() throws Exception {
+        final String ddl = "CREATE TABLE SJYH_DENGLU2 (\n" +
+                "DL_USER_ID varchar(22) DEFAULT '' NOT NULL,\n" +
+                "DL_ACCOUNT_ID varchar(32) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_TIME varchar(8) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_DATE varchar(8) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_IP varchar(18) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_ADDR varchar(15) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_IP_CITY varchar(32) DEFAULT '' NOT NULL,\n" +
+                "DL_ACCOUNT_TYPE varchar(2) DEFAULT '' NOT NULL,\n" +
+                "DL_PHONE_NO varchar(15) DEFAULT '' NOT NULL,\n" +
+                "DL_INDUSTRY_TYPE varchar(8) DEFAULT '' NOT NULL,\n" +
+                "SCORE float,\n" +
+                "TRXSTATUS varchar(1) DEFAULT '1',\n" +
+                "KEY_INFO varchar(256)\n" +
+                ");\n" +
+                "\n" +
+                "PARTITION TABLE SJYH_DENGLU2 ON COLUMN DL_USER_ID;";
+
+        final TestEnv env = new TestEnv(ddl,
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+
+            // insert some data
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003002','1','18423485412','000002',0,'1','1')", 1);
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003001','1','18423485412','000002',0,'1','1')", 1);
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003000','1','18423485412','000002',0,'1','1')", 1);
+            batcher.run();
+
+            // run the same subselect query for multiple times, we should always get the same&correct answer
+            Stream.generate(() -> "select * from (select count(*) from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;")
+                    .limit(5)
+                    .forEachOrdered(stmt -> {
+                        try {
+                            final ClientResponse cr = env.m_client.callProcedure("@AdHoc", stmt);
+                            assertContentOfTable(new Object[][]{{3}}, cr.getResults()[0]);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
             env.tearDown();
         }
     }
