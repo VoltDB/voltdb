@@ -27,9 +27,7 @@ import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
 import org.voltdb.exceptions.PlanningErrorException;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -99,7 +97,7 @@ final class RelDistributionUtils {
      * @param indices column indices with reference to table scan
      * @return  column indices with reference to given Program's projection relation
      */
-    static Set<Integer> adjustProjection(RexProgram program, Set<Integer> indices) {
+    static Set<Integer> adjustProjection(RexProgram program, Collection<Integer> indices) {
         final List<RexLocalRef> projections = program.getProjectList();
         final List<RexNode> expressions = program.getExprList();
         return IntStream.range(0, projections.size())
@@ -717,7 +715,7 @@ final class RelDistributionUtils {
      * @param calc Calc node on top of scan node
      * @return whether the top node is SP, and the partition equal value, if it is partitioned table and SP.
      */
-    static Pair<Boolean, RexNode> isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
+    static Pair<Boolean, RexNode> isCalcScanSP(TableScan scan, Calc calc) {
         final RelDistribution dist = scan.getTable().getDistribution(); // distribution for the scanned table
         final RelDistribution calcDist = calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         switch (dist.getType()) {

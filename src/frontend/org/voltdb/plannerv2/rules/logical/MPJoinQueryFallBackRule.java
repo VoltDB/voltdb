@@ -27,6 +27,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 
 /**
  * Rules that fallback a query with Join operator if it is multi-partitioned.
+ * Note that VoltLogicalJoin does not sub-class LogicalJoin
  *
  * @author Chao Zhou
  * @since 9.0
@@ -53,8 +54,9 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         // The query is SP, and the distributions of any partitioned tables had been set.
         final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
                 innerDist = RelDistributionUtils.getDistribution(inner);
-        final boolean isEitherParitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED ||
-                innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final boolean isEitherParitioned =
+                outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED ||
+                        innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
         final RelDistribution intermediate =
                 isEitherParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
         final RelDistribution newDist = intermediate

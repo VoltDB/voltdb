@@ -24,12 +24,10 @@ import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexNode;
 import org.voltcore.utils.Pair;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
-
-import java.util.HashSet;
 
 /**
  * Rule that fallback the processing of a multi-partition query without joins to
@@ -54,31 +52,37 @@ public class MPQueryFallBackRule extends RelOptRule {
         // Therefore, it can only be run using a Hep planner following the bottom-up order.
         // It will not work properly with Hep planners following other orders or Volcano planners.
 
-        if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalTableScan) {
+        if (call.rel(0) instanceof Calc && call.rel(1) instanceof TableScan) {
             // If it is a VoltLogicalCalc / VoltLogicalTableScan pattern, check the filter and see if it can be run SP.
             // VoltLogicalTableScan gives the partitioning scheme information,
             // and the VoltLogicalCalc above it gives the information about the filters.
-            VoltLogicalCalc calc = call.rel(0);
-            VoltLogicalTableScan tableScan = call.rel(1);
-            // TODO: the exception thrown here could be too early, e.g. the result is used as a child of a join,
-            // which will change MP decision to SP at that point.
+            final Calc calc = call.rel(0);
+            final TableScan tableScan = call.rel(1);
             final Pair<Boolean, RexNode> r = RelDistributionUtils.isCalcScanSP(tableScan, calc);
             final RelDistribution tableDist = tableScan.getTable().getDistribution();
             call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist.with(
                     tableDist.getType(),
-                    RelDistributionUtils.adjustProjection(calc.getProgram(), new HashSet<>(tableDist.getKeys())),
+                    RelDistributionUtils.adjustProjection(calc.getProgram(), tableDist.getKeys()),
                     r.getSecond(), r.getFirst())),
                     calc.getInputs()));
         } else {
             // Otherwise, propagate the DistributionTrait bottom up.
-            RelNode child = call.rel(1);
-            RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+            final RelDistribution childDist =
+                    call.rel(1).getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
             if (childDist != RelDistributions.ANY) {
-                SingleRel node = call.rel(0);
-                call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
+                final SingleRel node = call.rel(0);
+                final RelDistribution dist;
+                if (node instanceof Calc) {
+                    dist = childDist.with(childDist.getType(),
+                            RelDistributionUtils.adjustProjection(((Calc) node).getProgram(), childDist.getKeys()),
+                            childDist.getPartitionEqualValue(),
+                            childDist.getIsSP());
+                } else {
+                    dist = childDist;
+                }
+                call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
             }
         }
     }
-
 }
 
