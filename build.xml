@@ -872,7 +872,7 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so voltdb-${dist.version}.sym'" />
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
