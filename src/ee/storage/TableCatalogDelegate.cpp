@@ -755,9 +755,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     // Drop the old table
     ///////////////////////////////////////////////
     if (existingPersistentTable && newPersistentTable &&
-            newPersistentTable->isCatalogTableReplicated() != existingPersistentTable->isCatalogTableReplicated()) {
+            newPersistentTable->isReplicatedTable() != existingPersistentTable->isReplicatedTable()) {
         // A table can only be modified from replicated to partitioned
-        assert(newPersistentTable->isCatalogTableReplicated());
+        assert(newPersistentTable->isReplicatedTable());
         // Assume the MP memory context before starting the deallocate
         ExecuteWithMpMemory useMpMemory;
         existingTable->decrementRefcount();

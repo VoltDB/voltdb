@@ -65,7 +65,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
 
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
-    m_replicatedTableOperation = targetTable->isCatalogTableReplicated();
+    m_replicatedTableOperation = targetTable->isReplicatedTable();
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
@@ -93,7 +93,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     int64_t modified_tuples = 0;
 
     {
-        assert(targetTable->isCatalogTableReplicated() ==
+        assert(targetTable->isReplicatedTable() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));

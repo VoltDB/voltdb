@@ -119,7 +119,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     m_partitionColumn = targetTable->partitionColumn();
 
     // for shared replicated table special handling
-    m_replicatedTableOperation = targetTable->isCatalogTableReplicated();
+    m_replicatedTableOperation = targetTable->isReplicatedTable();
     return true;
 }
 
@@ -139,7 +139,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     int64_t modified_tuples = 0;
 
     {
-        assert(m_replicatedTableOperation == targetTable->isCatalogTableReplicated());
+        assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
