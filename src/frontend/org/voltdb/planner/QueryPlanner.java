@@ -29,6 +29,10 @@ import org.voltdb.catalog.*;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.compiler.VoltXMLElementHelper;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.*;
@@ -178,6 +182,34 @@ public class QueryPlanner implements AutoCloseable {
         catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
+        }
+
+        if (m_xmlSQL.name.equals("migrate")) {
+            final VoltXMLElement condition =
+                    VoltXMLElementHelper.getFirstChild(VoltXMLElementHelper.getFirstChild(m_xmlSQL, "condition"),
+                            "operation");
+            final AbstractExpression expr = ExpressionUtil.from(condition);
+            final Map<String, String> attributes = m_xmlSQL.attributes;
+            assert attributes.size() == 1;
+            final Table targetTable = m_db.getTables().get(attributes.get("table"));
+            assert targetTable != null;
+            final CatalogMap<TimeToLive> ttls = targetTable.getTimetolive();
+            if (ttls.isEmpty()) {
+                 throw new PlanningErrorException(String.format(
+                         "%s: Cannot migrate from table %s because it does not have a TTL column",
+                         m_sql, targetTable.getTypeName()));
+            } else {
+                final Column ttl = ttls.iterator().next().getTtlcolumn();
+                final TupleValueExpression columnExpression = new TupleValueExpression(
+                        targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
+                final Set<AbstractExpression> terminals = new HashSet<>();
+                ExpressionUtil.collectTerminals(expr, terminals);
+                if (! terminals.contains(columnExpression)) {
+                    throw new PlanningErrorException(String.format(
+                            "%s: Cannot migrate from table %s because the WHERE caluse does not contain TTL column %s",
+                            m_sql, targetTable.getTypeName(), ttl.getName()));
+                }
+            }
         }
 
         if (m_isUpsert) {
