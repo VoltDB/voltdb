@@ -32,14 +32,14 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
+
+import junit.framework.TestCase;
 
 public class TestInMemoryJarfile extends TestCase {
 

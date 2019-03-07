@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.junit.Test;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 
 public class TestDBBPool extends TestCase {
 
@@ -46,7 +46,7 @@ public class TestDBBPool extends TestCase {
 
     @Test
     public void testChecksum() {
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
         final long seed = System.currentTimeMillis();
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);

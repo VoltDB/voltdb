@@ -23,10 +23,19 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.IOException;
 import java.util.Set;
 
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -35,14 +44,16 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
-import junit.framework.TestCase;
 
-public class TestReplicatedTableSaveFileState extends TestCase
+public class TestReplicatedTableSaveFileState
 {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private static final String TABLE_NAME = "test_table";
     private static final String DATABASE_NAME = "database";
 
-    @Override
+    @Before
     public void setUp()
     {
         m_state = new ReplicatedTableSaveFileState(TABLE_NAME, 0);
@@ -50,6 +61,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
             ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
     }
 
+    @Test
     public void testLoadOperation()
     {
         assertEquals(m_state.getTableName(), TABLE_NAME);
@@ -81,6 +93,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertTrue(sites.contains(3));
     }
 
+    @Test
     public void testInconsistentIsReplicated()
     {
         addHostToTestData(0);
@@ -111,6 +124,8 @@ public class TestReplicatedTableSaveFileState extends TestCase
      * Test the easiest possible restore plan: table is replicated before and
      * after save/restore, and every site has a copy of the table
      */
+    @Test
+    @Flaky(description="TestReplicatedTableSaveFileState.testEasyRestorePlan")
     public void testEasyRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator =
@@ -168,6 +183,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
      * Test the restore plan when one of the sites doesn't have access to
      * a copy of the table
      */
+    @Test
     public void testSiteMissingTableRestorePlan() throws Exception
     {
         MockVoltDB catalog_creator = new MockVoltDB();

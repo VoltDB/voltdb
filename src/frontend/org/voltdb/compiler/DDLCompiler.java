@@ -1030,8 +1030,9 @@ public class DDLCompiler {
             // end of the statement
             retval.statement += nchar[0];
             // statement completed only if outside of begin..end
-            if(!inAsBegin)
+            if(!inAsBegin) {
                 return kStateCompleteStatement;
+            }
         }
         else if (nchar[0] == '\'') {
             retval.statement += nchar[0];
@@ -1345,7 +1346,9 @@ public class DDLCompiler {
                 // drop them: there are constraint objects in the catalog
                 // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
@@ -1354,7 +1357,9 @@ public class DDLCompiler {
                 }
 
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
@@ -1599,8 +1604,9 @@ public class DDLCompiler {
         column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
-        if (defaulttype != null)
+        if (defaulttype != null) {
             column.setDefaulttype(Integer.parseInt(defaulttype));
+        }
 
         columnMap.put(name, column);
     }
@@ -2151,8 +2157,7 @@ public class DDLCompiler {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
             // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
-        }
-        catch (VoltCompilerException e) {
+        } catch (VoltCompilerException e) {
             // Reformat the message thrown by VoltDB DDL processing to have a line number.
             String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
             throw m_compiler.new VoltCompilerException(msg);

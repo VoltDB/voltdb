@@ -23,16 +23,16 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.voltdb.catalog.Cluster;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
 
-public class TestEELibraryLoader
-{
+public class TestNativeLibraryLoader {
+
     @Test
     public void testLoader() {
         VoltDB.Configuration configuration = new VoltDB.Configuration();
@@ -41,20 +41,19 @@ public class TestEELibraryLoader
         VoltDB.ignoreCrash = true;
         VoltDB.replaceVoltDBInstanceForTest(mockvolt);
         mockvolt.m_noLoadLib = true;
-        assertFalse(EELibraryLoader.loadExecutionEngineLibrary(false));
+        assertFalse(NativeLibraryLoader.loadVoltDB(false));
         assertFalse(VoltDB.wasCrashCalled);
         boolean threw = false;
         try {
-            assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
-        }
-        catch (AssertionError ae) {
+            assertFalse(NativeLibraryLoader.loadVoltDB(true));
+        } catch (AssertionError ae) {
             threw = true;
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
         VoltDB.wasCrashCalled = false;
         VoltDB.initialize(configuration);
-        assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
+        assertFalse(NativeLibraryLoader.loadVoltDB(true));
         assertFalse(VoltDB.wasCrashCalled);
 
         // Now test SUCCESS case
@@ -72,6 +71,6 @@ public class TestEELibraryLoader
 
         VoltDB.replaceVoltDBInstanceForTest(mockitovolt);
         VoltDB.initialize(configuration);
-        assertTrue(EELibraryLoader.loadExecutionEngineLibrary(true));
+        assertTrue(NativeLibraryLoader.loadVoltDB(true));
     }
 }

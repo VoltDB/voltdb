@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogException;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -406,7 +407,13 @@ public class Inits {
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
+            try {
+                catalog.execute(serializedCatalog);
+            } catch (CatalogException e) {
+                // Disallow recovering from an incompatible Enterprise catalog.
+                VoltDB.crashLocalVoltDB(e.getLocalizedMessage());
+            }
+
             serializedCatalog = null;
 
             // note if this fails it will print an error first

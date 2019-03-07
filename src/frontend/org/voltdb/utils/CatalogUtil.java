@@ -2326,7 +2326,6 @@ public abstract class CatalogUtil {
                 // Setting this for compatibility mode only, don't use in new code
                 db.setIsactiveactivedred(true);
             }
-            cluster.setSchemacheckmode(dr.getSchema().value());
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {

@@ -478,7 +478,8 @@ public class SystemStatsCollector {
         String pidString = processName.substring(0, processName.indexOf('@'));
         pid = Integer.valueOf(pidString);
 
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(false);
+        // ETHAN (11/7/2018): If loading the native library does not have to succeed, why load?
+        // org.voltdb.NativeLibraryLoader.loadVoltDB(false);
 
         // test the default fallback performance
         start = System.currentTimeMillis();

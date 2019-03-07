@@ -27,10 +27,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
@@ -45,8 +43,11 @@ import java.util.Properties;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
@@ -59,7 +60,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CSVLoader;
 import org.voltdb.utils.JDBCLoader;
 import org.voltdb.utils.MiscUtils;
@@ -68,6 +68,9 @@ import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
 
 public class TestJDBCSecurityEnabled {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private static final String TEST_XML = "jdbcsecurityenabledtest.xml";
     private static final String TEST_JAR = "jdbcsecurityenabledtest.jar";
     static String testjar;
@@ -288,7 +291,9 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
-    public void testJDBCLoaderWithCredentialsFile() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
+    @Flaky(description="TestJDBCSecurityEnabled.testJDBCLoaderWithCredentialsFile")
+    public void testJDBCLoaderWithCredentialsFile()
+            throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
 
         // write username / password to csv
         String[] authData = {"username: userWithAdminPerm", "password: password"};
@@ -357,7 +362,8 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
-    public void testUsingCrendentialFileIncludingSpecialCharactersInPassword() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
+    public void testUsingCrendentialFileIncludingSpecialCharactersInPassword()
+            throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
 
         // write username / password to csv
         String[] authData = {"username: userWithAdminPerm2", "password: password!!!"};

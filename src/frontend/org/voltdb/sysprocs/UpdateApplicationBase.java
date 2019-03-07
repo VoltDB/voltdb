@@ -40,6 +40,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.catalog.CatalogException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -210,7 +211,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.upgradedFromVersion = loadResults.getSecond();
 
             Catalog newCatalog = new Catalog();
-            newCatalog.execute(newCatalogCommands);
+            try {
+                newCatalog.execute(newCatalogCommands);
+            } catch (CatalogException e) {
+                retval.errorMsg = e.getLocalizedMessage();
+                return retval;
+            }
+
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
