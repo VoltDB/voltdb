@@ -247,67 +247,25 @@ public class SysprocFragmentTask extends FragmentTaskBase
                 if (dep != null) {
                     currentFragResponse.addDependency(dep);
                 }
-            } catch (final EEException e) {
+            } catch (final EEException | SQLException | ReplicatedTableException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new
-                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                                    m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
+                addDependencyToFragment(currentFragResponse);
                 break;
-            } catch (final SQLException e) {
-                hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new
-                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                                    m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
-                break;
-            } catch (final ReplicatedTableException e) {
-                hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new
-                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                                    m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
-                break;
-            }
-            catch (final SpecifiedException e) {
-                // Note that with SpecifiedException, the error code here might get changed before
+            } catch (final SerializableException e) {
+                // Note that with SerializableException, the error code here might get changed before
                 // the client/user sees it. It really just needs to indicate failure.
                 //
                 // Key point here vs the next catch block for VAE is to not wrap the subclass of
                 // SerializableException here to preserve it during the serialization.
                 //
-                currentFragResponse.setStatus(
-                        FragmentResponseMessage.USER_ERROR,
-                        e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new
-                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                                    m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
-            }
-            catch (final VoltAbortException e) {
-                currentFragResponse.setStatus(
-                        FragmentResponseMessage.USER_ERROR,
-                        new SerializableException(CoreUtils.throwableToString(e)));
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new
-                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
-                                    m_rawDummyResult, 0, m_rawDummyResult.length));
-                }
+                currentFragResponse.setStatus( FragmentResponseMessage.USER_ERROR, e);
+                addDependencyToFragment(currentFragResponse);
+                break;
+            } catch (final VoltAbortException e) {
+                currentFragResponse.setStatus( FragmentResponseMessage.USER_ERROR, new SerializableException(CoreUtils.throwableToString(e)));
+                addDependencyToFragment(currentFragResponse);
                 break;
             }
 
@@ -319,6 +277,15 @@ public class SysprocFragmentTask extends FragmentTaskBase
         // we should never rollback DR buffer for MP sysprocs because we don't report the DR buffer size and therefore don't know if it is empty or not.
         currentFragResponse.setDrBufferSize(1);
         return currentFragResponse;
+    }
+
+    private void addDependencyToFragment(FragmentResponseMessage response) {
+        if (response.getTableCount() == 0) {
+            // Make sure the response has at least 1 result with a valid DependencyId
+            response.addDependency(new
+                    DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                            m_rawDummyResult, 0, m_rawDummyResult.length));
+        }
     }
 
     @Override

@@ -32,8 +32,9 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.EELibraryLoader;
 import org.voltdb.HybridCrc32;
+import org.voltdb.NativeLibraryLoader;
+import org.voltdb.VoltDB;
 import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PairSequencer.CyclicSequenceException;
@@ -115,7 +116,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
                     // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                     segmentReader = m_segment.getReader(m_cursorId);
-                    if (segmentReader == null) segmentReader = m_segment.openForRead(m_cursorId);
+                    if (segmentReader == null) {
+                        segmentReader = m_segment.openForRead(m_cursorId);
+                    }
                 }
                 BBContainer retcont = segmentReader.poll(ocf, checkCRC);
                 if (retcont == null) {
@@ -218,7 +221,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 boolean inclusive = true;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
                     // Check if there are more to read.
-                    if (m_segment.getReader(m_cursorId).hasMoreEntries()) return false;
+                    if (m_segment.getReader(m_cursorId).hasMoreEntries()) {
+                        return false;
+                    }
                     inclusive = false;
                 }
 
@@ -356,7 +361,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public PersistentBinaryDeque(final String nonce, DeferredSerialization schemaDS,
             final File path, VoltLogger logger,
             final boolean deleteEmpty) throws IOException {
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
         m_path = path;
         m_nonce = nonce;
         m_usageSpecificLog = logger;
@@ -1212,7 +1217,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void assertions() {
-        if (!assertionsOn || m_closed) return;
+        if (!assertionsOn || m_closed) {
+            return;
+        }
         for (ReadCursor cursor : m_readCursors.values()) {
             int numObjects = 0;
             try {
@@ -1235,7 +1242,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
     int numOpenSegments() {
         int numOpen = 0;
         for (PBDSegment segment : m_segments.values()) {
-            if (!segment.isClosed()) numOpen++;
+            if (!segment.isClosed()) {
+                numOpen++;
+            }
         }
 
         return numOpen;

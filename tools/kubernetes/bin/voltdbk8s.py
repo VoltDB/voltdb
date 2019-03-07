@@ -227,6 +227,23 @@ def hang():
     sp.wait()
 
 
+def get_files_list(dir):
+    # skip files starting with .., such as ..data, that k8s puts in configmaps
+    files = [f for f in os.listdir(dir) if not f.startswith('..')]
+    if len(files) > 1:
+        plf = os.path.join(dir, '.loadorder')
+        if os.path.exists(plf):
+            with open(plf, 'r') as f:
+                fl = f.readline().strip().split(',')
+            fqpl = map(lambda x: os.path.join(dir, x), fl)
+        else:
+            fqpl = [ dir + "/*", ]
+        return fqpl
+    elif len(files) == 1:
+        return [ os.path.join(dir, files[0]) ]
+    return None
+
+
 def main():
     # See if /voltdbroot (persistent storage mount) is exists
     if not os.path.exists(PV_VOLTDBROOT):
@@ -305,12 +322,18 @@ def main():
             deployment_file = os.path.join(assets_dir, 'deployment')
             if os.path.isfile(deployment_file):
                 cmd.extend(['--config', deployment_file])
-            classes_file = os.path.join(assets_dir, 'classes')
-            if os.path.isfile(classes_file):
-                cmd.extend(['--classes', classes_file])
-            schema_file = os.path.join(assets_dir, 'schema')
-            if os.path.isfile(schema_file):
-                cmd.extend(['--schema', schema_file])
+            classes_dir = os.path.join(assets_dir, "classes")
+            l = get_files_list(classes_dir)
+            logging.debug(l)
+            if l is not None:
+                cmd.append('--classes')
+                cmd.append(','.join(l))
+            schema_dir = os.path.join(assets_dir, "schema")
+            l = get_files_list(schema_dir)
+            logging.debug(l)
+            if l is not None:
+                cmd.append('--schema')
+                cmd.append(','.join(l))
         extra_init_args = os.getenv('VOLTDB_INIT_ARGS')
         if extra_init_args:
             cmd.extend(str_to_arg_list(extra_init_args))

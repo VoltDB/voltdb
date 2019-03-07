@@ -108,6 +108,10 @@ spec:
           name: voltdbroot
         - mountPath: /etc/voltdb
           name: voltdb-init-volume
+        - mountPath: /etc/voltdb/classes
+          name: voltdb-classes-volume
+        - mountPath: /etc/voltdb/schema
+          name: voltdb-schema-volume
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -117,6 +121,12 @@ spec:
       - configMap:
           name: --clusterName---init-configmap
         name: voltdb-init-volume
+      - configMap:
+          name: --clusterName---init-classes
+        name: voltdb-classes-volume
+      - configMap:
+          name: --clusterName---init-schema
+        name: voltdb-schema-volume
   volumeClaimTemplates:
   - metadata:
       name: voltdbroot

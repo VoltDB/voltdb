@@ -756,7 +756,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated1 = catalogForJar(testDir + File.separator + "testAlterTableTTL21.jar");
         verifyDiff(catUpdated, catUpdated1, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL22.jar"));
         Catalog catUpdated2 = catalogForJar(testDir + File.separator + "testAlterTableTTL22.jar");
         verifyDiff(catUpdated1, catUpdated2, false, null, true, false, true);
@@ -766,7 +766,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
         verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATION TO TARGET X;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATION TO TARGET X;");
         assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
     }
 

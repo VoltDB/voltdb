@@ -29,8 +29,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -125,7 +125,7 @@ public class CatalogDiffEngine {
     private boolean m_inStrictMatViewDiffMode = false;
 
     // contains the text of the difference
-    private final StringBuilder m_sb = new StringBuilder();
+    private final CatalogSerializer m_serializer = new CatalogSerializer();
 
     // true if the difference is allowed in a running system
     private boolean m_supported;
@@ -217,7 +217,7 @@ public class CatalogDiffEngine {
     }
 
     public String commands() {
-        return m_sb.toString();
+        return m_serializer.getResult();
     }
 
     public boolean supported() {
@@ -1324,7 +1324,7 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        newType.writeCommandForField(m_sb, field, true);
+        m_serializer.writeCommandForField(newType, field, true);
 
         // record the field change for later generation of descriptive text
         // though skip the schema field of database because it changes all the time
@@ -1462,16 +1462,11 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        m_sb.append(getDeleteDiffStatement(prevType, mapName));
+        m_serializer.writeDeleteDiffStatement(prevType, mapName);
 
         // add it to the set of deletions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(prevType));
         cgrp.processDeletion(prevType, newlyChildlessParent);
-    }
-
-    public static String getDeleteDiffStatement(CatalogType toDelete, String parentName) {
-        return "delete " + toDelete.getParent().getCatalogPath() + " " +
-            parentName + " " + toDelete.getTypeName() + "\n";
     }
 
     /**
@@ -1502,9 +1497,7 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        newType.writeCreationCommand(m_sb);
-        newType.writeFieldCommands(m_sb, null);
-        newType.writeChildCommands(m_sb);
+        newType.accept(m_serializer);
 
         // add it to the set of additions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(newType));

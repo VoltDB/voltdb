@@ -72,7 +72,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 public class TestExportGeneration {
 
     static {
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
     }
 
     static String testout_jar;

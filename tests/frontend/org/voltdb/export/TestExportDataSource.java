@@ -74,7 +74,7 @@ import junit.framework.TestCase;
 public class TestExportDataSource extends TestCase {
 
     static {
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
     }
     private final static File TEST_DIR = new File("/tmp/" + System.getProperty("user.name"));
 
