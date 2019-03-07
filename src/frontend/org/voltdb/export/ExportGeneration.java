@@ -1094,12 +1094,18 @@ public class ExportGeneration implements Generation {
 
     /**
      * Return table name from signature
+     *
+     * The method handles both signatures (e.g. "name|vv") and
+     * straight table names (e.g. "name")
+     *
      * FIXME: needs EE change to drop signatures
+     *
      * @param signature
      * @return table name
      */
     public static String tableNameFromSignature(String signature) {
-        return signature.substring(0,  signature.indexOf("|"));
+        int idx = signature.indexOf("|");
+        return idx == -1 ? signature : signature.substring(0,  idx);
     }
 
     @Override
