@@ -363,8 +363,8 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t tableSignatureLength;
-    char tableSignature[0];
+    int32_t streamNameLength;
+    char streamName[0];
 }__attribute__((packed)) get_uso;
 
 typedef struct {
@@ -1512,12 +1512,12 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
     get_uso *get = (get_uso*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    int32_t tableSignatureLength = ntohl(get->tableSignatureLength);
-    std::string tableSignature(get->tableSignature, tableSignatureLength);
+    int32_t streamNameLength = ntohl(get->streamNameLength);
+    std::string streamNameStr(get->streamName, streamNameLength);
 
     size_t ackOffset;
     int64_t seqNo;
-    m_engine->getUSOForExportTable(ackOffset, seqNo, tableSignature);
+    m_engine->getUSOForExportTable(ackOffset, seqNo, streamNameStr);
 
     // write offset across bigendian.
     int64_t ackOffsetI64 = static_cast<int64_t>(ackOffset);

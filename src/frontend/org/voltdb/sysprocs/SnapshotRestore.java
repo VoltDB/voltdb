@@ -1439,7 +1439,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            String signature = t.getSignature();
             String name = t.getTypeName();
 
             //Sequence numbers for this table for every partition
@@ -1473,9 +1472,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     uso,
                     sequenceNumber,
                     myPartitionId,
-                    signature);
+                    name);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
-            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, name,
                     isRecover, false, sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }

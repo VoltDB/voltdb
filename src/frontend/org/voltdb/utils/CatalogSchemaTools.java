@@ -334,6 +334,7 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
 
                 if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
+                    assert(TableType.isPersistentMigrate(catalog_tbl.getTabletype()));
                     table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
                 }
             }
@@ -347,11 +348,6 @@ public abstract class CatalogSchemaTools {
         // Partition Table for regular tables (non-streams)
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
-        }
-
-        // IW-ENG14804, add Export directive for regular (non stream) tables
-        if (!isExportOnly && !tableIsView && streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-            sb.append("EXPORT TABLE ").append(catalog_tbl.getTypeName()).append(" TO TARGET ").append(streamTarget).append(";\n");
         }
 
         // All other Indexes

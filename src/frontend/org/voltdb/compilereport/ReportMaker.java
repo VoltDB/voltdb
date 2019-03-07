@@ -381,7 +381,6 @@ public class ReportMaker {
         StringBuilder sb = new StringBuilder();
         SortedSet<Table> exportTables = CatalogUtil.getExportTables(db);
         for (Table table : db.getTables()) {
-            // FIXME - IW-ENG14804, do something for tables that export
             sb.append(generateSchemaRow(table, exportTables.contains(table) ? true : false));
         }
         return sb.toString();

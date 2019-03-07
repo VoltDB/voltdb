@@ -216,7 +216,7 @@ public interface SiteProcedureConnection {
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
-    public long[] getUSOForExportTable(String signature);
+    public long[] getUSOForExportTable(String streamName);
 
     public TupleStreamStateInfo getDRTupleStreamStateInfo();
 

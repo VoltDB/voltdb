@@ -74,7 +74,6 @@ import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
-import org.voltdb.compiler.statements.ExportStatement;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -210,7 +209,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropStream(this))
                                 .addNextProcessor(new DRTable(this))
                                 .addNextProcessor(new SetGlobalParam(this))
-                                .addNextProcessor(new ExportStatement(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }

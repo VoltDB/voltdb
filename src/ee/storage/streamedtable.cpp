@@ -233,8 +233,8 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  * since startup (used for rejoin/recovery).
  */
 void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
-    // assume this only gets called from a fresh rejoined node
-    assert(m_sequenceNo == 0);
+    // assume this only gets called from a fresh rejoined node or after the reset of a wrapper
+    assert(m_sequenceNo == 0 || seqNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
         m_wrapper->setBytesUsed(seqNo, streamBytesUsed);

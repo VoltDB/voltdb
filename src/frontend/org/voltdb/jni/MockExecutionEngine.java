@@ -198,11 +198,11 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String mStreamName) {
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
+    public long[] getUSOForExportTable(String streamName) {
         return null;
     }
 

@@ -195,7 +195,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 
     // For export tables with no partition column,
     // if the data is from a replicated source,
-    // only insert into one partition (the one for hash(0)).
+    // only insert into one partition (0).
     // Other partitions can just return a 0 modified tuple count.
     // OTOH, if the data is coming from a (sub)query with
     // partitioned tables, perform the insert on every partition.
@@ -203,7 +203,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
             m_isStreamed &&
             m_multiPartition &&
             !m_sourceIsPartitioned &&
-            !m_engine->isLocalSite(ValueFactory::getBigIntValue(0L))) {
+            m_engine->getPartitionId() != 0) {
         m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
         // put the tuple into the output table
         m_tmpOutputTable->insertTuple(m_count_tuple);

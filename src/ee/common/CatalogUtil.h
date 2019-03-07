@@ -33,10 +33,6 @@
 /**
  * A table is export only its catalog says so.
  */
-bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
-    return voltdb::tableTypeIsStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
-}
-
 bool tableTypePersistentWithMigrateStream(catalog::Table const& catalogTable) {
      return voltdb::tableTypePersistentWithMigrateStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }

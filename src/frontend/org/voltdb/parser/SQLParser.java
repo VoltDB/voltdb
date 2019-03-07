@@ -162,22 +162,6 @@ public class SQLParser extends SQLPatternFactory
             SPF.optional(SPF.clause(SPF.token("parameter"), SPF.capture(SPF.integer())))
         ).compile("PAT_PARTITION_PROCEDURE");
 
-    /**
-     * XXX
-     * Pattern: EXPORT TABLE tablename TO TARGET targetname
-     *
-     * NB supports only unquoted table and target names
-     *
-     * Capture groups:
-     *  (1) table name
-     *  (2) column name
-     */
-    private static final Pattern PAT_EXPORT_TABLE =
-        SPF.statement(
-            SPF.token("export"), SPF.token("table"), SPF.capture(SPF.databaseObjectName()),
-            SPF.token("to"), SPF.token("target"), SPF.capture(SPF.databaseObjectName())
-        ).compile("PAT_EXPORT_TABLE");
-
     //TODO: Convert to pattern factory usage below this point.
 
     /*
@@ -441,7 +425,6 @@ public class SQLParser extends SQLPatternFactory
             "\\APARTITION|" +
             "\\AREPLICATE|" +
             "\\AIMPORT|" +
-            "\\AEXPORT|" +
             "\\ADR|" +
             "\\ASET" +
             ")" +                                  // end (group 1)
@@ -802,16 +785,6 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchPartitionProcedure(String statement)
     {
         return PAT_PARTITION_PROCEDURE.matcher(statement);
-    }
-
-    /**
-     * Match statement against pattern for export table statement
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchExportTable(String statement)
-    {
-        return PAT_EXPORT_TABLE.matcher(statement);
     }
 
     /**

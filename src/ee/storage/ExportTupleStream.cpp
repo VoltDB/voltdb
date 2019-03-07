@@ -46,7 +46,6 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
       m_flushPending(false),
       m_nextFlushStream(NULL),
       m_prevFlushStream(NULL)
-
 {
     extendBufferChain(m_defaultCapacity);
 }

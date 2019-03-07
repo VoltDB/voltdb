@@ -1237,9 +1237,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
-        return m_ee.getUSOForExportTable(signature);
+        return m_ee.getUSOForExportTable(streamName);
     }
 
     @Override
@@ -1411,10 +1411,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void exportAction(boolean syncAction,
                              long uso,
                              Long sequenceNumber,
-                             Integer partitionId, String tableSignature)
+                             Integer partitionId, String streamName)
     {
         m_ee.exportAction(syncAction, uso, sequenceNumber,
-                          partitionId, tableSignature);
+                          partitionId, streamName);
     }
 
     @Override
@@ -1484,7 +1484,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
-                    catalogTable.getSignature());
+                    catalogTable.getTypeName());
             // assign the stats to the other partition's value
             ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getSignature(),
                     false, true, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());

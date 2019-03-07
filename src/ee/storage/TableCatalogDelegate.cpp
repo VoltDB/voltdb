@@ -391,8 +391,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = tableTypePeristentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, catalogTable);
+    m_tableType = static_cast<TableType>(catalogTable.tableType());
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
@@ -417,8 +416,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
                                                     partitionColumnIndex,
-                                                    exportEnabled,
-                                                    tableIsExportOnly,
+                                                    m_tableType,
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
@@ -459,8 +457,6 @@ void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
         return;
     }
 
-    evaluateExport(catalogDatabase, catalogTable);
-
     // configure for stats tables
     PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
     if (persistenttable) {
@@ -483,15 +479,6 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
     // So here we could use static_cast. But if we in the future want to lift this limitation,
     // we will have to put more thoughts on this.
     return static_cast<PersistentTable*>(deltaTable);
-}
-
-//After catalog is updated call this to ensure your export tables are connected correctly.
-void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
-        catalog::Table const& catalogTable) {
-    // FIXME: Must use enum values instead of hard-coded constants
-    // FIXME: This is a localized hack to avoid pushing to view-only streams
-    int32_t tableType = catalogTable.tableType();
-    m_exportEnabled = tableType == 2 || tableType == 3 || tableType == 4;
 }
 
 static void migrateChangedTuples(catalog::Table const& catalogTable,
