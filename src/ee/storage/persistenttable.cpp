@@ -156,6 +156,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         // we'll need a system for keeping track of which are which.
     }
 
+    }
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
 
     m_allowNulls.resize(m_columnCount);
@@ -1612,6 +1613,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message.str().c_str());
     }
+
+
 
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);

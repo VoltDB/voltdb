@@ -142,7 +142,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
 
     if (needsHiddenCloumnTableWithStream) {
         VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
-        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, true);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, false, true);
     }
     return schemaBuilder.build();
 }

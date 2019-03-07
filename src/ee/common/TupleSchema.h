@@ -82,6 +82,17 @@ public:
                                           const std::vector<bool>&      hiddenAllowNull,
                                           const std::vector<bool>&      hiddenColumnInBytes);
 
+    /** Static factory method to create a TupleSchema that contains hidden columns */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>&   columnSizes,
+                                          const std::vector<bool>&      allowNull,
+                                          const std::vector<bool>&      columnInBytes,
+                                          const std::vector<ValueType>& hiddenColumnTypes,
+                                          const std::vector<int32_t>&   hiddenColumnSizes,
+                                          const std::vector<bool>&      hiddenAllowNull,
+                                          const std::vector<bool>&      hiddenColumnInBytes,
+                                          const bool isTableWithStream);
+
     /** Static factory method to create a TupleSchema for index keys */
     static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
                                         const std::vector<int32_t>&     columnSizes,
@@ -142,9 +153,6 @@ public:
 
     /** Return true if there is a hidden column on the table with stream. */
     inline bool isTableWithStream() const;
-
-    /** set a hidden column for migrate. */
-    void setTableWithStream(bool isTableWithStream);
 
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {

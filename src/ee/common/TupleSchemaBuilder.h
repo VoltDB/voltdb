@@ -113,16 +113,15 @@ public:
     /** Finally, build the schema with the attributes specified. */
     TupleSchema* build() const
     {
-        TupleSchema* schema = TupleSchema::createTupleSchema(m_types,
+        return TupleSchema::createTupleSchema(m_types,
                                               m_sizes,
                                               m_allowNullFlags,
                                               m_inBytesFlags,
                                               m_hiddenTypes,
                                               m_hiddenSizes,
                                               m_hiddenAllowNullFlags,
-                                              m_hiddenInBytesFlags);
-        schema->setTableWithStream(m_isTableWithStream);
-        return schema;
+                                              m_hiddenInBytesFlags,
+                                              m_isTableWithStream);
     }
 
     /** A special build method for index keys, which use "headerless" tuples */

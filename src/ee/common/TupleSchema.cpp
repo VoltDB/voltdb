@@ -106,7 +106,26 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
                                             const std::vector<ValueType>& hiddenColumnTypes,
                                             const std::vector<int32_t>&   hiddenColumnSizes,
                                             const std::vector<bool>&      hiddenAllowNull,
-                                            const std::vector<bool>&      hiddenColumnInBytes)
+                                            const std::vector<bool>&      hiddenColumnInBytes) {
+    return TupleSchema::createTupleSchema(columnTypes,
+                                          columnSizes,
+                                          allowNull,
+                                          columnInBytes,
+                                          hiddenColumnTypes,
+                                          hiddenColumnSizes,
+                                          hiddenAllowNull,
+                                          hiddenColumnInBytes,
+                                          false);
+}
+TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                            const std::vector<int32_t>&   columnSizes,
+                                            const std::vector<bool>&      allowNull,
+                                            const std::vector<bool>&      columnInBytes,
+                                            const std::vector<ValueType>& hiddenColumnTypes,
+                                            const std::vector<int32_t>&   hiddenColumnSizes,
+                                            const std::vector<bool>&      hiddenAllowNull,
+                                            const std::vector<bool>&      hiddenColumnInBytes,
+                                            const bool isTableWithStream)
 {
     const uint16_t uninlineableObjectColumnCount =
       TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
@@ -125,7 +144,7 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
     retval->m_uninlinedObjectColumnCount = uninlineableObjectColumnCount;
     retval->m_hiddenColumnCount = hiddenColumnCount;
     retval->m_isHeaderless = false;
-
+    retval->m_isTableWithStream = isTableWithStream;
     uint16_t uninlinedObjectColumnIndex = 0;
     for (uint16_t ii = 0; ii < columnCount; ii++) {
         const ValueType type = columnTypes[ii];
@@ -323,10 +342,6 @@ std::string TupleSchema::ColumnInfo::debug() const {
            << "nullable = " << (allowNull ? "true" : "false") << ", "
            << "isInlined = " << inlined;
     return buffer.str();
-}
-
-void TupleSchema::setTableWithStream(bool isTableWithStream) {
-    m_isTableWithStream = isTableWithStream;
 }
 
 size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
