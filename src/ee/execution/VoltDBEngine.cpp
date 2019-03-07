@@ -1146,8 +1146,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             if (streamedTable) {
                 const std::string& name = streamedTable->name();
                 m_exportingTables[name] = streamedTable;
+                ExportTupleStream *wrapper = m_exportingStreams[name];
                 if (tableTypeNeedsTupleStream(tcd->getTableType())) {
-                    ExportTupleStream *wrapper = m_exportingStreams[name];
                     if (wrapper == NULL) {
                         wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
                                 m_executorContext->m_siteId, timestamp, catalogTable->signature(),
@@ -1161,6 +1161,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     }
                     streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                     streamedTable->setWrapper(wrapper);
+                }
+                else {
+                    // The table/stream type has been changed
+                    streamedTable->setWrapper(NULL);
+                    assert(purgedStreams[name] != NULL);
+                    streamedTable->setExportStreamPositions(0, 0);
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
