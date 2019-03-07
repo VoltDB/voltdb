@@ -156,7 +156,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
         // we'll need a system for keeping track of which are which.
     }
 
-    }
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
 
     m_allowNulls.resize(m_columnCount);
