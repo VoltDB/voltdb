@@ -34,7 +34,7 @@ public interface Generation {
     public void close(final HostMessenger messenger);
 
     public List<ExportStatsRow> getStats(boolean interval);
-    public void onSourceDone(int partitionId, String signature);
+    public void onSourceDrained(int partitionId, String tableName);
 
     public void pushExportBuffer(int partitionId, String signature,
                                 long seqNo, long committedSeqNo, int tupleCount,
@@ -45,4 +45,5 @@ public interface Generation {
                                                 boolean isLowestSite);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
-}
+    public int getCatalogVersion();
+    }

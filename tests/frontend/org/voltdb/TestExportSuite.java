@@ -37,7 +37,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -105,61 +104,6 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
 
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
-        quiesceAndVerifyTarget(client, m_verifier);
-    }
-
-    //  Test Export of a DROPPED table.  Queues some data to a table.
-    //  Then drops the table and verifies that Export can successfully
-    //  drain the dropped table. IE, drop table doesn't lose Export data.
-    //
-    public void testExportAndDroppedTable() throws Exception {
-        System.out.println("testExportAndDroppedTable");
-        Client client = getClient();
-        for (int i = 0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow(client, "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            m_verifier.addRow(client, "NO_NULLS_GRP", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            final Object[] paramsGrp = convertValsToParams("NO_NULLS_GRP", i, rowdata);
-            client.callProcedure("Insert", params);
-            client.callProcedure("Insert", paramsGrp);
-        }
-        waitForStreamedTargetAllocatedMemoryZero(client);
-
-        // now drop the no-nulls table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                new File(deploymentURL));
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        client = getClient();
-
-        // must still be able to verify the export data.
-        quiesceAndVerifyTarget(client, m_verifier);
-    }
-
-    // Test that a table w/o Export enabled does not produce Export content
-    public void testThatTablesOptIn() throws Exception {
-        System.out.println("testThatTablesOptIn");
-        final Client client = getClient();
-
-        final Object params[] = new Object[TestSQLTypesSuite.COLS + 2];
-        params[0] = "WITH_DEFAULTS";  // this table should not produce Export output
-
-        // populate the row data
-        for (int i = 0; i < TestSQLTypesSuite.COLS; ++i) {
-            params[i + 2] = TestSQLTypesSuite.m_midValues[i];
-        }
-        long icnt = m_verifier.getExportedDataCount();
-        for (int i = 0; i < 10; i++) {
-            params[1] = i; // pkey
-            // do NOT add row to TupleVerfier as none should be produced
-            client.callProcedure("Insert", params);
-        }
-        //Make sure that we have not recieved any new data.
-        waitForStreamedTargetAllocatedMemoryZero(client);
-        assertEquals(icnt, ExportTestClient.getExportedDataCount());
         quiesceAndVerifyTarget(client, m_verifier);
     }
 

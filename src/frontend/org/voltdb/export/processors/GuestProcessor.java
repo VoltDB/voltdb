@@ -237,7 +237,6 @@ public class GuestProcessor implements ExportDataProcessor {
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
-                                m_source.getSignature(),
                                 m_source.getTableName(),
                                 m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),

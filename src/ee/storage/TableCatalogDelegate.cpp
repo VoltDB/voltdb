@@ -488,7 +488,10 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
 //After catalog is updated call this to ensure your export tables are connected correctly.
 void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
         catalog::Table const& catalogTable) {
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    // FIXME: Must use enum values instead of hard-coded constants
+    // FIXME: This is a localized hack to avoid pushing to view-only streams
+    int32_t tableType = catalogTable.tableType();
+    m_exportEnabled = tableType == 2 || tableType == 3 || tableType == 4;
 }
 
 static void migrateChangedTuples(catalog::Table const& catalogTable,

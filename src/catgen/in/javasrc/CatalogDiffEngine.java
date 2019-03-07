@@ -979,9 +979,11 @@ public class CatalogDiffEngine {
             return null;
         }
         if (suspect instanceof Connector && "enabled".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         if (suspect instanceof Connector && "loaderclass".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         // ENG-6511 Allow materialized views to change the index they use dynamically.

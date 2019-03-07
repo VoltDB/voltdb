@@ -231,7 +231,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
         while (stats.advanceRow()) {
             if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
-                assert("DROPPED".equalsIgnoreCase(stats.getString("STATUS")));
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
             }
         }
 
