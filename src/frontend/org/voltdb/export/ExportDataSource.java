@@ -1142,6 +1142,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         void internalDiscard() {
             checkDoubleFree();
             m_backingCont.discard();
+            if (m_schemaCont != null) {
+                m_schemaCont.discard();
+            }
         }
 
         @Override
