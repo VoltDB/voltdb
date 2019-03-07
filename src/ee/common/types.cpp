@@ -15,28 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ctype.h>
 #include <string>
 #include <map>
-#include <algorithm>
 
 #include "types.h"
-
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"
 #include "common/ValueFactory.hpp"
 
 namespace voltdb {
 using namespace std;
-
-template<typename K, typename V>
-map<V, K> revert(map<K, V>const& original) {
-   map<V, K> reverted;
-   for(auto const& kv : original) {
-      reverted.emplace(make_pair(kv.second, kv.first));
-   }
-   return reverted;
-}
 
 template<typename K, typename V>
 inline V lookup(map<K, V> const& dictionary, K const& key, V const& defaultValue) {
@@ -51,24 +39,33 @@ inline string lookup(map<K, string> const& dictionary, K const& key, char const*
 }
 
 // TODO: when upgrade boost library, use boost::bimap
+template<typename K, typename V>
+map<V, K> revert(map<K, V>const& original) {
+   map<V, K> reverted;
+   for(auto const& kv : original) {
+      reverted.emplace(make_pair(kv.second, kv.first));
+   }
+   return reverted;
+}
+
 map<ValueType, string> const mapOfTypeName {
-   {VALUE_TYPE_TINYINT, "tinyint"},
-   {VALUE_TYPE_SMALLINT, "smallint"},
-   {VALUE_TYPE_INTEGER, "integer"},
-   {VALUE_TYPE_BIGINT, "bigint"},
-   {VALUE_TYPE_DOUBLE, "float"},
-   {VALUE_TYPE_VARCHAR, "varchar"},
-   {VALUE_TYPE_VARBINARY, "varbinary"},
-   {VALUE_TYPE_TIMESTAMP, "timestamp"},
-   {VALUE_TYPE_DECIMAL, "decimal"},
-   {VALUE_TYPE_BOOLEAN, "boolean"},
-   {VALUE_TYPE_POINT, "point"},
-   {VALUE_TYPE_GEOGRAPHY, "geography"},
-   {VALUE_TYPE_ADDRESS, "address"},
+   {VALUE_TYPE_TINYINT, "TINYINT"},
+   {VALUE_TYPE_SMALLINT, "SMALLINT"},
+   {VALUE_TYPE_INTEGER, "INTEGER"},
+   {VALUE_TYPE_BIGINT, "BIGINT"},
+   {VALUE_TYPE_DOUBLE, "FLOAT"},
+   {VALUE_TYPE_VARCHAR, "VARCHAR"},
+   {VALUE_TYPE_VARBINARY, "VARBINARY"},
+   {VALUE_TYPE_TIMESTAMP, "TIMESTAMP"},
+   {VALUE_TYPE_DECIMAL, "DECIMAL"},
+   {VALUE_TYPE_BOOLEAN, "BOOLEAN"},
+   {VALUE_TYPE_POINT, "POINT"},
+   {VALUE_TYPE_GEOGRAPHY, "GEOGRAPHY"},
+   {VALUE_TYPE_ADDRESS, "ADDRESS"},
    {VALUE_TYPE_INVALID, "INVALID"},
    {VALUE_TYPE_NULL, "NULL"},
-   {VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC, "numeric"},
-   {VALUE_TYPE_ARRAY, "array"}
+   {VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC, "NUMERIC"},
+   {VALUE_TYPE_ARRAY, "ARRAY"}
 };
 
 map<TableStreamType, string> const mapOfStreamTypeName {
@@ -80,25 +77,7 @@ map<TableStreamType, string> const mapOfStreamTypeName {
    {TABLE_STREAM_NONE, "TABLE_STREAM_NONE"}
 };
 
-map<string, ValueType> const mapToValueType {
-   {"INVALID", VALUE_TYPE_INVALID},
-   {"NULL", VALUE_TYPE_NULL},
-   {"NUMERIC", VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC},
-   {"TINYINT", VALUE_TYPE_TINYINT},
-   {"SMALLINT", VALUE_TYPE_SMALLINT},
-   {"INTEGER", VALUE_TYPE_INTEGER},
-   {"BIGINT", VALUE_TYPE_BIGINT},
-   {"FLOAT", VALUE_TYPE_DOUBLE},
-   {"VARCHAR", VALUE_TYPE_VARCHAR},
-   {"TIMESTAMP", VALUE_TYPE_TIMESTAMP},
-   {"DECIMAL", VALUE_TYPE_DECIMAL},
-   {"BOOLEAN", VALUE_TYPE_BOOLEAN},
-   {"ADDRESS", VALUE_TYPE_ADDRESS},
-   {"VARBINARY", VALUE_TYPE_VARBINARY},
-   {"POINT", VALUE_TYPE_POINT},
-   {"GEOGRAPHY", VALUE_TYPE_GEOGRAPHY},
-   {"ARRAY", VALUE_TYPE_ARRAY}
-};
+map<string, ValueType> const mapToValueType = revert(mapOfTypeName);
 
 map<JoinType, string> const mapOfJoinType {
    {JOIN_TYPE_INVALID, "INVALID"},
@@ -295,15 +274,13 @@ string getTypeName(ValueType type) {
          string("UNKNOWN[").append(to_string(type)).append("]"));
 }
 
-std::string tableStreamTypeToString(TableStreamType type) {
+string tableStreamTypeToString(TableStreamType type) {
    return lookup(mapOfStreamTypeName, type, "INVALID");
 }
 
 
 string valueToString(ValueType type) {
-   string result = getTypeName(type);
-   transform(result.begin(), result.end(), result.begin(), ::toupper);
-   return result;
+   return getTypeName(type);
 }
 
 ValueType stringToValue(string nam) {
