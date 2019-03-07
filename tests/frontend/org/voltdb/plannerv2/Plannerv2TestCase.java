@@ -32,6 +32,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
@@ -205,13 +206,20 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
         @Override public void fail() {
             super.pass();
-            final RelDistribution distribution = transform();
-            assertFalse("Expected fall back:\nGot distribution type " +
-                            distribution.getType().name() +
-                            " with partition equal value = " +
-                            (distribution.getPartitionEqualValue() == null ? "null" :
-                                    distribution.getPartitionEqualValue().toString()),
-                    distribution.getIsSP());
+            try {
+                final RelDistribution distribution = transform();
+                assertFalse("Expected fall back:\nGot distribution type " +
+                                distribution.getType().name() +
+                                " with partition equal value = " +
+                                (distribution.getPartitionEqualValue() == null ? "null" :
+                                        distribution.getPartitionEqualValue().toString()),
+                        distribution.getIsSP());
+            } catch (PlanningErrorException e) {    // transform stage is allowed to throw:
+                assertEquals(                       // See RelDistributionUtils#isJoinSP()
+                        "SQL error while compiling query: This query is not plannable.  "
+                                + "The planner cannot guarantee that all rows would be in a single partition.",
+                        e.getMessage());
+            }
         }
     }
 

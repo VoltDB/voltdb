@@ -357,6 +357,10 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select RI1.bi from RI1, (select I from P2 order by I) P22 where RI1.i = P22.I").fail();
 
         m_tester.sql("select RI1.bi from RI1, (select I from P2 where I = 5 order by I) P22 where RI1.i = P22.I").pass();
+
+        // Taken from TestInsertIntoSelectSuite#testSelectListConstants
+        m_tester.sql("select count(*) FROM target_p INNER JOIN (SELECT 9 bi, vc, ii, ti FROM source_p1) ins_sq ON "
+                + "target_p.bi = ins_sq.bi").fail();
     }
 
     public void testIn() {

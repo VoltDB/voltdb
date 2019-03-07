@@ -331,7 +331,9 @@ final class RelDistributionUtils {
         final RexProgram prog = calc.getProgram();
         final Map<Integer, RexNode> mapsToLiteral = new HashMap<>();
         final Set<Set<Integer>> eqCols = new HashSet<>();
-        getEqualValuePredicate(prog.getCondition(), prog.getExprList(), mapsToLiteral, eqCols);
+        if (prog.getCondition() != null) {
+            getEqualValuePredicate(prog.getCondition(), prog.getExprList(), mapsToLiteral, eqCols);
+        }
         return transExpand(mapsToLiteral, eqCols);
     }
 
