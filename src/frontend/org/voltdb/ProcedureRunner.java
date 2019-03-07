@@ -50,6 +50,7 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
@@ -390,7 +391,6 @@ public class ProcedureRunner {
                     log.trace("invoked");
                 }
                 catch (InvocationTargetException itex) {
-                    //itex.printStackTrace();
                     Throwable ex = itex.getCause();
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
@@ -1261,6 +1261,9 @@ public class ProcedureRunner {
         } else if (e.getClass() == MispartitionedException.class) {
             status = ClientResponse.TXN_MISPARTITIONED;
             msg.append("TRANSACTION MISPARTITIONED\n");
+        } else if (e.getClass() == DRTableNotFoundException.class) {
+            status = ClientResponse.DR_TABLE_HASH_NOT_FOUND;
+            msg.append("TABLE NOT FOUND FOR REMOTE TABLE HASH\n");
         } else {
             msg.append("UNEXPECTED FAILURE:\n");
             expected_failure = false;
@@ -1326,6 +1329,8 @@ public class ProcedureRunner {
                 "VOLTDB ERROR: " + msg);
        if (status == ClientResponse.TXN_MISPARTITIONED) {
            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       } else if (status == ClientResponse.DR_TABLE_HASH_NOT_FOUND) {
+           ((DRTableNotFoundException) e).setClientResponseResults(response);
        }
 
        return response;

@@ -38,22 +38,34 @@ public class TimeToLiveVoltDB {
     final ColumnSchema ttlColumn;
     final int batchSize;
     final int maxFrequency;
+    final String migrationTarget;
     public TimeToLiveVoltDB(int value, String unit, ColumnSchema column,
-            int batchSize, int maxFrequency) {
+            int batchSize, int maxFrequency, String migrationTarget) {
         ttlValue = value;
         ttlUnit = unit;
         ttlColumn = column;
         this.batchSize = batchSize;
         this.maxFrequency = maxFrequency;
+        this.migrationTarget = migrationTarget;
     }
 
     @Override
     public boolean equals(Object o) {
         if (o instanceof TimeToLiveVoltDB) {
             TimeToLiveVoltDB ttl = (TimeToLiveVoltDB)o;
-            return (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
+            boolean ret = (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
                     ttl.ttlColumn.getName().equals(ttlColumn.getName()) &&
                     ttl.batchSize == batchSize && ttl.maxFrequency == maxFrequency);
+            if (!ret) {
+                return false;
+            }
+
+            if (ttl.migrationTarget != null && migrationTarget == null) {
+                return true;
+            }
+            if (ttl.migrationTarget != null && ttl.migrationTarget.equals(migrationTarget)){
+                return true;
+            }
         }
         return false;
     }

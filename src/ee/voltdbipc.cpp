@@ -121,9 +121,9 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, voltdb::DrStreamBlock *block);
 
-    void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::DrStreamBlock *block);
 
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -144,7 +144,7 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, bool sync);
     void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
@@ -1605,7 +1605,7 @@ void VoltDBIPC::threadLocalPoolAllocations() {
 void VoltDBIPC::pushExportBuffer(
         int32_t partitionId,
         std::string signature,
-        voltdb::StreamBlock *block,
+        voltdb::ExportStreamBlock *block,
         bool sync) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
@@ -1616,8 +1616,8 @@ void VoltDBIPC::pushExportBuffer(
     ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->startExportSequenceNumber());
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCountforExport());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->startSequenceNumber());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCount());
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = htonll(block->lastSpUniqueId());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
@@ -1693,14 +1693,14 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     }
 }
 
-int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }
     return -1;
 }
 
-void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block) {
+void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::DrStreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }

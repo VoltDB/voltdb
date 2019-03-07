@@ -89,7 +89,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // longer) @Flaky, e.g., '@Flaky(isFlaky = false)'
         } else if ("NONE".equalsIgnoreCase(RUN_FLAKY_TESTS)) {
             if (DEBUG) {
-                System.out.println("DEBUG:   test will NOT be run!");
+                System.out.println("DEBUG:   test will run  : NO");
             }
             return false;
 
@@ -97,7 +97,7 @@ public class FlakyTestStandardRunner implements FlakyTestRunner {
         // or 'ALL', or 'DEFAULT', or anything else), run all @Flaky tests
         } else {
             if (DEBUG) {
-                System.out.println("DEBUG:   test WILL be run!");
+                System.out.println("DEBUG:   test will run  : YES");
             }
             return true;
         }

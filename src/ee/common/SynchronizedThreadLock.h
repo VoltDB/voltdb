@@ -92,7 +92,9 @@ public:
      * Wrapper around calling UndoQuantum::registerUndoAction
      */
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-            PersistentTable *interest = NULL, PersistentTable *removeInterest = NULL);
+            PersistentTable *interest = NULL);
+    static void addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+            PersistentTable *deletedTable);
 
     static bool isInSingleThreadMode();
     static void setIsInSingleThreadMode(bool value);
