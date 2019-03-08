@@ -731,7 +731,7 @@ public class ExportGeneration implements Generation {
                         } else {
                             // Reset to no export client
                             eds.setClient(null);
-                            eds.setRunEveryWhere(true);
+                            eds.setRunEveryWhere(false);
                         }
 
                         // Mark in catalog only if partition is in use
