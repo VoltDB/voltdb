@@ -109,7 +109,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-        m_replicatedTableOperation = persistentTarget->isCatalogTableReplicated();
+        m_replicatedTableOperation = persistentTarget->isReplicatedTable();
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -180,7 +180,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_persistentTable = m_isStreamed ?
             NULL : static_cast<PersistentTable*>(m_targetTable);
     assert((!m_persistentTable && !m_replicatedTableOperation) ||
-            m_replicatedTableOperation == m_persistentTable->isCatalogTableReplicated());
+            m_replicatedTableOperation == m_persistentTable->isReplicatedTable());
 
     m_upsertTuple = TableTuple(m_targetTable->schema());
 
@@ -217,7 +217,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     }
 
     VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
-               static_cast<PersistentTable*>(m_targetTable)->isCatalogTableReplicated() ? "replicated" : "partitioned",
+               static_cast<PersistentTable*>(m_targetTable)->isReplicatedTable() ? "replicated" : "partitioned",
                m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
                m_node->isInline() ? "inline"

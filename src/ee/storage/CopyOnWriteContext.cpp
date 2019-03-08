@@ -52,7 +52,7 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_skippedDirtyRows(0),
              m_skippedInactiveRows(0),
-             m_replicated(table.isCatalogTableReplicated())
+             m_replicated(table.isReplicatedTable())
 {
     if (m_replicated) {
         // There is a corner case where a replicated table is streamed from a thread other than the lowest
