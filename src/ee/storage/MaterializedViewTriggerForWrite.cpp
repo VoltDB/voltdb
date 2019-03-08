@@ -228,6 +228,10 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
     if (minMaxIndexIncludesAggCol(selectedIndex, m_groupByColumnCount)) {
         // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
+        // we can not use CoveringCellIndex for value comparison.
+        assert(selectedIndex->getKeySchema()->getColumnInfo(
+                static_cast<int>(m_groupByColumnCount))->getVoltType() !=
+               VALUE_TYPE_POINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
@@ -488,8 +492,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                         }
                         // indexscan if an index is available, otherwise tablescan
                         else if (m_indexForMinMax[minMaxAggIdx] &&
-                                 // If the Index Column type is VALUE_TYPE_POINT, it is a **CoveringCellIndex**
-                                 // for GEOGRAPHY type. This index is to accelerate queries that use the
+                                 // CoveringCellIndex is to accelerate queries that use the
                                  // CONTAINS function which tests to see if a point is contained by a polygon.
                                  // But NOT for value comparison, so we can't use it here.
                                  dynamic_cast<CoveringCellIndex *>(m_indexForMinMax[minMaxAggIdx]) == NULL) {
