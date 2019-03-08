@@ -402,8 +402,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = isTableWithExport(static_cast<TableType>(catalogTable.tableType()));
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, catalogTable);
+    bool exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable);
+    bool tableIsExportOnly = isTableExportOnly(catalogTable);
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
@@ -423,7 +423,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
-    VOLT_DEBUG("Creating %s %s as %s", m_materialized?"VIEW":"TABLE", tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED");
+    VOLT_DEBUG("Creating %s %s as %s, type: %d, export:%s", m_materialized?"VIEW":"TABLE",
+               tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType(), tableIsExportOnly ? "true":"false");
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
@@ -499,7 +500,7 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
 //After catalog is updated call this to ensure your export tables are connected correctly.
 void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
         catalog::Table const& catalogTable) {
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable);
 }
 
 static void migrateChangedTuples(catalog::Table const& catalogTable,

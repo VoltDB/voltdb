@@ -33,7 +33,7 @@
 /**
  * A table is export only its catalog says so.
  */
-bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
+bool isTableExportOnly(catalog::Table const& catalogTable) {
     return voltdb::isStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
@@ -50,13 +50,17 @@ bool isTableWithExport(catalog::Table const& catalogTable) {
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
-bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIndex) {
+bool isExportEnabledForTable(catalog::Database const & database, catalog::Table const& catalogTable) {
 
+    int32_t tableIndex = catalogTable.relativeIndex();
     // export is disabled unless a connector exists
     if (database.connectors().size() == 0) {
         return false;
     }
-
+    bool streamTable = isTableExportOnly(catalogTable);
+    if (!streamTable) {
+       return false;
+    }
     // iterate through all connectors
     std::map<std::string, catalog::Connector*>::const_iterator connIter;
     for (connIter = database.connectors().begin();

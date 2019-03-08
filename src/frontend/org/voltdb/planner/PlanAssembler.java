@@ -28,6 +28,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -206,14 +207,12 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
-        // list of all export tables (assume uppercase)
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (exportTables.contains(table.getTypeName())) {
+            if (TableType.isStream(table.getTabletype())) {
                 return true;
             }
         }
