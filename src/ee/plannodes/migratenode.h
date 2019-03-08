@@ -53,7 +53,7 @@ namespace voltdb {
     */
    class MigratePlanNode : public AbstractOperationPlanNode {
       public:
-         MigratePlanNode() {}
+         MigratePlanNode() : AbstractOperationPlanNode() {}
          PlanNodeType getPlanNodeType() const {
             return PLAN_NODE_TYPE_MIGRATE;
          }

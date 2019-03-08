@@ -53,7 +53,7 @@
 namespace voltdb {
 
 bool MigrateExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVector& executorVector) {
-    VOLT_TRACE("init Delete Executor");
+    VOLT_TRACE("init Migrate Executor");
 
     m_node = dynamic_cast<MigratePlanNode*>(abstract_node);
     assert(m_node);
@@ -62,7 +62,7 @@ bool MigrateExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVect
 
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
-    m_replicatedTableOperation = targetTable->isCatalogTableReplicated();
+    m_replicatedTableOperation = targetTable->isReplicatedTable();
 
     assert(m_node->getInputTableCount() == 1);
     return true;
@@ -70,15 +70,10 @@ bool MigrateExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVect
 
 bool MigrateExecutor::p_execute(const NValueArray &params) {
    // target table should be persistenttable
-   // update target table reference from table delegate
    // Note that the target table pointer in the node's tcd can change between p_init and p_execute
    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
    assert(targetTable);
-   TableTuple targetTuple(targetTable->schema());
-   int64_t modified_tuples = 0;
-   TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-   count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
-   m_engine->addToTuplesModified(modified_tuples);
+   //m_engine->addToTuplesModified(s_modifiedTuples);
    return true;
 }
 
