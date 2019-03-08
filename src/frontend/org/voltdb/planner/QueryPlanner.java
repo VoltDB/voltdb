@@ -30,7 +30,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.compiler.VoltXMLElementHelper;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
@@ -185,40 +184,47 @@ public class QueryPlanner implements AutoCloseable {
         }
 
         if (m_xmlSQL.name.equals("migrate")) {
-            final VoltXMLElement condition =
-                    VoltXMLElementHelper.getFirstChild(VoltXMLElementHelper.getFirstChild(m_xmlSQL, "condition"),
-                            "operation");
-            final AbstractExpression expr = ExpressionUtil.from(condition);
-            final Map<String, String> attributes = m_xmlSQL.attributes;
-            assert attributes.size() == 1;
-            final Table targetTable = m_db.getTables().get(attributes.get("table"));
-            assert targetTable != null;
-            final CatalogMap<TimeToLive> ttls = targetTable.getTimetolive();
-            if (ttls.isEmpty()) {
-                 throw new PlanningErrorException(String.format(
-                         "%s: Cannot migrate from table %s because it does not have a TTL column",
-                         m_sql, targetTable.getTypeName()));
-            } else {
-                final Column ttl = ttls.iterator().next().getTtlcolumn();
-                final TupleValueExpression columnExpression = new TupleValueExpression(
-                        targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
-                final Set<AbstractExpression> terminals = new HashSet<>();
-                ExpressionUtil.collectTerminals(expr, terminals);
-                if (! terminals.contains(columnExpression)) {
-                    throw new PlanningErrorException(String.format(
-                            "%s: Cannot migrate from table %s because the WHERE caluse does not contain TTL column %s",
-                            m_sql, targetTable.getTypeName(), ttl.getName()));
-                }
-            }
-        }
-
-        if (m_isUpsert) {
+            validateMigrateStmt(m_sql, m_xmlSQL, m_db);
+        } else if (m_isUpsert) {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));
             // for AdHoc cache distinguish purpose which is based on the XML
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
+    }
+
+    /**
+     * Check that "MIGRATE FROM tbl WHERE..." statement is valid.
+     * @param sql SQL statement
+     * @param xmlSQL HSQL parsed tree
+     * @param db database catalog
+     */
+    private static void validateMigrateStmt(String sql, VoltXMLElement xmlSQL, Database db) {
+        final Map<String, String> attributes = xmlSQL.attributes;
+        assert attributes.size() == 1;
+        final Table targetTable = db.getTables().get(attributes.get("table"));
+        assert targetTable != null;
+        final CatalogMap<TimeToLive> ttls = targetTable.getTimetolive();
+        if (ttls.isEmpty()) {
+            throw new PlanningErrorException(String.format(
+                    "%s: Cannot migrate from table %s because it does not have a TTL column",
+                    sql, targetTable.getTypeName()));
+        } else {
+            final Column ttl = ttls.iterator().next().getTtlcolumn();
+            final TupleValueExpression columnExpression = new TupleValueExpression(
+                    targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
+            if (! ExpressionUtil.collectTerminals(
+                    ExpressionUtil.from(
+                            VoltXMLElementHelper.getFirstChild(
+                                    VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
+                                    "operation")))
+                    .contains(columnExpression)) {
+                throw new PlanningErrorException(String.format(
+                        "%s: Cannot migrate from table %s because the WHERE caluse does not contain TTL column %s",
+                        sql, targetTable.getTypeName(), ttl.getName()));
+            }
+        }
     }
 
     // Generate a Volt XML tree for a hypothetical SWAP TABLE statement.
