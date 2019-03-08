@@ -23,6 +23,7 @@
 #include "catalog/statement.h"
 #include "execution/ExecutorVector.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/CoveringCellIndex.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexscannode.h"
 
@@ -491,9 +492,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                                  // for GEOGRAPHY type. This index is to accelerate queries that use the
                                  // CONTAINS function which tests to see if a point is contained by a polygon.
                                  // But NOT for value comparison, so we can't use it here.
-                                 m_indexForMinMax[minMaxAggIdx]->getKeySchema()->getColumnInfo(
-                                         static_cast<int>(m_groupByColumnCount))->getVoltType() !=
-                                 VALUE_TYPE_POINT) {
+                                 dynamic_cast<CoveringCellIndex *>(m_indexForMinMax[minMaxAggIdx]) == NULL) {
                             newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
                                                                       reversedForMin, aggIndex, minMaxAggIdx, numCountStar);
                         }
