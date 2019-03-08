@@ -57,7 +57,6 @@ import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.test.utils.RandomTestRule;
 
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ContiguousSet;
@@ -754,22 +753,22 @@ public class TestAbstractTopology {
     @Test
     public void testRestorePlacementOnRecovery() throws Exception {
         Joiner joiner = Joiner.on(',');
-        ImmutableMap<Integer, Set<Integer>> hostPartitions = ImmutableMap.of(0, ImmutableSortedSet.of(0, 1, 2), 1,
-                ImmutableSortedSet.of(6, 7, 8), 2, ImmutableSortedSet.of(9, 10, 11), 3, ImmutableSortedSet.of(3, 4, 5));
+        ImmutableMap<Integer, List<Integer>> hostPartitions = ImmutableMap.of(0, ImmutableList.of(0, 1, 2), 1,
+                ImmutableList.of(6, 7, 8), 2, ImmutableList.of(9, 10, 11), 3, ImmutableList.of(3, 4, 5));
         Map<Integer, HostInfo> hostInfos = new HashMap<>();
-        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+        for (Map.Entry<Integer, List<Integer>> entry : hostPartitions.entrySet()) {
             hostInfos.put(entry.getKey(), new HostInfo("", "g0", 3, joiner.join(entry.getValue())));
         }
 
         AbstractTopology topology = AbstractTopology.getTopology(hostInfos, Collections.emptySet(), 0, true);
 
-        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+        for (Map.Entry<Integer, List<Integer>> entry : hostPartitions.entrySet()) {
             assertEquals(entry.getValue(), topology.getPartitionIdList(entry.getKey()));
         }
 
         topology = AbstractTopology.getTopology(hostInfos, Collections.emptySet(), 0, false);
 
-        for (Map.Entry<Integer, Set<Integer>> entry : hostPartitions.entrySet()) {
+        for (Map.Entry<Integer, List<Integer>> entry : hostPartitions.entrySet()) {
             if (!entry.getValue().equals(topology.getPartitionIdList(entry.getKey()))) {
                 return;
             }
