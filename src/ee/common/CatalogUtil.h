@@ -38,7 +38,7 @@ bool tableTypePersistentWithMigrateStream(catalog::Table const& catalogTable) {
 }
 
 bool tableTypePeristentWithLinkingStream(catalog::Table const& catalogTable) {
-     return voltdb::tableTypePeristentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
+     return voltdb::tableTypePersistentWithLinkingStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
 /**

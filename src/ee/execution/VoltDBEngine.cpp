@@ -1136,7 +1136,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             // set export info on the new table
             auto streamedTable = tcd->getStreamedTable();
             if (!streamedTable) {
-                // IW-ENG14804, check if this table has a companion stream
+                // Check if this table has a shadow stream
                 PersistentTable *persistentTable = tcd->getPersistentTable();
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
@@ -1165,7 +1165,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 else {
                     // The table/stream type has been changed
                     streamedTable->setWrapper(NULL);
-                    assert(purgedStreams[name] != NULL);
                     streamedTable->setExportStreamPositions(0, 0);
                 }
 

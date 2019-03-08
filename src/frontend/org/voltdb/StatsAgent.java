@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -25,13 +24,10 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportManager.ExportStats;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -830,17 +826,6 @@ public class StatsAgent extends OpsAgent
                         resultTable.addRow(row);
                     }
                 }
-            }
-        }
-        if (selector == StatsSelector.TABLE) {
-            // Append all the stream table stats to Table stats (this should be deprecated at some point)
-            ExportStats statsRows = ExportManager.instance().getExportStats();
-            Iterator<Object> iter = statsRows.getStatsRowKeyIterator(interval);
-            while (iter.hasNext()) {
-                ExportStatsRow stat = statsRows.getStatsRow(iter.next());
-                resultTable.addRow(now, statsRows.getHostId(), statsRows.getHostname(),
-                        stat.m_siteId, stat.m_partitionId, stat.m_sourceName, "StreamedTable",
-                        stat.m_tupleCount, 0L, 0L, 0L, null, 0);
             }
         }
         return resultTable;

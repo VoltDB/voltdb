@@ -70,7 +70,7 @@ Table* TableFactory::getPersistentTable(
     StreamedTable *streamedTable = NULL;
     PersistentTable *persistentTable = NULL;
 
-    if (tableTypeIsExportStream(tableType)) {
+    if (tableTypeIsStream(tableType)) {
         table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
@@ -92,7 +92,7 @@ Table* TableFactory::getPersistentTable(
                compactionThreshold);
 
     TableStats *stats;
-    if (tableTypeIsExportStream(tableType)) {
+    if (tableTypeIsStream(tableType)) {
         stats = streamedTable->getTableStats();
     }
     else {

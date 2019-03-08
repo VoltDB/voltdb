@@ -625,7 +625,16 @@ inline bool tableTypeIsExportStream(TableType tableType) {
     return tableType == STREAM;
 }
 
-inline bool tableTypePeristentWithLinkingStream(TableType tableType) {
+inline bool tableTypeIsViewStream(TableType tableType) {
+    return tableType == STREAM_VIEW_ONLY;
+}
+
+inline bool tableTypeIsStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) ||
+            tableTypeIsViewStream(tableType);
+}
+
+inline bool tableTypePersistentWithLinkingStream(TableType tableType) {
     return tableType == PERSISTENT_EXPORT;
 }
 
@@ -634,7 +643,7 @@ inline bool tableTypePersistentWithMigrateStream(TableType tableType) {
 }
 
 inline bool tableTypeIsPersistentWithLinkedStream(TableType tableType) {
-    return tableTypePeristentWithLinkingStream(tableType) ||
+    return tableTypePersistentWithLinkingStream(tableType) ||
             tableTypePersistentWithMigrateStream(tableType);
 }
 
