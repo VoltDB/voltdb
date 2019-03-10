@@ -54,7 +54,7 @@ public class StreamBlock {
     public static final int UNIQUE_ID_OFFSET = 20;
 
     StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, long committedSequenceNumber,
-            int rowCount, long uniqueId, boolean isPersisted) {
+            int rowCount, long uniqueId, long segmentIndex, boolean isPersisted) {
         m_buffer = fcont;
         m_schema = schemaCont;
         m_startSequenceNumber = startSequenceNumber;
@@ -65,6 +65,7 @@ public class StreamBlock {
         // if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
+        m_segmentIndex = segmentIndex;
         //The first 8 bytes are space for us to store the sequence number if we end up persisting
         m_isPersisted = isPersisted;
     }
@@ -159,6 +160,8 @@ public class StreamBlock {
     private BBContainer m_schema;
     // index of the last row that has been released.
     private int m_releaseOffset = -1;
+    // reverse lookup to find pbd segment
+    private long m_segmentIndex = -1;
 
     /*
      * True if this block is still backed by a file and false
@@ -202,5 +205,9 @@ public class StreamBlock {
         m_buffer.b().position(SEQUENCE_NUMBER_OFFSET);
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
+    }
+
+    public long getSegmentIndex() {
+        return m_segmentIndex;
     }
 }

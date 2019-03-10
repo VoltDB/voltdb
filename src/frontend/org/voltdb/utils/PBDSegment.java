@@ -26,10 +26,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
 import java.util.List;
+import java.util.zip.CRC32;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.HybridCrc32;
 import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
@@ -44,22 +44,26 @@ public abstract class PBDSegment {
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
     // Segment Header layout:
-    //  - crc of segment header (8 bytes),
+    //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
-    //  - total bytes of data (4 bytes),
-    static final int SEGMENT_HEADER_BYTES = 16;
+    //  - total bytes of data (4 bytes, uncompressed size),
     public static final int HEADER_CRC_OFFSET = 0;
-    public static final int HEADER_NUM_OF_ENTRY_OFFSET = 8;
-    public static final int HEADER_TOTAL_BYTES_OFFSET = 12;
+    public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
+    public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
+    static final int SEGMENT_HEADER_BYTES = 12;
 
-    public static final int EXPORT_SCHEMA_HEADER_BYTES = 1 /*export buffer version*/ + 8 /*generation id*/ + 4 /*schema size*/;
+    public static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + //export buffer version
+                                                         8 + //generation id
+                                                         4;  //schema size
     // Export Segment Entry Header layout (each segment has multiple entries):
-    //  - crc of segment entry (8 bytes),
-    //  - total bytes of the entry (4 bytes),
+    //  - crc of segment entry (4 bytes),
+    //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
     //  - entry flag (4 bytes)
-    // TODO: Does DR Segment Entry needs a header? PartitionDRGatewayImpl defines
-    //       DR_BLOCK_HEADER_SIZE but also says this header is unused.
-    public static final int ENTRY_HEADER_BYTES = 16;
+    public static final int ENTRY_HEADER_CRC_OFFSET = 0;
+    public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = 4;
+    public static final int ENTRY_HEADER_FLAG_OFFSET = 8;
+    public static final int ENTRY_HEADER_BYTES = 12;
+
     protected final File m_file;
 
     protected boolean m_closed = true;
@@ -67,14 +71,14 @@ public abstract class PBDSegment {
     protected FileChannel m_fc;
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
-    protected HybridCrc32 m_segmentHeaderCRC;
-    protected HybridCrc32 m_entryCRC;
+    protected CRC32 m_segmentHeaderCRC;
+    protected CRC32 m_entryCRC;
 
     public PBDSegment(File file)
     {
         m_file = file;
-        m_segmentHeaderCRC = new HybridCrc32();
-        m_entryCRC = new HybridCrc32();
+        m_segmentHeaderCRC = new CRC32();
+        m_entryCRC = new CRC32();
     }
 
     abstract long segmentIndex();
@@ -160,7 +164,7 @@ public abstract class PBDSegment {
             final long beforePos = reader.readOffset();
 
             if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal);
+                schemaCont = reader.getSchema(!isFinal);
             }
 
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
@@ -251,7 +255,7 @@ public abstract class PBDSegment {
         while (true) {
             // Start to read a new segment
             if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                schemaCont = reader.getSchema(false);
             }
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
             if (cont == null) {
