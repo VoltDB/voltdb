@@ -26,13 +26,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.HybridCrc32;
 import org.voltdb.NativeLibraryLoader;
 import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
@@ -132,32 +132,41 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public BBContainer getSchema(OutputContainerFactory ocf, boolean checkCRC) throws IOException {
+        public BBContainer getSchema(long segmentIndex, boolean restoreReaderOffset, boolean checkCRC)
+                throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
+                PBDSegmentReader segmentReader = null;
+                PBDSegment segment = null;
                 moveToValidSegment();
-                PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
-                if (segmentReader == null) {
-                    segmentReader = m_segment.openForRead(m_cursorId);
-                }
-                assert (segmentReader.readIndex() == 0);
-                long lastSegmentId = peekLastSegment().segmentIndex();
-                while (!segmentReader.hasMoreEntries()) {
-                    if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
+                if (segmentIndex != -1) {
+                    // looking for schema from a specific segment
+                    segment = m_segments.get(segmentIndex);
+                    if (segment == null) {
                         return null;
                     }
-
-                    segmentReader.close();
-                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
-                    segmentReader = m_segment.getReader(m_cursorId);
-                    if (segmentReader == null) segmentReader = m_segment.openForRead(m_cursorId);
+                } else {
+                    // looking for schema from the segment that cursor is currently reading on
+                    segment = m_segment;
                 }
-                BBContainer retcont = segmentReader.getSchema(ocf, checkCRC);
-                assert (retcont.b() != null);
-                return retcont;
+
+                long originalOffset = -1;
+                try {
+                    segmentReader = segment.getReader(m_cursorId);
+                    if (segmentReader == null) {
+                        segmentReader = segment.openForRead(m_cursorId);
+                    }
+                    // need to restore the read offset
+                    originalOffset = segmentReader.readOffset();
+                    segmentReader.setReadOffset(PBDSegment.ENTRY_HEADER_BYTES);
+                    return segmentReader.getSchema(checkCRC);
+                } finally {
+                    if (segmentReader != null && restoreReaderOffset) {
+                        segmentReader.setReadOffset(originalOffset);
+                    }
+                }
             }
         }
 
@@ -263,6 +272,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 if (m_usageSpecificLog.isDebugEnabled()) {
                                     m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
                                 }
+                                // If the segment that cursor currently points to is going to be deleted,
+                                // looks for next segment.
+                                long lastSegmentId = peekLastSegment().segmentIndex();
+                                if (m_segment == segment) {
+                                    // Tail segment should always exists
+                                    if (m_segment.segmentIndex() == lastSegmentId) {
+                                        throw new IOException("Tail segment file " + m_segment.file().getName() + " shouldn't be deleted! ");
+                                    }
+                                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
+                                }
                                 closeAndDeleteSegment(segment);
                             }
                         } catch (IOException e) {
@@ -280,20 +299,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
                 assertions();
                 moveToValidSegment();
-                // If cursor points to a deleted segment, looks for next segment until finds a valid one
-                long lastSegmentId = peekLastSegment().segmentIndex();
-                while (!m_segment.file().exists()) {
-                    // Tail segment should always exists
-                    if (m_segment.segmentIndex() == lastSegmentId) {
-                        throw new IOException("Tail segment file " + m_segment.file().getName() + " doesn't exist! ");
-                    }
-                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-                }
                 PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
                 // push to PBD will rewind cursors. So, this cursor may have already opened this segment
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
                 }
+                long lastSegmentId = peekLastSegment().segmentIndex();
                 while (!segmentReader.hasMoreEntries()) {
                     if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
                         return false;
@@ -313,6 +324,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 return false;
             }
         }
+
+        public long getSegmentIndex() {
+            synchronized(PersistentBinaryDeque.this) {
+                if (m_segment == null) {
+                    return -1;
+                }
+                return m_segment.segmentIndex();
+            }
+        }
+
     }
 
     public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();
@@ -1100,13 +1121,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     public static class ByteBufferTruncatorResponse extends TruncatorResponse {
         private final ByteBuffer m_retval;
-        private final HybridCrc32 m_crc;
+        private final CRC32 m_crc;
 
         public ByteBufferTruncatorResponse(ByteBuffer retval) {
             super(Status.PARTIAL_TRUNCATE);
             assert retval.remaining() > 0;
             m_retval = retval;
-            m_crc = new HybridCrc32();
+            m_crc = new CRC32();
         }
 
         @Override
@@ -1132,7 +1153,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         private final DeferredSerialization m_ds;
         private final Callback m_truncationCallback;
-        private final HybridCrc32 m_crc = new HybridCrc32();
+        private final CRC32 m_crc32 = new CRC32();
 
         public DeferredSerializationTruncatorResponse(DeferredSerialization ds, Callback truncationCallback) {
             super(Status.PARTIAL_TRUNCATE);
@@ -1147,15 +1168,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         @Override
         public int writeTruncatedObject(ByteBuffer output) throws IOException {
-            int bytesWritten = PBDUtils.writeDeferredSerialization(output, m_ds);
-            m_crc.update(bytesWritten);
-            m_crc.update(PBDSegment.NO_FLAGS);
-            m_crc.updateFromPosition(PBDSegment.ENTRY_HEADER_BYTES, output);
-            // write entry header
-            output.flip();
-            output.putLong(m_crc.getValue());
-            output.putInt(bytesWritten);
-            output.putInt(PBDSegment.NO_FLAGS);
+            output.position(PBDSegment.ENTRY_HEADER_BYTES);
+            int bytesWritten = MiscUtils.writeDeferredSerialization(output, m_ds);
+            output.position(PBDSegment.ENTRY_HEADER_BYTES);
+            ByteBuffer header = output.duplicate();
+            header.position(PBDSegment.ENTRY_HEADER_CRC_OFFSET);
+            PBDUtils.writeEntryHeader(m_crc32, header, output, bytesWritten, PBDSegment.NO_FLAGS);
             if (m_truncationCallback != null) {
                 m_truncationCallback.bytesWritten(bytesWritten);
             }

@@ -18,23 +18,26 @@
 package org.voltdb.exportclient;
 
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import com.google_voltpatches.common.base.Preconditions;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
-import org.voltdb.export.AdvertisedDataSource;
+import static org.voltdb.exportclient.ExportRow.getFirstField;
 
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
-import static org.voltdb.exportclient.ExportRow.getFirstField;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 
 /**
@@ -82,7 +85,7 @@ public abstract class ExportDecoderBase {
     final ExportRow m_legacyRow;
 
     //Used by new style connector to pickup schema information from previous record.
-    ExportRow m_previousRow;
+    ExportRow m_rowSchema;
     public ExportDecoderBase(AdvertisedDataSource ads) {
         m_source = ads;
         m_startTS = System.currentTimeMillis();
@@ -275,13 +278,13 @@ public abstract class ExportDecoderBase {
         return m_legacy;
     }
 
-    public void setPreviousRow(ExportRow row) {
-        //We do keep the values of previous row but they are not used.
-        m_previousRow = row;
+    public void setExportRowSchema(ExportRow row) {
+        //We do keep the values in the schema row but they are not used.
+        m_rowSchema = row;
     }
 
-    public ExportRow getPreviousRow() {
+    public ExportRow getExportRowSchema() {
         //We do keep the values of previous row but they should not be relied upon only schema information is used.
-        return m_previousRow;
+        return m_rowSchema;
     }
 }

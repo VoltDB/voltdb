@@ -123,10 +123,9 @@ public class StreamBlockQueue {
         try {
             // Start to read a new segment
             if (m_reader.isStartOfSegment()) {
-                schemaCont = m_reader.getSchema(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                schemaCont = m_reader.getSchema(-1, false, false);
             }
             cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
-
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -134,6 +133,7 @@ public class StreamBlockQueue {
         if (cont == null) {
             return null;
         } else {
+            long segmentIndex = m_reader.getSegmentIndex();
             cont.b().order(ByteOrder.LITTLE_ENDIAN);
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
@@ -147,6 +147,7 @@ public class StreamBlockQueue {
                 seqNo,
                 tupleCount,
                 uniqueId,
+                segmentIndex,
                 true);
 
             //Optionally store a reference to the block in the in memory deque
@@ -155,6 +156,30 @@ public class StreamBlockQueue {
             }
             return block;
         }
+    }
+
+    /*
+     * Poll stream table schema that either represents the first object in the memory dequeue, or
+     * from the segment that the cursor is currently reading on.
+     */
+    public BBContainer pollSchema() {
+        BBContainer schemaCont = null;
+        long segmentIndex = -1;
+        if (m_memoryDeque.peek() != null) {
+            StreamBlock sb = m_memoryDeque.peek();
+            BBContainer cont = sb.getSchemaContainer();
+            if (cont != null) {
+                return cont;
+            }
+            segmentIndex = sb.getSegmentIndex();
+        }
+        try {
+            schemaCont = m_reader.getSchema(segmentIndex, true, false);
+        } catch (IOException e) {
+            exportLog.error(e);
+        }
+        return schemaCont;
+
     }
     /*
      * Present an iterator that is backed by the blocks
@@ -300,45 +325,50 @@ public class StreamBlockQueue {
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
+                ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
-                final long startSequenceNumber = b.getLong();
-                // If after the truncation point is the first row in the block, the entire block is to be discarded
-                if (startSequenceNumber > truncationSeqNo) {
-                    return PersistentBinaryDeque.fullTruncateResponse();
-                }
-                final int tupleCountPos = b.position();
-                final int tupleCount = b.getInt();
-                // There is nothing to do with this buffer
-                final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
-                if (lastSequenceNumber <= truncationSeqNo) {
-                    return null;
-                }
-                b.getLong(); // uniqueId
+                try {
+                    final long startSequenceNumber = b.getLong();
+                    // If after the truncation point is the first row in the block, the entire block is to be discarded
+                    if (startSequenceNumber > truncationSeqNo) {
+                        return PersistentBinaryDeque.fullTruncateResponse();
+                    }
+                    final int tupleCountPos = b.position();
+                    final int tupleCount = b.getInt();
+                    // There is nothing to do with this buffer
+                    final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
+                    if (lastSequenceNumber <= truncationSeqNo) {
+                        return null;
+                    }
+                    b.getLong(); // uniqueId
 
-                // Partial truncation
-                int offset = 0;
-                while (b.hasRemaining()) {
-                    if (startSequenceNumber + offset > truncationSeqNo) {
-                        // The sequence number of this row is the greater than the truncation sequence number.
-                        // Don't want this row, but want to preserve all rows before it.
-                        // Move back before the row length prefix, txnId and header
-                        // Return everything in the block before the truncation point.
-                        // Indicate this is the end of the interesting data.
-                        b.limit(b.position());
-                        // update tuple count in the header
-                        b.putInt(tupleCountPos, offset - 1);
-                        b.position(0);
-                        return new ByteBufferTruncatorResponse(b);
+                    // Partial truncation
+                    int offset = 0;
+                    while (b.hasRemaining()) {
+                        if (startSequenceNumber + offset > truncationSeqNo) {
+                            // The sequence number of this row is the greater than the truncation sequence number.
+                            // Don't want this row, but want to preserve all rows before it.
+                            // Move back before the row length prefix, txnId and header
+                            // Return everything in the block before the truncation point.
+                            // Indicate this is the end of the interesting data.
+                            b.limit(b.position());
+                            // update tuple count in the header
+                            b.putInt(tupleCountPos, offset - 1);
+                            b.position(0);
+                            return new ByteBufferTruncatorResponse(b);
+                        }
+                        offset++;
+                        // Not the row we are looking to truncate at. Skip past it (row length + row length field).
+                        final int rowLength = b.getInt();
+                        if (b.position() + rowLength > b.limit()) {
+                            System.out.println(rowLength);
+                        }
+                        b.position(b.position() + rowLength);
                     }
-                    offset++;
-                    // Not the row we are looking to truncate at. Skip past it (row length + row length field).
-                    final int rowLength = b.getInt();
-                    if (b.position() + rowLength > b.limit()) {
-                        System.out.println(rowLength);
-                    }
-                    b.position(b.position() + rowLength);
+                    return null;
+                } finally {
+                    b.order(endianness);
                 }
-                return null;
             }
         });
 
@@ -358,9 +388,11 @@ public class StreamBlockQueue {
 
             public ExportSequenceNumberTracker scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
+                ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
                 final int tupleCount = b.getInt();
+                b.order(endianness);
                 ExportSequenceNumberTracker gapTracker = new ExportSequenceNumberTracker();
                 gapTracker.append(startSequenceNumber, startSequenceNumber + tupleCount - 1);
                 return gapTracker;

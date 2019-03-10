@@ -691,7 +691,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, null, startSequenceNumber, tupleCount, uniqueId, false);
+                        }, null, startSequenceNumber, tupleCount, uniqueId, -1, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -884,6 +884,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_pendingContainer.set(container);
     }
 
+    public ListenableFuture<BBContainer> pollSchema() {
+        final SettableFuture<BBContainer> fut = SettableFuture.create();
+        try {
+            m_es.execute(new Runnable() {
+                public void run() {
+                    //  Auto-generated method stub
+                    if (!m_es.isShutdown()) {
+                        pollSchemaImpl(fut);
+                    }
+                }
+            });
+        } catch (RejectedExecutionException rej) {
+            //Don't expect this to happen outside of test, but in test it's harmless
+            exportLog.info("Polling schema from export data source rejected, this should be harmless");
+        }
+        return fut;
+    }
+
     public ListenableFuture<AckingContainer> poll() {
         final SettableFuture<AckingContainer> fut = SettableFuture.create();
         try {
@@ -942,6 +960,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.info("Polling from export data source rejected, this should be harmless");
         }
         return fut;
+    }
+
+    private synchronized void pollSchemaImpl(SettableFuture<BBContainer> fut) {
+        BBContainer schemaC = m_committedBuffers.pollSchema();
+        fut.set(schemaC);
     }
 
     private synchronized void pollImpl(SettableFuture<AckingContainer> fut) {

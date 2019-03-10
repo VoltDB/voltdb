@@ -32,6 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -226,7 +227,8 @@ public class GuestProcessor implements ExportDataProcessor {
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
             final ListenableFuture<AckingContainer> fut = m_source.poll();
-            addBlockListener(m_source, fut, edb);
+            final ListenableFuture<BBContainer> schemaFut = m_source.pollSchema();
+            addBlockListener(m_source, fut, schemaFut, edb);
             m_source.forwardAckToOtherReplicas();
         }
 
@@ -311,6 +313,7 @@ public class GuestProcessor implements ExportDataProcessor {
     private void addBlockListener(
             final ExportDataSource source,
             final ListenableFuture<AckingContainer> fut,
+            final ListenableFuture<BBContainer> schemaFut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -329,6 +332,12 @@ public class GuestProcessor implements ExportDataProcessor {
                     AckingContainer cont = fut.get();
                     if (cont == null) {
                         return;
+                    }
+                    // If export master accepts promotion in case of mastership migration or leader re-election,
+                    // we need an extra poll to get the schema of current buffer to setup the decoder
+                    BBContainer schemaCont = null;
+                    if (schemaFut != null) {
+                        schemaCont = schemaFut.get();
                     }
                     try {
                         //Position to restart at on error
@@ -349,7 +358,13 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                final ByteBuffer schemaBuf = cont.schema();
+                                ByteBuffer schemaBuf = null;
+                                if (cont.schema() != null) {
+                                    schemaBuf = cont.schema();
+                                } else if (schemaCont != null) {
+                                    // This happens when export master migration or leader re-election
+                                    schemaBuf = schemaCont.b();
+                                }
                                 if (schemaBuf != null) {
                                     schemaBuf.position(0);
                                     schemaBuf.order(ByteOrder.LITTLE_ENDIAN);
@@ -358,21 +373,17 @@ public class GuestProcessor implements ExportDataProcessor {
                                     // update the global generation id of guest processor
                                     m_genId = schemaBuf.getLong();
                                     schemaSize = schemaBuf.getInt();
-                                    ExportRow previousRow = edb.getPreviousRow();
+                                    ExportRow previousRow = edb.getExportRowSchema();
                                     // update the decoder if current generation is different than previous row
                                     if (previousRow == null || previousRow.generation != m_genId) {
                                         byte[] schemadata = new byte[schemaSize];
                                         schemaBuf.get(schemadata, 0, schemaSize);
                                         sbuf = ByteBuffer.wrap(schemadata);
                                         sbuf.order(ByteOrder.LITTLE_ENDIAN);
-                                        edb.setPreviousRow(
+                                        edb.setExportRowSchema(
                                                 ExportRow.decodeBufferSchema(
                                                         sbuf, schemaSize,
                                                         source.getPartitionId(), m_genId));
-                                    } else {
-                                        // If generation is same, skip past the schema header
-                                        // because it has not changed.
-                                        buf.position(buf.position() + schemaSize);
                                     }
                                 }
                                 ExportRow row = null;
@@ -392,14 +403,14 @@ public class GuestProcessor implements ExportDataProcessor {
                                         //New style connector.
                                         try {
                                             cont.updateStartTime(System.currentTimeMillis());
-                                            if (edb.getPreviousRow() == null && sbuf != null) {
-                                                edb.setPreviousRow(
+                                            if (edb.getExportRowSchema() == null && sbuf != null) {
+                                                edb.setExportRowSchema(
                                                         ExportRow.decodeBufferSchema(
                                                                 sbuf, schemaSize,
                                                                 source.getPartitionId(), m_genId));
                                             }
-                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                            edb.setPreviousRow(row);
+                                            row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(), m_startTS, rowdata);
+                                            edb.setExportRowSchema(row);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
@@ -427,6 +438,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 if (!m_shutdown && cont != null) {
                                     cont.discard();
                                     cont = null;
+                                    if (schemaCont != null) {
+                                        schemaCont.discard();
+                                        schemaCont = null;
+                                    }
                                 }
                                 break;
                             } catch (RestartBlockException e) {
@@ -473,7 +488,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(), edb);
+                    addBlockListener(source, source.poll(), null, edb);
                 }
             }
         }, edb.getExecutor());

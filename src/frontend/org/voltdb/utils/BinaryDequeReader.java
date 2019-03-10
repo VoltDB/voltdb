@@ -38,12 +38,13 @@ public interface BinaryDequeReader {
 
     /**
      * Read and return the schema of table located in the segment header
-     * @param ocf
-     * @param checkCRC
+     * @param segmentIndex index of the segment to get schema from, -1 means get schema from current segment
+     * @param updateReaderOffset whether to restore reader's original read offset after polling schema
+     * @param checkCRC check PBD header CRC while getting schema
      * @return
      * @throws IOException
      */
-    public BBContainer getSchema(OutputContainerFactory ocf, boolean checkCRC) throws IOException;
+    public BBContainer getSchema(long segmentIndex, boolean restoreReaderOffset, boolean checkCRC) throws IOException;
 
     /**
      * Number of bytes left to read for this reader.
@@ -72,4 +73,10 @@ public interface BinaryDequeReader {
      * throws IOException
      */
     public boolean isStartOfSegment() throws IOException;
+
+    /**
+     * Returns the index of the segment that reader currently reads on
+     * @return
+     */
+    public long getSegmentIndex();
 }
