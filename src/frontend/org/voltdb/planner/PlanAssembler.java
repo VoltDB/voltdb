@@ -207,12 +207,14 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
+        // list of all export tables (assume uppercase)
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (TableType.isStream(table.getTabletype())) {
+            if (exportTables.contains(table.getTypeName()) && TableType.isStream(table.getTabletype())) {
                 return true;
             }
         }
