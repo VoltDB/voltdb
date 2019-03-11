@@ -152,26 +152,26 @@
 	<lib name="httpcore-nio-4.3.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpcore-nio-4.3.2.jar!/"/>
 	</lib>
-	<lib name="jetty-continuation-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-continuation-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-continuation-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-continuation-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-http-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-http-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-http-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-http-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-io-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-io-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-io-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-io-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-server-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-server-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-server-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-server-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-util-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-util-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-util-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-util-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-servlet-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-servlet-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-servlet-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-servlet-9.4.15.v20190215.jar!/"/>
 	</lib>
-	<lib name="jetty-security-9.3.21.v20170918.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.3.21.v20170918.jar!/"/>
+	<lib name="jetty-security-9.4.15.v20190215.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.4.15.v20190215.jar!/"/>
 	</lib>
 	<lib name="netty-tcnative-boringssl-static-2.0.20.Final.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-tcnative-boringssl-static-2.0.20.Final.jar!/"/>

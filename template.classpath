@@ -79,13 +79,13 @@
 	<classpathentry kind="lib" path="lib/avro-1.7.7.jar"/>
 	<classpathentry kind="lib" path="lib/httpasyncclient-4.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/httpcore-nio-4.3.2.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-http-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-io-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-server-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-util-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-servlet-9.3.21.v20170918.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-security-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-continuation-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-http-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-io-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-server-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-util-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-servlet-9.4.15.v20190215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-security-9.4.15.v20190215.jar"/>
 	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.20.Final.jar"/>
 	<classpathentry kind="lib" path="lib/netty-all-4.1.32.Final.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
