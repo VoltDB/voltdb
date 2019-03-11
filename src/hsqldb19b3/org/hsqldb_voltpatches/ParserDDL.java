@@ -4212,7 +4212,7 @@ public class ParserDDL extends ParserRoutine {
         if (table.timeToLive != null) {
             final String ttlColumn = table.timeToLive.ttlColumn.getNameString();
             if (colName.equalsIgnoreCase(ttlColumn)) {
-                throw Error.error("This column used by TTL cannot be dropped.");
+                throw Error.error("Columns used by TTL cannot be dropped.");
             }
         }
         Object[] args = new Object[] {
