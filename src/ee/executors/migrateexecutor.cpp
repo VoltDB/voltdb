@@ -71,8 +71,10 @@ bool MigrateExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVect
 bool MigrateExecutor::p_execute(const NValueArray &params) {
    // target table should be persistenttable
    // Note that the target table pointer in the node's tcd can change between p_init and p_execute
+#ifndef NDEBUG
    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
    assert(targetTable);
+#endif
    //m_engine->addToTuplesModified(s_modifiedTuples);
    return true;
 }

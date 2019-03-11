@@ -295,7 +295,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
                         m_javaTypeNamePatternForInListFailureTest[fromType];
                 if (typeExpectedToFailInListQuery.endsWith("]") &&
                         inListType == VoltType.INLIST_OF_BIGINT) {
-                    errorMsg = "rhs of IN expression is of a non-list type varbinary";
+                    errorMsg = "rhs of IN expression is of a non-list type VARBINARY";
                 }
                 else {
                     errorMsg = "Incompatible parameter type: can not convert type '"
