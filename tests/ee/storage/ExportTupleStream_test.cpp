@@ -690,8 +690,8 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
      * Txn11 |
      *--------
      */
-    size_t mark;
-    int64_t seqNo;
+    size_t mark = 0;
+    int64_t seqNo = 0;
     for (int i = 4; i < (m_tuplesToFill + 1) * 2; i++)
     {
         appendTuple(10, 11, i);

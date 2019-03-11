@@ -168,6 +168,7 @@ SET (VOLTDB_SRC
   executors/aggregateexecutor.cpp
   executors/commontableexecutor.cpp
   executors/deleteexecutor.cpp
+  executors/migrateexecutor.cpp
   executors/executorfactory.cpp
   executors/executorutil.cpp
   executors/indexcountexecutor.cpp
@@ -216,6 +217,7 @@ SET (VOLTDB_SRC
   plannodes/aggregatenode.cpp
   plannodes/commontablenode.cpp
   plannodes/deletenode.cpp
+  plannodes/migratenode.cpp
   plannodes/indexcountnode.cpp
   plannodes/indexscannode.cpp
   plannodes/insertnode.cpp

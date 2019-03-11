@@ -27,15 +27,133 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.Collectors;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.compiler.VoltXMLElementHelper;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.QuantifierType;
 
 /**
  *
  */
-public abstract class ExpressionUtil {
+public final class ExpressionUtil {
+
+    private static Map<String, ExpressionType> mapOfVoltXMLOpType = new HashMap<String, ExpressionType>() {{
+       put("or", ExpressionType.CONJUNCTION_OR);
+       put("and", ExpressionType.CONJUNCTION_AND);
+       put("greaterthan", ExpressionType.COMPARE_GREATERTHAN);
+       put("lessthan", ExpressionType.COMPARE_LESSTHAN);
+       put("greaterthanorequalto", ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+       put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
+       put("equal", ExpressionType.COMPARE_EQUAL);
+       put("in", ExpressionType.COMPARE_IN);
+       put("not", ExpressionType.COMPARE_EQUAL);
+       put("exists", ExpressionType.OPERATOR_EXISTS);
+       put("add", ExpressionType.OPERATOR_PLUS);
+       put("subtract", ExpressionType.OPERATOR_MINUS);
+       put("multiply", ExpressionType.OPERATOR_MULTIPLY);
+       put("divide", ExpressionType.OPERATOR_DIVIDE);
+    }};
+
+    private ExpressionUtil() {}
+
+    public static AbstractExpression from(VoltXMLElement elm) {
+        if (elm == null) {
+            return null;
+        } else if (elm.name.equals("columnref")) {
+            final String tblName = elm.getStringAttribute("table", ""),
+                    colName = elm.getStringAttribute("column", "");
+            final int colIndex = elm.getIntAttribute("index", 0);
+            assert !tblName.isEmpty();
+            assert !colName.isEmpty();
+            return new TupleValueExpression(tblName, colName, colIndex);
+        } else if (elm.name.equals("value")) {
+            final ConstantValueExpression expr = new ConstantValueExpression();
+            expr.setValue(elm.getStringAttribute("value", ""));
+            expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", "")));
+            return expr;
+        } else if (elm.name.equals("vector")) {
+            final VectorValueExpression expr = new VectorValueExpression();
+            expr.setArgs(elm.children.stream().map(ExpressionUtil::from).collect(Collectors.toList()));
+            return expr;
+        } else if (elm.name.equals("row")) {
+            return from(VoltXMLElementHelper.getFirstChild(elm, "columnref"));
+        } else if (elm.name.equals("function")) {
+            final FunctionExpression expr = new FunctionExpression();
+            expr.setAttributes(elm.getStringAttribute("name", ""),
+                    elm.getStringAttribute("argument", null),
+                    elm.getIntAttribute("id", 0));
+            expr.setArgs(elm.children.stream().map(ExpressionUtil::from).collect(Collectors.toList()));
+            expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", "")));
+            return expr;
+        } else if (elm.name.equals("tablesubquery")) {  // e.g. where X in (SELECT ...)
+            // TODO: do not support parsing more complex queries
+            throw new PlanningErrorException("Expression is too complicated");
+        } else {
+            assert elm.name.equals("operation");
+            final ExpressionType op = mapOfVoltXMLOpType.get(elm.attributes.get("optype"));
+            assert op != null;
+            switch (op) {
+                case CONJUNCTION_OR:
+                case CONJUNCTION_AND:
+                    return new ConjunctionExpression(op, from(elm.children.get(0)), from(elm.children.get(1)));
+                case COMPARE_GREATERTHAN:
+                case COMPARE_LESSTHAN:
+                case COMPARE_EQUAL:
+                case COMPARE_NOTEQUAL:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHANOREQUALTO: {
+                    final ComparisonExpression expr =
+                            new ComparisonExpression(op, from(elm.children.get(0)), from(elm.children.get(1)));
+                    expr.setQuantifier(QuantifierType.get(elm.getStringAttribute("opsubtype", "none")));
+                    return expr;
+                }
+                case OPERATOR_PLUS:
+                case OPERATOR_MINUS:
+                case OPERATOR_MULTIPLY:
+                case OPERATOR_DIVIDE:
+                case OPERATOR_CONCAT:
+                case OPERATOR_MOD:
+                    return new OperatorExpression(op, from(elm.children.get(0)), from(elm.children.get(1)));
+                case OPERATOR_IS_NULL:
+                case OPERATOR_EXISTS:
+                case OPERATOR_NOT:
+                case OPERATOR_UNARY_MINUS:
+                    return new OperatorExpression(op, from(elm.children.get(0)), null);
+                case COMPARE_IN: {
+                    final InComparisonExpression expr = new InComparisonExpression();
+                    expr.setLeft(from(elm.children.get(0)));
+                    expr.setRight(from(elm.children.get(1)));
+                    return expr;
+                }
+                default:
+                    assert false;
+                    return null;
+            }
+        }
+    }
+
+    // A terminal node of an expression is the one that does not have left/right child, nor any parameters;
+    private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
+        if (expr != null) {
+            collectTerminals(expr.getLeft(), accum);
+            collectTerminals(expr.getRight(), accum);
+            if (expr.getArgs() != null) {
+                expr.getArgs().forEach(e -> collectTerminals(e, accum));
+            } else if (expr.getLeft() == null && expr.getRight() == null) {
+                accum.add(expr);
+            }
+        }
+    }
+
+    public static Set<AbstractExpression> collectTerminals(AbstractExpression expr) {
+        final Set<AbstractExpression> result = new HashSet<>();
+        collectTerminals(expr, result);
+        return result;
+    }
 
     public static void finalizeValueTypes(AbstractExpression exp)
     {

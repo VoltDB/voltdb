@@ -757,12 +757,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // use DECODE as integer input to operator, with used incompatible option
         try {
-            cr = client.callProcedure("@AdHoc", "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2");
+            client.callProcedure("@AdHoc", "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2");
             fail("failed to except incompatible option");
         } catch (ProcCallException pce) {
             String message = pce.getMessage();
             // It's about that string argument to the addition operator.
-            assertTrue(message.contains("varchar"));
+            assertTrue(message, message.contains("VARCHAR"));
         }
     }
 
