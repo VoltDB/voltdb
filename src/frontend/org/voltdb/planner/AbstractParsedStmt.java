@@ -125,6 +125,7 @@ public abstract class AbstractParsedStmt {
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
     private static final String DELETE_NODE_NAME = "delete";
+    private static final String MIGRATE_NODE_NAME = "migrate";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
     private static final String SWAP_NODE_NAME = "swap";
@@ -186,6 +187,8 @@ public abstract class AbstractParsedStmt {
         }
         else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
             retval = new ParsedSwapStmt(parent, paramValues, db);
+        } else if (stmtTypeElement.name.equalsIgnoreCase(MIGRATE_NODE_NAME)) {
+            retval = new ParsedMigrateStmt(parent, paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -363,41 +366,30 @@ public abstract class AbstractParsedStmt {
                                  VoltXMLElement element);
     }
 
-    private static Map<String, XMLElementExpressionParser> m_exprParsers;
+    private static Map<String, XMLElementExpressionParser> m_exprParsers =
+            new HashMap<String, XMLElementExpressionParser>() {{
+                put("value",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseValueExpression(element));
+                put("vector",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseVectorExpression(element));
+                put("columnref",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseColumnRefExpression(element));
+                put("operation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseOperationExpression(element));
+                put("aggregation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseAggregationExpression(element));
+                put("asterisk",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> null);
+                put("win_aggregation",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseWindowedAggregationExpression(element));
+                put("function",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseFunctionExpression(element));
+                put("tablesubquery",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseSubqueryExpression(element));
+                put("row",
+                        (AbstractParsedStmt stmt, VoltXMLElement element) -> stmt.parseRowExpression(element));
 
-    static {
-        m_exprParsers = new HashMap<>();
-        m_exprParsers.put("value",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseValueExpression(element));
-        m_exprParsers.put("vector",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseVectorExpression(element));
-        m_exprParsers.put("columnref",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseColumnRefExpression(element));
-        m_exprParsers.put("operation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseOperationExpression(element));
-        m_exprParsers.put("aggregation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseAggregationExpression(element));
-        m_exprParsers.put("asterisk",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> null);
-        m_exprParsers.put("win_aggregation",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseWindowedAggregationExpression(element));
-        m_exprParsers.put("function",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseFunctionExpression(element));
-        m_exprParsers.put("tablesubquery",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseSubqueryExpression(element));
-        m_exprParsers.put("row",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> stmt.parseRowExpression(element));
-    }
+            }};
 
     /**
      * Given a VoltXMLElement expression node, translate it into an
@@ -406,13 +398,12 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression parseExpressionNode(VoltXMLElement exprNode) {
         String elementName = exprNode.name.toLowerCase();
-        AbstractExpression retval = null;
 
         XMLElementExpressionParser parser = m_exprParsers.get(elementName);
         if (parser == null) {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
-        retval = parser.parse(this, exprNode);
+        AbstractExpression retval = parser.parse(this, exprNode);
         assert("asterisk".equals(elementName) || retval != null);
         return retval;
     }

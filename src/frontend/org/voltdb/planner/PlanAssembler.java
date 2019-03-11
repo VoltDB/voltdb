@@ -53,34 +53,7 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.AbstractJoinPlanNode;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.CommonTablePlanNode;
-import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.IndexSortablePlanNode;
-import org.voltdb.plannodes.IndexUseForOrderBy;
-import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.SwapTablesPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
-import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -129,6 +102,8 @@ public class PlanAssembler {
     private ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for a union */
     private ParsedUnionStmt m_parsedUnion = null;
+    /** parsed statement for a migrate */
+    private ParsedMigrateStmt m_parsedMigrate = null;
 
     /** plan selector */
     private final PlanSelector m_planSelector;
@@ -369,21 +344,19 @@ public class PlanAssembler {
             m_parsedInsert = (ParsedInsertStmt) parsedStmt;
             // The currently handled inserts are too simple to even require a subplan assembler. So, done.
             return;
-        }
-
-        if (parsedStmt instanceof ParsedUpdateStmt) {
+        } else if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException("Illegal to update a stream.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-        }
-        else if (parsedStmt instanceof ParsedDeleteStmt) {
+        } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException("Illegal to delete from a stream.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-        }
-        else {
+        } else if (parsedStmt instanceof ParsedMigrateStmt) {
+            m_parsedMigrate = (ParsedMigrateStmt) parsedStmt;
+        } else {
             throw new RuntimeException("Unknown subclass of AbstractParsedStmt.");
         }
 
@@ -719,30 +692,27 @@ public class PlanAssembler {
         if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
             retval = getNextSelectPlan();
-        }
-        else if (m_parsedInsert != null) {
+        } else if (m_parsedInsert != null) {
             nextStmt = m_parsedInsert;
             retval = getNextInsertPlan();
-        }
-        else if (m_parsedDelete != null) {
+        } else if (m_parsedDelete != null) {
             nextStmt = m_parsedDelete;
             retval = getNextDeletePlan();
             // note that for replicated tables, multi-fragment plans
             // need to divide the result by the number of partitions
-        }
-        else if (m_parsedUpdate != null) {
+        } else if (m_parsedUpdate != null) {
             nextStmt = m_parsedUpdate;
             retval = getNextUpdatePlan();
-        }
-        else if (m_parsedUnion != null) {
+        } else if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
             retval = getNextUnionPlan();
-        }
-        else if (m_parsedSwap != null) {
+        } else if (m_parsedSwap != null) {
             nextStmt = m_parsedSwap;
             retval = getNextSwapPlan();
-        }
-        else {
+        } else if (m_parsedMigrate != null) {
+            nextStmt = m_parsedMigrate;
+            retval = getNextMigratePlan();
+        } else {
             throw new RuntimeException(
                     "setupForNewPlans encountered unsupported statement type.");
         }
@@ -1600,6 +1570,40 @@ public class PlanAssembler {
         boolean isReplicated = targetTable.getIsreplicated();
         retval.rootPlanGraph = addCoordinatorToDMLNode(updateNode, isReplicated);
         return retval;
+    }
+
+    private CompiledPlan getNextMigratePlan() {
+        assert (m_subAssembler != null);
+        final AbstractOperationPlanNode migrateNode = new MigratePlanNode();
+        assert (m_parsedMigrate.m_tableList.size() == 1);
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
+        if (subSelectRoot == null) {
+            return null;
+        } else {
+            assert(subSelectRoot instanceof AbstractScanPlanNode);
+            final NodeSchema proj_schema = new NodeSchema();
+            // This planner-created column is magic.
+            proj_schema.addColumn(
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    "tuple_address", "tuple_address",
+                    new TupleAddressExpression());
+            subSelectRoot.addInlinePlanNode(new ProjectionPlanNode(proj_schema));
+            migrateNode.addAndLinkChild(subSelectRoot);
+        }
+        final Table targetTable = m_parsedMigrate.m_tableList.get(0);
+        migrateNode.setTargetTableName(targetTable.getTypeName());
+        CompiledPlan plan = new CompiledPlan(m_isLargeQuery);
+        plan.setReadOnly(false);
+        final boolean isSinglePartitionPlan = m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle();
+        plan.replicatedTableDML = targetTable.getIsreplicated();
+        // The delete statement cannot be inherently content non-deterministic.
+        // So, the last parameter is always null.
+        plan.statementGuaranteesDeterminism(
+                false, migrateNode.isOrderDeterministic(), null);
+        plan.rootPlanGraph = isSinglePartitionPlan ? migrateNode :
+                addCoordinatorToDMLNode(migrateNode, plan.replicatedTableDML);
+        return plan;
     }
 
     static private AbstractExpression castExprIfNeeded(

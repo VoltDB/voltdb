@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -102,32 +101,20 @@ public class TestFailuresSuite extends RegressionSuite {
     {
         System.out.println("STARTING testBadFloatToVarcharCompare");
         Client client = getClient();
-
-        boolean threw = false;
         try
         {
             client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
+            fail("Should have failed");
         }
         catch (ProcCallException e)
         {
-            if (!isHSQL())
-            {
-                if ((e.getMessage().contains("SQL ERROR")) &&
-                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT")))
-                {
-                    threw = true;
-                }
-                else
-                {
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                threw = true;
+            if (!isHSQL() &&
+                    (! e.getMessage().contains("SQL ERROR") ||
+                            !e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT"))) {
+                e.printStackTrace();
+                fail(e.getMessage());
             }
         }
-        assertTrue(threw);
     }
 
     // Subcase of ENG-800

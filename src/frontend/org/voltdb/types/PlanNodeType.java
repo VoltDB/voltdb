@@ -21,32 +21,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.CommonTablePlanNode;
-import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexCountPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.MaterializedScanPlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.SwapTablesPlanNode;
-import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.plannodes.TupleScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
-import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
+import org.voltdb.plannodes.*;
 
 /**
  * This is the type of plan nodes.
@@ -82,6 +57,7 @@ public enum PlanNodeType implements PlanMatcher {
     DELETE          (32, DeletePlanNode.class),
     // UPSERT       (33, UpsertPlanNode.class),// UNUSED: Upserts are inserts.
     SWAPTABLES      (34, SwapTablesPlanNode.class),
+    MIGRATE          (35, MigratePlanNode.class),
 
     //
     // Communication Nodes
