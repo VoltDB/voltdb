@@ -40,5 +40,9 @@ public enum TableType {
     public static boolean isStream(int e) {
         return (e ==STREAM.get() || e == STREAM_VIEW_ONLY.get());
     }
+
+    public static boolean needsMigrateHiddenColumn(int e) {
+        return (e == PERSISTENT_MIGRATE.get() || e == PERSISTENT_EXPORT.get());
+    }
 }
 

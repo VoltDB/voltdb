@@ -148,13 +148,12 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     assert (schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    if (! m_isMaterialized && hiddenColumnCount == 1) {
+    bool isTableWithStream = schema->isTableWithStream();
+    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithStream) ||
+        (hiddenColumnCount == 2 && isTableWithStream))) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.
-    }
-    else {
-        assert (m_isMaterialized || hiddenColumnCount == 0);
     }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
@@ -1613,6 +1612,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message.str().c_str());
     }
+
+
 
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);

@@ -28,6 +28,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -213,7 +214,7 @@ public class PlanAssembler {
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (exportTables.contains(table.getTypeName())) {
+            if (exportTables.contains(table.getTypeName()) && TableType.isStream(table.getTabletype())) {
                 return true;
             }
         }

@@ -640,7 +640,12 @@ private:
     }
 
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
-        for (int colIdx = 0; colIdx < m_schema->hiddenColumnCount(); colIdx++) {
+        // Exclude the hidden column for persistent table with stream
+        uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
+        if (m_schema->isTableWithStream()) {
+            hiddenColumnCount--;
+        }
+        for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
             getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
         }
     }
@@ -1131,7 +1136,13 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
         }
     }
 
-    const int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
+    int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
+
+    // Exclude the hidden column for persistent table with stream for de-serialization
+    if (m_schema->isTableWithStream()) {
+        hiddenColumnCount--;
+    }
+
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
         char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
@@ -1139,6 +1150,13 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
                             tupleIn, dataPool, dataPtr,
                             hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
                             static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
+    }
+
+    // Null the column
+    if (m_schema->isTableWithStream()) {
+         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(hiddenColumnCount);
+         NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
+         setNValue(hiddenColumnInfo->offset, value);
     }
 }
 

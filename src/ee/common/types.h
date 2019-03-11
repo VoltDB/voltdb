@@ -604,6 +604,39 @@ enum DRConflictOnPK {
     CONFLICT_ON_PK,
 };
 
+enum TableType {
+      // Regular PersistentTable
+     PERSISTENT = 0,
+
+      // StreamTable without ExportTupleStream (Views only)
+     STREAM_VIEW_ONLY =1,
+
+     // StreamTable with ExportTupleStream
+     STREAM = 2,
+
+     // PersistentTable with associated Stream for migrating DELETES
+     PERSISTENT_MIGRATE  = 3,
+
+     // PersistentTable with associated Stream for linking INSERTS
+     PERSISTENT_EXPORT = 4,
+};
+
+inline bool isStream(TableType tableType) {
+    return tableType == STREAM_VIEW_ONLY || tableType == STREAM;
+}
+
+inline bool isTableWithExport(TableType tableType) {
+    return tableType == PERSISTENT_EXPORT;
+}
+
+inline bool isTableWithMigrate(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE;
+}
+
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+}
+
 // ------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------
