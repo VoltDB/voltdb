@@ -100,7 +100,7 @@
             <exclude name='classes-java1.7.jar' />
         </fileset>
         <fileset dir='${lib.dir}'>
-            <include name='felix.jar'/>
+            <include name='felix-framework-5.6.12.jar'/>
             <include name='commons-lang3-3.8.1.jar'/>
             <include name='kafka-clients-0.10.2.1.jar'/>
         </fileset>
