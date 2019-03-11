@@ -48,11 +48,17 @@ def shutdown(runner):
     if runner.opts.cancel:
         runner.info('Canceling cluster shutdown ...')
         response = runner.call_proc('@CancelShutdown', [], [])
+        if response.status() != 1:
+            runner.abort('Cancel shutdown failed with status: %d' % resp.response.statusString)
+        else:
+            runner.info('Shutdown canceled.')
     else:
         runner.info('Cluster shutdown in progress.')
         if not runner.opts.forcing:
             stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
-            actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".'
+            actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, '\
+                            + 'continue to wait with "voltadmin shutdown",\n'\
+                            + 'or cancel the shutdown with the "voltadmin shutdown --cancel" command'
             try:
                 runner.info('Preparing for shutdown...')
                 resp = runner.call_proc('@PrepareShutdown', [], [])
@@ -74,13 +80,18 @@ def shutdown(runner):
                 runner.info('If running Enterprise Edition, all transactions have been made durable.')
 
                 if runner.opts.save:
-                   actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
+                   actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, '\
+                            + 'continue to wait with "voltadmin shutdown --save",\n'\
+                            + 'or cancel the shutdown with the "voltadmin shutdown --cancel" command.'
                    columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                    shutdown_params = [zk_pause_txnid]
                    # save option, check more stats
                    checkstats.check_dr_consumer(runner)
                    runner.info('Starting resolution of external commitments...')
                    checkstats.check_exporter(runner)
+                   status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+                   if status <> 0:
+                       runner.abort('The cluster has failed to quiesce with status: %d' % status)
                    checkstats.check_dr_producer(runner)
                    runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
                 else:
@@ -96,5 +107,5 @@ def shutdown(runner):
                 runner.info(stateMessage)
                 runner.abort(actionMessage)
         response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status=False)
-    print response
+        print response
 
