@@ -118,8 +118,8 @@ java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
 java_opts.append('-XX:+CMSClassUnloadingEnabled')
 
-# skip PermSize in Java 8
-if "1.8" not in java_version:
+# skip PermSize in Java 8 and above
+if "1.7" in java_version:
     java_opts.append('-XX:PermSize=64m')
 
 def _is_tmpfs(path):
