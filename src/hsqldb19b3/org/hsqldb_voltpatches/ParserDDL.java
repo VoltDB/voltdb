@@ -4209,6 +4209,12 @@ public class ParserDDL extends ParserRoutine {
             throw Error.error(ErrorCode.X_42591);
         }
 
+        if (table.timeToLive != null) {
+            final String ttlColumn = table.timeToLive.ttlColumn.getNameString();
+            if (colName.equalsIgnoreCase(ttlColumn)) {
+                throw Error.error("Columns used by TTL cannot be dropped.");
+            }
+        }
         Object[] args = new Object[] {
             table.getColumn(colindex).getName(),
             Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(cascade),

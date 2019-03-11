@@ -513,7 +513,7 @@ public:
     }
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
-        if (table->isCatalogTableReplicated()) {
+        if (table->isReplicatedTable()) {
             return insertTupleForReplicated(table, temp_tuple);
         }
         table->insertTuple(temp_tuple);
@@ -547,7 +547,7 @@ public:
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         table->updateTuple(oldTuple, newTuple);
         TableTuple tuple = table->lookupTupleByValues(newTuple);
         assert(!tuple.isNullTuple());
@@ -555,14 +555,14 @@ public:
     }
 
     void deleteTuple(PersistentTable* table, TableTuple tuple) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -574,7 +574,7 @@ public:
     }
 
     TableTuple updateTupleFirstAndSecondColumn(PersistentTable* table, TableTuple tuple, int8_t new_tinyint_value, int64_t new_bigint_value) {
-        assert(!table->isCatalogTableReplicated());
+        assert(!table->isReplicatedTable());
         TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();

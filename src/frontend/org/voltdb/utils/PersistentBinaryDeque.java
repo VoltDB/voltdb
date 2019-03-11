@@ -356,15 +356,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @return  segment file name
      */
     private String getSegmentFileName(long currentId, long previousId) {
-
-        StringBuilder sb = new StringBuilder(m_nonce)
-                .append("_")
-                .append(String.format("%010d", currentId))
-                .append("_")
-                .append(String.format("%010d", previousId))
-                .append(".pbd");
-
-        return sb.toString();
+        return PbdSegmentName.createName(m_nonce, currentId, previousId);
     }
 
     /**
@@ -377,34 +369,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @return
      */
     private long getPreviousSegmentId(File file) {
-        long ret;
-        String fname = file.getName();
-
-        String rootname = fname.substring(0, fname.lastIndexOf("."));
-        String[] parts = rootname.split("_");
-        if (parts.length < 3) {
-            throw new IllegalStateException("Invalid file name: " + fname);
+        PbdSegmentName segmentName = PbdSegmentName.parseFile(m_usageSpecificLog, file);
+        if (segmentName.m_result != PbdSegmentName.Result.OK) {
+            throw new IllegalStateException("Invalid file name: " + file.getName());
         }
-
-        // Parse the previous timestamp
-        try {
-            ret = Long.parseLong(parts[parts.length - 1]);
-        } catch (NumberFormatException ex) {
-            throw new IllegalStateException("Failed to parse timestamps in: " + fname + ", " + ex);
-        }
-
-        return ret;
+        return segmentName.m_prevId;
     }
 
     /**
-     * Parse files in m_path and build m_segments
-     *
-     * File name structure = "nonce_currentCounter_previousCounter.pbd"
-     * Where:
-     * - currentCounter = Value of monotonic counter at PBD segment creation
-     * - previousCounter = Value of monotonic counter at previous PBD segment creation
-     *
      * @param deleteEmpty true if must delete empty PBD files
+     *
      * @throws IOException
      */
     private void parseFiles(boolean deleteEmpty) throws IOException {
@@ -413,36 +387,23 @@ public class PersistentBinaryDeque implements BinaryDeque {
         PairSequencer<Long> sequencer = new PairSequencer<>();
         try {
             for (File file : m_path.listFiles()) {
-
                 if (file.isDirectory() || !file.isFile() || file.isHidden()) {
                     continue;
                 }
 
-                String fname = file.getName();
-                if (!fname.endsWith(".pbd")) {
-                    continue;
-                }
+                PbdSegmentName segmentName = PbdSegmentName.parseFile(m_usageSpecificLog, file);
 
-                // Parse the pbd file name and delete files that have a non conforming name.
-                String rootname = fname.substring(0, fname.lastIndexOf("."));
-                String[] parts = rootname.split("_");
-                if (parts.length < 3) {
-                    // Note: same file may be deleted from different PBDs
+                switch (segmentName.m_result) {
+                case INVALID_NAME:
                     deleteStalePbdFile(file);
+                    //$FALL-THROUGH$
+                case NOT_PBD:
                     continue;
-                }
-
-                /// Reconstruct nonce in case it has '_' characters
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < parts.length - 2; i++) {
-                    if (i > 0) sb.append("_");
-                    if (parts[i].isEmpty()) continue;
-                    sb.append(parts[i]);
+                default:
                 }
 
                 // Is this one of our PBD files?
-                String nonce = sb.toString();
-                if (!m_nonce.equals(nonce)) {
+                if (!m_nonce.equals(segmentName.m_nonce)) {
                     // Not my PBD
                     continue;
                 }
@@ -453,28 +414,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     continue;
                 }
 
-                // Parse the counters
-                long prevCnt = 0L;
-                long curCnt = 0L;
-                try {
-                    prevCnt = Long.parseLong(parts[parts.length - 1]);
-                    curCnt = Long.parseLong(parts[parts.length - 2]);
-                } catch (NumberFormatException ex) {
-                    LOG.warn("Failed to parse counters in " + fname);
-                    deleteStalePbdFile(file);
-                    continue;
+                long maxCnt = Math.max(segmentName.m_id, segmentName.m_prevId);
+                if (m_segmentCounter < maxCnt) {
+                    m_segmentCounter = maxCnt;
                 }
-
-                if (m_segmentCounter < Math.max(prevCnt, curCnt)) {
-                    m_segmentCounter = Math.max(prevCnt, curCnt);
-                }
-                filesById.put(curCnt, file);
-                sequencer.add(new Pair<Long, Long>(prevCnt, curCnt));
+                filesById.put(segmentName.m_id, file);
+                sequencer.add(new Pair<Long, Long>(segmentName.m_prevId, segmentName.m_id));
             }
 
             // Handle common cases: no PBD files or just one
             if (filesById.size() == 0) {
-                LOG.info("No PBD segments for " + m_nonce);
+                m_usageSpecificLog.info("No PBD segments for " + m_nonce);
                 return;
             }
 

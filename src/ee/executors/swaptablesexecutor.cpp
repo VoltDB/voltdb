@@ -64,7 +64,7 @@ bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(node->getInputTableCount() == 0);
 #endif
 
-    m_replicatedTableOperation = static_cast<PersistentTable*>(node->getTargetTable())->isCatalogTableReplicated();
+    m_replicatedTableOperation = static_cast<PersistentTable*>(node->getTargetTable())->isReplicatedTable();
     setDMLCountOutputTable(executorVector.limits());
     return true;
 }
@@ -86,7 +86,7 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                theTargetTable->name().c_str(),
                otherTargetTable->name().c_str());
     {
-        assert(m_replicatedTableOperation == theTargetTable->isCatalogTableReplicated());
+        assert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
