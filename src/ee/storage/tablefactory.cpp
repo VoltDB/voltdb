@@ -109,7 +109,7 @@ Table* TableFactory::getPersistentTable(
     configureStats(name, stats);
 
     // If a regular table with export enabled, create a companion streamed table
-    if (tableTypeIsPersistentWithLinkedStream(tableType)) {
+    if (isTableWithExport(tableType)) {
         streamedTable = new StreamedTable(partitionColumn);
         initCommon(databaseId,
                    streamedTable,

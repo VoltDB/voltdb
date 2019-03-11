@@ -190,6 +190,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
+    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -199,6 +201,8 @@ public abstract class CatalogUtil {
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
     public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo MIGRATE_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -640,22 +644,7 @@ public abstract class CatalogUtil {
      * @return true if a table is export or false otherwise
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
-                                            org.voltdb.catalog.Table table)
-    {
-        /* IW-ENG14804
-        for (Connector connector : database.getConnectors()) {
-            // iterate the connector tableinfo list looking for tableIndex
-            // tableInfo has a reference to a table - can compare the reference
-            // to the desired table by looking at the relative index. ick.
-            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-        */
+                                            org.voltdb.catalog.Table table) {
         return TableType.isStream(table.getTabletype());
     }
 

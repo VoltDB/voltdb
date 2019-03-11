@@ -2220,6 +2220,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 store.indexRow(null, newrow);
             }
+            this.timeToLive = from.timeToLive;
         } catch (Throwable t) {
             store.release();
 

@@ -81,7 +81,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
     bool needsHiddenCountForView = false;
-
+    bool needsHiddenCloumnTableWithStream = isTableWithStream(static_cast<TableType>(catalogTable.tableType()));
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
 
     // only looking for potential existing table count(*) when this is a Materialized view table
@@ -102,8 +102,11 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
 
     // DR timestamp and hidden COUNT(*) should not appear at the same time
     assert(!(needsDRTimestamp && needsHiddenCountForView));
-    TupleSchemaBuilder schemaBuilder(numColumns,
-                                     (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0); // hidden columns
+    int numHiddenColumns = (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0;
+    if (needsHiddenCloumnTableWithStream) {
+         numHiddenColumns++;
+    }
+    TupleSchemaBuilder schemaBuilder(numColumns, numHiddenColumns);
 
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
@@ -115,7 +118,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                        catalogColumn->nullable(),
                                        catalogColumn->inbytes());
     }
-
+    int hiddenIndex = 0;
     if (needsDRTimestamp) {
         // Create a hidden timestamp column for a DRed table in an
         // active-active context.
@@ -123,16 +126,26 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         // Column will be marked as not nullable in TupleSchema,
         // because we never expect a null value here, but this is not
         // actually enforced at runtime.
-        schemaBuilder.setHiddenColumnAtIndex(0,
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex,
                                              VALUE_TYPE_BIGINT,
                                              8,      // field size in bytes
                                              false); // nulls not allowed
+        hiddenIndex++;
+        VOLT_DEBUG("Adding hidden column for dr table %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
     if (needsHiddenCountForView) {
-      schemaBuilder.setHiddenColumnAtIndex(needsDRTimestamp ? 1 : 0, VALUE_TYPE_BIGINT, 8, false);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, false);
+        hiddenIndex++;
+        VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
+    // Always create the hidden column for migrate last so the hidden columns can be handled correctly on java side
+    // for snapshot write plans.
+    if (needsHiddenCloumnTableWithStream) {
+        VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
+        schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, false, true);
+    }
     return schemaBuilder.build();
 }
 
@@ -411,7 +424,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
-    VOLT_DEBUG("Creating %s %s as %s", m_materialized?"VIEW":"TABLE", tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED");
+    VOLT_DEBUG("Creating %s %s as %s, type: %d, export:%s", m_materialized?"VIEW":"TABLE",
+               tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType(), tableIsExportOnly ? "true":"false");
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
@@ -743,9 +757,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     // Drop the old table
     ///////////////////////////////////////////////
     if (existingPersistentTable && newPersistentTable &&
-            newPersistentTable->isCatalogTableReplicated() != existingPersistentTable->isCatalogTableReplicated()) {
+            newPersistentTable->isReplicatedTable() != existingPersistentTable->isReplicatedTable()) {
         // A table can only be modified from replicated to partitioned
-        assert(newPersistentTable->isCatalogTableReplicated());
+        assert(newPersistentTable->isReplicatedTable());
         // Assume the MP memory context before starting the deallocate
         ExecuteWithMpMemory useMpMemory;
         existingTable->decrementRefcount();

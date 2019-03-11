@@ -634,22 +634,22 @@ inline bool tableTypeIsStream(TableType tableType) {
             tableTypeIsViewStream(tableType);
 }
 
-inline bool tableTypePersistentWithLinkingStream(TableType tableType) {
+inline bool isTableWithExport(TableType tableType) {
     return tableType == PERSISTENT_EXPORT;
 }
 
-inline bool tableTypePersistentWithMigrateStream(TableType tableType) {
+inline bool tableTypeNeedsTupleStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) || isTableWithExport(tableType);
+}
+
+inline bool isTableWithMigrate(TableType tableType) {
     return tableType == PERSISTENT_MIGRATE;
 }
 
-inline bool tableTypeIsPersistentWithLinkedStream(TableType tableType) {
-    return tableTypePersistentWithLinkingStream(tableType) ||
-            tableTypePersistentWithMigrateStream(tableType);
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
 }
 
-inline bool tableTypeNeedsTupleStream(TableType tableType) {
-    return tableTypeIsExportStream(tableType) || tableTypeIsPersistentWithLinkedStream(tableType);
-}
 // ------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------

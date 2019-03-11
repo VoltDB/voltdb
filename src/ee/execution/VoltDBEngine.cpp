@@ -294,7 +294,7 @@ VoltDBEngine::~VoltDBEngine() {
             if (!table) {
                 VOLT_DEBUG("Partition %d Deallocating %s table", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
-            else if(!table->isCatalogTableReplicated()) {
+            else if(!table->isReplicatedTable()) {
                 VOLT_DEBUG("Partition %d Deallocating partitioned table %s", m_partitionId, eraseThis->second->getTable()->name().c_str());
             }
             else {
@@ -882,7 +882,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             Table* table = tcd->getTable();
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable) {
-                if (updateReplicated != persistenttable->isCatalogTableReplicated()) {
+                if (updateReplicated != persistenttable->isReplicatedTable()) {
                     deletions.erase(path);
                 }
             }
@@ -903,7 +903,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         if (table->activeTupleCount() == 0) {
             PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable) {
-                if (persistenttable->isCatalogTableReplicated()) {
+                if (persistenttable->isReplicatedTable()) {
                     if (updateReplicated) {
                         // identify empty tables and mark for deletion
                         deletions.insert(delegatePair.first);
@@ -975,7 +975,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                     m_exportingTables.erase(name);
                 }
             }
-            if (persistenttable && persistenttable->isCatalogTableReplicated()) {
+            if (persistenttable && persistenttable->isReplicatedTable()) {
                 isReplicatedTable = true;
                 ExecuteWithAllSitesMemory execAllSites;
                 for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
@@ -1335,7 +1335,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             PersistentTable *deltaTable = persistentTable->deltaTable();
 
             {
-                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isReplicatedTable());
                 // iterate over indexes for this table in the catalog
                 BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
                     auto foundIndex = labeledIndex.second;
@@ -1463,7 +1463,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     }
                 }
 
-                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isReplicatedTable());
                 // This guards its destTable from accidental deletion with a refcount bump.
                 MaterializedViewTriggerForWrite::build(persistentTable, destTable, currInfo);
                 obsoleteViews.push_back(currView);
@@ -1471,7 +1471,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
 
 
             {
-                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isCatalogTableReplicated());
+                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(persistentTable->isReplicatedTable());
                 BOOST_FOREACH (auto toDrop, obsoleteViews) {
                     persistentTable->dropMaterializedView(toDrop);
                 }
@@ -1657,7 +1657,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
-            (table->isCatalogTableReplicated(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+            (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         try {
             table->loadTuplesForLoadTable(serializeIn,
@@ -1692,7 +1692,7 @@ VoltDBEngine::loadTable(int32_t tableId,
             throwFatalException("%s", serializableExc.message().c_str());
         }
 
-        if (table->isCatalogTableReplicated() && returnConflictRows) {
+        if (table->isReplicatedTable() && returnConflictRows) {
             // There may or may not have been conflicts but the call always succeeds. We need to copy the
             // lowest site result into the results of other sites so there are no hash mismatches.
             ExecuteWithAllSitesMemory execAllSites;
@@ -2864,7 +2864,7 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
                     // We should have prevented this in the Java layer.
                     continue;
                 }
-                if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
+                if (persistentTable->isReplicatedTable() != updateReplicated) {
                     VOLT_TRACE("[Partition %d] skip %s\n", m_partitionId, persistentTable->name().c_str());
                     continue;
                 }

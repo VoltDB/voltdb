@@ -1435,13 +1435,20 @@ NATIVE EE STUFF
 ***************************************
 -->
 
-<target name='catalog' description="Generate catalog source code.">
-  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
-    <arg line="catalog.py"/>
-  </exec>
-  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
-    <arg line="install.py"/>
-  </exec>
+<target name='catalog' depends="buildinfo" description="Generate catalog source code.">
+    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+        <arg line="catalog.py"/>
+    </exec>
+    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+        <arg line="install.py"/>
+    </exec>
+    <mkdir dir="${jar.nativelib.dir}"/>
+    <!-- GenerateEETests and plannertester needs the catalog API library. -->
+    <copy todir="${jar.nativelib.dir}">
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
+        </fileset>
+    </copy>
 </target>
 
 <!-- Build the jni library. -->
@@ -1536,12 +1543,6 @@ NATIVE EE STUFF
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
-    <!-- GenerateEETests needs the catalog API library. -->
-    <copy todir="${jar.nativelib.dir}">
-        <fileset dir="${base.dir}/lib">
-            <include name="libcatalog-${dist.version}.*"/>
-        </fileset>
-    </copy>
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
@@ -2374,6 +2375,7 @@ TEST CASES
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
+        <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml"/>
         <arg line="-C=${config} -dv ${explain} -r=${reportpath} -sp=${workpath}"/>
     </java>
 </target>

@@ -149,13 +149,12 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     assert (schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    if (! m_isMaterialized && hiddenColumnCount == 1) {
+    bool isTableWithStream = schema->isTableWithStream();
+    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithStream) ||
+        (hiddenColumnCount == 2 && isTableWithStream))) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.
-    }
-    else {
-        assert (m_isMaterialized || hiddenColumnCount == 0);
     }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
@@ -557,7 +556,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
         UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
-        SynchronizedThreadLock::addTruncateUndoAction(isCatalogTableReplicated(), uq, undoAction, this);
+        SynchronizedThreadLock::addTruncateUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
     else {
         if (fallible) {
@@ -895,7 +894,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
-            SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+            SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
         }
     }
 
@@ -1104,7 +1103,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+        SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
     }
     else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -1245,7 +1244,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), &m_surgeon);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, this);
+        SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
 
     // handle any materialized views, insert the tuple into delta table,
@@ -1628,6 +1627,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message.str().c_str());
     }
+
+
 
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);
