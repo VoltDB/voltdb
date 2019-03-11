@@ -38,21 +38,19 @@ public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
     public UnsafeDirectBufferCleaner() {
         try {
             cleanerMtd = Class.forName("sun.nio.ch.DirectBuffer").getMethod("cleaner");
-        }
-        catch (ClassNotFoundException | NoSuchMethodException e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new RuntimeException("No sun.nio.ch.DirectBuffer.cleaner() method found", e);
         }
 
         try {
             invokeCleanerMtd = Unsafe.class.getMethod("invokeCleaner", ByteBuffer.class);
-        }
-        catch (NoSuchMethodException e) {
+        } catch (NoSuchMethodException e) {
             throw new RuntimeException("Reflection failure: no sun.misc.Unsafe.invokeCleaner() method found", e);
         }
     }
 
-    /** {@inheritDoc} */
-    @Override public boolean clean(ByteBuffer buf) {
+    @Override
+    public boolean clean(ByteBuffer buf) {
         try {
             Object cleaner = cleanerMtd.invoke(buf);
             if (cleaner == null) {
@@ -60,8 +58,7 @@ public class UnsafeDirectBufferCleaner implements DirectBufferCleaner {
             }
             VoltUnsafe.invoke(invokeCleanerMtd, buf);
             return true;
-        }
-        catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to invoke direct buffer cleaner", e);
         }
     }

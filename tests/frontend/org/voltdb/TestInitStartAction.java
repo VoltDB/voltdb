@@ -467,7 +467,7 @@ final public class TestInitStartAction {
         ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
         int classesFound = 0;
-        if (VoltUnsafe.isJava8) {
+        if (VoltUnsafe.IS_JAVA8) {
             for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
                 compiler.addClassToJar(originalInMemoryJar, myclass.load());
                 classesFound++;
@@ -510,7 +510,7 @@ final public class TestInitStartAction {
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
         ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         int classesFound = 0;
-        if (VoltUnsafe.isJava8) {
+        if (VoltUnsafe.IS_JAVA8) {
             for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
                 compiler.addClassToJar(originalInMemoryJar, myclass.load());
                 classesFound++;
@@ -582,7 +582,7 @@ final public class TestInitStartAction {
         String packageName = "org.voltdb_testprocs.fakeusecase.greetings";
         ClassPath classpath = ClassPath.from(new URLClassLoader(new URL[]{GetGreetingBase.class.getResource(".")}, GetGreetingBase.class.getClassLoader()));
         int classesFound = 0;
-        if (VoltUnsafe.isJava8) {
+        if (VoltUnsafe.IS_JAVA8) {
             for (ClassInfo myclass : classpath.getTopLevelClassesRecursive(packageName)) {
                 if (myclass.getSimpleName().startsWith("Get")) {
                     compiler.addClassToJar(inMemoryJar1, myclass.load());
