@@ -190,7 +190,7 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
-    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migarate_column";
+    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
 
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);

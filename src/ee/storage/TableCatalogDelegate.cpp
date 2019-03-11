@@ -140,6 +140,8 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
         VOLT_DEBUG("Adding hidden column for mv %s index %d", catalogTable.name().c_str(), hiddenIndex);
     }
 
+    // Always create the hidden column for migrate last so the hidden columns can be handled correctly on java side
+    // for snapshot write plans.
     if (needsHiddenCloumnTableWithStream) {
         VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
         schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, false, true);
