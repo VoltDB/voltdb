@@ -21,7 +21,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.Thread.State;
-import java.lang.management.ManagementFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -66,6 +65,11 @@ public class ElasticHashinator extends TheHashinator {
     public static int DEFAULT_TOTAL_TOKENS =
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
+    private static final ElasticHashinatorCleaner CLEANER = VoltUnsafe.IS_JAVA8
+            ? new ElasticHashinatorCleanerJRE8()
+            : new ElasticHashinatorCleanerJRE9();
+
+
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
      * the value's hash
@@ -82,13 +86,6 @@ public class ElasticHashinator extends TheHashinator {
     // Provide a hook for the GC
     @SuppressWarnings("unused")
     private final Object m_cleaner;
-
-    private static final ElasticHashinatorCleaner CLEANER = VoltUnsafe.isJava8
-            ? new ElasticHashinatorCleanerJRE8()
-            : new ElasticHashinatorCleanerJRE9();
-
-
-
     private final Supplier<byte[]> m_configBytes;
     private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
         @Override
@@ -815,7 +812,6 @@ public class ElasticHashinator extends TheHashinator {
             try {
                 return createMtd.invoke(null, obj, action);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                e.printStackTrace();
                 throw new RuntimeException("Reflection failure: invoke sun.misc.Cleaner.create method failed", e);
             }
         }
@@ -827,10 +823,10 @@ public class ElasticHashinator extends TheHashinator {
         private final Method registerMtd;
 
         public ElasticHashinatorCleanerJRE9() {
-            System.out.println("JAVA version " + ManagementFactory.getRuntimeMXBean().getSpecVersion());
             try {
-                createMtd = Class.forName("java.lang.ref.Cleaner").getMethod("create");
-                registerMtd = Class.forName("java.lang.ref.Cleaner").getMethod("register", Object.class, Runnable.class);
+                Class<?> cleanerClass = Class.forName("java.lang.ref.Cleaner");
+                createMtd = cleanerClass.getMethod("create");
+                registerMtd = cleanerClass.getMethod("register", Object.class, Runnable.class);
             } catch (ClassNotFoundException | NoSuchMethodException e) {
                 throw new RuntimeException("Reflection failure: no java.lang.ref.Cleaner found", e);
             }
@@ -843,7 +839,6 @@ public class ElasticHashinator extends TheHashinator {
                 registerMtd.invoke(cleaner, obj, action);
                 return cleaner;
             } catch (IllegalAccessException | InvocationTargetException e) {
-                e.printStackTrace();
                 throw new RuntimeException("Reflection failure: invoke java.lang.ref.Cleaner method failed", e);
             }
         }

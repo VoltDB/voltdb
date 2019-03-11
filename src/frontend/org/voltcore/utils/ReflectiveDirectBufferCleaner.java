@@ -37,20 +37,19 @@ public class ReflectiveDirectBufferCleaner implements DirectBufferCleaner {
     public ReflectiveDirectBufferCleaner() {
         try {
             cleanerMtd = Class.forName("sun.nio.ch.DirectBuffer").getMethod("cleaner");
-        }
-        catch (ClassNotFoundException | NoSuchMethodException e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new RuntimeException("No sun.nio.ch.DirectBuffer.cleaner() method found", e);
         }
 
         try {
             cleanMtd = Class.forName("sun.misc.Cleaner").getMethod("clean");
-        }
-        catch (ClassNotFoundException | NoSuchMethodException e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new RuntimeException("No sun.misc.Cleaner.clean() method found", e);
         }
     }
 
-    @Override public boolean clean(ByteBuffer buf) {
+    @Override
+    public boolean clean(ByteBuffer buf) {
         try {
             Object cleaner = cleanerMtd.invoke(buf);
             if (cleaner == null) {
@@ -58,8 +57,7 @@ public class ReflectiveDirectBufferCleaner implements DirectBufferCleaner {
             }
             cleanMtd.invoke(cleaner);
             return true;
-        }
-        catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to invoke direct buffer cleaner", e);
         }
     }

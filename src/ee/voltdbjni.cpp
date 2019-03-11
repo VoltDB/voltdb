@@ -140,6 +140,7 @@ using namespace voltdb;
  */
 static VoltDBEngine *currentEngine = NULL;
 static JavaVM *currentVM = NULL;
+static jfieldID field_fd;
 
 void signalHandler(int signum, siginfo_t *info, void *context) {
     if (currentVM == NULL || currentEngine == NULL)
@@ -215,6 +216,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     currentVM = vm;
     if (isSunJVM == JNI_TRUE)
         setupSigHandler();
+    // retrieving the fieldId fd of FileDescriptor for later use
+    jclass class_fdesc = env->FindClass("java/io/FileDescriptor");
+    if (class_fdesc == NULL) {
+        assert(!"Failed to find filed if of FileDescriptor.");
+        throw std::exception();
+        return 0;
+    }
+    // poke the "fd" field with the file descriptor
+    field_fd = env->GetFieldID(class_fdesc, "fd", "I");
+
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
@@ -1332,11 +1343,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
 /**
  * Utility used for access file descriptor number from JAVA FileDescriptor class
  */
-jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject)
-{
-    jclass fdesc = env->GetObjectClass(fdObject);
-    // poke the "fd" field with the file descriptor
-    jfieldID field_fd = env->GetFieldID(fdesc, "fd", "I");
+jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject) {
     return env-> GetIntField(fdObject, field_fd);
 }
 
