@@ -104,6 +104,12 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
+              "alter table ttl drop column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
     }
 
     public void testDDLFiltering() throws Exception {
@@ -3639,7 +3645,8 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerStreamType() throws Exception {
         String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
                 " USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET TEST;\n" +
-                "partition table ttl on column a;";
+                "partition table ttl on column a;" +
+                "ALTER TABLE TTL DROP COLUMN B;";
         Database db = checkDDLAgainstGivenSchema(null,
                 "CREATE STREAM e PARTITION ON COLUMN D1 (D1 INTEGER NOT NULL, D2 INTEGER);\n",
                 "CREATE STREAM e1 PARTITION ON COLUMN D1 EXPORT TO TARGET T(D1 INTEGER NOT NULL, D2 INTEGER);\n" +
