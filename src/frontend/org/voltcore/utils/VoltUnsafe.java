@@ -19,7 +19,6 @@ package org.voltcore.utils;
 
 import sun.misc.Unsafe;
 
-import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -33,13 +32,13 @@ import java.security.PrivilegedExceptionAction;
  */
 public abstract class VoltUnsafe {
 
-    public static final boolean isJava8 = ManagementFactory.getRuntimeMXBean().getSpecVersion().startsWith("1.8");
+    public static final boolean IS_JAVA8 = System.getProperty("java.version").startsWith("1.8");
 
     /** Unsafe. */
     private static final Unsafe UNSAFE = unsafe();
 
     /** Cleaner code for direct {@code java.nio.ByteBuffer}. */
-    public static final DirectBufferCleaner DIRECT_BYTE_BUFFER_CLEANER = isJava8
+    public static final DirectBufferCleaner DIRECT_BYTE_BUFFER_CLEANER = IS_JAVA8
                     ? new ReflectiveDirectBufferCleaner()
                     : new UnsafeDirectBufferCleaner();
 
