@@ -270,6 +270,10 @@ public class SysProcFragmentId
     public static final int PF_cancelShutdown = 360;
     public static final int PF_cancelShutdownAggregate = 361;
 
+    // @MigrateRowsAcked_SP
+    public static final int PF_migrateRows = 370;
+    public static final int PF_migrateRowsAggregate = 371;
+
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 

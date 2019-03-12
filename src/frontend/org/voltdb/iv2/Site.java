@@ -1418,6 +1418,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public boolean deleteMigratedRows(String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
+    {
+        return m_ee.deleteMigratedRows(tableName, deletableTxnId, maxRowCount);
+    }
+
+    @Override
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {

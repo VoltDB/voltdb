@@ -1307,13 +1307,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
@@ -2601,6 +2601,19 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
         table_for_el->setExportStreamPositions(seqNo, (size_t) uso);
     }
     return 0;
+}
+
+bool VoltDBEngine::deleteMigratedRows(std::string tableName, int64_t deletableTxnId, int32_t maxRowCount) {
+    PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
+    if (table) {
+        return table->deleteMigratedRows(deletableTxnId, maxRowCount);
+    }
+    char msg[512];
+    snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+            tableName.c_str());
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+
+    return false;
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string streamName) {

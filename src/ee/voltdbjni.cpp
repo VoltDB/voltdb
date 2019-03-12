@@ -1136,6 +1136,43 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
     return 0;
 }
 
+/**
+ * Complete the deletion of the Migrated Table rows.
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeDeleteMigratedRows
+ *
+ * @param pointer Pointer to an engine instance
+ * @param mTableName The name of the table that the deletes should be applied to.
+ * @param deletableTxnId The transactionId of the last row that can be deleted
+ * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+ * @return true if every row up to and including deletableTxnId have been deleted.
+ */
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
+        JNIEnv *env, jobject obj, jlong engine_ptr,
+        jbyteArray streamName, jlong deletableTxnId, jint maxRowCount)
+{
+    VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
+    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
+    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
+    try {
+        try {
+            engine->resetReusedResultOutputBuffer();
+            return engine->exportAction(syncAction,
+                                        static_cast<int64_t>(ackOffset),
+                                        static_cast<int64_t>(seqNo),
+                                        streamNameStr);
+        } catch (const SQLException &e) {
+            throwFatalException("%s", e.message().c_str());
+        }
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return false;
+}
+
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetUSOForExportTable

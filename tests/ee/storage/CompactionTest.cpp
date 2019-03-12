@@ -36,6 +36,7 @@
 #include "indexes/tableindexfactory.h"
 #include "storage/DRTupleStream.h"
 #include "storage/persistenttable.h"
+#include "storage/PersistentTableUndoInsertAction.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
@@ -55,6 +56,7 @@ using namespace voltdb;
  * Counter for unique primary key values
  */
 static int32_t m_primaryKeyIndex = 0;
+const int HIDDEN_COLUMN_COUNT = 1;
 
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
@@ -86,7 +88,6 @@ public:
         m_columnNames.push_back("6");
         m_columnNames.push_back("7");
         m_columnNames.push_back("8");
-        m_columnNames.push_back("9");
 
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
@@ -97,7 +98,6 @@ public:
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
@@ -108,12 +108,10 @@ public:
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
 
-        m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
@@ -126,18 +124,29 @@ public:
         m_undoToken = 0;
 
         m_tableId = 0;
+        m_engine->setUndoToken(m_undoToken);
     }
 
     ~CompactionTest() {
         delete m_engine;
+        // Clear the dummy StreamedTable so that PersistentTable is deallocated cleanly.
+        m_table->setStreamedTable(NULL);
         delete m_table;
         voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable() {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
-                                                               m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull);
+        std::vector<ValueType> hiddenTypes;
+        std::vector<int32_t> hiddenColumnLengths;
+        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, true);
+        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+        const std::vector<bool> columnInBytes (m_tableSchemaAllowNull.size(), false);
+
+        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+
+
+        m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes, m_tableSchemaColumnSizes, m_tableSchemaAllowNull, columnInBytes,
+                                                       hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -169,6 +178,8 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature));
+        // Set a dummy StreamedTable to avoid asserts in the main path
+        m_table->setStreamedTable((StreamedTable*) 1);
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -183,13 +194,24 @@ public:
         }
     }
 
-    void addRandomUniqueTuples(Table *table, int numTuples) {
+    void addRandomUniqueTuples(PersistentTable *table, int numTuples, bool withMigrating = false) {
         TableTuple tuple = table->tempTuple();
         for (int ii = 0; ii < numTuples; ii++) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
             tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
             table->insertTuple(tuple);
+            if (withMigrating && (rand() % 100) >= 95) {
+                // For 5% of the tuples put them in the migrating state using primaryKey as TxnId
+                int64_t txnId = m_primaryKeyIndex - 1;
+                // Need to find the memory in the tuple block to update the hidden column (simulate migrate)
+                const UndoReleaseAction* undo = ExecutorContext::currentUndoQuantum()->getLastUndoActionForTest();
+                const PersistentTableUndoInsertAction* insertUndo = (const PersistentTableUndoInsertAction*) undo;
+                TableTuple targetTuple = TableTuple(static_cast<char*>(insertUndo->getTupleForTest()), tuple.getSchema());
+                targetTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(txnId));
+                dynamic_cast<voltdb::PersistentTable *>(table)->migratingAdd(txnId, targetTuple);
+            }
         }
+        m_engine->releaseUndoToken(m_undoToken, true);
     }
 
     void doRandomUndo() {
@@ -299,7 +321,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 #else
     int tupleCount = 645260;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples( m_table, tupleCount, true );
 
 #ifdef MEMCHECK
     ASSERT_EQ( tupleCount, m_table->m_data.size());
@@ -379,6 +401,67 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
+}
+
+TEST_F(CompactionTest, CompactionWithMigratingRows) {
+    initTable();
+#ifdef MEMCHECK
+    int tupleCount = 1000;
+#else
+    int tupleCount = 645260;
+#endif
+    addRandomUniqueTuples( m_table, tupleCount);
+
+#ifdef MEMCHECK
+    ASSERT_EQ( tupleCount, m_table->m_data.size());
+#else
+    ASSERT_EQ(20, m_table->m_data.size());
+#endif
+
+    stx::btree_set<int32_t> pkeysNotDeleted;
+    std::vector<int32_t> pkeysToDelete;
+    for (int ii = 0; ii < tupleCount; ii ++) {
+        if (ii % 2 == 0) {
+            pkeysToDelete.push_back(ii);
+        } else {
+            pkeysNotDeleted.insert(ii);
+        }
+    }
+
+    voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
+    TableTuple key(pkeyIndex->getKeySchema());
+    boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
+    key.moveNoHeader(backingStore.get());
+
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+
+    for (std::vector<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
+        key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
+        //FIXME: deleteTuple should clean up the index for us
+        m_table->migratingRemove(*ii, tuple);
+        m_table->deleteTuple(tuple, true);
+    }
+
+    m_table->doForcedCompaction();
+
+    TableIterator iter = m_table->iterator();
+    TableTuple tuple(m_table->schema());
+    while (iter.next(tuple)) {
+        int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+        key.setNValue(0, ValueFactory::getIntegerValue(pkey));
+        for (int ii = 0; ii < 4; ii++) {
+            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
+            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
+            ASSERT_EQ(indexTuple.address(), tuple.address());
+        }
+        int64_t migratingTxn = ValuePeeker::peekAsBigInt(tuple.getHiddenNValue(0));
+        if (migratingTxn) {
+            ASSERT_TRUE(m_table->migratingRemove(migratingTxn, tuple));
+        }
+    }
+    ASSERT_TRUE(m_table->m_migratingRows.empty());
 }
 
 TEST_F(CompactionTest, CompactionWithCopyOnWrite) {

@@ -71,8 +71,12 @@
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 #include "common/SynchronizedThreadLock.h"
+#include <map>
+#include <set>
+
 
 class CompactionTest_BasicCompaction;
+class CompactionTest_CompactionWithMigratingRows;
 class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
 
@@ -207,6 +211,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
+    friend class ::CompactionTest_CompactionWithMigratingRows;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
@@ -577,16 +582,23 @@ public:
      * Set a companion streamed table to export tuples
      */
     void setStreamedTable(StreamedTable* st) {
-        m_st = st;
+        m_shadowStream = st;
     }
 
     /**
-     * IW-ENG14804
-     * Get the companion streamed table or nullptr
+     * Get the shadow streamed table or nullptr
      */
     StreamedTable* getStreamedTable() {
-        return m_st;
+        return m_shadowStream;
     }
+
+    void migratingAdd(int64_t txnId, TableTuple& tuple);
+    bool migratingRemove(int64_t txnId, TableTuple& tuple);
+
+    /**
+     * Delete the rows that have completed the migration process
+     */
+    bool deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount);
 
 private:
     // Zero allocation size uses defaults.
@@ -863,8 +875,11 @@ private:
     SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
     SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
 
-    // IW-ENG14804 - pointer to companion streamed table or nullptr
-    StreamedTable* m_st;
+    // Pointer to Shadow streamed table (For Migrate) or nullptr
+    StreamedTable* m_shadowStream;
+    typedef std::set<void*> MigratingBatch;
+    typedef std::map<int64_t, MigratingBatch> MigratingRows;
+    MigratingRows m_migratingRows;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

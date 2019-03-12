@@ -798,6 +798,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long uso, long seqNo, int partitionId, String streamName);
 
     /**
+     * Execute an Delete of migrated rows in the execution engine.
+     */
+    public abstract boolean deleteMigratedRows(String tableName,
+            long deletableTxnId, int maxRowCount);
+
+    /**
      * Get the seqNo and offset for an export table.
      * @param streamName the name of the stream being polled.
      * @return the response ExportMessage
@@ -1152,6 +1158,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long mAckOffset,
             long seqNo,
             byte mStreamName[]);
+
+    /**
+     * Complete the deletion of the Migrated Table rows.
+     * @param pointer Pointer to an engine instance
+     * @param mTableName The name of the table that the deletes should be applied to.
+     * @param deletableTxnId The transactionId of the last row that can be deleted
+     * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+     * @return true if every row up to and including deletableTxnId have been deleted.
+     */
+    protected native boolean nativeDeleteMigratedRows(long pointer, byte mTableName[],
+            long deletableTxnId, int maxRowCount);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
