@@ -369,7 +369,7 @@ public class PBDRegularSegment extends PBDSegment {
             m_entryCRC.reset();
             m_entryHeaderBuf.b().clear();
             final int written = MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
-
+            destBuf.b().flip();
             // Write entry header
             PBDUtils.writeEntryHeader(m_entryCRC, m_entryHeaderBuf.b(), destBuf.b(),
                     written, PBDSegment.NO_FLAGS);
