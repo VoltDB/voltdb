@@ -56,13 +56,18 @@ public class CancelShutdown extends Resume {
 
         if (fragmentId == PF_cancelShutdown) {
 
+            // First clear the shutdown condition
+            if (context.isLowestSiteId()){
+                VoltDB.instance().setShuttingdown(false);
+            }
+
+            // Then resume cluster
             super.run(context);
             VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             if (context.isLowestSiteId()){
-                VoltDB.instance().setShuttingdown(false);
                 t.addRow(m_stat.getMzxid());
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("@PrepareShutdown returning sigil " + ll(m_stat.getMzxid()));
+                    LOG.debug("@CancelShutdown returning sigil " + ll(m_stat.getMzxid()));
                 }
             }
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_cancelShutdown, t);
