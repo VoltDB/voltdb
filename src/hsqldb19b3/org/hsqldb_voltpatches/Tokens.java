@@ -364,7 +364,9 @@ public class Tokens {
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
     // A VoltDB extension to support the assume unique index attribute
-    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
+    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";
+    // A VoltDB extension to support the migrating index attribute
+    static final String        T_MIGRATING         = "MIGRATING";
     // End of VoltDB extension
     public static final String T_UNIQUE            = "UNIQUE";
     static final String        T_UNKNOWN           = "UNKNOWN";
@@ -1145,7 +1147,9 @@ public class Tokens {
     public static final int UNION                            = 296;
     public static final int UNIQUE                           = 297;
     // A VoltDB extension to support the assume unique index attribute
-    public static final int ASSUMEUNIQUE                     = 1303;    // For VoltDB
+    public static final int ASSUMEUNIQUE                     = 1303;
+    // A VoltDB extension to support the MIGRATING index attribute
+    public static final int MIGRATING                        = 1304;
     // End of VoltDB extension
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
@@ -1962,7 +1966,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
         // A VoltDB extension to support the assume unique index attribute
-        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
+        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);
+        // A VoltDB extension to support the migrating index attribute
+        reservedKeys.put(Tokens.T_MIGRATING, MIGRATING);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
@@ -2331,7 +2337,9 @@ public class Tokens {
             STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
-            ASSUMEUNIQUE, // For VoltDB
+            ASSUMEUNIQUE,
+            // A VoltDB extension to support the MIGRATEING index attribute.
+            MIGRATING,
             // End of VoltDB extension
             // A VoltDB extension APPROX_COUNT_DISTINCT
             APPROX_COUNT_DISTINCT,

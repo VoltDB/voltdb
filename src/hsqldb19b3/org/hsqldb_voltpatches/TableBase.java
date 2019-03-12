@@ -388,7 +388,7 @@ public class TableBase {
 
         long id = database.persistentStoreCollection.getNextId();
         Index newindex = new IndexAVL(name, id, this, pkcols, null, null,
-                                      pktypes, true, true, true, false);
+                                      pktypes, true, true, false, true, false);
 
         try {
             addIndex(newindex);
@@ -397,10 +397,10 @@ public class TableBase {
 
     public final Index createAndAddIndexStructure(HsqlName name,
             int[] columns, boolean[] descending, boolean[] nullsLast,
-            boolean unique, boolean constraint, boolean forward) {
+            boolean unique, boolean migrating, boolean constraint, boolean forward) {
 
         Index newindex = createIndexStructure(name, columns, descending,
-                                              nullsLast, unique, constraint,
+                                              nullsLast, unique, migrating, constraint,
                                               forward);
 
         addIndex(newindex);
@@ -410,7 +410,7 @@ public class TableBase {
 
     final Index createIndexStructure(HsqlName name, int[] columns,
                                      boolean[] descending,
-                                     boolean[] nullsLast, boolean unique,
+                                     boolean[] nullsLast, boolean unique, boolean migrating,
                                      boolean constraint, boolean forward) {
 
         if (primaryKeyCols == null) {
@@ -433,7 +433,7 @@ public class TableBase {
 
         long id = database.persistentStoreCollection.getNextId();
         Index newIndex = new IndexAVL(name, id, this, cols, descending,
-                                      nullsLast, types, false, unique,
+                                      nullsLast, types, false, unique, migrating,
                                       constraint, forward);
 
         return newIndex;
@@ -491,11 +491,11 @@ public class TableBase {
      */
     public final Index createIndex(PersistentStore store, HsqlName name,
                                    int[] columns, boolean[] descending,
-                                   boolean[] nullsLast, boolean unique,
+                                   boolean[] nullsLast, boolean unique, boolean migrating,
                                    boolean constraint, boolean forward) {
 
         Index newIndex = createAndAddIndexStructure(name, columns, descending,
-            nullsLast, unique, constraint, forward);
+            nullsLast, unique, migrating, constraint, forward);
 
         return newIndex;
     }
