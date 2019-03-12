@@ -55,7 +55,7 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
                         deletableTxnId, maxRowCount);
                 VoltTable results = new VoltTable(new ColumnInfo("txnDeleted", VoltType.TINYINT));
                 results.addRow(txnDeleted ? 1 : 0);
-                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_quiesce_sites, results);
+                return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_migrateRows, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_migrateRowsAggregate) {
                 return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_migrateRowsAggregate,
