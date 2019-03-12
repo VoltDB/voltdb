@@ -1149,21 +1149,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
         JNIEnv *env, jobject obj, jlong engine_ptr,
-        jbyteArray streamName, jlong deletableTxnId, jint maxRowCount)
+        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount)
 {
     VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jbyte *streamNameChars = env->GetByteArrayElements(streamName, NULL);
-    std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
-    env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
+    jbyte *tableNameChars = env->GetByteArrayElements(tableName, NULL);
+    std::string tableNameStr(reinterpret_cast<char *>(tableNameChars), env->GetArrayLength(tableName));
+    env->ReleaseByteArrayElements(tableName, tableNameChars, JNI_ABORT);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->exportAction(syncAction,
-                                        static_cast<int64_t>(ackOffset),
-                                        static_cast<int64_t>(seqNo),
-                                        streamNameStr);
+            return engine->deleteMigratedRows(tableNameStr,
+                                        static_cast<int64_t>(deletableTxnId),
+                                        static_cast<int32_t>(maxRowCount));
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
