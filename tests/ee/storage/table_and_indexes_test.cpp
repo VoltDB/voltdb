@@ -242,8 +242,18 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, signature, false, 0));
-            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtReplicaTupleSchema, districtColumnNames, signature, false, 0));
+            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                        "DISTRICT",
+                                                                                                        districtTupleSchema,
+                                                                                                        districtColumnNames,
+                                                                                                        signature,
+                                                                                                        false, 0));
+            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                               "DISTRICT",
+                                                                                                               districtReplicaTupleSchema,
+                                                                                                               districtColumnNames,
+                                                                                                               signature,
+                                                                                                               false, 0));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
@@ -264,7 +274,7 @@ class TableAndIndexTest : public Test {
                                                                                             warehouseTupleSchema,
                                                                                             warehouseColumnNames,
                                                                                             signature, false,
-                                                                                            0, false, false));
+                                                                                            0, PERSISTENT));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
@@ -279,11 +289,11 @@ class TableAndIndexTest : public Test {
             customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                customerTupleSchema, customerColumnNames,
                                                                signature, false,
-                                                               0, false, false));
+                                                               0, PERSISTENT));
             customerTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                       customerReplicaTupleSchema, customerColumnNames,
                                                                       signature, false,
-                                                                      0, false, false));
+                                                                      0, PERSISTENT));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {

@@ -360,8 +360,7 @@ public:
                                                                                                              columnNames,
                                                                                                              replicatedTableHandle,
                                                                                                              false, -1,
-                                                                                                             false,
-                                                                                                             false, 0,
+                                                                                                             PERSISTENT, 0,
                                                                                                              INT_MAX,
                                                                                                              95, true,
                                                                                                              true));
@@ -369,11 +368,24 @@ public:
 
         {
             ReplicaProcessContextSwitcher switcher;
-            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
+            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                         "P_TABLE_REPLICA",
+                                                                                                         m_schemaReplica,
+                                                                                                         columnNames,
+                                                                                                         tableHandle,
+                                                                                                         false, 0));
             ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory useMpMemory;
-            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1,
-                false, false, 0, INT_MAX, 95, false, true));
+            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                                   "R_TABLE_REPLICA",
+                                                                                                                   m_replicatedSchemaReplica,
+                                                                                                                   columnNames,
+                                                                                                                   replicatedTableHandle,
+                                                                                                                   false, -1,
+                                                                                                                   PERSISTENT, 0,
+                                                                                                                   INT_MAX,
+                                                                                                                   95, false,
+                                                                                                                   true));
         }
         m_table->setDR(true);
 
