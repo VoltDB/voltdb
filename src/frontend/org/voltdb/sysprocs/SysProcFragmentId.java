@@ -266,6 +266,10 @@ public class SysProcFragmentId
     public static final int PF_exportControl = 350;
     public static final int PF_exportControlAggregate = 351;
 
+    // @MigrateRowsAcked_SP
+    public static final int PF_migrateRows = 352;
+    public static final int PF_migrateRowsAggregate = 353;
+
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
