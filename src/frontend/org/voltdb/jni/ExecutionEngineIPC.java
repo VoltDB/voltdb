@@ -44,6 +44,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -132,7 +133,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , ExecuteTask(28)
         , ApplyBinaryLog(29)
         , ShutDown(30)
-        , SetViewsEnabled(31);
+        , SetViewsEnabled(31)
+        , DeleteMigratedRows(32);
 
         Commands(final int id) {
             m_id = id;
@@ -1578,6 +1580,31 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", streamName: " + mStreamName);
             }
+        } catch (final IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public boolean deleteMigratedRows(String tableName,
+            long deletableTxnId, int maxRowCount) {
+        try {
+            m_data.clear();
+            m_data.putInt(Commands.DeleteMigratedRows.m_id);
+            m_data.putLong(deletableTxnId);
+            m_data.putInt(maxRowCount);
+            m_data.putInt(tableName.getBytes("UTF-8").length);
+            m_data.put(tableName.getBytes("UTF-8"));
+            m_data.flip();
+            m_connection.write();
+
+            ByteBuffer results = ByteBuffer.allocate(1);
+            while (results.remaining() > 0) {
+                m_connection.m_socketChannel.read(results);
+            }
+            results.flip();
+            boolean txnFullyDeleted = results.get() == 1 ? true : false;
+            return txnFullyDeleted;
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }

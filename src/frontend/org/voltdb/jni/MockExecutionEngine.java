@@ -202,6 +202,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public boolean deleteMigratedRows(String tableName,
+            long deletableTxnId, int maxRowCount) {
+        return false;
+    }
+
+    @Override
     public long[] getUSOForExportTable(String streamName) {
         return null;
     }

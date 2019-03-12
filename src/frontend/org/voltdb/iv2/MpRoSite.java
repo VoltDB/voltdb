@@ -570,6 +570,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public boolean deleteMigratedRows(String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {

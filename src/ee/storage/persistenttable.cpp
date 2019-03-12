@@ -133,7 +133,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
     , m_releaseReplicated(this)
-    , m_st(nullptr)
+    , m_shadowStream(nullptr)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -214,8 +214,8 @@ PersistentTable::~PersistentTable() {
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
     }
-    if (m_st != nullptr) {
-        delete m_st;
+    if (m_shadowStream != nullptr) {
+        delete m_shadowStream;
     }
 }
 
@@ -802,11 +802,6 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-        if (m_st != nullptr) {
-            if (!m_st->insertTuple(source)) {
-                VOLT_ERROR("Failed to insert tuple into companion stream of %s", m_name.c_str());
-            }
-        }
     }
     catch (ConstraintFailureException& e) {
         deleteTupleStorage(target); // also frees object columns
@@ -1139,11 +1134,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // handle any materialized views
     BOOST_FOREACH (auto view, m_views) {
         view->processTupleInsert(targetTupleToUpdate, fallible);
-    }
-    if (m_st != nullptr) {
-        if (!m_st->insertTuple(targetTupleToUpdate)) {
-            VOLT_ERROR("Failed to insert UPDATE into companion stream of %s", m_name.c_str());
-        }
     }
 }
 
@@ -1881,6 +1871,20 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
+    if (m_shadowStream != nullptr) {
+        // This assumes the last column is the migrate column. This will need to be fixed
+        // if more columns are added.
+        int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(m_schema->hiddenColumnCount()-1));
+        if (migrateTxnId) {
+            MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
+            assert(it != m_migratingRows.end());
+            MigratingBatch& batch = it->second;
+            void* addr = originalTuple.address();
+            size_t found = batch.erase(addr);
+            assert(found == 1);
+            batch.emplace(destinationTuple.address());
+        }
+    }
 }
 
 bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector* bucketVector) {
@@ -2378,6 +2382,53 @@ void PersistentTable::polluteViews() {
     if (m_mvHandler) {
         m_mvHandler->pollute();
     }
+}
+
+void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
+    assert(m_shadowStream != nullptr);
+    MigratingRows::iterator it = m_migratingRows.lower_bound(txnId);
+    if (it == m_migratingRows.end() || it->first != txnId) {
+        // txnId not allocated yet
+        it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
+    };
+    void* addr = tuple.address();
+    it->second.insert(addr);
+};
+
+bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
+    assert(m_shadowStream != nullptr);
+    MigratingRows::iterator it = m_migratingRows.find(txnId);
+    if (it == m_migratingRows.end()) {
+        return false;
+    }
+    it->second.erase(tuple.address());
+    size_t found = it->second.erase(tuple.address());
+    assert(found <= 1);
+    return found == 1;
+}
+
+bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
+    if (m_shadowStream != nullptr) {
+        MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
+        int32_t deletedRows = 0;
+        if (it != m_migratingRows.end()) {
+            TableTuple targetTuple(m_schema);
+            MigratingRows::iterator currIt = m_migratingRows.begin();
+            do {
+                MigratingBatch& batch = currIt->second;
+                deletedRows += batch.size();
+                BOOST_FOREACH (auto toDelete, batch) {
+                    targetTuple.move(toDelete);
+                    deleteTuple(targetTuple);
+                }
+            } while (deletedRows <= maxRowCount && currIt->first <= it->first);
+            return currIt == m_migratingRows.end() || currIt->first > it->first;
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace voltdb

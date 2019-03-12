@@ -221,6 +221,7 @@ private:
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
     void exportAction(struct ipc_command *cmd);
+    void deleteMigratedRows(struct ipc_command *cmd);
     void getUSOForExportTable(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
@@ -360,6 +361,14 @@ typedef struct {
     int32_t tableSignatureLength;
     char tableSignature[0];
 }__attribute__((packed)) export_action;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t deletableTxnId;
+    int32_t maxRowCount;
+    int32_t tableNameLength;
+    char tableName[0];
+}__attribute__((packed)) delete_migrated_rows;
 
 typedef struct {
     struct ipc_command cmd;
@@ -566,6 +575,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 31:
           setViewsEnabled(cmd);
+          result = kErrorCode_None;
+          break;
+      case 32:
+          deleteMigratedRows(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -1499,13 +1512,26 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
     std::string tableSignature(action->tableSignature, tableSignatureLength);
     int64_t result = m_engine->exportAction(action->isSync,
-                                         static_cast<int64_t>(ntohll(action->offset)),
-                                         static_cast<int64_t>(ntohll(action->seqNo)),
-                                         tableSignature);
+                                            static_cast<int64_t>(ntohll(action->offset)),
+                                            static_cast<int64_t>(ntohll(action->seqNo)),
+                                            tableSignature);
 
     // write offset across bigendian.
     result = htonll(result);
     writeOrDie(m_fd, (unsigned char*)&result, sizeof(result));
+}
+
+void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
+    delete_migrated_rows *migrate_msg = (delete_migrated_rows *)cmd;
+    m_engine->resetReusedResultOutputBuffer();
+    int32_t tableNameLength = ntohl(migrate_msg->tableNameLength);
+    std::string tableName(migrate_msg->tableName, tableNameLength);
+    bool result = m_engine->deleteMigratedRows(tableName,
+                                               static_cast<int64_t>(ntohll(migrate_msg->deletableTxnId)),
+                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)));
+    char response[1];
+    response[0] = result ? 1 : 0;
+    writeOrDie(m_fd, (unsigned char*)response, sizeof(int8_t));
 }
 
 void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
