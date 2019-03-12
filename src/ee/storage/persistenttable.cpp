@@ -1880,7 +1880,10 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             assert(it != m_migratingRows.end());
             MigratingBatch& batch = it->second;
             void* addr = originalTuple.address();
-            size_t found = batch.erase(addr);
+#ifndef NDEBUG
+            size_t found =
+#endif
+                    batch.erase(addr);
             assert(found == 1);
             batch.emplace(destinationTuple.address());
         }
@@ -2390,7 +2393,7 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
     if (it == m_migratingRows.end() || it->first != txnId) {
         // txnId not allocated yet
         it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
-    };
+    }
     void* addr = tuple.address();
     it->second.insert(addr);
 };

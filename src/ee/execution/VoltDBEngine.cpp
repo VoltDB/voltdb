@@ -2606,12 +2606,24 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
 bool VoltDBEngine::deleteMigratedRows(std::string tableName, int64_t deletableTxnId, int32_t maxRowCount) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
-        return table->deleteMigratedRows(deletableTxnId, maxRowCount);
+        if (table->isReplicatedTable()) {
+            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
+                ExecuteWithMpMemory useMpMemory;
+                bool txnIdFound = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+                SynchronizedThreadLock::signalLowestSiteFinished();
+                return txnIdFound;
+            }
+        }
+        else {
+            return table->deleteMigratedRows(deletableTxnId, maxRowCount);
+        }
     }
-    char msg[512];
-    snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
-            tableName.c_str());
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+    if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
+        char msg[512];
+        snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+                tableName.c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
+    }
 
     return false;
 }
