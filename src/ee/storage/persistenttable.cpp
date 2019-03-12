@@ -1571,7 +1571,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
                                              Pool *stringPool,
                                              ReferenceSerializeOutput *uniqueViolationOutput,
                                              bool shouldDRStreamRows,
-                                             bool ignoreTupleLimit) {
+                                             bool ignoreTupleLimit,
+                                             bool elastic) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();
@@ -1613,8 +1614,6 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
                                       message.str().c_str());
     }
 
-
-
     int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);
 
@@ -1636,7 +1635,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         target.setPendingDeleteOnUndoReleaseFalse();
 
         try {
-            target.deserializeFrom(serialInput, stringPool);
+            target.deserializeFrom(serialInput, stringPool, elastic);
         } catch (SQLException &e) {
             deleteTupleStorage(target);
             throw;

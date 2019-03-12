@@ -499,6 +499,7 @@ public:
     int compare(const TableTuple &other) const;
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
+    void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool, bool elasticJoin);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
     size_t serializeToExport(voltdb::ExportSerializeOutput &io,
@@ -1049,6 +1050,9 @@ inline void TableTuple::copy(const TableTuple &source) {
 }
 
 inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool) {
+    TableTuple::deserializeFrom(tupleIn, dataPool, false);
+}
+inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool, bool elastic) {
     assert(m_schema);
     assert(m_data);
 
@@ -1091,6 +1095,7 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 
+    bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithStream() : false);
     for (int j = 0; j < hiddenColumnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
 
@@ -1103,9 +1108,14 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
         }
 
+        if (hiddenColumnMigrateElastic && j == hiddenColumnCount -1) {
+            NValue value = NValue::getNullValue(columnInfo->getVoltType());
+            setHiddenNValue(j, value);
+        } else {
         char *dataPtr = getWritableDataPtr(columnInfo);
-        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+            NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+        }
     }
 }
 
