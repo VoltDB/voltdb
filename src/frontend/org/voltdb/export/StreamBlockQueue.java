@@ -176,7 +176,7 @@ public class StreamBlockQueue {
         try {
             schemaCont = m_reader.getSchema(segmentIndex, true, false);
         } catch (IOException e) {
-            exportLog.error(e);
+            exportLog.error("Failed to poll schema: " + e);
         }
         return schemaCont;
 

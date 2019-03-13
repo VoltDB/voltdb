@@ -242,7 +242,7 @@ public class TestExportGeneration {
                     foo.duplicate(),
                     false
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));

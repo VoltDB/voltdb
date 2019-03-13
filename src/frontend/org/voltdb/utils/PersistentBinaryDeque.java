@@ -295,7 +295,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public boolean isStartOfSegment() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    throw new IOException("Cannot call isReadFirstObjectOfSegment: PBD has been closed");
+                    throw new IOException("Cannot call isStartOfSegment: PBD has been closed");
                 }
                 assertions();
                 moveToValidSegment();
