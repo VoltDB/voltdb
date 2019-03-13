@@ -121,6 +121,7 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # will build and run correctly.
 #
 ########################################################################
+SET (VOLTDB_COMPILER_GCC8   "8.0.0")
 SET (VOLTDB_COMPILER_U18p04 "7.3.0")
 SET (VOLTDB_COMPILER_U17p10 "7.2.0")
 SET (VOLTDB_COMPILER_U17p04 "6.3.0")
@@ -136,7 +137,7 @@ SET (VOLTDB_COMPILER_OLDE   "4.4.0")
 #
 # Note: Update this when adding a new compiler support.
 #
-SET (VOLTDB_COMPILER_NEWEST ${VOLTDB_COMPILER_U18p04})
+SET (VOLTDB_COMPILER_NEWEST ${VOLTDB_COMPILER_GCC8})
 #
 #
 #
@@ -147,8 +148,14 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
   # It turns out to be easier to go from a higher version to a lower
   # version, since we can't easily test <= and >=.
-  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_NEWEST )
-    # COMPILER_VERSION > 7.3.0
+  IF ( (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_GCC8)
+      OR (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL VOLTDB_COMPILER_GCC8))
+    # COMPILER_VERSION >= 8.0.0
+    MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds -Wno-error=class-memaccess -Wno-parentheses)
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U18p04)
+    # 7.3.0 < COMPILER_VERSION < 8.0.0
     MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
     MESSAGE ("We're using the options for ${CMAKE_COMPILER_NEWEST}, which is the newest one we've tried.  Good Luck.")
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
