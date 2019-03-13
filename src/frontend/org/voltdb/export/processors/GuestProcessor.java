@@ -32,7 +32,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -227,9 +226,8 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<AckingContainer> fut = m_source.poll();
-            final ListenableFuture<BBContainer> schemaFut = m_source.pollSchema();
-            addBlockListener(m_source, fut, schemaFut, edb);
+            final ListenableFuture<AckingContainer> fut = m_source.poll(true);
+            addBlockListener(m_source, fut, edb);
             m_source.forwardAckToOtherReplicas();
         }
 
@@ -313,7 +311,6 @@ public class GuestProcessor implements ExportDataProcessor {
     private void addBlockListener(
             final ExportDataSource source,
             final ListenableFuture<AckingContainer> fut,
-            final ListenableFuture<BBContainer> schemaFut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -335,10 +332,6 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     // If export master accepts promotion in case of mastership migration or leader re-election,
                     // we need an extra poll to get the schema of current buffer to setup the decoder
-                    BBContainer schemaCont = null;
-                    if (schemaFut != null) {
-                        schemaCont = schemaFut.get();
-                    }
                     try {
                         //Position to restart at on error
                         final int startPosition = cont.b().position();
@@ -364,9 +357,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                 ByteBuffer schemaBuf = null;
                                 if (cont.schema() != null) {
                                     schemaBuf = cont.schema();
-                                } else if (schemaCont != null) {
-                                    // This happens when export master migration or leader re-election
-                                    schemaBuf = schemaCont.b();
                                 }
                                 if (schemaBuf != null) {
                                     schemaBuf.position(0);
@@ -450,10 +440,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                     }
                                     cont.discard();
                                     cont = null;
-                                    if (schemaCont != null) {
-                                        schemaCont.discard();
-                                        schemaCont = null;
-                                    }
                                 }
                                 break;
                             } catch (RestartBlockException e) {
@@ -489,10 +475,6 @@ public class GuestProcessor implements ExportDataProcessor {
                         if (cont != null) {
                             cont.discard();
                         }
-                        if (schemaCont != null) {
-                            schemaCont.discard();
-                            schemaCont = null;
-                        }
                     }
                 } catch (Exception e) {
                     if (e.getCause() instanceof ReentrantPollException) {
@@ -504,7 +486,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(), null, edb);
+                    addBlockListener(source, source.poll(false), edb);
                 }
             }
         }, edb.getExecutor());
