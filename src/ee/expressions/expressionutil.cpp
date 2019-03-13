@@ -701,4 +701,12 @@ AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& js
     return AbstractExpression::buildExpressionTree(domRoot.rootObject());
 }
 
+OperatorIsNullExpression* ExpressionUtil::columnIsNull(const int tableIndex, const int valueIndex) {
+   return new OperatorIsNullExpression(new TupleValueExpression(tableIndex, valueIndex));
+}
+
+OperatorNotExpression* ExpressionUtil::columnNotNull(const int tableIndex, const int valueIndex) {
+   return new OperatorNotExpression(columnIsNull(tableIndex, valueIndex));
+}
+
 }

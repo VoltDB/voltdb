@@ -52,6 +52,7 @@
 
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
+#include "operatorexpression.h"
 
 namespace voltdb {
 
@@ -89,6 +90,16 @@ public:
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
 
     static AbstractExpression* vectorFactory(ValueType vt, const std::vector<AbstractExpression*>* args);
+
+    /**
+     * Given the table index and column index, return an expression of `col IS NULL`.
+     */
+    static OperatorIsNullExpression* columnIsNull(const int tableIndex, const int valueIndex);
+
+    /**
+     * Given the table index and column index, return an expression of `col IS NOT NULL`.
+     */
+    static OperatorNotExpression* columnNotNull(const int tableIndex, const int valueIndex);
 
 };
 
