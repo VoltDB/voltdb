@@ -1579,7 +1579,8 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
                                              Pool *stringPool,
                                              ReferenceSerializeOutput *uniqueViolationOutput,
                                              bool shouldDRStreamRows,
-                                             bool ignoreTupleLimit) {
+                                             bool ignoreTupleLimit,
+                                             bool elastic) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();

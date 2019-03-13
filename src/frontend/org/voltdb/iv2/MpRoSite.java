@@ -469,7 +469,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean undo)
+            boolean undo, boolean elastic)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
