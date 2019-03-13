@@ -605,14 +605,13 @@ public class TestPersistentBinaryDeque {
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false));
 
         //Make sure a single file with the appropriate data is created
-        m_pbd.offer(defaultContainer());
+        m_pbd.offer(defaultContainer(), m_ds, true, false);
         File files[] = TEST_DIR.listFiles();
         assertEquals( 1, files.length);
         assertTrue("pbd_nonce_0000000001_0000000002.pbd".equals(files[0].getName()));
 
         //Now make sure the current write file is stolen and a new write file created
-        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
-        retval.discard();
+        pollOnce(reader);
     }
 
     @Test

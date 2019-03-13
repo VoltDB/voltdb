@@ -275,7 +275,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 // If the segment that cursor currently points to is going to be deleted,
                                 // looks for next segment.
                                 long lastSegmentId = peekLastSegment().segmentIndex();
-                                if (m_segment == segment) {
+                                if (m_segment.segmentIndex() == segment.segmentIndex()) {
                                     // Tail segment should always exists
                                     if (m_segment.segmentIndex() == lastSegmentId) {
                                         throw new IOException("Tail segment file " + m_segment.file().getName() + " shouldn't be deleted! ");
@@ -850,6 +850,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private PBDSegment addSegment(PBDSegment tail, DeferredSerialization schemaDS) throws IOException {
+        boolean previousTailIsDeleted = false;
         //Check to see if the tail is completely consumed so we can close and delete it
         if (tail.hasAllFinishedReading() && canDeleteSegment(tail)) {
             pollLastSegment();
@@ -857,24 +858,28 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 m_usageSpecificLog.debug("Segment " + tail.file() + " has been closed and deleted because of empty queue");
             }
             closeAndDeleteSegment(tail);
+            previousTailIsDeleted = true;
         }
         Long nextIndex = tail.segmentIndex() + 1;
         long lastId = tail.segmentId();
 
         long curId = getNextSegmentId();
         String fname = getSegmentFileName(curId, lastId);
-        tail = newSegment(nextIndex, curId, new VoltFile(m_path, fname));
-        tail.openForWrite(true);
-        tail.setFinal(false);
+        PBDSegment newSegment = newSegment(nextIndex, curId, new VoltFile(m_path, fname));
+        newSegment.openForWrite(true);
+        newSegment.setFinal(false);
         if (schemaDS != null) {
-            tail.writeExtraHeader(schemaDS);
+            newSegment.writeExtraHeader(schemaDS);
         }
         if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + tail.file()
-                + " (final: " + tail.isFinal() + "), has been created because of an offer");
+            m_usageSpecificLog.debug("Segment " + newSegment.file()
+                + " (final: " + newSegment.isFinal() + "), has been created because of an offer");
         }
-        closeTailAndOffer(tail);
-        return tail;
+        closeTailAndOffer(newSegment);
+        if (previousTailIsDeleted) {
+            advanceCursorTo(tail, newSegment);
+        }
+        return newSegment;
     }
 
     private void closeAndDeleteSegment(PBDSegment segment) throws IOException {
@@ -1059,6 +1064,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         return true;
+    }
+
+    private void advanceCursorTo(PBDSegment deletedSegment, PBDSegment newSegment) {
+        for (ReadCursor cursor : m_readCursors.values()) {
+            if (cursor.m_segment != null && cursor.m_segment.segmentIndex() == deletedSegment.segmentIndex()) {
+                cursor.m_segment = newSegment;
+            }
+        }
     }
 
     @Override
