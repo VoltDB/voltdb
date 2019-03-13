@@ -571,7 +571,8 @@ public:
                                 Pool* stringPool = NULL,
                                 ReferenceSerializeOutput* uniqueViolationOutput = NULL,
                                 bool shouldDRStreamRows = false,
-                                bool ignoreTupleLimit = true);
+                                bool ignoreTupleLimit = true,
+                                bool elastic = false);
 
 private:
     // Zero allocation size uses defaults.
