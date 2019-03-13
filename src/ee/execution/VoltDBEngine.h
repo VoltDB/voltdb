@@ -275,7 +275,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t uniqueId,
                        bool returnConflictRows,
                        bool shouldDRStream,
-                       int64_t undoToken);
+                       int64_t undoToken,
+                       bool elastic);
 
         /**
          * Reset the result buffer (use the nextResultBuffer by default)

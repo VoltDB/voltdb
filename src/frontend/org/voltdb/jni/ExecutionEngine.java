@@ -736,8 +736,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
-        long undoToken) throws EEException;
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations,
+        boolean shouldDRStream, long undoToken, boolean elsaticJoin) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -979,8 +979,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
-            long undoToken);
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations,
+            boolean shouldDRStream, long undoToken, boolean elastic);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

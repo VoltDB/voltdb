@@ -200,12 +200,12 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
+        assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
         m_sequenceNo--;
-        assert(seqNo == m_sequenceNo);
     }
 }
 

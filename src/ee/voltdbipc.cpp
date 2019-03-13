@@ -284,6 +284,7 @@ typedef struct {
     int64_t undoToken;
     int32_t returnUniqueViolations;
     int32_t shouldDRStream;
+    int32_t elastic;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -997,6 +998,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
+    const bool elastic = loadTableCommand->elastic != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -1005,7 +1007,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
 
         bool success = m_engine->loadTable(tableId, serialize_in,
                                            txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream, undoToken);
+                                           returnUniqueViolations, shouldDRStream, undoToken, elastic);
         if (success) {
             return kErrorCode_Success;
         } else {
