@@ -477,6 +477,10 @@ public class GuestProcessor implements ExportDataProcessor {
                         if (cont != null) {
                             cont.discard();
                         }
+                        if (schemaCont != null) {
+                            schemaCont.discard();
+                            schemaCont = null;
+                        }
                     }
                 } catch (Exception e) {
                     if (e.getCause() instanceof ReentrantPollException) {
