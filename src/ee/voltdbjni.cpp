@@ -413,7 +413,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
-    jlong uniqueId, jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken)
+    jlong uniqueId, jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken, jboolean elastic)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -436,7 +436,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
                                              spHandle, lastCommittedSpHandle, uniqueId,
-                                             returnUniqueViolations, shouldDRStream, undoToken);
+                                             returnUniqueViolations, shouldDRStream, undoToken, elastic);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 

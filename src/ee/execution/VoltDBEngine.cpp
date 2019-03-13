@@ -1574,7 +1574,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                         int64_t uniqueId,
                         bool returnConflictRows,
                         bool shouldDRStream,
-                        int64_t undoToken) {
+                        int64_t undoToken,
+                        bool elastic) {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
@@ -1635,7 +1636,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                                           NULL,
                                           returnConflictRows ? &m_resultOutput : NULL,
                                           shouldDRStream,
-                                          ExecutorContext::currentUndoQuantum() == NULL);
+                                          ExecutorContext::currentUndoQuantum() == NULL,
+                                          elastic);
         }
         catch (const ConstraintFailureException &cfe) {
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;
