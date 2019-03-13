@@ -1111,8 +1111,9 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
         if (hiddenColumnMigrateElastic && j == hiddenColumnCount -1) {
             NValue value = NValue::getNullValue(columnInfo->getVoltType());
             setHiddenNValue(j, value);
+            VOLT_DEBUG("Deserializing migrate hidden column for elastic operation");
         } else {
-        char *dataPtr = getWritableDataPtr(columnInfo);
+            char *dataPtr = getWritableDataPtr(columnInfo);
             NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
         }
