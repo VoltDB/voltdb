@@ -127,7 +127,7 @@ public class StreamBlockQueue {
             }
             cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
         } catch (IOException e) {
-            exportLog.error(e);
+            exportLog.error("Failed to poll from persistent binary deque:" + e);
         }
 
         if (cont == null) {
