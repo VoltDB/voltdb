@@ -693,7 +693,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
     else {
         // Error handling
-        string errorMsg = udfResultIn.readTextString();
+        std::string errorMsg = udfResultIn.readTextString();
         throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
     }
 }
@@ -964,7 +964,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                 if (streamedtable) {
                     VOLT_TRACE("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
                     const std::string& name = streamedtable->name();
-                    streamedtable->setSignatureAndGeneration(tcd->signature(), timestamp);
+                    streamedtable->setGeneration(timestamp);
                     //Maintain the streams that will go away for which wrapper needs to be cleaned;
                     auto wrapper = streamedtable->getWrapper();
                     if (wrapper) {
@@ -990,7 +990,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string& name = streamedtable->name();
-                streamedtable->setSignatureAndGeneration(tcd->signature(), timestamp);
+                streamedtable->setGeneration(timestamp);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
                 purgedStreams[name] = streamedtable->getWrapper();
                 //Unset wrapper so it can be deleted after last push.
@@ -1150,8 +1150,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 if (tableTypeNeedsTupleStream(tcd->getTableType())) {
                     if (wrapper == NULL) {
                         wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                streamedTable->name(), streamedTable->getColumnNames());
+                                                        m_executorContext->m_siteId,
+                                                        timestamp,
+                                                        streamedTable->name());
                         m_exportingStreams[name] = wrapper;
                         VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
                     } else {
@@ -1159,7 +1160,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                         // A case when exact same stream is dropped and added.
                         purgedStreams[name] = NULL;
                     }
-                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    streamedTable->setGeneration(timestamp);
                     streamedTable->setWrapper(wrapper);
                 }
                 else {
@@ -1242,15 +1243,16 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                         ExportTupleStream *wrapper = m_exportingStreams[name];
                         if (wrapper == NULL) {
                             wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                    m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                    name, streamedTable->getColumnNames());
+                                                            m_executorContext->m_siteId,
+                                                            timestamp,
+                                                            name);
                             m_exportingStreams[name] = wrapper;
                         } else {
                             //If stream was altered in UAC and the added back we should not purge the wrapper.
                             //A case when alter has not changed anything that changes table signature.
                             purgedStreams[name] = NULL;
                         }
-                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                        streamedTable->setGeneration(timestamp);
                         streamedTable->setWrapper(wrapper);
                     }
                 }

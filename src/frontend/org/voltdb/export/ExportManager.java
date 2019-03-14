@@ -707,7 +707,7 @@ public class ExportManager
      */
     public static void pushEndOfStream(
             int partitionId,
-            String signature) {
+            String tableName) {
     }
     /*
      * This method pulls double duty as a means of pushing export buffers
@@ -718,7 +718,7 @@ public class ExportManager
      */
     public static void pushExportBuffer(
             int partitionId,
-            String signature,
+            String tableName,
             long startSequenceNumber,
             long committedSequenceNumber,
             long tupleCount,
@@ -738,7 +738,7 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature,
+            generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
                     (int)tupleCount, uniqueId, genId, buffer, sync);
         } catch (Exception e) {
