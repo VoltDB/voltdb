@@ -3408,7 +3408,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "insert into m2 values(1, 10);",
                 "insert into m2 values(2, 20);",
                 "insert into m2 values(3, 30);",
-                "insert into m2 values(4, 40);")
+                "insert into m2 values(4, 40);",
+                "insert into p1 values(1, null, 4, 4.1);")
                 .forEachOrdered(stmt -> {
                     try {
                         final ClientResponse cr = client.callProcedure("@AdHoc", stmt);
@@ -3449,6 +3450,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // migrate() in subquery select
         cr = client.callProcedure("@AdHoc", "select t1.a from (select * from m2 where not migrating and b < 30) as t1 order by t1.a");
         assertContentOfTable(new Object[][]{{1}, {2}}, cr.getResults()[0]);
+
+        // Can not apply MIGRATING function on non-migrating tables.
+        verifyProcFails(client, "Can not apply MIGRATING function on non-migrating tables.\\s*", "@AdHoc",
+                "select * from p1 where NOT migrating();");
 
         // we do not support migrating() in SELECT clause
         verifyProcFails(client, "A SELECT clause does not allow a BOOLEAN expression.\\s*", "@AdHoc",
