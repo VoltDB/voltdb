@@ -35,9 +35,11 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -190,7 +192,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
-        boolean schemaHasNoTables = catalog.getTables().isEmpty();
+        boolean schemaHasNoTables = true;
+        for (Table t : catalog.getTables()) {
+            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.STREAM_VIEW_ONLY.get()) {
+                schemaHasNoTables = false;
+                break;
+            }
+        }
         m_startTime = System.currentTimeMillis();
         List<Long> firstSites = new ArrayList<Long>();
         synchronized (m_lock) {
