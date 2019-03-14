@@ -21,24 +21,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.HybridCrc32;
+import java.util.zip.CRC32;
 
 public class PBDUtils {
-    public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
-    {
-        int written = 0;
-        try {
-            mbuf.position(mbuf.position() + PBDSegment.ENTRY_HEADER_BYTES);
-            final int objStartPosition = mbuf.position();
-            ds.serialize(mbuf);
-            written = mbuf.position() - objStartPosition;
-        } finally {
-            ds.cancel();
-        }
-        return written;
-    }
 
     public static void writeBuffer(FileChannel fc, ByteBuffer buf, int startPos) throws IOException
     {
@@ -61,13 +46,13 @@ public class PBDUtils {
         buf.flip();
     }
 
-    public static void writeEntryHeader(HybridCrc32 crc, ByteBuffer headerBuf,
+    public static void writeEntryHeader(CRC32 crc, ByteBuffer headerBuf,
             ByteBuffer destBuf, int size, int flag) {
         crc.update(size);
         crc.update(flag);
         crc.update(destBuf);
-        headerBuf.clear();
-        headerBuf.putLong(crc.getValue());
+        // the checksum here is really an unsigned int, store integer to save 4 bytes
+        headerBuf.putInt((int)crc.getValue());
         headerBuf.putInt(size);
         headerBuf.putInt(flag);
     }

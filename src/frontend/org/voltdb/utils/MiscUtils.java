@@ -45,6 +45,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
@@ -1084,5 +1085,25 @@ public class MiscUtils {
             }
         }
         return props;
+    }
+
+    /**
+     * Serialize the deferred serializer data into byte buffer
+     * @param mbuf ByteBuffer the buffer is written to
+     * @param ds DeferredSerialization data writes to the byte buffer
+     * @return size of data
+     * @throws IOException
+     */
+    public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
+    {
+        int written = 0;
+        try {
+            final int objStartPosition = mbuf.position();
+            ds.serialize(mbuf);
+            written = mbuf.position() - objStartPosition;
+        } finally {
+            ds.cancel();
+        }
+        return written;
     }
 }

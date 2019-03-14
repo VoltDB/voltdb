@@ -153,7 +153,6 @@ public class ExportGeneration implements Generation {
             final ExportDataProcessor processor,
             File[] files, List<Pair<Integer, Integer>> localPartitionsToSites,
             long genId) {
-
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
 
         /*
@@ -249,7 +248,6 @@ public class ExportGeneration implements Generation {
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
-
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 Table table = ti.getTable();
                 if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
@@ -830,7 +828,6 @@ public class ExportGeneration implements Generation {
     public void pushExportBuffer(int partitionId, String signature,
             long startSequenceNumber, long committedSequenceNumber,
             int tupleCount, long uniqueId, long genId, ByteBuffer buffer, boolean sync) {
-
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {

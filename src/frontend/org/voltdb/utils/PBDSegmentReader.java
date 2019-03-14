@@ -55,8 +55,7 @@ public interface PBDSegmentReader {
     public DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory,
             boolean checkCRC) throws IOException;
 
-    public DBBPool.BBContainer getSchema(BinaryDeque.OutputContainerFactory factory,
-            boolean checkCRC) throws IOException;
+    public DBBPool.BBContainer getSchema(boolean checkCRC) throws IOException;
 
     //Don't use size in bytes to determine empty, could potentially
     //diverge from object count on crash or power failure
@@ -82,6 +81,16 @@ public interface PBDSegmentReader {
      * Rewinds the read offset for this reader by the specified number of bytes.
      */
     public void rewindReadOffset(int byBytes);
+
+    /**
+     * Set the current read offset for this reader in this segment to given value
+     */
+    public void setReadOffset(long readOffset);
+
+    /**
+     * Reopen a previously closed reader. Re-opened reader still keeps the original read offset.
+     */
+    public void reopen(boolean forWrite, boolean emptyFile) throws IOException;
 
     /**
      * Close this reader and release any resources.

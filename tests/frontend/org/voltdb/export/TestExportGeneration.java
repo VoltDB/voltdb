@@ -48,6 +48,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -172,6 +173,15 @@ public class TestExportGeneration {
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                if (message instanceof BinaryPayloadMessage) {
+                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final byte msgType = buf.get();
+                    // Skip non-related messages
+                    if (msgType != ExportManager.RELEASE_BUFFER) {
+                        return;
+                    }
+                }
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -234,7 +244,7 @@ public class TestExportGeneration {
                     foo.duplicate(),
                     false
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_ackMatcherRef.set(ackMbxMessageIs(m_part, tableName, seqNo));

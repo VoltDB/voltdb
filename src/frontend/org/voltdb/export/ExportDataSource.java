@@ -145,7 +145,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
     // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
     // is reused to notify export decoder to stop waiting.
-    private SettableFuture<AckingContainer> m_pollFuture;
+    private PollTask m_pollTask;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
@@ -206,6 +206,38 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         private static final long serialVersionUID = 1L;
         ReentrantPollException() { super(); }
         ReentrantPollException(String s) { super(s); }
+    }
+
+    public static class PollTask {
+        private SettableFuture<AckingContainer> m_pollFuture;
+        private boolean m_forcePollSchema;
+
+        public PollTask(SettableFuture<AckingContainer> fut, Boolean forcePollSchema) {
+            m_pollFuture = fut;
+            m_forcePollSchema = forcePollSchema;
+        }
+
+        public SettableFuture<AckingContainer> getPollFuture() {
+            return m_pollFuture;
+        }
+
+        public boolean forcePollSchema() {
+            return m_forcePollSchema;
+        }
+
+        public void setFuture(AckingContainer cont) {
+            m_pollFuture.set(cont);
+        }
+
+        public void setException(Throwable t) {
+            m_pollFuture.setException(t);
+        }
+
+        public void clear() {
+            m_pollFuture.set(null);
+            m_pollFuture = null;
+            m_forcePollSchema = false;
+        }
     }
 
     /**
@@ -702,7 +734,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         null,
                         startSequenceNumber,
                         committedSequenceNumber,
-                        tupleCount, uniqueId, false);
+                        tupleCount, uniqueId, -1, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -736,7 +768,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         if (poll) {
             try {
-                pollImpl(m_pollFuture);
+                pollImpl(m_pollTask);
             } catch (RejectedExecutionException ex) {
                 //Its ok.
             }
@@ -878,13 +910,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // FIXME: necessary? Old processor should have been shut down.
         // Returning null indicates end of stream
         try {
-            if (m_pollFuture != null) {
-                m_pollFuture.set(null);
+            if (m_pollTask != null) {
+                m_pollTask.setFuture(null);
             }
         } catch (RejectedExecutionException reex) {
             //We are closing source.
         }
-        m_pollFuture = null;
+        m_pollTask = null;
 
         return m_es.submit(new Runnable() {
             @Override
@@ -938,8 +970,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<AckingContainer> poll() {
+    public ListenableFuture<AckingContainer> poll(boolean forcePollSchema) {
         final SettableFuture<AckingContainer> fut = SettableFuture.create();
+        PollTask pollTask = new PollTask(fut, forcePollSchema);
         try {
             m_es.execute(new Runnable() {
                 @Override
@@ -954,20 +987,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
-                        fut.set(null);
-                        m_pollFuture = null;
+                        pollTask.clear();
+                        m_pollTask = null;
                         return;
                     }
 
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            fut.set(m_pendingContainer.getAndSet(null));
-                            if (m_pollFuture != null) {
+                            pollTask.setFuture(m_pendingContainer.getAndSet(null));
+                            if (m_pollTask != null) {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("Pick up work from pending container, set poll future to null");
                                 }
-                                m_pollFuture = null;
+                                m_pollTask = null;
                             }
                             return;
                         }
@@ -976,13 +1009,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * call poll a second time until a response has been given
                          * which satisfies the cached future.
                          */
-                        if (m_pollFuture != null) {
+                        if (m_pollTask != null) {
                             fut.setException(new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
                                     " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
                             return;
                         }
                         if (!m_es.isShutdown()) {
-                            pollImpl(fut);
+                            pollImpl(pollTask);
                         }
                     } catch (Exception e) {
                         exportLog.error("Exception polling export buffer", e);
@@ -998,8 +1031,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
-    private synchronized void pollImpl(SettableFuture<AckingContainer> fut) {
-        if (fut == null) {
+    private synchronized void pollImpl(PollTask pollTask) {
+        if (pollTask == null) {
             return;
         }
 
@@ -1072,7 +1105,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             //If there are no unpolled blocks return the firstUnpolledUSO with no data
             if (first_unpolled_block == null) {
-                m_pollFuture = fut;
+                m_pollTask = pollTask;
             } else {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
@@ -1081,20 +1114,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     setStatus(StreamStatus.ACTIVE);
                     m_queueGap = 0;
                 }
+                BBContainer schemaContainer = null;
+                if (pollTask.forcePollSchema()) {
+                    schemaContainer = m_buffers.pollSchema();
+                } else {
+                    schemaContainer = first_unpolled_block.getSchemaContainer();
+                }
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                first_unpolled_block.getSchemaContainer(),
+                                schemaContainer,
                                 first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
                                 first_unpolled_block.committedSequenceNumber());
                 try {
-                    fut.set(ackingContainer);
+                    pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
                 }
-                m_pollFuture = null;
+                m_pollTask = null;
             }
         } catch (Throwable t) {
-            fut.setException(t);
+            pollTask.setException(t);
         }
     }
 
@@ -1339,7 +1378,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-
      /**
       * Notify the generation when source is drained on an unused partition.
       *
@@ -1349,13 +1387,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          if (!inCatalog() && m_buffers.isEmpty()) {
              //Returning null indicates end of stream
              try {
-                 if (m_pollFuture != null) {
-                     m_pollFuture.set(null);
+                 if (m_pollTask != null) {
+                     m_pollTask.setFuture(null);
                  }
              } catch (RejectedExecutionException reex) {
                  //We are closing source.
              }
-             m_pollFuture = null;
+             m_pollTask = null;
              m_generation.onSourceDrained(m_partitionId, m_tableName);
              return;
          }
@@ -1497,7 +1535,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug(toString() + " is no longer the export stream master.");
         }
         m_mastershipAccepted.set(false);
-        m_pollFuture = null;
+        m_pollTask = null;
         m_readyForPolling = false;
         m_seqNoToDrain = Long.MAX_VALUE;
         m_newLeaderHostId = null;
@@ -1886,7 +1924,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         return false;
     }
-
 
     private void setCommittedSeqNo(long committedSeqNo) {
         if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
