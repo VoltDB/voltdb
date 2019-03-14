@@ -681,5 +681,15 @@ public class PBDRegularSegment extends PBDSegment {
         public void setReadOffset(long readOffset) {
             m_readOffset = readOffset;
         }
+
+        public void reopen(boolean forWrite, boolean emptyFile) throws IOException {
+            if (m_closed) {
+                open(forWrite, emptyFile);
+            }
+            if (m_cursorId != null) {
+                m_closedCursors.remove(m_cursorId);
+                m_readCursors.put(m_cursorId, this);
+            }
+        }
     }
 }

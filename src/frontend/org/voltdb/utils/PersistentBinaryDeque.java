@@ -157,6 +157,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     segmentReader = segment.getReader(m_cursorId);
                     if (segmentReader == null) {
                         segmentReader = segment.openForRead(m_cursorId);
+                    } else if (segmentReader.isClosed()) {
+                        segmentReader.reopen(false, false);
                     }
                     // need to restore the read offset
                     originalOffset = segmentReader.readOffset();

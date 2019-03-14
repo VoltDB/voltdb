@@ -88,6 +88,11 @@ public interface PBDSegmentReader {
     public void setReadOffset(long readOffset);
 
     /**
+     * Reopen a previously closed reader. Re-opened reader still keeps the original read offset.
+     */
+    public void reopen(boolean forWrite, boolean emptyFile) throws IOException;
+
+    /**
      * Close this reader and release any resources.
      * <code>getReader</code> will still return this reader until the segment is closed.
      */
