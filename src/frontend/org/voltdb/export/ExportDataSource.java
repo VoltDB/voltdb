@@ -997,11 +997,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_pendingContainer.get() != null) {
                             AckingContainer cont = m_pendingContainer.getAndSet(null);
                             boolean hasSchema = cont.schema() != null;
-                            exportLog.info("XXX Set poll future with pending container, hasSchema: " + hasSchema);
                             if (!hasSchema) {
+                                // Ensure this first block has a schema
                                 BBContainer schemaContainer = m_buffers.pollSchema();
                                 if (schemaContainer == null) {
-                                    exportLog.error("XXX No schema for committedSeqNo " + cont.m_commitSeqNo);
                                     pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo));
                                     return;
                                 } else {
