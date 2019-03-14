@@ -1010,7 +1010,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             pollTask.setFuture(cont);
                             if (m_pollTask != null) {
                                 if (exportLog.isDebugEnabled()) {
-                                    exportLog.error("Pick up work from pending container, set poll future to null");
+                                    exportLog.debug("Pick up work from pending container, set poll future to null");
                                 }
                                 m_pollTask = null;
                             }
