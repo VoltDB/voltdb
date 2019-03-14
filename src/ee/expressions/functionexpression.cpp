@@ -98,7 +98,20 @@ public:
         : AbstractExpression(EXPRESSION_TYPE_FUNCTION) {
     };
 
-    NValue eval(const TableTuple *, const TableTuple *) const {
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        // special handler for MIGRATING() function
+        if (F == FUNC_VOLT_MIGRATING) {
+            // For MIGRATING(), check if we are evaluating on a migrating table(the table with a migrate target).
+            if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
+                // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
+                // and transaction id for migrating is always the last one.
+                return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
+                        tuple1->getSchema()->hiddenColumnCount() - 1).callUnary<FUNC_VOLT_MIGRATING>();
+            } else {
+                throw SQLException(SQLException::dynamic_sql_error,
+                                   "Can not apply MIGRATING function on non-migrating tables.");
+            }
+        }
         return NValue::callConstant<F>();
     }
 
@@ -266,6 +279,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_MAX_VALID_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_VOLT_MAX_VALID_TIMESTAMP>();
+            break;
+        case FUNC_VOLT_MIGRATING:
+            ret = new ConstantFunctionExpression<FUNC_VOLT_MIGRATING>();
             break;
         default:
             return NULL;

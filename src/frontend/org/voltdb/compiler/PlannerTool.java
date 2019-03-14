@@ -372,6 +372,7 @@ public class PlannerTool {
                 // Again, plans with inferred partitioning are the only ones supported in the cache.
                 m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
             }
+
             return ahps;
         }
         finally {
