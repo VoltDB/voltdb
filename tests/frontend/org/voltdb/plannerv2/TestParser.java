@@ -15,10 +15,10 @@ public class TestParser extends Plannerv2TestCase {
     }
 
     public void testQuotedCasing() {
-        // by default quoted identifier's casing is UNCHANGED
+        // by default convert quoted identifier to upper case
         m_tester.sql("select \"i\" from R2").pass();
         assertEquals(m_tester.m_parsedNode.toString(),
-                "SELECT `i`\n"
+                "SELECT `I`\n"
                 + "FROM `R2`");
         m_tester.sql("select \"I\" from R2").pass();
         assertEquals(m_tester.m_parsedNode.toString(),
