@@ -1141,15 +1141,19 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeDeleteMigratedRows
  *
- * @param pointer Pointer to an engine instance
+ * @param txnId The transactionId of the currently executing stored procedure
+ * @param spHandle The spHandle of the currently executing stored procedure
+ * @param uniqueId The uniqueId of the currently executing stored procedure
  * @param mTableName The name of the table that the deletes should be applied to.
  * @param deletableTxnId The transactionId of the last row that can be deleted
  * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+ * @param undoToken The token marking the rollback point for this transaction
  * @return true if every row up to and including deletableTxnId have been deleted.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
         JNIEnv *env, jobject obj, jlong engine_ptr,
-        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount)
+        jlong txnId, jlong spHandle, jlong uniqueId,
+        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount, jlong undoToken)
 {
     VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1160,9 +1164,13 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeD
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->deleteMigratedRows(tableNameStr,
-                                        static_cast<int64_t>(deletableTxnId),
-                                        static_cast<int32_t>(maxRowCount));
+            return engine->deleteMigratedRows(static_cast<int64_t>(txnId),
+                                              static_cast<int64_t>(spHandle),
+                                              static_cast<int64_t>(uniqueId),
+                                              tableNameStr,
+                                              static_cast<int64_t>(deletableTxnId),
+                                              static_cast<int32_t>(maxRowCount),
+                                              static_cast<int32_t>(undoToken));
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }

@@ -570,7 +570,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public boolean deleteMigratedRows(String tableName,
+    public boolean deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
                                       long deletableTxnId,
                                       int maxRowCount)
     {

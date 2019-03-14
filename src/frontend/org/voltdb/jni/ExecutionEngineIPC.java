@@ -1586,12 +1586,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean deleteMigratedRows(String tableName,
-            long deletableTxnId, int maxRowCount) {
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
         try {
             m_data.clear();
             m_data.putInt(Commands.DeleteMigratedRows.m_id);
+            m_data.putLong(txnid);
+            m_data.putLong(spHandle);
+            m_data.putLong(uniqueId);
             m_data.putLong(deletableTxnId);
+            m_data.putLong(undoToken);
             m_data.putInt(maxRowCount);
             m_data.putInt(tableName.getBytes("UTF-8").length);
             m_data.put(tableName.getBytes("UTF-8"));

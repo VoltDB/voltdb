@@ -800,8 +800,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Delete of migrated rows in the execution engine.
      */
-    public abstract boolean deleteMigratedRows(String tableName,
-            long deletableTxnId, int maxRowCount);
+    public abstract boolean deleteMigratedRows(
+            long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken);
 
     /**
      * Get the seqNo and offset for an export table.
@@ -1162,13 +1163,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Complete the deletion of the Migrated Table rows.
      * @param pointer Pointer to an engine instance
+     * @param txnId The transactionId of the currently executing stored procedure
+     * @param spHandle The spHandle of the currently executing stored procedure
+     * @param uniqueId The uniqueId of the currently executing stored procedure
      * @param mTableName The name of the table that the deletes should be applied to.
      * @param deletableTxnId The transactionId of the last row that can be deleted
      * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+     * @param undoToken The token marking the rollback point for this transaction
      * @return true if every row up to and including deletableTxnId have been deleted.
      */
-    protected native boolean nativeDeleteMigratedRows(long pointer, byte mTableName[],
-            long deletableTxnId, int maxRowCount);
+    protected native boolean nativeDeleteMigratedRows(long pointer,
+            long txnid, long spHandle, long uniqueId,
+            byte mTableName[], long deletableTxnId, int maxRowCount, long undoToken);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 

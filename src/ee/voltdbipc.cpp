@@ -364,7 +364,11 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
+    int64_t txnId;
+    int64_t spHandle;
+    int64_t uniqueId;
     int64_t deletableTxnId;
+    int64_t undoToken;
     int32_t maxRowCount;
     int32_t tableNameLength;
     char tableName[0];
@@ -1526,9 +1530,13 @@ void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
     m_engine->resetReusedResultOutputBuffer();
     int32_t tableNameLength = ntohl(migrate_msg->tableNameLength);
     std::string tableName(migrate_msg->tableName, tableNameLength);
-    bool result = m_engine->deleteMigratedRows(tableName,
+    bool result = m_engine->deleteMigratedRows(static_cast<int64_t>(ntohll(migrate_msg->txnId)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->spHandle)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->uniqueId)),
+                                               tableName,
                                                static_cast<int64_t>(ntohll(migrate_msg->deletableTxnId)),
-                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)));
+                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->undoToken)));
     char response[1];
     response[0] = result ? 1 : 0;
     writeOrDie(m_fd, (unsigned char*)response, sizeof(int8_t));
