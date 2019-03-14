@@ -820,6 +820,302 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(isColumnNullable("T54", "C2"));
     }
 
+    @Test
+    public void testAlterStreamDropColumn() throws Exception
+    {
+        // Tests of T25R, the "replicated" (non-partitioned) stream
+        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertColumnDoesNotExist("T25R", "D1");
+        assertColumnDoesNotExist("T25R", "D6");
+        assertColumnDoesNotExist("T25R", "D7");
+        assertColumnDoesNotExist("T25R", "D14");
+
+        // Tests of T25P, the partitioned stream (identical to the above tests for T25R)
+        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertColumnDoesNotExist("T25P", "D1");
+        assertColumnDoesNotExist("T25P", "D6");
+        assertColumnDoesNotExist("T25P", "D7");
+        assertColumnDoesNotExist("T25P", "D14");
+    }
+
+    @Test
+    public void testAlterStreamAddColumn() throws Exception
+    {
+        // Tests of T25R, the "replicated" (non-partitioned) stream
+        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertColumnExists("T25R", "A1");
+        assertColumnExists("T25R", "A2");
+        assertColumnExists("T25R", "A3");
+        assertColumnExists("T25R", "A4");
+        assertColumnExists("T25R", "A5");
+        assertColumnExists("T25R", "A6");
+        assertColumnExists("T25R", "A7");
+        assertColumnExists("T25R", "A8");
+        assertColumnExists("T25R", "A9");
+
+        assertColumnTypeEquals("T25R", "A1", "VARCHAR");
+        assertColumnTypeEquals("T25R", "A2", "INTEGER");
+        assertColumnTypeEquals("T25R", "A3", "VARCHAR");
+        assertColumnTypeEquals("T25R", "A4", "INTEGER");
+        assertColumnTypeEquals("T25R", "A5", "INTEGER");
+        assertColumnTypeEquals("T25R", "A6", "VARCHAR");
+        assertColumnTypeEquals("T25R", "A7", "INTEGER");
+        assertColumnTypeEquals("T25R", "A8", "VARCHAR");
+        assertColumnTypeEquals("T25R", "A9", "INTEGER");
+
+        assertColumnSizeEquals("T25R", "A1", 16);
+        assertColumnSizeEquals("T25R", "A2", 31);
+        assertColumnSizeEquals("T25R", "A3", 15);
+        assertColumnSizeEquals("T25R", "A4", 31);
+        assertColumnSizeEquals("T25R", "A5", 31);
+        assertColumnSizeEquals("T25R", "A6", 63);
+        assertColumnSizeEquals("T25R", "A7", 31);
+        assertColumnSizeEquals("T25R", "A8", 2048);
+        assertColumnSizeEquals("T25R", "A9", 31);
+
+        assertColumnIsNullable   ("T25R", "A1");
+        assertColumnIsNotNullable("T25R", "A2");
+        assertColumnIsNullable   ("T25R", "A3");
+        assertColumnIsNotNullable("T25R", "A4");
+        assertColumnIsNullable   ("T25R", "A5");
+        assertColumnIsNotNullable("T25R", "A6");
+        assertColumnIsNullable   ("T25R", "A7");
+        assertColumnIsNotNullable("T25R", "A8");
+        assertColumnIsNotNullable("T25R", "A9");
+
+        assertColumnDefaultValueEquals("T25R", "A1", null);
+        assertColumnDefaultValueEquals("T25R", "A2", null);
+        assertColumnDefaultValueEquals("T25R", "A3", "'def'");
+        assertColumnDefaultValueEquals("T25R", "A4", "-2");
+        assertColumnDefaultValueEquals("T25R", "A5", null);
+        assertColumnDefaultValueEquals("T25R", "A6", null);
+        assertColumnDefaultValueEquals("T25R", "A7", "-3");
+        assertColumnDefaultValueEquals("T25R", "A8", "'ghi'");
+        assertColumnDefaultValueEquals("T25R", "A9", "-4");
+
+        assertColumnOrdinalPositionEquals("T25R", "A1", 14);
+        assertColumnOrdinalPositionEquals("T25R", "A2", 15);
+        assertColumnOrdinalPositionEquals("T25R", "A3", 16);
+        assertColumnOrdinalPositionEquals("T25R", "A4", 19);
+        assertColumnOrdinalPositionEquals("T25R", "A5", 2);
+        assertColumnOrdinalPositionEquals("T25R", "A6", 12);
+        assertColumnOrdinalPositionEquals("T25R", "A7", 1);
+        assertColumnOrdinalPositionEquals("T25R", "A8", 18);
+        assertColumnOrdinalPositionEquals("T25R", "A9", 17);
+
+        assertColumnOrdinalPositionEquals("T25R", "C2", 3);
+        assertColumnOrdinalPositionEquals("T25R", "C3", 4);
+        assertColumnOrdinalPositionEquals("T25R", "C4", 5);
+        assertColumnOrdinalPositionEquals("T25R", "C5", 6);
+        assertColumnOrdinalPositionEquals("T25R", "C8", 7);
+        assertColumnOrdinalPositionEquals("T25R", "C9", 8);
+        assertColumnOrdinalPositionEquals("T25R", "C10", 9);
+        assertColumnOrdinalPositionEquals("T25R", "C11", 10);
+        assertColumnOrdinalPositionEquals("T25R", "C12", 11);
+        assertColumnOrdinalPositionEquals("T25R", "C13", 13);
+
+        // Tests of T25P, the partitioned stream
+        // (identical to the above tests for T25R - mostly)
+        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertColumnExists("T25P", "A1");
+        assertColumnExists("T25P", "A2");
+        assertColumnExists("T25P", "A3");
+        assertColumnExists("T25P", "A4");
+        assertColumnExists("T25P", "A5");
+        assertColumnExists("T25P", "A6");
+        assertColumnExists("T25P", "A7");
+        assertColumnExists("T25P", "A8");
+        assertColumnExists("T25P", "A9");
+
+        assertColumnTypeEquals("T25P", "A1", "VARCHAR");
+        assertColumnTypeEquals("T25P", "A2", "INTEGER");
+        assertColumnTypeEquals("T25P", "A3", "VARCHAR");
+        assertColumnTypeEquals("T25P", "A4", "INTEGER");
+        assertColumnTypeEquals("T25P", "A5", "INTEGER");
+        assertColumnTypeEquals("T25P", "A6", "VARCHAR");
+        assertColumnTypeEquals("T25P", "A7", "INTEGER");
+        assertColumnTypeEquals("T25P", "A8", "VARCHAR");
+        assertColumnTypeEquals("T25P", "A9", "INTEGER");
+
+        assertColumnSizeEquals("T25P", "A1", 16);
+        assertColumnSizeEquals("T25P", "A2", 31);
+        assertColumnSizeEquals("T25P", "A3", 15);
+        assertColumnSizeEquals("T25P", "A4", 31);
+        assertColumnSizeEquals("T25P", "A5", 31);
+        assertColumnSizeEquals("T25P", "A6", 63);
+        assertColumnSizeEquals("T25P", "A7", 31);
+        assertColumnSizeEquals("T25P", "A8", 2048);
+        assertColumnSizeEquals("T25P", "A9", 31);
+
+        assertColumnIsNullable   ("T25P", "A1");
+        assertColumnIsNotNullable("T25P", "A2");
+        assertColumnIsNullable   ("T25P", "A3");
+        assertColumnIsNotNullable("T25P", "A4");
+        assertColumnIsNullable   ("T25P", "A5");
+        assertColumnIsNotNullable("T25P", "A6");
+        assertColumnIsNullable   ("T25P", "A7");
+        assertColumnIsNotNullable("T25P", "A8");
+        assertColumnIsNotNullable("T25P", "A9");
+
+        assertColumnDefaultValueEquals("T25P", "A1", null);
+        assertColumnDefaultValueEquals("T25P", "A2", null);
+        assertColumnDefaultValueEquals("T25P", "A3", "'def'");
+        assertColumnDefaultValueEquals("T25P", "A4", "-2");
+        assertColumnDefaultValueEquals("T25P", "A5", null);
+        assertColumnDefaultValueEquals("T25P", "A6", null);
+        assertColumnDefaultValueEquals("T25P", "A7", "-3");
+        assertColumnDefaultValueEquals("T25P", "A8", "'ghi'");
+        assertColumnDefaultValueEquals("T25P", "A9", "-4");
+
+        // The remaining tests are not quite identical to the above tests of T25R,
+        // because T25P includes the partitioning column P0, which T25R does not
+        assertColumnOrdinalPositionEquals("T25P", "A1", 15);
+        assertColumnOrdinalPositionEquals("T25P", "A2", 16);
+        assertColumnOrdinalPositionEquals("T25P", "A3", 17);
+        assertColumnOrdinalPositionEquals("T25P", "A4", 20);
+        assertColumnOrdinalPositionEquals("T25P", "A5", 2);
+        assertColumnOrdinalPositionEquals("T25P", "A6", 13);
+        assertColumnOrdinalPositionEquals("T25P", "A7", 1);
+        assertColumnOrdinalPositionEquals("T25P", "A8", 19);
+        assertColumnOrdinalPositionEquals("T25P", "A9", 18);
+
+        assertColumnOrdinalPositionEquals("T25P", "C2", 3);
+        assertColumnOrdinalPositionEquals("T25P", "C3", 5);
+        assertColumnOrdinalPositionEquals("T25P", "C4", 6);
+        assertColumnOrdinalPositionEquals("T25P", "C5", 7);
+        assertColumnOrdinalPositionEquals("T25P", "C8", 8);
+        assertColumnOrdinalPositionEquals("T25P", "C9", 9);
+        assertColumnOrdinalPositionEquals("T25P", "C10", 10);
+        assertColumnOrdinalPositionEquals("T25P", "C11", 11);
+        assertColumnOrdinalPositionEquals("T25P", "C12", 12);
+        assertColumnOrdinalPositionEquals("T25P", "C13", 14);
+    }
+
+    @Test
+    public void testAlterStreamAlterColumn() throws Exception
+    {
+        // Tests of T25R, the "replicated" (non-partitioned) stream
+        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertColumnExists("T25R", "C2");
+        assertColumnExists("T25R", "C3");
+        assertColumnExists("T25R", "C4");
+        assertColumnExists("T25R", "C5");
+        assertColumnExists("T25R", "C8");
+        assertColumnExists("T25R", "C9");
+        assertColumnExists("T25R", "C10");
+        assertColumnExists("T25R", "C11");
+        assertColumnExists("T25R", "C12");
+        assertColumnExists("T25R", "C13");
+
+        assertColumnTypeEquals("T25R", "C2", "VARCHAR");
+        assertColumnTypeEquals("T25R", "C3", "INTEGER");
+        assertColumnTypeEquals("T25R", "C4", "VARCHAR");
+        assertColumnTypeEquals("T25R", "C5", "INTEGER");
+        assertColumnTypeEquals("T25R", "C8", "VARCHAR");
+        assertColumnTypeEquals("T25R", "C9", "INTEGER");
+        assertColumnTypeEquals("T25R", "C10", "VARCHAR");
+        assertColumnTypeEquals("T25R", "C11", "INTEGER");
+        assertColumnTypeEquals("T25R", "C12", "VARCHAR");
+        assertColumnTypeEquals("T25R", "C13", "INTEGER");
+
+        assertColumnSizeEquals("T25R", "C2", 15);
+        assertColumnSizeEquals("T25R", "C3", 31);
+        assertColumnSizeEquals("T25R", "C4", 16);
+        assertColumnSizeEquals("T25R", "C5", 31);
+        assertColumnSizeEquals("T25R", "C8", 2048);
+        assertColumnSizeEquals("T25R", "C9", 31);
+        assertColumnSizeEquals("T25R", "C10", 2048);
+        assertColumnSizeEquals("T25R", "C11", 31);
+        assertColumnSizeEquals("T25R", "C12", 16);
+        assertColumnSizeEquals("T25R", "C13", 31);
+
+        assertColumnIsNullable   ("T25R", "C2");
+        assertColumnIsNotNullable("T25R", "C3");
+        assertColumnIsNullable   ("T25R", "C4");
+        assertColumnIsNotNullable("T25R", "C5");
+        assertColumnIsNotNullable("T25R", "C8");
+        assertColumnIsNullable   ("T25R", "C9");
+        assertColumnIsNullable   ("T25R", "C10");
+        assertColumnIsNotNullable("T25R", "C11");
+        assertColumnIsNullable   ("T25R", "C12");
+        assertColumnIsNotNullable("T25R", "C13");
+
+        assertColumnDefaultValueEquals("T25R", "C2", null);
+        assertColumnDefaultValueEquals("T25R", "C3", null);
+        assertColumnDefaultValueEquals("T25R", "C4", "'jkl'");
+        assertColumnDefaultValueEquals("T25R", "C5", "-5");
+        assertColumnDefaultValueEquals("T25R", "C8", null);
+        assertColumnDefaultValueEquals("T25R", "C9", null);
+        assertColumnDefaultValueEquals("T25R", "C10", "'mno'");
+        assertColumnDefaultValueEquals("T25R", "C11", "-1");
+        assertColumnDefaultValueEquals("T25R", "C12", "'abc'");
+        assertColumnDefaultValueEquals("T25R", "C13", "-6");
+
+        // Tests of T25P, the partitioned stream (identical to the tests above for T25R)
+        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertColumnExists("T25P", "C2");
+        assertColumnExists("T25P", "C3");
+        assertColumnExists("T25P", "C4");
+        assertColumnExists("T25P", "C5");
+        assertColumnExists("T25P", "C8");
+        assertColumnExists("T25P", "C9");
+        assertColumnExists("T25P", "C10");
+        assertColumnExists("T25P", "C11");
+        assertColumnExists("T25P", "C12");
+        assertColumnExists("T25P", "C13");
+
+        assertColumnTypeEquals("T25P", "C2", "VARCHAR");
+        assertColumnTypeEquals("T25P", "C3", "INTEGER");
+        assertColumnTypeEquals("T25P", "C4", "VARCHAR");
+        assertColumnTypeEquals("T25P", "C5", "INTEGER");
+        assertColumnTypeEquals("T25P", "C8", "VARCHAR");
+        assertColumnTypeEquals("T25P", "C9", "INTEGER");
+        assertColumnTypeEquals("T25P", "C10", "VARCHAR");
+        assertColumnTypeEquals("T25P", "C11", "INTEGER");
+        assertColumnTypeEquals("T25P", "C12", "VARCHAR");
+        assertColumnTypeEquals("T25P", "C13", "INTEGER");
+
+        assertColumnSizeEquals("T25P", "C2", 15);
+        assertColumnSizeEquals("T25P", "C3", 31);
+        assertColumnSizeEquals("T25P", "C4", 16);
+        assertColumnSizeEquals("T25P", "C5", 31);
+        assertColumnSizeEquals("T25P", "C8", 2048);
+        assertColumnSizeEquals("T25P", "C9", 31);
+        assertColumnSizeEquals("T25P", "C10", 2048);
+        assertColumnSizeEquals("T25P", "C11", 31);
+        assertColumnSizeEquals("T25P", "C12", 16);
+        assertColumnSizeEquals("T25P", "C13", 31);
+
+        assertColumnIsNullable   ("T25P", "C2");
+        assertColumnIsNotNullable("T25P", "C3");
+        assertColumnIsNullable   ("T25P", "C4");
+        assertColumnIsNotNullable("T25P", "C5");
+        assertColumnIsNotNullable("T25P", "C8");
+        assertColumnIsNullable   ("T25P", "C9");
+        assertColumnIsNullable   ("T25P", "C10");
+        assertColumnIsNotNullable("T25P", "C11");
+        assertColumnIsNullable   ("T25P", "C12");
+        assertColumnIsNotNullable("T25P", "C13");
+
+        assertColumnDefaultValueEquals("T25P", "C2", null);
+        assertColumnDefaultValueEquals("T25P", "C3", null);
+        assertColumnDefaultValueEquals("T25P", "C4", "'jkl'");
+        assertColumnDefaultValueEquals("T25P", "C5", "-5");
+        assertColumnDefaultValueEquals("T25P", "C8", null);
+        assertColumnDefaultValueEquals("T25P", "C9", null);
+        assertColumnDefaultValueEquals("T25P", "C10", "'mno'");
+        assertColumnDefaultValueEquals("T25P", "C11", "-1");
+        assertColumnDefaultValueEquals("T25P", "C12", "'abc'");
+        assertColumnDefaultValueEquals("T25P", "C13", "-6");
+
+        // Additional tests of T25P's partitioned column, P0
+        assertColumnDoesNotExist      ("T25R", "P0");
+        assertColumnExists            ("T25P", "P0" );
+        assertColumnTypeEquals        ("T25P", "P0", "INTEGER");
+        assertColumnSizeEquals        ("T25P", "P0", 31);
+        assertColumnIsNotNullable     ("T25P", "P0");
+        assertColumnDefaultValueEquals("T25P", "P0", "-7");
+    }
 
     @Test
     public void testTableDR() throws Exception
