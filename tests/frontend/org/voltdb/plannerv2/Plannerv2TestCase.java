@@ -26,7 +26,11 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
-import org.apache.calcite.rel.*;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -34,7 +38,6 @@ import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.PlannerTestCase;
-import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
@@ -153,6 +156,17 @@ public class Plannerv2TestCase extends PlannerTestCase {
             try {
                 m_parsedNode = m_planner.parse(m_sap.sql);
                 m_validatedNode = m_planner.validate(m_parsedNode);
+            } catch (Exception ex) {
+                checkEx(ex);
+            }
+        }
+    }
+
+    public class SqlParserTester extends Tester {
+        @Override public void pass() throws AssertionError {
+            super.pass();
+            try {
+                m_parsedNode = m_planner.parse(m_sap.sql);
             } catch (Exception ex) {
                 checkEx(ex);
             }
