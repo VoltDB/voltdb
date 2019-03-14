@@ -1170,7 +1170,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeD
                                               tableNameStr,
                                               static_cast<int64_t>(deletableTxnId),
                                               static_cast<int32_t>(maxRowCount),
-                                              static_cast<int32_t>(undoToken));
+                                              static_cast<int64_t>(undoToken));
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
