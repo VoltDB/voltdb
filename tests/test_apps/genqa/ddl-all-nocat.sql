@@ -406,6 +406,18 @@ CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET a
 );
 
 
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM EXPORT_PARTITIONED_TABLE
+ GROUP BY rowid;
+
+
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
 CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
