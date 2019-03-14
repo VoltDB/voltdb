@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.stream.Stream;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
@@ -41,6 +42,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadParamTypesForTimestamp;
 import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
+
 
 /**
  * Tests for SQL that was recently (early 2012) unsupported.
@@ -115,6 +117,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  DEC DECIMAL, \n" +
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
+
+                "create table M1(" +
+                "a int not null, " +
+                "b int not null) " +
+                "USING TTL 10 minutes ON COLUMN a MIGRATE TO TARGET archiver;" +
+
+                "create table M2(" +
+                "a int not null, " +
+                "b int not null) " +
+                "USING TTL 10 minutes ON COLUMN a MIGRATE TO TARGET archiver;" +
+                "PARTITION TABLE M2 ON COLUMN a;\n" +
 
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
@@ -3384,4 +3397,67 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testMigrating() throws IOException, ProcCallException {
+        Client client = getClient();
+        // insert some data into the migrating table.
+        // m1 is replicated and m2 is partitioned.
+        Stream.of("insert into m1 values(1, 11);",
+                "insert into m1 values(2, 22);",
+                "insert into m1 values(3, 33);",
+                "insert into m1 values(4, 44);",
+                "insert into m2 values(1, 10);",
+                "insert into m2 values(2, 20);",
+                "insert into m2 values(3, 30);",
+                "insert into m2 values(4, 40);")
+                .forEachOrdered(stmt -> {
+                    try {
+                        final ClientResponse cr = client.callProcedure("@AdHoc", stmt);
+                        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                    } catch (IOException | ProcCallException e) {
+                        fail("Query \"" + stmt + "\" should have worked fine");
+                    }
+                });
+
+        ClientResponse cr;
+        // select migrating rows
+        cr = client.callProcedure("@AdHoc", "select * from m1 where migrating() order by a, b;");
+        assertContentOfTable(new Object[][]{}, cr.getResults()[0]);
+
+        cr = client.callProcedure("@AdHoc", "select * from m2 where migrating() order by a, b;");
+        assertContentOfTable(new Object[][]{}, cr.getResults()[0]);
+
+        // select !migrating rows
+        cr = client.callProcedure("@AdHoc", "select * from m1 where NOT migrating order by a, b;");
+        assertContentOfTable(new Object[][]{{1, 11}, {2, 22}, {3, 33}, {4, 44}}, cr.getResults()[0]);
+
+        cr = client.callProcedure("@AdHoc", "select * from m2 where NOT migrating order by a, b;");
+        assertContentOfTable(new Object[][]{{1, 10}, {2, 20}, {3, 30}, {4, 40}}, cr.getResults()[0]);
+
+        cr = client.callProcedure("@AdHoc", "select * from m1 where NOT migrating() and a >= 3 order by a, b;");
+        assertContentOfTable(new Object[][]{{3, 33}, {4, 44}}, cr.getResults()[0]);
+
+        cr = client.callProcedure("@AdHoc", "select * from m2 where NOT migrating and a >= 3 order by a, b;");
+        assertContentOfTable(new Object[][]{{3, 30}, {4, 40}}, cr.getResults()[0]);
+
+        // migrate() in subquery select
+        cr = client.callProcedure("@AdHoc", "select t1.a from (select * from m2 where not migrating and b < 30) as t1 order by t1.a");
+        assertContentOfTable(new Object[][]{{1}, {2}}, cr.getResults()[0]);
+
+        // we do not support migrating() in SELECT clause
+        verifyProcFails(client, "A SELECT clause does not allow a BOOLEAN expression.\\s*", "@AdHoc",
+                "select migrating() from m1;");
+
+        // we do not support migrating() with joins
+        verifyProcFails(client, "Join with filters that do not depend on joined tables is not supported in VoltDB\\s*",
+                "@AdHoc",
+                "select * from m2, p1 where migrating;");
+
+        // we do not support migrating() with subquery joins
+        verifyProcFails(client, "Join with filters that do not depend on joined tables is not supported in VoltDB\\s*", "@AdHoc",
+                "select t1.a from "
+                        + "  (select * from m1 where not migrating and b < 30) as t1 "
+                        + "  inner join "
+                        + "  (select * from m2 where a > 0) as t2 "
+                        + "on t1.a = t2.a ");
+    }
 }
