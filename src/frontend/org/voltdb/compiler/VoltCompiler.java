@@ -1391,6 +1391,11 @@ public class VoltCompiler {
                     }
                 }
             }
+            // This is used to enforce default connectors assigned to streams through the Java Property
+            // for streams that don't have the Export To Target clause
+            if (TableType.isStreamViewOnly(tableref.getTabletype())) {
+                tableref.setTabletype(TableType.STREAM.get());
+            }
         }
         if (tableref.getMaterializer() != null)
         {
