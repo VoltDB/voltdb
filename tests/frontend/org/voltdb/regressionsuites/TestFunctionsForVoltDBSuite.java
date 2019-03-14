@@ -3439,6 +3439,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "select * from m2 where NOT migrating and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{3, 30}, {4, 40}}, cr.getResults()[0]);
 
+        // migrating with aggregate functions.
+        cr = client.callProcedure("@AdHoc", "select count(*) from m1 where NOT migrating and a >= 3 order by a, b;");
+        assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from m2 where NOT migrating and a >= 3 order by a, b;");
+        assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
+
         // migrate() in subquery select
         cr = client.callProcedure("@AdHoc", "select t1.a from (select * from m2 where not migrating and b < 30) as t1 order by t1.a");
         assertContentOfTable(new Object[][]{{1}, {2}}, cr.getResults()[0]);
