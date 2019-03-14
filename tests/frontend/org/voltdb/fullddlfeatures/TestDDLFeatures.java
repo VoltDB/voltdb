@@ -456,15 +456,17 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testDropStream() throws Exception
     {
-        assertFalse("Stream T25D should NOT exist; it was DROP-ed", findTableInSystemCatalogResults("T25D"));
+        assertFalse("Stream T25D1 should NOT exist; it was DROP-ed", findTableInSystemCatalogResults("T25D1"));
+        assertFalse("Stream T25D2 should NOT exist; it was DROP-ed", findTableInSystemCatalogResults("T25D2"));
     }
 
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
-        assertEquals("Stream T25P has wrong type", getTableType("T25P"), "EXPORT");
-        assertEquals("Stream View VT25P has wrong type", getTableType("VT25P"), "VIEW");
+        assertTrue  ("Stream T25 should exist",         findTableInSystemCatalogResults("T25"));
+        assertEquals("Stream T25 has wrong type",       "EXPORT", getTableType("T25"));
+        assertTrue  ("Stream View VT25 should exist",   findTableInSystemCatalogResults("VT25"));
+        assertEquals("Stream View VT25 has wrong type", "VIEW", getTableType("VT25"));
     }
 
 //    @Test
@@ -832,6 +834,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     {
         // Tests of T25R, the "replicated" (non-partitioned) stream
         assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertEquals("Stream T25R has wrong type", "EXPORT", getTableType("T25R"));
         assertColumnDoesNotExist("T25R", "D1");
         assertColumnDoesNotExist("T25R", "D6");
         assertColumnDoesNotExist("T25R", "D7");
@@ -839,6 +842,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         // Tests of T25P, the partitioned stream (identical to the above tests for T25R)
         assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertEquals("Stream T25P has wrong type", "EXPORT", getTableType("T25P"));
         assertColumnDoesNotExist("T25P", "D1");
         assertColumnDoesNotExist("T25P", "D6");
         assertColumnDoesNotExist("T25P", "D7");
@@ -1115,7 +1119,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertColumnDefaultValueEquals("T25P", "C12", "'abc'");
         assertColumnDefaultValueEquals("T25P", "C13", "-6");
 
-        // Additional tests of T25P's partitioned column, P0
+        // Additional tests of T25P's partitioned column, P0,
+        // which T25R does not have
         assertColumnDoesNotExist      ("T25R", "P0");
         assertColumnExists            ("T25P", "P0" );
         assertColumnTypeEquals        ("T25P", "P0", "INTEGER");
