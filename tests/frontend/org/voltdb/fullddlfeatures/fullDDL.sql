@@ -460,36 +460,23 @@ AS
           ,  T24.C2
 ;
 
--- STREAM TABLE
--- basic
 
+-- CREATE STREAM testing: note that the VoltDB Community Edition only supports
+-- 3 streams per database, so you cannot add more than the 3 below (unless they
+-- are DROP-ed, like T25D below)
+
+-- The most basic possible Stream
 CREATE STREAM T25
 (
     id INTEGER NOT NULL
 );
 
-CREATE STREAM T25S EXPORT TO TARGET imagine
+-- DROP STREAM testing
+CREATE STREAM T25D
 (
     id INTEGER NOT NULL
 );
-
--- CREATE STREAM
-CREATE STREAM T25N PARTITION ON COLUMN id EXPORT TO TARGET imagine
-(
-    id INTEGER NOT NULL
-);
--- CREATE VIEW on STREAM
-CREATE VIEW VT25N
-(
-    id
-,   TOTAL
-)
-AS
-    SELECT id
-        ,  COUNT(*)
-    FROM T25N
-    GROUP BY id
-;
+DROP STREAM T25D;
 
 -- ALTER STREAM testing, with a "replicated" (non-partitioned) stream:
 CREATE STREAM T25R EXPORT TO TARGET imagine
@@ -541,10 +528,29 @@ ALTER STREAM T25R ALTER COLUMN C11 SET NOT NULL;
 ALTER STREAM T25R ALTER COLUMN C12 SET     NULL;
 ALTER STREAM T25R ALTER COLUMN C13 SET DEFAULT -6;
 
+-- Redundant ALTER STREAM commands: should change nothing
+ALTER STREAM T25R ALTER C2 VARCHAR(15);
+ALTER STREAM T25R ALTER C5 INTEGER     DEFAULT -5 NOT NULL;
+ALTER STREAM T25R ALTER        C8  SET NOT NULL;
+ALTER STREAM T25R ALTER        C9  SET     NULL;
+ALTER STREAM T25R ALTER COLUMN C13 SET DEFAULT -6;
+
+-- CREATE VIEW on STREAM
+CREATE VIEW VT25R
+(
+    id
+,   TOTAL
+)
+AS
+    SELECT C2
+        ,  COUNT(*)
+    FROM T25R
+    GROUP BY C2
+;
 
 -- ALTER STREAM testing, with a partitioned stream:
 -- identical to the "replicated" tests above, except for the addition of
--- the P0 column (which must always be NOT NULL), and a few tests on it
+-- the P0 column (which must always be NOT NULL), and a few tests of it
 CREATE STREAM T25P PARTITION ON COLUMN P0 EXPORT TO TARGET imagine
 (
     D1  INTEGER                   NOT NULL
@@ -597,10 +603,13 @@ ALTER STREAM T25P ALTER COLUMN C12 SET     NULL;
 ALTER STREAM T25P ALTER COLUMN C13 SET DEFAULT -6;
 ALTER STREAM T25P ALTER COLUMN P0  SET DEFAULT -7;
 
--- TODO: Redundant ALTER STREAM commands (should change nothing) ???
-
--- TODO: test DROP STREAM ???
-
+-- Redundant ALTER STREAM commands: should change nothing
+ALTER STREAM T25P ALTER C2 VARCHAR(15);
+ALTER STREAM T25P ALTER C5 INTEGER     DEFAULT -5 NOT NULL;
+ALTER STREAM T25P ALTER        C8  SET NOT NULL;
+ALTER STREAM T25P ALTER        C9  SET     NULL;
+ALTER STREAM T25P ALTER COLUMN C13 SET DEFAULT -6;
+ALTER STREAM T25P ALTER COLUMN P0  SET DEFAULT -7;
 
 
 -- IMPORT CLASS

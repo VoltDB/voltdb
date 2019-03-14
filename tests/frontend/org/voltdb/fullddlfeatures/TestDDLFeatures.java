@@ -443,21 +443,28 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     }
 
     @Test
-    public void testExportTable() throws Exception
+    public void testCreateStream() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25"));
+        assertTrue("Stream T25 should exist", findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
-        //Export table created with STREAM syntax
-        assertTrue(findTableInSystemCatalogResults("T25S"));
-        assertEquals(getTableType("T25S"), "EXPORT");
+        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertEquals(getTableType("T25R"), "EXPORT");
+        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertEquals(getTableType("T25P"), "EXPORT");
+    }
+
+    @Test
+    public void testDropStream() throws Exception
+    {
+        assertFalse("Stream T25D should NOT exist; it was DROP-ed", findTableInSystemCatalogResults("T25D"));
     }
 
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25N"));
-        assertEquals(getTableType("T25N"), "EXPORT");
-        assertEquals(getTableType("VT25N"), "VIEW");
+        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertEquals(getTableType("T25R"), "EXPORT");
+        assertEquals(getTableType("VT25R"), "VIEW");
     }
 
 //    @Test
@@ -824,14 +831,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterStreamDropColumn() throws Exception
     {
         // Tests of T25R, the "replicated" (non-partitioned) stream
-        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
         assertColumnDoesNotExist("T25R", "D1");
         assertColumnDoesNotExist("T25R", "D6");
         assertColumnDoesNotExist("T25R", "D7");
         assertColumnDoesNotExist("T25R", "D14");
 
         // Tests of T25P, the partitioned stream (identical to the above tests for T25R)
-        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
         assertColumnDoesNotExist("T25P", "D1");
         assertColumnDoesNotExist("T25P", "D6");
         assertColumnDoesNotExist("T25P", "D7");
@@ -842,7 +849,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterStreamAddColumn() throws Exception
     {
         // Tests of T25R, the "replicated" (non-partitioned) stream
-        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
         assertColumnExists("T25R", "A1");
         assertColumnExists("T25R", "A2");
         assertColumnExists("T25R", "A3");
@@ -916,7 +923,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         // Tests of T25P, the partitioned stream
         // (identical to the above tests for T25R - mostly)
-        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
         assertColumnExists("T25P", "A1");
         assertColumnExists("T25P", "A2");
         assertColumnExists("T25P", "A3");
@@ -995,7 +1002,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterStreamAlterColumn() throws Exception
     {
         // Tests of T25R, the "replicated" (non-partitioned) stream
-        assertTrue("Table T25R should exist", findTableInSystemCatalogResults("T25R"));
+        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
         assertColumnExists("T25R", "C2");
         assertColumnExists("T25R", "C3");
         assertColumnExists("T25R", "C4");
@@ -1052,7 +1059,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertColumnDefaultValueEquals("T25R", "C13", "-6");
 
         // Tests of T25P, the partitioned stream (identical to the tests above for T25R)
-        assertTrue("Table T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
         assertColumnExists("T25P", "C2");
         assertColumnExists("T25P", "C3");
         assertColumnExists("T25P", "C4");
