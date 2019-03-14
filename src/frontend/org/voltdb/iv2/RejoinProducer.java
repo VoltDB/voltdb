@@ -219,6 +219,8 @@ public class RejoinProducer extends JoinProducerBase {
         if (m_hasPersistentTables) {
             m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
             m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
+            // Start the watchdog so if we never get data it will notice
+            kickWatchdog(true);
         } else {
             m_streamSnapshotMb = null;
             m_rejoinSiteProcessor = null;
