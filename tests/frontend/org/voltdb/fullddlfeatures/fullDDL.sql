@@ -461,22 +461,22 @@ AS
 ;
 
 
--- CREATE STREAM testing: note that the VoltDB Community Edition only supports
--- 3 streams per database, so you cannot add more than the 3 below (unless they
--- are DROP-ed, like T25D below)
-
--- The most basic possible Stream
-CREATE STREAM T25
-(
-    id INTEGER NOT NULL
-);
-
 -- DROP STREAM testing
 CREATE STREAM T25D
 (
     id INTEGER NOT NULL
 );
 DROP STREAM T25D;
+
+-- CREATE STREAM testing: note that the VoltDB Community Edition only supports
+-- 3 streams per database, so you cannot add more than the 3 below (not counting
+-- T25D above, which gets DROP-ed before these are created)
+
+-- The most basic possible Stream
+CREATE STREAM T25
+(
+    id INTEGER NOT NULL
+);
 
 -- ALTER STREAM testing, with a "replicated" (non-partitioned) stream:
 CREATE STREAM T25R EXPORT TO TARGET imagine
@@ -534,19 +534,6 @@ ALTER STREAM T25R ALTER C5 INTEGER     DEFAULT -5 NOT NULL;
 ALTER STREAM T25R ALTER        C8  SET NOT NULL;
 ALTER STREAM T25R ALTER        C9  SET     NULL;
 ALTER STREAM T25R ALTER COLUMN C13 SET DEFAULT -6;
-
--- CREATE VIEW on STREAM
-CREATE VIEW VT25R
-(
-    id
-,   TOTAL
-)
-AS
-    SELECT C2
-        ,  COUNT(*)
-    FROM T25R
-    GROUP BY C2
-;
 
 -- ALTER STREAM testing, with a partitioned stream:
 -- identical to the "replicated" tests above, except for the addition of
@@ -610,6 +597,19 @@ ALTER STREAM T25P ALTER        C8  SET NOT NULL;
 ALTER STREAM T25P ALTER        C9  SET     NULL;
 ALTER STREAM T25P ALTER COLUMN C13 SET DEFAULT -6;
 ALTER STREAM T25P ALTER COLUMN P0  SET DEFAULT -7;
+
+-- CREATE VIEW on STREAM
+CREATE VIEW VT25P
+(
+    id
+,   TOTAL
+)
+AS
+    SELECT C2
+        ,  COUNT(*)
+    FROM T25P
+    GROUP BY C2
+;
 
 
 -- IMPORT CLASS

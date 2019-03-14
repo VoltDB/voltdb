@@ -462,9 +462,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue("Stream T25R should exist", findTableInSystemCatalogResults("T25R"));
-        assertEquals(getTableType("T25R"), "EXPORT");
-        assertEquals(getTableType("VT25R"), "VIEW");
+        assertTrue("Stream T25P should exist", findTableInSystemCatalogResults("T25P"));
+        assertEquals("Stream T25P has wrong type", getTableType("T25P"), "EXPORT");
+        assertEquals("Stream View VT25P has wrong type", getTableType("VT25P"), "VIEW");
     }
 
 //    @Test
