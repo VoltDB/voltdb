@@ -1359,6 +1359,8 @@ if __name__ == "__main__":
                             ['Invalid catalog update', 'another one is in progress'],
                             ['The requested catalog change', 'not supported'],
                             ['failed to create the transaction internally'],
+                            ['ParameterValueExpression', 'cannot be cast', 'TupleValueExpression'],
+                            ['SQL Aggregate function calls with subquery expression arguments are not allowed'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
