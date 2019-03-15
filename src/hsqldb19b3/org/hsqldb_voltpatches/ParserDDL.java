@@ -3563,8 +3563,7 @@ public class ParserDDL extends ParserRoutine {
         indexColumns = getColumnList(set, table);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
-            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), Boolean.valueOf(migrating), indexExprs,
-            Boolean.valueOf(assumeUnique), predicate
+            table, indexColumns, indexHsqlName, unique, migrating, indexExprs, assumeUnique, predicate
         /* disable 4 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();
@@ -5540,9 +5539,12 @@ public class ParserDDL extends ParserRoutine {
     private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc, boolean allowEmpty) {
         readThis(Tokens.OPENBRACKET);
 
-        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+        java.util.List<Expression> indexExprs = new java.util.ArrayList<>();
 
-        while (! allowEmpty) {
+        while (true) {
+            if (allowEmpty && readIfThis(Tokens.CLOSEBRACKET)) {    // empty bracket
+                return indexExprs;
+            }
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 

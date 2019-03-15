@@ -166,7 +166,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
                 catch (Exception ex) {
                     retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage();
-                    ex.printStackTrace();
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null
