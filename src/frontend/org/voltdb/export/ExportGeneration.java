@@ -128,7 +128,7 @@ public class ExportGeneration implements Generation {
     {
         File files[] = exportOverflowDirectory.listFiles();
         if (files != null) {
-            initializeGenerationFromDisk(messenger, processor, files, localPartitionsToSites);
+            initializeGenerationFromDisk(messenger, processor, files, localPartitionsToSites, catalogContext.m_genId);
         }
         initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, messenger, localPartitionsToSites);
 
@@ -136,7 +136,8 @@ public class ExportGeneration implements Generation {
 
     private void initializeGenerationFromDisk(HostMessenger messenger,
             final ExportDataProcessor processor,
-            File[] files, List<Pair<Integer, Integer>> localPartitionsToSites) {
+            File[] files, List<Pair<Integer, Integer>> localPartitionsToSites,
+            long genId) {
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
 
         /*
@@ -159,7 +160,7 @@ public class ExportGeneration implements Generation {
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
-                        addDataSource(ad, localPartitionsToSites, onDiskPartitions, processor);
+                        addDataSource(ad, localPartitionsToSites, onDiskPartitions, processor, genId);
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + ad, true, e);
                     }
@@ -196,7 +197,7 @@ public class ExportGeneration implements Generation {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(table, hostId, localPartitionsToSites, processor);
+                    addDataSources(table, hostId, localPartitionsToSites, processor, catalogContext.m_genId);
                     exportSignatures.add(table.getSignature());
                     createdSources = true;
                 }
@@ -598,8 +599,9 @@ public class ExportGeneration implements Generation {
     private void addDataSource(File adFile,
             List<Pair<Integer, Integer>> localPartitionsToSites,
             List<Integer> adFilePartitions,
-            final ExportDataProcessor processor) throws IOException {
-        ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor);
+            final ExportDataProcessor processor,
+            final long genId) throws IOException {
+        ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         adFilePartitions.add(source.getPartitionId());
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
@@ -622,7 +624,8 @@ public class ExportGeneration implements Generation {
     // silly helper to add datasources for a table catalog object
     private void addDataSources(Table table, int hostId,
             List<Pair<Integer, Integer>> localPartitionsToSites,
-            final ExportDataProcessor processor)
+            final ExportDataProcessor processor,
+            final long genId)
     {
         for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
 
@@ -647,6 +650,7 @@ public class ExportGeneration implements Generation {
                                 table.getTypeName(),
                                 partition,
                                 siteId,
+                                genId,
                                 key,
                                 table.getColumns(),
                                 table.getPartitioncolumn(),
@@ -676,7 +680,8 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void pushExportBuffer(int partitionId, String signature,
-            long startSequenceNumber, int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
+            long startSequenceNumber, int tupleCount, long uniqueId,
+            long genId, ByteBuffer buffer, boolean sync) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -698,7 +703,7 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);
+        source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, genId, buffer, sync);
     }
 
     private void cleanup(final HostMessenger messenger) {

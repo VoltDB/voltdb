@@ -76,9 +76,6 @@ public:
         return value.length() + sizeof(int32_t);
     }
 
-    // compute # of bytes needed to serialize the meta data column names
-    inline size_t getMDColumnNamesSerializedSize() const { return s_mdSchemaSize; }
-
     int64_t testAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
         int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
@@ -129,8 +126,6 @@ public:
     virtual void extendBufferChain(size_t minLength);
 
     virtual int partitionId() { return m_partitionId; }
-    void setNew() { m_new = true; }
-    bool isNew() { return m_new; }
 
     inline ExportTupleStream* getNextFlushStream() const {
         return m_nextFlushStream;
@@ -146,10 +141,6 @@ public:
 
 
 public:
-    // Computed size for metadata columns
-    static const size_t s_mdSchemaSize;
-    // Size of Fixed header (not including schema)
-    static const size_t s_FIXED_BUFFER_HEADER_SIZE;
     // Size of Fixed buffer header (rowCount + uniqueId)
     static const size_t s_EXPORT_BUFFER_HEADER_SIZE;
 
@@ -158,13 +149,10 @@ private:
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    // This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
-    bool m_new;
     std::string m_signature;
     int64_t m_generation;
     const std::string &m_tableName;
     const std::vector<std::string> &m_columnNames;
-    const int32_t m_ddlSchemaSize;
 
     int64_t m_nextSequenceNumber;
     int64_t m_committedSequenceNumber;
