@@ -749,6 +749,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
         StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
         StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
         if (existingStreamedTable && newStreamedTable) {
+            int64_t seqNo;
+            size_t streamBytesUsed;
+            existingStreamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
+            ExportTupleStream* wrapper = new ExportTupleStream(*existingStreamedTable->getWrapper());
+            newStreamedTable->setWrapper(wrapper);
+            newStreamedTable->setExportStreamPositions(seqNo, streamBytesUsed);
             migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
         }
     }

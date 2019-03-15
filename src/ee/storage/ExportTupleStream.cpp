@@ -49,8 +49,23 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
     extendBufferChain(m_defaultCapacity);
 }
 
+ExportTupleStream::ExportTupleStream(const ExportTupleStream &otherStream)
+    : TupleStreamBase(EL_BUFFER_SIZE, s_EXPORT_BUFFER_HEADER_SIZE),
+      m_partitionId(otherStream.m_partitionId),
+      m_siteId(otherStream.m_siteId),
+      m_generation(otherStream.m_generation),
+      m_tableName(otherStream.m_tableName),
+      m_nextSequenceNumber(otherStream.m_nextSequenceNumber),
+      m_committedSequenceNumber(otherStream.m_committedSequenceNumber),
+      m_flushPending(otherStream.m_flushPending),
+      m_nextFlushStream(otherStream.m_nextFlushStream),
+      m_prevFlushStream(otherStream.m_prevFlushStream)
+{
+    extendBufferChain(m_defaultCapacity);
+}
+
 void ExportTupleStream::setGeneration(int64_t generation) {
-    assert(generation > m_generation);
+    assert(generation >= m_generation);
     m_generation = generation;
 }
 
@@ -140,9 +155,9 @@ size_t ExportTupleStream::appendTuple(
     assert(seqNo > 0 && m_nextSequenceNumber == seqNo);
     m_nextSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
-//    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-//            << " sequence number " << seqNo
-//            << " offset " << m_currBlock->offset() << std::endl;
+    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+            << " sequence number " << seqNo
+            << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
