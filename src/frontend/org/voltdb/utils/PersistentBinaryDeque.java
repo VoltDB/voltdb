@@ -327,6 +327,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
         }
 
+        @Override
         public long getSegmentIndex() {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_segment == null) {
@@ -1155,7 +1156,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
             int objectSize = m_retval.remaining();
             // write entry header
             PBDUtils.writeEntryHeader(m_crc, output, m_retval, objectSize, PBDSegment.NO_FLAGS);
-            // write entry
+            // write buffer after resetting position changed by writeEntryHeader
+            // Note: cannot do this in writeEntryHeader as it breaks JUnit tests
+            m_retval.position(0);
             output.put(m_retval);
             return objectSize;
         }
