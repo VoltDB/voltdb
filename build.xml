@@ -840,7 +840,7 @@ DISTRIBUTION
     <antcall target="call_strip_lib" />
 
     <!-- copy to dir where jar picks it up as well -->
-    <!-- libcatalog for OS is copied  in the catalog" target (earlier than this) -->
+    <!-- libcatalog for both OS copied in the "catalog" target (earlier than this) -->
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb-${dist.version}.*"/>
