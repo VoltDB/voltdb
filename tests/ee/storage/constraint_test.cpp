@@ -195,7 +195,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     pkey_column_indices.push_back(0);
     TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX,
                           pkey_column_indices, TableIndex::simplyIndexColumns(),
-                          true, true, NULL);
+                          true, true, false, NULL);
 
     setTable(pkey);
 
@@ -255,7 +255,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     pkey_column_indices.push_back(0);
     TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                                   pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                  true, true, NULL);
+                                  true, true, false, NULL);
 
     setTable(pkey);
 
@@ -313,7 +313,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     pkey_column_indices.push_back(3);
     TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                           pkey_column_indices, TableIndex::simplyIndexColumns(),
-                          true, true, NULL);
+                          true, true, false, NULL);
 
     setTable(pkey);
 
@@ -359,7 +359,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     pkey_column_indices.push_back(3);
     TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                           pkey_column_indices, TableIndex::simplyIndexColumns(),
-                          true, true, NULL);
+                          true, true, false, NULL);
 
     setTable(pkey);
 
