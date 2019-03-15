@@ -36,7 +36,6 @@ else
     if [ -e ~/nativelibs/obj/release/nativelibs/libvoltdb-$2.jnilib ]; then
         mkdir -p $1
         cp ~/nativelibs/obj/release/nativelibs/libvoltdb-$2.jnilib $1
-        cp ~/nativelibs/obj/release/nativelibs/libcatalog-$2.jnilib $1
         exit 0
     else
         echo "Mac native lib expected -- not found!"
