@@ -43,4 +43,11 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
     return getNullValue();
 }
 
+/*
+* implement the Volt MIGRATING function
+*/
+template<>
+inline NValue NValue::callUnary<FUNC_VOLT_MIGRATING>() const {
+    return ValueFactory::getBooleanValue(!isNull());
+}
 }
