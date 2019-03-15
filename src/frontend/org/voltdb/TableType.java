@@ -37,6 +37,10 @@ public enum TableType {
         return type;
     }
 
+    public static boolean isStreamViewOnly(int e) {
+        return (e == STREAM_VIEW_ONLY.get());
+    }
+
     public static boolean isStream(int e) {
         return (e == STREAM.get() || e == STREAM_VIEW_ONLY.get());
     }

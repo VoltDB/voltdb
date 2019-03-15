@@ -504,12 +504,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Complete the deletion of the Migrated Table rows.
          *
-         * @param mTableName The name of the table that the deletes should be applied to.
+         * @param txnId The transactionId of the currently executing stored procedure
+         * @param spHandle The spHandle of the currently executing stored procedure
+         * @param uniqueId The uniqueId of the currently executing stored procedure
+         * @param mTableName The name of the table that the deletes should be applied to
          * @param deletableTxnId The transactionId of the last row that can be deleted
          * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
-         * @return true if every row up to and including deletableTxnId have been deleted.
+         * @param undoToken Commit/Rollback token for this delete call
+         * @return true if every row up to and including deletableTxnId have been deleted
          */
-        bool deleteMigratedRows(std::string tableName, int64_t deletableTxnId, int32_t maxRowCount);
+        bool deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+                std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken);
 
         void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string streamName);
 
