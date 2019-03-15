@@ -1060,12 +1060,19 @@ public class ParserDDL extends ParserRoutine {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
-        if (token.tokenType == Tokens.BATCH_SIZE) {
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
             read();
             if (token.tokenType != Tokens.X_VALUE) {
                 throw unexpectedToken();
             }
-            batchSize = (Integer)(token.tokenValue);
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                batchSize = (Integer)(token.tokenValue);
+            } else {
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
+            }
         }
 
         if (token.tokenType == Tokens.MIGRATE) {
@@ -1077,12 +1084,19 @@ public class ParserDDL extends ParserRoutine {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
-        if (token.tokenType == Tokens.MAX_FREQUENCY) {
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
             read();
             if (token.tokenType != Tokens.X_VALUE) {
                 throw unexpectedToken();
             }
-            maxFrequency = (Integer)(token.tokenValue);
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                batchSize = (Integer)(token.tokenValue);
+            } else {
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
+            }
         }
 
         if (token.tokenType == Tokens.MIGRATE) {
