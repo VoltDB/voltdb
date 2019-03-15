@@ -96,8 +96,10 @@ public class TestVoltCompiler extends TestCase {
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
                      "alter table ttl USING TTL 20 ON COLUMN a;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
+                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
+                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
+                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
+                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
                      "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n" +
                      "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
@@ -105,8 +107,16 @@ public class TestVoltCompiler extends TestCase {
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
+        // can not drop ttl column
         ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
               "alter table ttl drop column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // max_fequency must be positive integer
+        ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
+              "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
