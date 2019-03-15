@@ -1067,6 +1067,9 @@ public class ParserDDL extends ParserRoutine {
             }
             if (token.tokenType == Tokens.BATCH_SIZE) {
                 batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
             } else {
                 maxFrequency = (Integer)(token.tokenValue);
                 if (maxFrequency < 1) {
@@ -1091,6 +1094,9 @@ public class ParserDDL extends ParserRoutine {
             }
             if (token.tokenType == Tokens.BATCH_SIZE) {
                 batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
             } else {
                 maxFrequency = (Integer)(token.tokenValue);
                 if (maxFrequency < 1) {
