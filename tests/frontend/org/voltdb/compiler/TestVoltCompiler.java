@@ -408,7 +408,7 @@ public class TestVoltCompiler extends TestCase {
                 "  CLIENT INTEGER NOT NULL,\n" +
                 "  ID INTEGER DEFAULT '0' NOT NULL,\n" +
                 "  VAL INTEGER);";
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
             ddl.append(String.format(ddlTemplate, i));
         }
         project.addLiteralSchema(ddl.toString());
