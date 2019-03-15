@@ -99,14 +99,11 @@ public:
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
-        std::ostringstream os;
 
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
-            os.str(""); os << std::dec << i;
-            m_columnNames.push_back(os.str());
         }
         m_schema =
           TupleSchema::createTupleSchemaForTest(columnTypes,
@@ -114,7 +111,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new ExportTupleStream(1, 1, 0, "sign", m_tableName, m_columnNames);
+        m_wrapper = new ExportTupleStream(1, 1, 0, m_tableName);
 
             // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacityForTest(BUFFER_SIZE);
@@ -202,7 +199,6 @@ protected:
     TableTuple* m_tuple;
     DummyTopend m_topend;
     Pool m_pool;
-    std::vector<std::string> m_columnNames;
     MockVoltDBEngine* m_engine;
     boost::scoped_ptr<ExecutorContext> m_context;
     size_t m_tupleSize;

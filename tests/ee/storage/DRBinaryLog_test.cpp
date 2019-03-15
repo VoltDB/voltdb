@@ -119,9 +119,8 @@ static std::map<int, ClusterCtx> s_clusterMap;
 class MockExportTupleStream : public ExportTupleStream {
 public:
     MockExportTupleStream(VoltDBEngine* engine, CatalogId partitionId, int64_t siteId,
-                          int64_t generation, std::string signature, const std::string &tableName,
-                          const std::vector<std::string> &columnNames)
-        : ExportTupleStream(partitionId, siteId, generation, signature, tableName, columnNames),
+                          int64_t generation, const std::string &tableName)
+        : ExportTupleStream(partitionId, siteId, generation, tableName),
           m_engine(engine)
     { }
 
@@ -206,7 +205,7 @@ public:
 
         m_exportSchema = TupleSchema::createTupleSchemaForTest(m_exportColumnType, m_exportColumnLength, m_exportColumnAllowNull);
 
-        m_exportStream = new MockExportTupleStream((VoltDBEngine*)this, 1, 1, 0, "sign", tableName, m_exportColumnName);
+        m_exportStream = new MockExportTupleStream((VoltDBEngine*)this, 1, 1, 0, tableName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
                 tableName,
                 m_exportSchema,
