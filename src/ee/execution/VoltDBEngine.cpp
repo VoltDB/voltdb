@@ -1021,20 +1021,23 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
     }
 }
 
-static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2) {
+static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetTable, bool targetIsPersistentTable) {
     // covers column count
-    if (t1->columns().size() != t2->columnCount()) {
+    if (srcTable->columns().size() != targetTable->columnCount()) {
         return true;
     }
 
-    if (t1->isDRed() != t2->isDREnabled()) {
-        return true;
+    if (targetIsPersistentTable) {
+        PersistentTable* persistentTable = dynamic_cast<PersistentTable *>(targetTable);
+        if (srcTable->isDRed() != persistentTable->isDREnabled()) {
+            return true;
+        }
     }
 
     // make sure each column has same metadata
     std::map<std::string, catalog::Column*>::const_iterator outerIter;
-    for (outerIter = t1->columns().begin();
-         outerIter != t1->columns().end();
+    for (outerIter = srcTable->columns().begin();
+         outerIter != srcTable->columns().end();
          outerIter++) {
         int index = outerIter->second->index();
         int size = outerIter->second->size();
@@ -1043,11 +1046,11 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
         bool nullable = outerIter->second->nullable();
         bool inBytes = outerIter->second->inbytes();
 
-        if (t2->columnName(index).compare(name)) {
+        if (targetTable->columnName(index).compare(name)) {
             return true;
         }
 
-        auto columnInfo = t2->schema()->getColumnInfo(index);
+        auto columnInfo = targetTable->schema()->getColumnInfo(index);
 
         if (columnInfo->allowNull != nullable) {
             return true;
@@ -1145,23 +1148,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             }
             if (streamedTable) {
                 const std::string& name = streamedTable->name();
-                m_exportingTables[name] = streamedTable;
-                ExportTupleStream *wrapper = m_exportingStreams[name];
                 if (tableTypeNeedsTupleStream(tcd->getTableType())) {
-                    if (wrapper == NULL) {
-                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                                        m_executorContext->m_siteId,
-                                                        timestamp,
-                                                        streamedTable->name());
-                        m_exportingStreams[name] = wrapper;
-                        VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
-                    } else {
-                        // If stream was dropped in UAC and the added back we should not purge the wrapper.
-                        // A case when exact same stream is dropped and added.
-                        purgedStreams[name] = NULL;
-                    }
-                    streamedTable->setGeneration(timestamp);
-                    streamedTable->setWrapper(wrapper);
+                    attachTupleStream(streamedTable, name, purgedStreams, timestamp);
                 }
                 else {
                     // The table/stream type has been changed
@@ -1210,8 +1198,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 continue;
             }
             //////////////////////////////////////////////
-            // update the export info for existing tables can not be done now so ignore streamed table.
-            //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
@@ -1222,7 +1208,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
              * that no more data is coming for the previous generation
              */
             PersistentTable *persistentTable = tcd->getPersistentTable();
-            bool persistentTableSchemaChanged = false;
+            bool tableSchemaChanged = false;
 
             auto streamedTable = tcd->getStreamedTable();
             if (persistentTable) {
@@ -1231,29 +1217,15 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 if (streamedTable) {
                     VOLT_TRACE("UPDATING companion stream for %s", persistentTable->name().c_str());
                 }
-                persistentTableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable);
+                tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
             }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
                 if (isStreamUpdate) {
                     const std::string& name = streamedTable->name();
                     if (tableTypeNeedsTupleStream(tcd->getTableType())) {
-                        //Reset generation after stream wrapper is created.
-                        m_exportingTables[name] = streamedTable;
-                        ExportTupleStream *wrapper = m_exportingStreams[name];
-                        if (wrapper == NULL) {
-                            wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                                            m_executorContext->m_siteId,
-                                                            timestamp,
-                                                            name);
-                            m_exportingStreams[name] = wrapper;
-                        } else {
-                            //If stream was altered in UAC and the added back we should not purge the wrapper.
-                            //A case when alter has not changed anything that changes table signature.
-                            purgedStreams[name] = NULL;
-                        }
-                        streamedTable->setGeneration(timestamp);
-                        streamedTable->setWrapper(wrapper);
+                        attachTupleStream(streamedTable, name, purgedStreams, timestamp);
+                        tableSchemaChanged = haveDifferentSchema(catalogTable, streamedTable, false);
                     }
                 }
 
@@ -1289,12 +1261,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 }
 
                 BOOST_FOREACH (auto toDrop, obsoleteViews) {
-
                     streamedTable->dropMaterializedView(toDrop);
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
-                if (!persistentTableSchemaChanged) {
+                if (!tableSchemaChanged) {
                     continue;
                 }
             }
@@ -1305,7 +1276,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             // indexes as we go
             //////////////////////////////////////////
 
-            if (persistentTableSchemaChanged) {
+            if (tableSchemaChanged) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
@@ -1506,6 +1477,27 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
     return true;
 }
 
+void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
+                                     const std::string& streamName,
+                                     std::map<std::string, ExportTupleStream*> & purgedStreams,
+                                     int64_t timestamp) {
+    m_exportingTables[streamName] = streamedTable;
+    ExportTupleStream *wrapper = m_exportingStreams[streamName];
+    if (wrapper == NULL) {
+        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                        m_executorContext->m_siteId,
+                                        timestamp,
+                                        streamName);
+        m_exportingStreams[streamName] = wrapper;
+        streamedTable->setWrapper(wrapper);
+        VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
+    } else {
+        // If stream was dropped in UAC and the added back we should not purge the wrapper.
+        // A case when exact same stream is dropped and added.
+        purgedStreams[streamName] = NULL;
+    }
+    streamedTable->setGeneration(timestamp);
+}
 
 /*
  * Accept a list of catalog commands expressing a diff between the
