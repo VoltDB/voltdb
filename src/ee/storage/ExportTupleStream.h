@@ -150,7 +150,7 @@ private:
     const int64_t m_siteId;
 
     int64_t m_generation;
-    const std::string &m_tableName;
+    const std::string m_tableName;
 
     int64_t m_nextSequenceNumber;
     int64_t m_committedSequenceNumber;
