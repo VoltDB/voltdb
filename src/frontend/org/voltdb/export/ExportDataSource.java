@@ -995,7 +995,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            pollTask.setFuture(m_pendingContainer.getAndSet(null));
+                            AckingContainer cont = m_pendingContainer.getAndSet(null);
+                            boolean hasSchema = cont.schema() != null;
+                            if (!hasSchema) {
+                                // Ensure this first block has a schema
+                                BBContainer schemaContainer = m_buffers.pollSchema();
+                                if (schemaContainer == null) {
+                                    pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo));
+                                    return;
+                                } else {
+                                    cont.setSchema(schemaContainer);
+                                }
+                            }
+                            pollTask.setFuture(cont);
                             if (m_pollTask != null) {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("Pick up work from pending container, set poll future to null");
@@ -1141,7 +1153,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final long m_lastSeqNo;
         final long m_commitSeqNo;
         final BBContainer m_backingCont;
-        final BBContainer m_schemaCont;
+        BBContainer m_schemaCont;
         long m_startTime = 0;
         long m_commitSpHandle = 0;
 
@@ -1157,11 +1169,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_startTime = startTime;
         }
 
-        public ByteBuffer schema() {
+        // Synchronized because schema is settable
+        public synchronized ByteBuffer schema() {
             if (m_schemaCont == null) {
                 return null;
             }
             return m_schemaCont.b();
+        }
+
+        public synchronized void setSchema(BBContainer schemaCont) {
+            if (m_schemaCont != null) {
+                throw new IllegalStateException("Overwriting schema");
+            }
+            m_schemaCont = schemaCont;
         }
 
         public long getCommittedSeqNo() {
@@ -1181,8 +1201,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         void internalDiscard() {
             checkDoubleFree();
             m_backingCont.discard();
-            if (m_schemaCont != null) {
-                m_schemaCont.discard();
+            synchronized(this) {
+                if (m_schemaCont != null) {
+                    m_schemaCont.discard();
+                }
             }
         }
 
@@ -1207,8 +1229,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                         try {
                              m_backingCont.discard();
-                             if (m_schemaCont != null) {
-                                 m_schemaCont.discard();
+                             synchronized(this) {
+                                 if (m_schemaCont != null) {
+                                     m_schemaCont.discard();
+                                 }
                              }
                             try {
                                 if (!m_es.isShutdown()) {
@@ -1229,7 +1253,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                   //Don't expect this to happen outside of test, but in test it's harmless
                   exportLog.info("Acking export data task rejected, this should be harmless");
                   m_backingCont.discard();
-                  m_schemaCont.discard();
+                  synchronized(this) {
+                      m_schemaCont.discard();
+                  }
             }
         }
     }
