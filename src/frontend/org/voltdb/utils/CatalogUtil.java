@@ -109,6 +109,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -3177,5 +3178,15 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+    public static int getPersistentMigrateBatchSize(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null && table.getTimetolive() != null ) {
+            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (ttl != null && !StringUtil.isEmpty(ttl.getMigrationtarget())) {
+                return ttl.getBatchsize();
+            }
+        }
+        return -1;
     }
 }

@@ -31,7 +31,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -102,7 +104,12 @@ public class TTLManager extends StatsSource{
             }
             ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
-                performDelete(cl, this);
+                String stream = ttlRef.get().getMigrationtarget();
+                if (!StringUtil.isEmpty(stream)) {
+                    migrate(cl, this);
+                } else {
+                    delete(cl, this);
+                }
             }
         }
 
@@ -151,6 +158,10 @@ public class TTLManager extends StatsSource{
         }
         String getColumnName() {
             return ttlRef.get().getTtlcolumn().getName();
+        }
+
+        String getStream() {
+            return ttlRef.get().getMigrationtarget();
         }
     }
 
@@ -247,7 +258,7 @@ public class TTLManager extends StatsSource{
             TTLTask task = m_tasks.get(t.getTypeName());
             if (task == null) {
                 TTLStats stats = m_stats.get(t.getTypeName());
-                if (stats == null) {
+                if (!TableType.isPersistentMigrate(t.getTabletype()) && stats == null) {
                     stats = new TTLStats(t.getTypeName());
                     m_stats.put(t.getTypeName(), stats);
                 }
@@ -312,7 +323,32 @@ public class TTLManager extends StatsSource{
         }
     }
 
-    protected void performDelete(ClientInterface cl, TTLTask task) {
+    protected void migrate(ClientInterface cl, TTLTask task) {
+        CountDownLatch latch = new CountDownLatch(1);
+        final ProcedureCallback cb = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse resp) throws Exception {
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.warn(String.format("Fail to execute nibble export on table: %s, column: %s, status: %s",
+                            task.tableName, task.getColumnName(), resp.getStatusString()));
+                }
+                if (resp.getResults() != null && resp.getResults().length > 0) {
+
+                }
+                latch.countDown();
+            }
+        };
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
+                "@MigrateRowsNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
+                        TIMEOUT, task.getMaxFrequency(), INTERVAL});
+        try {
+            latch.await(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            hostLog.warn("Nibble export waiting interrupted" + e.getMessage());
+        }
+    }
+
+    protected void delete(ClientInterface cl, TTLTask task) {
         CountDownLatch latch = new CountDownLatch(1);
         final ProcedureCallback cb = new ProcedureCallback() {
             @Override
@@ -332,8 +368,8 @@ public class TTLManager extends StatsSource{
                             // the transaction will be aborted. The same is true for nibble delete transaction.
                             // If hit this error, no more data can be deleted in this TTL table.
                             drLimitError = "The transaction exceeds DR Buffer Limit of "
-                                        + MpTransactionState.DR_MAX_AGGREGATE_BUFFERSIZE
-                                        + " TTL is disabled for the table. Please change BATCH_SIZE to a smaller value.";
+                                    + MpTransactionState.DR_MAX_AGGREGATE_BUFFERSIZE
+                                    + " TTL is disabled for the table. Please change BATCH_SIZE to a smaller value.";
                             task.cancel();
                             ScheduledFuture<?> fut = m_futures.get(task.tableName);
                             if (fut != null) {
