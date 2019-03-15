@@ -98,22 +98,8 @@ namespace functionexpression {
                : AbstractExpression(EXPRESSION_TYPE_FUNCTION) {
                };
 
-            NValue eval(const TableTuple* tuple1, const TableTuple*) const {
-               // special handler for MIGRATING() function
-               if (F == FUNC_VOLT_MIGRATING) {
-                  // For MIGRATING(), check if we are evaluating on a migrating table(the table with a migrate target).
-                  if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
-                     // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
-                     // and transaction id for migrating is always the last one.
-                     return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
-                           tuple1->getSchema()->hiddenColumnCount() - 1).callUnary<FUNC_VOLT_MIGRATING>();
-                  } else {
-                     throw SQLException(SQLException::dynamic_sql_error,
-                           "Can not apply MIGRATING function on non-migrating tables.");
-                  }
-               } else {
-                  return NValue::callConstant<F>();
-               }
+            NValue eval(const TableTuple*, const TableTuple*) const {
+               return NValue::callConstant<F>();
             }
 
             std::string debugInfo(const std::string &spacer) const {
@@ -122,6 +108,19 @@ namespace functionexpression {
                return (buffer.str());
             }
       };
+
+   template<> NValue ConstantFunctionExpression<FUNC_VOLT_MIGRATING>::eval(const TableTuple* tuple1, const TableTuple*) const {
+      // For MIGRATING(), check if we are evaluating on a migrating table(the table with a migrate target).
+      if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
+         // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
+         // and transaction id for migrating is always the last one.
+         return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
+               tuple1->getSchema()->hiddenColumnCount() - 1).callUnary<FUNC_VOLT_MIGRATING>();
+      } else {
+         throw SQLException(SQLException::dynamic_sql_error,
+               "Can not apply MIGRATING function on non-migrating tables.");
+      }
+   }
 
    /*
     * Unary functions. (abs, upper, lower)
