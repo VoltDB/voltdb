@@ -46,31 +46,6 @@ import org.voltdb.client.ClientResponseWithPartitionKey;
 public class MigrateRowsNT extends VoltNTSystemProcedure {
     VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public static enum ComparisonOperation {
-        GT, LT, GTE, LTE, EQ;
-
-        static ComparisonOperation fromString(String op) {
-            op = op.trim();
-            if (op.equals(">")) return GT;
-            if (op.equals("<")) return LT;
-            if (op.equals(">=")) return GTE;
-            if (op.equals("<=")) return LTE;
-            if (op.equals("==")) return EQ;
-            throw new VoltAbortException("Invalid comparison operation: " + op);
-        }
-
-        public String toString() {
-            switch (this) {
-            case GT: return ">";
-            case LT: return "<";
-            case GTE: return ">=";
-            case LTE: return "<=";
-            case EQ: return "==";
-            default: return null;
-            }
-        }
-    }
-
     private Table getValidatedTable(CatalogContext ctx, String tableName) {
         Table catTable = ctx.database.getTables().getIgnoreCase(tableName.trim());
         if (catTable == null) {

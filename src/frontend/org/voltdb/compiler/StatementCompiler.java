@@ -665,7 +665,6 @@ public abstract class StatementCompiler {
             ComparisonOperation comparison) {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
-//        sb.append(" WHERE " + column.getName() + " " + comparison.toString() + " ?");
         sb.append(" ORDER BY " + column.getName());
         if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
             sb.append(" ASC OFFSET ? LIMIT 1;");
@@ -808,5 +807,35 @@ public abstract class StatementCompiler {
         addStatement(catTable, newCatProc, valueAtQuery, "2");
 
         return newCatProc;
+    }
+
+    public static Procedure compileMigrateProcedure(Table table, String procName,
+            Column column, ComparisonOperation comparison) {
+        Procedure proc = addProcedure(table, procName);
+
+        // Select count(*)
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT COUNT(*) FROM " + table.getTypeName());
+        sb.append(" WHERE MIGRATING() AND " + column.getName() + " " + comparison.toString() + " ?;");
+        addStatement(table, proc, sb.toString(), "0");
+
+        // Migrate
+        sb = new StringBuilder();
+        sb.append("MIGRATE FROM " + table.getTypeName());
+        sb.append(" WHERE MIGRATING() AND " + column.getName() + " " + comparison.toString() + " ?;");
+        addStatement(table, proc, sb.toString(), "0");
+
+        // Get cutoff value
+        sb = new StringBuilder();
+        sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
+        sb.append(" WHERE MIGRATING() ORDER BY " + column.getName());
+        if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
+            sb.append(" ASC OFFSET ? LIMIT 1;");
+        } else {
+            sb.append(" DESC OFFSET ? LIMIT 1;");
+        }
+        addStatement(table, proc, sb.toString(), "2");
+
+        return proc;
     }
 }

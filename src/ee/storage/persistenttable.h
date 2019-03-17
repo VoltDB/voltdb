@@ -301,7 +301,8 @@ public:
                                         TableTuple& sourceTupleWithNewValues,
                                         std::vector<TableIndex*> const& indexesToUpdate,
                                         bool fallible = true,
-                                        bool updateDRTimestamp = true);
+                                        bool updateDRTimestamp = true,
+                                        bool updateMigrate = false);
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -735,6 +736,7 @@ private:
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
+    void setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& tuple);
 
     void computeSmallestUniqueIndex();
 
