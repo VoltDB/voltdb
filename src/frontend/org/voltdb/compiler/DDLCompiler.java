@@ -20,21 +20,8 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.stream.StreamSupport;
 
@@ -1384,8 +1371,12 @@ public class DDLCompiler {
             }
         }
 
-        final boolean hasMigratingIndex = StreamSupport.stream(((Iterable<Index>) () -> table.getIndexes().iterator()).spliterator(),
-                false).anyMatch(Index::getMigrating);
+        final String migratingIndexName =
+                StreamSupport.stream(((Iterable<Index>) () -> table.getIndexes().iterator()).spliterator(), false)
+                        .filter(Index::getMigrating)
+                        .map(Index::getTypeName)
+                        .findAny()
+                        .orElse(null);
 
         if (ttlNode != null) {
             TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
@@ -1401,6 +1392,10 @@ public class DDLCompiler {
             if (!StringUtil.isEmpty(migrationTarget)) {
                 ttl.setMigrationtarget(migrationTarget);
                 table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
+            } else if (migratingIndexName != null) {
+                throw m_compiler.new VoltCompilerException(
+                        String.format("Cannot create migrating index \"%s\" on non-migrating table \"%s\"",
+                                migratingIndexName, name));
             }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
@@ -1408,8 +1403,10 @@ public class DDLCompiler {
                     break;
                 }
             }
-        } else if (hasMigratingIndex) {
-            throw new PlanningErrorException("Cannot create a migrating index on a non-TTL table");
+        } else if (migratingIndexName != null) {
+            throw new PlanningErrorException(
+                    String.format("Cannot create a migrating index \"%s\" on a non-TTL table \"%s\"",
+                            migratingIndexName, name));
         }
 
         // Warn user if DR table don't have any unique index.
@@ -1698,7 +1695,6 @@ public class DDLCompiler {
         final boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
         final boolean isMigrating = Boolean.parseBoolean(node.getStringAttribute("migrating", "false"));
-        // validate against TTL, etc. in addTableToCatalog() after propagating TTL field
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, null, db);
         dummy.setDDLIndexedTable(table);

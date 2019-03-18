@@ -158,14 +158,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
     std::vector<ValueType> column_types;
 
     // The catalog::Index object now has a list of columns that are to be
-    // used. Note that a migrating index can have empty explicit
-    // column to be indexed.
-    if (catalogIndex.migrating() && ! schema->isTableWithStream()) {
-       VOLT_ERROR("Cannot create migrating index '%s' on non-migrating table '%s'",
-             catalogIndex.name().c_str(), catalogTable.name().c_str());
-       assert(false);
-       return false;
-    } else if (!catalogIndex.migrating() && catalogIndex.columns().size() == 0) {
+    // used
+    if (!catalogIndex.migrating() && catalogIndex.columns().size() == 0) {
        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns to use",
              catalogIndex.name().c_str(), catalogTable.name().c_str());
        return false;
