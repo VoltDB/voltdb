@@ -119,7 +119,7 @@ public final class Constraint implements SchemaObject {
     // A VoltDB extension to support LIMIT PARTITION ROWS syntax
                             LIMIT          = 6,
     // A VoltDB extension to support CREATE MIGRATING INDEX syntax
-                            MIGRATING        = 7;
+                            MIGRATING      = 7;
     // End of VoltDB extension
     ConstraintCore          core;
     private HsqlName        name;

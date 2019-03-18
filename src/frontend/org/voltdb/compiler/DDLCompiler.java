@@ -1762,44 +1762,41 @@ public class DDLCompiler {
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
-            if (name.startsWith("SYS_IDX_") && columns[i] == null) {
+            //  Allow creation of empty migrating index which has no explicit columns.
+            if (!isMigrating && columns[i] == null) {
                 return;
             }
         }
 
-        if (exprs == null) {
-            if (colNames.length > 1 || ! colNames[0].isEmpty()) {
-                for (int i = 0; i < colNames.length; i++) {
-                    if (!colNames[0].isEmpty()) {      // We allow MIGRATING INDEX to have no explicit columns
-                        VoltType colType = VoltType.get((byte) columns[i].getType());
+        // Empty columns of migrating index ==> colNames = {""}
+        if (exprs == null && (!isMigrating || colNames.length > 1)) {
+            for (int i = 0; i < colNames.length; i++) {
+                VoltType colType = VoltType.get((byte) columns[i].getType());
 
-                        if (!colType.isIndexable()) {
-                            String emsg = "Cannot create index \"" + name + "\" because " +
-                                    colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
-                            throw compiler.new VoltCompilerException(emsg);
-                        }
+                if (!colType.isIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
+                            colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
 
-                        if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
-                            String emsg = "Cannot create index \"" + name + "\" because " +
-                                    colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
-                            throw compiler.new VoltCompilerException(emsg);
-                        }
+                if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
+                            colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
 
-                        if (!colType.isBackendIntegerType()) {
-                            has_nonint_col = true;
-                            nonint_col_name = colNames[i];
-                            has_geo_col = colType.equals(VoltType.GEOGRAPHY);
-                            if (has_geo_col && colNames.length > 1) {
-                                String emsg = "Cannot create index \"" + name + "\" because " +
-                                        colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
-                                throw compiler.new VoltCompilerException(emsg);
-                            }
-                        }
+                if (!colType.isBackendIntegerType()) {
+                    has_nonint_col = true;
+                    nonint_col_name = colNames[i];
+                    has_geo_col = colType.equals(VoltType.GEOGRAPHY);
+                    if (has_geo_col && colNames.length > 1) {
+                        String emsg = "Cannot create index \"" + name + "\" because " +
+                                colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
+                        throw compiler.new VoltCompilerException(emsg);
                     }
                 }
             }
-        }
-        else {
+        } else if (exprs != null) {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
 
@@ -1833,6 +1830,9 @@ public class DDLCompiler {
                 }
                 expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
+        } else {
+            assert isMigrating && colNames.length == 1 :
+                    "Encountered with an index that does not include columns or expressions";
         }
 
         Index index = table.getIndexes().add(name);

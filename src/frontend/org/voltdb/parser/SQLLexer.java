@@ -289,7 +289,7 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         if (!hadWLMatch) {
-            return String.format("AdHoc-DDL contains an unsupported statement: %s", sql);
+            return String.format("AdHoc DDL contains an unsupported statement: %s", sql);
         }
 
         // The statement is permitted.
