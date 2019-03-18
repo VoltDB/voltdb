@@ -26,6 +26,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
 
@@ -147,7 +148,12 @@ public class StmtTargetTableScan extends StmtTableScan {
         // from the original column (T.C)
         Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
                 tve.getDifferentiator());
-        assert(columnIndex != null);
+        if (columnIndex == null) {
+            throw new PlanningErrorException("Column <"
+                                                + columnName
+                                                + "> Not found. Please update your query.",
+                                             1);
+        }
         SchemaColumn originalSchemaColumn = m_origSubqueryScan.getSchemaColumn(columnIndex);
         assert(originalSchemaColumn != null);
         String origColumnName = originalSchemaColumn.getColumnName();
