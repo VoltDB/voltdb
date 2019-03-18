@@ -47,7 +47,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
 
-#include "MigrateExecutor.h"
+#include "migrateexecutor.h"
 
 #include "common/ExecuteWithMpMemory.h"
 #include "plannodes/updatenode.h"
