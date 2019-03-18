@@ -360,9 +360,6 @@ public class StreamBlockQueue {
                         offset++;
                         // Not the row we are looking to truncate at. Skip past it (row length + row length field).
                         final int rowLength = b.getInt();
-                        if (b.position() + rowLength > b.limit()) {
-                            System.out.println(rowLength);
-                        }
                         b.position(b.position() + rowLength);
                     }
                     return null;
@@ -386,6 +383,7 @@ public class StreamBlockQueue {
         assert(m_memoryDeque.isEmpty());
         return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
 
+            @Override
             public ExportSequenceNumberTracker scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();

@@ -38,11 +38,9 @@ public abstract class PBDSegment {
     private static final String SCANNER_CURSOR = "__scanner__";
     protected static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
 
-    static final int NO_FLAGS = 0;
-    static final int FLAG_COMPRESSED = 1;
-
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
+
     // Segment Header layout:
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
@@ -51,6 +49,9 @@ public abstract class PBDSegment {
     public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
     static final int SEGMENT_HEADER_BYTES = 12;
+
+    static final int NO_FLAGS = 0;
+    static final int FLAG_COMPRESSED = 1;
 
     public static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + //export buffer version
                                                          8 + //generation id
@@ -240,7 +241,9 @@ public abstract class PBDSegment {
      * @throws IOException
      */
     ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
-        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
+        if (!m_closed) {
+            throw new IOException(("Segment should not be open before truncation"));
+        }
 
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();

@@ -42,7 +42,6 @@ import com.google_voltpatches.common.base.Preconditions;
  */
 public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
@@ -194,7 +193,6 @@ public class PBDRegularSegment extends PBDSegment {
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             initNumEntries(0, 0);
-
         }
         if (forWrite) {
             m_fc.position(m_fc.size());
@@ -281,7 +279,9 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public void sync() throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
         if (!m_syncedSinceLastEdit) {
             m_fc.force(true);
         }
@@ -290,9 +290,13 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public boolean hasAllFinishedReading() throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
 
-        if (m_readCursors.size() == 0) return false;
+        if (m_readCursors.size() == 0) {
+            return false;
+        }
 
         for (SegmentReader reader : m_readCursors.values()) {
             if (reader.m_objectReadIndex < m_numOfEntries) {
@@ -307,12 +311,18 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException
     {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
-        if (remaining < 32 || !buf.isDirect()) compress = false;
+        if (remaining < 32 || !buf.isDirect()) {
+            compress = false;
+        }
         final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + ENTRY_HEADER_BYTES;
-        if (remaining() < maxCompressedSize) return false;
+        if (remaining() < maxCompressedSize) {
+            return false;
+        }
 
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = cont;
@@ -358,9 +368,13 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public int offer(DeferredSerialization ds) throws IOException
     {
-        if (m_closed) throw new IOException("closed");
+        if (m_closed) {
+            throw new IOException("closed");
+        }
         final int fullSize = ds.getSerializedSize();
-        if (remaining() < fullSize) return -1;
+        if (remaining() < fullSize) {
+            return -1;
+        }
 
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = DBBPool.allocateDirectAndPool(fullSize);
@@ -462,7 +476,9 @@ public class PBDRegularSegment extends PBDSegment {
         @Override
         public DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCRC) throws IOException {
 
-            if (m_readerClosed) throw new IOException("Reader closed");
+            if (m_readerClosed) {
+                throw new IOException("Reader closed");
+            }
 
             if (!hasMoreEntries()) {
                 return null;
@@ -633,7 +649,9 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public int uncompressedBytesToRead() {
-            if (m_readerClosed) throw new RuntimeException("Reader closed");
+            if (m_readerClosed) {
+                throw new RuntimeException("Reader closed");
+            }
 
             return m_size - m_bytesRead;
         }

@@ -1898,6 +1898,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * column length(4)
          *
          */
+        @Override
         public void serialize(ByteBuffer buf) throws IOException {
             buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
             buf.putLong(m_catalogContext.m_genId);
@@ -1918,8 +1919,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
 
+        @Override
         public void cancel() {}
 
+        @Override
         public int getSerializedSize() throws IOException {
             int size = 0;
             // column name length, name, type, length

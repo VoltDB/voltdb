@@ -241,8 +241,12 @@ public class TestPersistentBinaryDeque {
             }
         }
 
-        if (penultimate != null) sorted.addLast(penultimate);
-        if (lastEntry != null) sorted.addLast(lastEntry);
+        if (penultimate != null) {
+            sorted.addLast(penultimate);
+        }
+        if (lastEntry != null) {
+            sorted.addLast(lastEntry);
+        }
         return sorted;
     }
 
@@ -358,8 +362,8 @@ public class TestPersistentBinaryDeque {
                 if (b.getLong(0) != m_objectsParsed) {
                     System.out.println("asd");
                 }
-                assertEquals(b.getLong(0), m_objectsParsed);
-                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                assertEquals(m_objectsParsed, b.getLong(0));
+                assertEquals(1024 * 1024 * 2, b.remaining());
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
                     return PersistentBinaryDeque.fullTruncateResponse();
@@ -432,8 +436,8 @@ public class TestPersistentBinaryDeque {
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
-                assertEquals(b.getLong(0), m_objectsParsed);
-                assertEquals(b.remaining(), 1024 * 1024 * 2 );
+                assertEquals(m_objectsParsed, b.getLong(0));
+                assertEquals(1024 * 1024 * 2, b.remaining());
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
                     return new PersistentBinaryDeque.ByteBufferTruncatorResponse(b.slice());

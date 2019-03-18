@@ -25,7 +25,7 @@ import org.voltcore.utils.DBBPool;
  * Represents a reader for a segment. Multiple readers may be active
  * at any point in time, reading from different locations in the segment.
  */
-public interface PBDSegmentReader {
+interface PBDSegmentReader {
     /**
      * Are there any more entries to read from this segment for this reader
      *

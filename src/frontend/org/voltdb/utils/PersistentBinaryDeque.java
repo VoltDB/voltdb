@@ -294,6 +294,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             };
         }
 
+        @Override
         public boolean isStartOfSegment() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
