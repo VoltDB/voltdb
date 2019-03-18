@@ -109,16 +109,17 @@ namespace functionexpression {
             }
       };
 
-   template<> NValue ConstantFunctionExpression<FUNC_VOLT_MIGRATING>::eval(const TableTuple* tuple1, const TableTuple*) const {
-      // For MIGRATING(), check if we are evaluating on a migrating table(the table with a migrate target).
+   template<> NValue ConstantFunctionExpression<FUNC_VOLT_NOT_MIGRATED>::eval(
+         const TableTuple* tuple1, const TableTuple*) const {
+      // For NOT_MIGRATED(), check if we are evaluating on a migrating table (the table with a migrate target).
       if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
          // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
          // and transaction id for migrating is always the last one.
          return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method
-               tuple1->getSchema()->hiddenColumnCount() - 1).callUnary<FUNC_VOLT_MIGRATING>();
+               tuple1->getSchema()->hiddenColumnCount() - 1).callUnary<FUNC_VOLT_NOT_MIGRATED>();
       } else {
          throw SQLException(SQLException::dynamic_sql_error,
-               "Can not apply MIGRATING function on non-migrating tables.");
+               "Can not apply NOT_MIGRATED function on non-migrating tables.");
       }
    }
 
@@ -271,8 +272,8 @@ AbstractExpression* functionFactory(int functionId, const std::vector<AbstractEx
          case FUNC_VOLT_MAX_VALID_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_VOLT_MAX_VALID_TIMESTAMP>();
             break;
-         case FUNC_VOLT_MIGRATING:
-            ret = new ConstantFunctionExpression<FUNC_VOLT_MIGRATING>();
+         case FUNC_VOLT_NOT_MIGRATED:
+            ret = new ConstantFunctionExpression<FUNC_VOLT_NOT_MIGRATED>();
             break;
          default:
             return NULL;

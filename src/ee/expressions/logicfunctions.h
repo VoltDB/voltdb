@@ -44,10 +44,11 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
 }
 
 /*
-* implement the Volt MIGRATING function
+* Implement the Volt NOT_MIGRATED function.
+* Returns true if the hidden column is NULL, which means that it
+* has not been migrated.
 */
-template<>
-inline NValue NValue::callUnary<FUNC_VOLT_MIGRATING>() const {
-    return ValueFactory::getBooleanValue(!isNull());
+template<> inline NValue NValue::callUnary<FUNC_VOLT_NOT_MIGRATED>() const {
+    return ValueFactory::getBooleanValue(isNull());
 }
 }
