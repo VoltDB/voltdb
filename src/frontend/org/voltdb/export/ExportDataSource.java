@@ -745,12 +745,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += newTuples;
                 m_tuplesPending.addAndGet((int)newTuples);
-                assert (genId >= m_previousGenId);
-                // This serializer is used to write stream schema to pbd
-                StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
-                        VoltDB.instance().getCatalogContext(), m_tableName);
-                // check generation id change at every push to tell when to create new segment
-                m_committedBuffers.offer(sb, ds, genId != m_previousGenId);
+
+                if (genId != m_previousGenId) {
+                    assert (genId > m_previousGenId);
+                    // This serializer is used to write stream schema to pbd
+                    StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
+                            VoltDB.instance().getCatalogContext(), m_tableName);
+                    // check generation id change at every push to tell when to update the header
+                    m_committedBuffers.updateSchema(ds);
+                }
+                m_committedBuffers.offer(sb);
                 m_previousGenId = genId;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);

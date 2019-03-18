@@ -264,11 +264,15 @@ public class StreamBlockQueue {
         }
     }
 
+    public void updateSchema(DeferredSerialization schemaSerializer) throws IOException {
+        m_persistentDeque.updateExtraHeader(schemaSerializer);
+    }
+
     /*
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
-    public void offer(StreamBlock streamBlock, DeferredSerialization ds, boolean createNewFile) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), ds, !DISABLE_COMPRESSION, createNewFile);
+    public void offer(StreamBlock streamBlock) throws IOException {
+        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);

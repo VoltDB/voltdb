@@ -40,6 +40,14 @@ public interface BinaryDeque {
     }
 
     /**
+     * Update the extraHeader associated with this instance.
+     *
+     * @param extraHeaderSerializer {@link DeferredSerialization} which will be used to write out the extra header.
+     * @throws IOException If an error occurs while updating the extraHeader
+     */
+    void updateExtraHeader(DeferredSerialization extraHeaderSerializer) throws IOException;
+
+    /**
      * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
@@ -53,11 +61,10 @@ public interface BinaryDeque {
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
      * @param object
-     * @param ds
      * @param allowCompression
      * @throws IOException
      */
-    void offer(BBContainer object, DeferredSerialization ds, boolean allowCompression, boolean createNewFile) throws IOException;
+    void offer(BBContainer object, boolean allowCompression) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 
