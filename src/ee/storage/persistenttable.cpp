@@ -743,6 +743,7 @@ void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& t
     uint16_t migrateColumnIndex = tuple.getSchema()->hiddenColumnCount() -1;
     if (tuple.getHiddenNValue(migrateColumnIndex).isNull()) {
         int64_t txnId = ec->currentTxnId();
+        VOLT_TRACE("Migrated row transaction id:%ld", (long)txnId);
         tuple.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(txnId));
     }
 }

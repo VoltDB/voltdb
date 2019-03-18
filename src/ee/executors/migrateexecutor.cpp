@@ -203,7 +203,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 }
 
                 targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                            indexesToUpdate, true, false);
+                                                            indexesToUpdate, true, false, true);
             }
             modified_tuples = m_inputTable->tempTableTupleCount();
             if (m_replicatedTableOperation) {
