@@ -1189,6 +1189,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public int writeTruncatedObject(ByteBuffer output) throws IOException {
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             int bytesWritten = MiscUtils.writeDeferredSerialization(output, m_ds);
+            output.flip();
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             ByteBuffer header = output.duplicate();
             header.position(PBDSegment.ENTRY_HEADER_CRC_OFFSET);
