@@ -570,10 +570,7 @@ void JNITopend::pushExportBuffer(
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
-<<<<<<< HEAD
                 static_cast<int64_t>(0),
-=======
->>>>>>> origin/master
                 generationId,
                 NULL,
                 NULL,
