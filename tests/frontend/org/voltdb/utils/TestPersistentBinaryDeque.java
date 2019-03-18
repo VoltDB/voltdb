@@ -32,6 +32,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -45,6 +46,7 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
@@ -1180,6 +1182,55 @@ public class TestPersistentBinaryDeque {
         // Make sure a new segment was created and the old segment was deleted
         assertEquals(1, files.length);
         assertEquals("pbd_nonce_0000000003_0000000001.pbd", files[0].getName());
+    }
+
+    @Test
+    public void testUpdateExtraHeader() throws Exception {
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 2; j++) {
+                m_pbd.offer(defaultContainer(), true);
+            }
+            assertEquals(i + 1, TEST_DIR.listFiles().length);
+
+            final int headerData = i;
+            m_pbd.updateExtraHeader(new DeferredSerialization() {
+                @Override
+                public void serialize(ByteBuffer buf) throws IOException {
+                    buf.putInt(headerData);
+                }
+
+                @Override
+                public int getSerializedSize() throws IOException {
+                    return Integer.BYTES;
+                }
+
+                @Override
+                public void cancel() {}
+            });
+        }
+        assertEquals(6, TEST_DIR.listFiles().length);
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        BBContainer container = reader.getExtraHeader(1);
+        try {
+            assertNotNull(container);
+            ByteBuffer expected = ByteBuffer.allocate(m_ds.getSerializedSize());
+            expected.order(ByteOrder.LITTLE_ENDIAN);
+            m_ds.serialize(expected);
+            expected.rewind();
+            assertEquals(expected, container.b());
+        } finally {
+            container.discard();
+        }
+        for (int i = 0; i < 5; ++i) {
+            container = reader.getExtraHeader(i + 2);
+            try {
+                assertNotNull(container);
+                assertEquals(i, container.b().getInt());
+                assertFalse(container.b().hasRemaining());
+            } finally {
+                container.discard();
+            }
+        }
     }
 
     private BBContainer pollOnceWithoutDiscard(BinaryDequeReader reader) throws IOException {
