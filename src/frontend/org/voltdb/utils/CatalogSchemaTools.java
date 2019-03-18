@@ -356,12 +356,12 @@ public abstract class CatalogSchemaTools {
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
                     sb.append("CREATE ASSUMEUNIQUE INDEX ");
-                }
-                else {
+                } else {
                     sb.append("CREATE UNIQUE INDEX ");
                 }
-            }
-            else {
+            } else if (catalog_idx.getMigrating()) {
+                sb.append("CREATE MIGRATING INDEX ");
+            } else {
                 sb.append("CREATE INDEX ");
             }
 
