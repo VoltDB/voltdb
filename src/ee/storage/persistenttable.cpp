@@ -1176,6 +1176,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
+    // undo migrating indexes
     if (m_shadowStream != nullptr) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         migratingRemove(ec->currentTxnId(), sourceTupleWithNewValues);

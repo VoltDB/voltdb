@@ -126,8 +126,6 @@ bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
 bool MigrateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTable);
 
-    // target table should be persistenttable
-    // Note that the target table pointer in the node's tcd can change between p_init and p_execute (at least for delete)
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
 
