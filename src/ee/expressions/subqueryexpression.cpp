@@ -50,7 +50,6 @@ SubqueryExpression::~SubqueryExpression() {
 NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
 {
     // Get the subquery context with the last evaluation result and parameters used to obtain that result
-
     ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
 
     SubqueryContext* context = exeContext->getSubqueryContext(m_subqueryId);
@@ -83,7 +82,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
         std::vector<NValue>& lastParams = context->accessLastParams();
         assert(lastParams.size() == m_otherParamIdxs.size());
         for (size_t i = 0; i < lastParams.size(); ++i) {
-            NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
+            const NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
             if (lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL) {
                 lastParams[i] = prevParam.copyNValue();
                 paramsChanged = true;
@@ -133,7 +132,7 @@ std::string SubqueryExpression::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
     buffer << spacer << expressionToString(getExpressionType()) << ": subqueryId: " << m_subqueryId;
-    return (buffer.str());
+    return buffer.str();
 }
 
 }
