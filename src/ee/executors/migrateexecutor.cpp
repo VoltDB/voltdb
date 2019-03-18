@@ -188,20 +188,6 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                     }
                 }
 
-                // if there is a partition column for the target table
-                if (m_partitionColumn != -1) {
-                    // check for partition problems
-                    // get the value for the partition column
-                    bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
-                    // if it doesn't map to this site
-                    if (!isLocal) {
-                        throw ConstraintFailureException(
-                                targetTable, tempTuple,
-                                 "An update to a partitioning column triggered a partitioning error. "
-                                 "Updating a partitioning column is not supported. Try delete followed by insert.");
-                    }
-                }
-
                 targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                             indexesToUpdate, true, false, true);
             }
