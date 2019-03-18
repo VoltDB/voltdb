@@ -79,7 +79,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         if (isValgrind()) {
             return;
         }
-        int numOfStreams = 3;
+        int numOfStreams = 2;
         if (MiscUtils.isPro()) {
             numOfStreams += 2;
         }

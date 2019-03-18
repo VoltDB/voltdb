@@ -344,7 +344,9 @@ public class PlannerTool {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
-                if (e.getMessage() != null) {
+                // JAVA 9+ NumberFormatException from BigDecimal will contain message
+                // TODO:  why need to omit other exception types?
+                if (!(e instanceof NumberFormatException) && (e.getMessage() != null)) {
                     throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
                 }
                 throw new RuntimeException("SQL error while compiling query: " + e.toString() + loggedMsg, e);

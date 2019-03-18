@@ -67,6 +67,7 @@
 #define  __USE_GNU
 #endif // __USE_GNU
 #include <sched.h>
+#include <cerrno>
 #endif // LINUX
 #ifdef MACOSX
 #include <mach/task.h>
@@ -139,6 +140,7 @@ using namespace voltdb;
  */
 static VoltDBEngine *currentEngine = NULL;
 static JavaVM *currentVM = NULL;
+static jfieldID field_fd;
 
 void signalHandler(int signum, siginfo_t *info, void *context) {
     if (currentVM == NULL || currentEngine == NULL)
@@ -214,6 +216,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     currentVM = vm;
     if (isSunJVM == JNI_TRUE)
         setupSigHandler();
+    // retrieving the fieldId fd of FileDescriptor for later use
+    jclass class_fdesc = env->FindClass("java/io/FileDescriptor");
+    if (class_fdesc == NULL) {
+        assert(!"Failed to find filed if of FileDescriptor.");
+        throw std::exception();
+        return 0;
+    }
+    // poke the "fd" field with the file descriptor
+    field_fd = env->GetFieldID(class_fdesc, "fd", "I");
+
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
@@ -1372,15 +1384,22 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
 #endif
 }
 
+/**
+ * Utility used for access file descriptor number from JAVA FileDescriptor class
+ */
+jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject) {
+    return env-> GetIntField(fdObject, field_fd);
+}
+
 /*
  * Class:     org_voltdb_utils_PosixAdvise
- * Method:    fadvise
- * Signature: (JJJI)J
+ * Method:    nativeFadvise
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_nativeFadvise
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
-    return posix_fadvise(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+    return posix_fadvise(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
 #else
     return 0;
 #endif
@@ -1389,20 +1408,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    sync_file_range
- * Signature: (JJJI)J
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
 #error VoltDB server requires that your kernel headers define __NR_sync_file_range.
 #endif
-    return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
+    return syscall(__NR_sync_file_range, getFdFromFileDescriptor(env,fdObject), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
 #elif MACOSX
     return -1;
 #else
-    return fdatasync(static_cast<int>(fd));
+    return fdatasync(getFdFromFileDescriptor(env,fdObject));
 #endif
 }
 
@@ -1410,14 +1429,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    fallocate
- * Signature: (JJJ)J
+ * Signature: (Ljava/io/FileDescriptor;JJ)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length) {
 #ifdef MACOSX
     return -1;
 #else
-    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+    return posix_fallocate(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length));
 #endif
 }
 

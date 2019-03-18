@@ -1404,8 +1404,13 @@ Mockito
  * Copyright (c) 2007 Mockito contributors
  * This program is made available under the terms of the MIT License.
  */
+ ================================================================================
+PowerMock 2.0.0
+/* Copyright 2007-2017 PowerMock Contributors
+This software is released under Apache software license as mentioned below.
+*/
  ===============================================================================
- hamcrest-all-1.3
+ hamcrest-2.1
  BSD License
 
 Copyright (c) 2000-2006, www.hamcrest.org
@@ -2582,6 +2587,7 @@ limitations under the License.
 
 ===============================================================================
 apache felix
+version 5.6.12
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -2849,7 +2855,7 @@ License: http://joda-time.sourceforge.net/license.html
    limitations under the License.
 
 =========================================================================================
-owner-1.0.9
+owner-1.0.10
 License URL: https://raw.githubusercontent.com/lviggiano/owner/master/LICENSE
 Site: https://github.com/lviggiano/owner
 =========================================================================================

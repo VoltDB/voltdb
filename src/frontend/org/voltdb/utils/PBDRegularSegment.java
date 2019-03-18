@@ -195,6 +195,7 @@ public class PBDRegularSegment extends PBDSegment {
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             initNumEntries(0, 0);
+
         }
         if (forWrite) {
             m_fc.position(m_fc.size());

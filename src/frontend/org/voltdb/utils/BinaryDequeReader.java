@@ -22,7 +22,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
 /**
- * Reader class used to read entries from the deque. Multiple readers may be active at the same time,
+ * Reader interface used to read entries from the deque. Multiple readers may be active at the same time,
  * each of them maintaining their own read location within the deque.
  */
 public interface BinaryDequeReader {
