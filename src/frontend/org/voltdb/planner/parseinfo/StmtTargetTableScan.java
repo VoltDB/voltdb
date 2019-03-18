@@ -151,7 +151,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         if (columnIndex == null) {
             throw new PlanningErrorException("Column <"
                                                 + columnName
-                                                + "> Not found. Please update your query.",
+                                                + "> not found. Please update your query.",
                                              1);
         }
         SchemaColumn originalSchemaColumn = m_origSubqueryScan.getSchemaColumn(columnIndex);
