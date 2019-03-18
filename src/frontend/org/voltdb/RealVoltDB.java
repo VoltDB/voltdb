@@ -75,6 +75,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -145,6 +148,7 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -3737,18 +3741,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                  " in use. Class " + classname + " was compiled with ";
 
                     Integer major = 0;
-                    try {
-                        major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
-                    } catch (Exception ex) {
-                        hostLog.info("Unable to parse compile version number from UnsupportedClassVersionError.",
-                                ex);
+                    // update the matcher pattern for various jdk
+                    Pattern pattern = Pattern.compile("version\\s(\\d+).(\\d+)");
+                    Matcher matcher = pattern.matcher(e.getMessage());
+                    if (matcher.find()) {
+                        major = Integer.parseInt(matcher.group(1));
+                    } else {
+                        hostLog.info("Unable to parse compile version number from UnsupportedClassVersionError.");
                     }
 
                     if (VerifyCatalogAndWriteJar.SupportedJavaVersionMap.containsKey(major)) {
                         errorMsg = errorMsg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
                                          System.getProperty("java.version") + ".");
                     } else {
-                        errorMsg = errorMsg.concat("an incompatable Java version.");
+                        errorMsg = errorMsg.concat("an incompatible Java version.");
                     }
                     hostLog.info(errorMsg);
                     return errorMsg;
@@ -5107,9 +5113,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_iv2Initiators.firstKey();
     }
 
-    public void updateReplicaForJoin(long siteId, long txnId) {
+    public void updateReplicaForJoin(long siteId, TransactionState transactionState) {
         m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
-            .forEach(s->((SpInitiator)s).updateReplicasForJoin(txnId));
+                .forEach(s -> ((SpInitiator) s).updateReplicasForJoin(transactionState));
     }
 
     @Override

@@ -6,6 +6,8 @@ from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
 from fabric.utils import abort
 
+#TODO: These should not be globals
+
 #Login as user test, but build in a directory by real username
 username = 'test'
 builddir = "/tmp/" + getpass.getuser() + "Kits/buildtemp"
@@ -260,99 +262,101 @@ def rmNativeLibs():
 # GET THE GIT TAGS OR SHAS TO BUILD FROM
 ################################################
 
-parser = argparse.ArgumentParser(description = "Create a full kit. With no args, will do build of master")
-parser.add_argument('voltdb_sha', nargs="?", default="master", help="voltdb repository commit, tag or branch" )
-parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository commit, tag or branch" )
-parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
-parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
-parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
-parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
-args = parser.parse_args()
+if __name__ == "__main__":
 
-proTreeish = args.pro_sha
-voltdbTreeish = args.voltdb_sha
-rbmqExportTreeish = args.rabbitmq_sha
+    parser = argparse.ArgumentParser(description = "Create a full kit. With no args, will do build of master")
+    parser.add_argument('voltdb_sha', nargs="?", default="master", help="voltdb repository commit, tag or branch" )
+    parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository commit, tag or branch" )
+    parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
+    parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
+    parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
+    parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
+    args = parser.parse_args()
 
-print args
+    proTreeish = args.pro_sha
+    voltdbTreeish = args.voltdb_sha
+    rbmqExportTreeish = args.rabbitmq_sha
 
-build_community = not args.nocommunity
-build_mac = not args.nomac
+    print args
 
-#If anything is missing we're going to dump this in oneoffs dir.
-build_all = build_community and build_mac
-if voltdbTreeish != proTreeish or not build_all:
-    oneOff = True
-else:
-    oneOff  = False
+    build_community = not args.nocommunity
+    build_mac = not args.nomac
 
-rmNativeLibs()
+    #If anything is missing we're going to dump this in oneoffs dir.
+    build_all = build_community and build_mac
+    if voltdbTreeish != proTreeish or not build_all:
+        oneOff = True
+    else:
+        oneOff  = False
 
-try:
-    build_args = os.environ['VOLTDB_BUILD_ARGS']
-except:
-    build_args=""
+    rmNativeLibs()
 
-print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
-
-build_errors=False
-
-versionCentos = "unknown"
-versionMac = "unknown"
-releaseDir = "unknown"
-
-# get ssh config [key_filename, hostname]
-CentosSSHInfo = getSSHInfoForHost("buildkits_C7")
-MacSSHInfo = getSSHInfoForHost("voltmini")
-UbuntuSSHInfo = getSSHInfoForHost("volt12d")
-
-# build community kit on the mini so that .so can be picked up for unified kit
-if build_mac or build_community:
     try:
-        with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-            versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
-            buildCommunity()
+        build_args = os.environ['VOLTDB_BUILD_ARGS']
+    except:
+        build_args=""
+
+    print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
+
+    build_errors=False
+
+    versionCentos = "unknown"
+    versionMac = "unknown"
+    releaseDir = "unknown"
+
+    # get ssh config [key_filename, hostname]
+    CentosSSHInfo = getSSHInfoForHost("buildkits_C7")
+    MacSSHInfo = getSSHInfoForHost("voltmini")
+    UbuntuSSHInfo = getSSHInfoForHost("volt12d")
+
+    # build community kit on the mini so that .so can be picked up for unified kit
+    if build_mac or build_community:
+        try:
+            with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+                versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
+                buildCommunity()
+        except Exception as e:
+            print traceback.format_exc()
+            print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
+            build_errors=True
+
+    # build kits on 15f
+    try:
+        with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+            versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
+            if build_mac:
+                assert versionCentos == versionMac
+
+            if oneOff:
+                releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
+                    (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
+            else:
+                releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
+            makeReleaseDir(releaseDir)
+            print "VERSION: " + versionCentos
+            if build_community:
+                buildCommunity()
+                buildRabbitMQExport(versionCentos, "community")
+                copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+            buildEnterprise()
+            buildRabbitMQExport(versionCentos, "ent")
+            makeSHA256SUM(versionCentos,"ent")
+            copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
+            packagePro(versionCentos)
+            makeSHA256SUM(versionCentos,"pro")
+            copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
+            makeTrialLicense()
+            copyTrialLicenseToReleaseDir(releaseDir)
+            makeMavenJars()
+            copyMavenJarsToReleaseDir(releaseDir, versionCentos)
+
     except Exception as e:
         print traceback.format_exc()
-        print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
+        print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
         build_errors=True
 
-# build kits on 15f
-try:
-    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-        versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
-        if build_mac:
-            assert versionCentos == versionMac
+    rmNativeLibs()      # cleanup imported native libs so not picked up unexpectedly by other builds
 
-        if oneOff:
-            releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
-                (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
-        else:
-            releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
-        makeReleaseDir(releaseDir)
-        print "VERSION: " + versionCentos
-        if build_community:
-            buildCommunity()
-            buildRabbitMQExport(versionCentos, "community")
-            copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
-        buildEnterprise()
-        buildRabbitMQExport(versionCentos, "ent")
-        makeSHA256SUM(versionCentos,"ent")
-        copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
-        packagePro(versionCentos)
-        makeSHA256SUM(versionCentos,"pro")
-        copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
-        makeTrialLicense()
-        copyTrialLicenseToReleaseDir(releaseDir)
-        makeMavenJars()
-        copyMavenJarsToReleaseDir(releaseDir, versionCentos)
-
-except Exception as e:
-    print traceback.format_exc()
-    print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
-
-rmNativeLibs()      # cleanup imported native libs so not picked up unexpectedly by other builds
-
-exit (build_errors)
-#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
-#backupReleaseDir(releaseDir, archiveDir, versionCentos)
+    exit (build_errors)
+    #archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
+    #backupReleaseDir(releaseDir, archiveDir, versionCentos)

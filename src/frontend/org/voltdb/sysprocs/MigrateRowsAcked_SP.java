@@ -26,6 +26,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.VoltType;
 
@@ -59,8 +60,10 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
         VoltTable[] results = null;
 
         try {
-            boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(tableName,
-                    deletableTxnId, maxRowCount);
+            final TransactionState txnState = m_runner.getTxnState();
+            boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+                    txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
+                    tableName, deletableTxnId, maxRowCount);
             results = new VoltTable[1];
             VoltTable result = new VoltTable(new ColumnInfo("txnDeleted", VoltType.TINYINT));
             result.addRow(txnDeleted ? 1 : 0);

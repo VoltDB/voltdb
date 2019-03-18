@@ -1917,11 +1917,11 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
 
     quiesce(lastCommittedSpHandle);
     if (m_executorContext->drStream()->drStreamStarted()) {
-        m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+        m_executorContext->drStream()->generateDREvent(SWAP_TABLE,
                 spHandle, uniqueId, payload);
     }
     if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
-        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE,
                 spHandle, uniqueId, payload);
     }
 }
@@ -2605,19 +2605,56 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-bool VoltDBEngine::deleteMigratedRows(std::string tableName, int64_t deletableTxnId, int32_t maxRowCount) {
+bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+        std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
-        if (table->isReplicatedTable()) {
-            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
-                ExecuteWithMpMemory useMpMemory;
-                bool txnIdFound = table->deleteMigratedRows(deletableTxnId, maxRowCount);
-                SynchronizedThreadLock::signalLowestSiteFinished();
-                return txnIdFound;
+        setUndoToken(undoToken);
+        m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                                 txnId,
+                                                 spHandle,
+                                                 -1,
+                                                 uniqueId,
+                                                 false);
+
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+                (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            bool txnIdFound = false;
+            try {
+                txnIdFound = table->deleteMigratedRows(deletableTxnId, maxRowCount);
             }
+            catch (const SQLException &sqe) {
+                s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+                throw;
+            }
+            catch (const SerializableEEException& serializableExc) {
+                // Exceptions that are not constraint failures or sql exeception are treated as fatal.
+                // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+                // other kind of exception?
+                s_loadTableException = serializableExc.getType();
+                throwFatalException("%s", serializableExc.message().c_str());
+            }
+
+            // Indicate to other threads that load happened successfully.
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
+            return txnIdFound;
         }
-        else {
-            return table->deleteMigratedRows(deletableTxnId, maxRowCount);
+        else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
+            // An sql exception was thrown on the lowest site thread and
+            // handle it on the other threads too.
+            std::ostringstream oss;
+            oss << "Replicated table deleteMigratedRows failed (sql exception) on other thread for table \""
+                << table->name() << "\".\n";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
+        }
+        else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
+            // This is fatal.
+            std::ostringstream oss;
+            oss << "An unknown exception occurred on another thread calling deleteMigratedRows \"" << table->name() << "\".";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throwFatalException("%s", oss.str().c_str());
         }
     }
     if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
@@ -2800,8 +2837,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
                 new (*uq) ExecuteTaskUndoGenerateDREventAction(
                         m_executorContext->drStream(), m_executorContext->drReplicatedStream(),
                         m_executorContext->m_partitionId,
-                        type, lastCommittedSpHandle,
-                        spHandle, uniqueId, payloads));
+                        type, spHandle, uniqueId, payloads));
         break;
     }
     default:

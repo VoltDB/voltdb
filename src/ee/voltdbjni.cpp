@@ -67,6 +67,7 @@
 #define  __USE_GNU
 #endif // __USE_GNU
 #include <sched.h>
+#include <cerrno>
 #endif // LINUX
 #ifdef MACOSX
 #include <mach/task.h>
@@ -139,6 +140,7 @@ using namespace voltdb;
  */
 static VoltDBEngine *currentEngine = NULL;
 static JavaVM *currentVM = NULL;
+static jfieldID field_fd;
 
 void signalHandler(int signum, siginfo_t *info, void *context) {
     if (currentVM == NULL || currentEngine == NULL)
@@ -214,6 +216,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     currentVM = vm;
     if (isSunJVM == JNI_TRUE)
         setupSigHandler();
+    // retrieving the fieldId fd of FileDescriptor for later use
+    jclass class_fdesc = env->FindClass("java/io/FileDescriptor");
+    if (class_fdesc == NULL) {
+        assert(!"Failed to find filed if of FileDescriptor.");
+        throw std::exception();
+        return 0;
+    }
+    // poke the "fd" field with the file descriptor
+    field_fd = env->GetFieldID(class_fdesc, "fd", "I");
+
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
@@ -1141,15 +1153,19 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeDeleteMigratedRows
  *
- * @param pointer Pointer to an engine instance
+ * @param txnId The transactionId of the currently executing stored procedure
+ * @param spHandle The spHandle of the currently executing stored procedure
+ * @param uniqueId The uniqueId of the currently executing stored procedure
  * @param mTableName The name of the table that the deletes should be applied to.
  * @param deletableTxnId The transactionId of the last row that can be deleted
  * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
+ * @param undoToken The token marking the rollback point for this transaction
  * @return true if every row up to and including deletableTxnId have been deleted.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
         JNIEnv *env, jobject obj, jlong engine_ptr,
-        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount)
+        jlong txnId, jlong spHandle, jlong uniqueId,
+        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount, jlong undoToken)
 {
     VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1160,9 +1176,13 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeD
     try {
         try {
             engine->resetReusedResultOutputBuffer();
-            return engine->deleteMigratedRows(tableNameStr,
-                                        static_cast<int64_t>(deletableTxnId),
-                                        static_cast<int32_t>(maxRowCount));
+            return engine->deleteMigratedRows(static_cast<int64_t>(txnId),
+                                              static_cast<int64_t>(spHandle),
+                                              static_cast<int64_t>(uniqueId),
+                                              tableNameStr,
+                                              static_cast<int64_t>(deletableTxnId),
+                                              static_cast<int32_t>(maxRowCount),
+                                              static_cast<int64_t>(undoToken));
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
         }
@@ -1364,15 +1384,22 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
 #endif
 }
 
+/**
+ * Utility used for access file descriptor number from JAVA FileDescriptor class
+ */
+jint getFdFromFileDescriptor(JNIEnv *env, jobject fdObject) {
+    return env-> GetIntField(fdObject, field_fd);
+}
+
 /*
  * Class:     org_voltdb_utils_PosixAdvise
- * Method:    fadvise
- * Signature: (JJJI)J
+ * Method:    nativeFadvise
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_nativeFadvise
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
-    return posix_fadvise(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+    return posix_fadvise(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
 #else
     return 0;
 #endif
@@ -1381,20 +1408,20 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    sync_file_range
- * Signature: (JJJI)J
+ * Signature: (Ljava/io/FileDescriptor;JJI)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
 #error VoltDB server requires that your kernel headers define __NR_sync_file_range.
 #endif
-    return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
+    return syscall(__NR_sync_file_range, getFdFromFileDescriptor(env,fdObject), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
 #elif MACOSX
     return -1;
 #else
-    return fdatasync(static_cast<int>(fd));
+    return fdatasync(getFdFromFileDescriptor(env,fdObject));
 #endif
 }
 
@@ -1402,14 +1429,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
 /*
  * Class:     org_voltdb_utils_PosixAdvise
  * Method:    fallocate
- * Signature: (JJJ)J
+ * Signature: (Ljava/io/FileDescriptor;JJ)J
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
-  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+        (JNIEnv *env, jclass, jobject fdObject, jlong offset, jlong length) {
 #ifdef MACOSX
     return -1;
 #else
-    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+    return posix_fallocate(getFdFromFileDescriptor(env,fdObject), static_cast<off_t>(offset), static_cast<off_t>(length));
 #endif
 }
 

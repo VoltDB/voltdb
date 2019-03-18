@@ -195,6 +195,7 @@ public class PBDRegularSegment extends PBDSegment {
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             initNumEntries(0, 0);
+
         }
         if (forWrite) {
             m_fc.position(m_fc.size());
@@ -442,7 +443,7 @@ public class PBDRegularSegment extends PBDSegment {
         private int m_objectReadIndex = 0;
         private int m_bytesRead = 0;
         private int m_discardCount = 0;
-        private boolean m_closed = false;
+        private boolean m_readerClosed = false;
         private CRC32 m_crc32 = new CRC32();
 
         public SegmentReader(String cursorId) {
@@ -471,7 +472,7 @@ public class PBDRegularSegment extends PBDSegment {
         @Override
         public DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCRC) throws IOException {
 
-            if (m_closed) throw new IOException("Reader closed");
+            if (m_readerClosed) throw new IOException("Reader closed");
 
             if (!hasMoreEntries()) {
                 return null;
@@ -596,7 +597,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public DBBPool.BBContainer getSchema(boolean checkCRC) throws IOException {
-            if (m_closed) throw new IOException("Reader closed");
+            if (m_readerClosed) throw new IOException("Reader closed");
 
             final long writePos = m_fc.position();
             m_fc.position(SEGMENT_HEADER_BYTES);
@@ -642,7 +643,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public int uncompressedBytesToRead() {
-            if (m_closed) throw new RuntimeException("Reader closed");
+            if (m_readerClosed) throw new RuntimeException("Reader closed");
 
             return m_size - m_bytesRead;
         }
@@ -664,7 +665,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public void close() throws IOException {
-            m_closed = true;
+            m_readerClosed = true;
             m_readCursors.remove(m_cursorId);
             m_closedCursors.put(m_cursorId, this);
             if (m_readCursors.isEmpty()) {
@@ -674,7 +675,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public boolean isClosed() {
-            return m_closed;
+            return m_readerClosed;
         }
 
         @Override
@@ -682,9 +683,11 @@ public class PBDRegularSegment extends PBDSegment {
             m_readOffset = readOffset;
         }
 
+        @Override
         public void reopen(boolean forWrite, boolean emptyFile) throws IOException {
-            if (m_closed) {
+            if (m_readerClosed) {
                 open(forWrite, emptyFile);
+                m_readerClosed = false;
             }
             if (m_cursorId != null) {
                 m_closedCursors.remove(m_cursorId);

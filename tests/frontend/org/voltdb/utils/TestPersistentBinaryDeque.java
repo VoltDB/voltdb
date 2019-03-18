@@ -378,7 +378,9 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 2);
 
         for (int ii = 46; ii < 96; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)), m_ds, true, false);
+            // Note: new segment after truncate?
+            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)), m_ds, true,
+                    ii == 46 ? true : false);
         }
 
         reader = m_pbd.openForRead(CURSOR_ID);
@@ -451,7 +453,9 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 2);
 
         for (int ii = 46; ii < 96; ii++) {
-            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)), m_ds, true, false);
+            // Note: new segment after truncate?
+            m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)), m_ds, true,
+                    ii == 46 ? true : false);
         }
 
         long actualSizeInBytes = 0;
