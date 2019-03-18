@@ -78,9 +78,9 @@
         };
 
         this.GetDataTablesInformation = function (onConnectionAdded) {
-             var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
-             var parameters = ["TABLE", "TABLES"];
-             var values = ['0', undefined];
+             var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog'];
+             var parameters = ["TABLE", "EXPORT", "TABLES"];
+             var values = ['0', '0', undefined];
              this.processTask(onConnectionAdded, "DATABASE_INFORMATION", procedureNames, parameters, values);
         };
 
@@ -147,9 +147,9 @@
         };
 
         this.GetTableInformation = function (onConnectionAdded) {
-            var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
-            var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
-            var values = ['0', '0', undefined];
+            var procedureNames = ['@Statistics', '@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+            var parameters = ["TABLE", "INDEX", "EXPORT", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+            var values = ['0', '0', '0', undefined];
             this.processTaskAdmin(onConnectionAdded, "TABLE_INFORMATION", procedureNames, parameters, values, true, false);
         };
 
