@@ -1182,7 +1182,7 @@ public class TestPersistentBinaryDeque {
         BBContainer schema = null;
         try {
             if (reader.isStartOfSegment()) {
-                schema = reader.getSchema(-1, false, false);
+                schema = reader.getExtraHeader(-1);
                 assertNotNull(schema);
                 assertFalse(reader.isEmpty());
             }
@@ -1199,7 +1199,7 @@ public class TestPersistentBinaryDeque {
         BBContainer retval = null;
         try {
             if (reader.isStartOfSegment()) {
-                schema = reader.getSchema(-1, false, false);
+                schema = reader.getExtraHeader(-1);
                 assertNotNull(schema);
                 assertFalse(reader.isEmpty());
             }
@@ -1219,7 +1219,7 @@ public class TestPersistentBinaryDeque {
         BBContainer retval = null;
         try {
             if (reader.isStartOfSegment()) {
-                schema = reader.getSchema(-1, false, false);
+                schema = reader.getExtraHeader(-1);
                 assertNotNull(schema);
                 assertFalse(reader.isEmpty());
             }

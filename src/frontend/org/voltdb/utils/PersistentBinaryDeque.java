@@ -132,8 +132,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public BBContainer getSchema(long segmentIndex, boolean restoreReaderOffset, boolean checkCRC)
-                throws IOException {
+        public BBContainer getExtraHeader(long segmentIndex) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
@@ -152,23 +151,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     segment = m_segment;
                 }
 
-                long originalOffset = -1;
-                try {
-                    segmentReader = segment.getReader(m_cursorId);
-                    if (segmentReader == null) {
-                        segmentReader = segment.openForRead(m_cursorId);
-                    } else if (segmentReader.isClosed()) {
-                        segmentReader.reopen(false, false);
-                    }
-                    // need to restore the read offset
-                    originalOffset = segmentReader.readOffset();
-                    segmentReader.setReadOffset(PBDSegment.ENTRY_HEADER_BYTES);
-                    return segmentReader.getSchema(checkCRC);
-                } finally {
-                    if (segmentReader != null && restoreReaderOffset) {
-                        segmentReader.setReadOffset(originalOffset);
-                    }
+                segmentReader = segment.getReader(m_cursorId);
+                if (segmentReader == null) {
+                    segmentReader = segment.openForRead(m_cursorId);
+                } else if (segmentReader.isClosed()) {
+                    segmentReader.reopen(false, false);
                 }
+                // need to restore the read offset
+                return segmentReader.getExtraHeader();
             }
         }
 

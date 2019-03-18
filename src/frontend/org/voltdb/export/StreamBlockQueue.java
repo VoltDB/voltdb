@@ -123,7 +123,7 @@ public class StreamBlockQueue {
         try {
             // Start to read a new segment
             if (m_reader.isStartOfSegment()) {
-                schemaCont = m_reader.getSchema(-1, false, false);
+                schemaCont = m_reader.getExtraHeader(-1);
             }
             cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
         } catch (IOException e) {
@@ -174,7 +174,7 @@ public class StreamBlockQueue {
             segmentIndex = sb.getSegmentIndex();
         }
         try {
-            schemaCont = m_reader.getSchema(segmentIndex, true, false);
+            schemaCont = m_reader.getExtraHeader(segmentIndex);
         } catch (IOException e) {
             exportLog.error("Failed to poll schema: " + e);
         }

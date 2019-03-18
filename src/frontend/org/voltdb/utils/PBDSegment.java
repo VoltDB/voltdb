@@ -48,14 +48,12 @@ public abstract class PBDSegment {
     public static final int HEADER_CRC_OFFSET = 0;
     public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
-    static final int SEGMENT_HEADER_BYTES = 12;
+    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = 12;
+    static final int SEGMENT_HEADER_BYTES = 16;
 
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
 
-    public static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + //export buffer version
-                                                         8 + //generation id
-                                                         4;  //schema size
     // Export Segment Entry Header layout (each segment has multiple entries):
     //  - crc of segment entry (4 bytes),
     //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
@@ -159,14 +157,8 @@ public abstract class PBDSegment {
         int sizeInBytes = 0;
 
         DBBPool.BBContainer cont;
-        DBBPool.BBContainer schemaCont = null;
-        boolean isFinal = isFinal();
         while (true) {
             final long beforePos = reader.readOffset();
-
-            if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(!isFinal);
-            }
 
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
             if (cont == null) {
@@ -216,10 +208,6 @@ public abstract class PBDSegment {
                 }
             } finally {
                 cont.discard();
-                if (schemaCont != null) {
-                    schemaCont.discard();
-                    schemaCont = null;
-                }
             }
         }
         int entriesScanned = reader.readIndex();
@@ -258,7 +246,7 @@ public abstract class PBDSegment {
         while (true) {
             // Start to read a new segment
             if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(false);
+                schemaCont = reader.getExtraHeader();
             }
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
             if (cont == null) {
