@@ -27,7 +27,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.VoltType;
 
 /**
@@ -53,12 +52,13 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext context,
+                           int partitionParam,          // Partition parameter
                            String tableName,            // Name of table that can have rows deleted
                            long deletableTxnId,         // All rows with TxnIds before this can be deleted
                            int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
     {
         VoltTable[] results = null;
-
+System.out.println("deleting........" + deletableTxnId);
         try {
             final TransactionState txnState = m_runner.getTxnState();
             boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
