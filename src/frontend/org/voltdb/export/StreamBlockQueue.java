@@ -123,7 +123,7 @@ public class StreamBlockQueue {
         try {
             // Start to read a new segment
             if (m_reader.isStartOfSegment()) {
-                schemaCont = m_reader.getSchema(-1, false, false);
+                schemaCont = m_reader.getExtraHeader(-1);
             }
             cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
         } catch (IOException e) {
@@ -174,7 +174,7 @@ public class StreamBlockQueue {
             segmentIndex = sb.getSegmentIndex();
         }
         try {
-            schemaCont = m_reader.getSchema(segmentIndex, true, false);
+            schemaCont = m_reader.getExtraHeader(segmentIndex);
         } catch (IOException e) {
             exportLog.error("Failed to poll schema: " + e);
         }
@@ -264,11 +264,15 @@ public class StreamBlockQueue {
         }
     }
 
+    public void updateSchema(DeferredSerialization schemaSerializer) throws IOException {
+        m_persistentDeque.updateExtraHeader(schemaSerializer);
+    }
+
     /*
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
-    public void offer(StreamBlock streamBlock, DeferredSerialization ds, boolean createNewFile) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), ds, !DISABLE_COMPRESSION, createNewFile);
+    public void offer(StreamBlock streamBlock) throws IOException {
+        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
@@ -360,9 +364,6 @@ public class StreamBlockQueue {
                         offset++;
                         // Not the row we are looking to truncate at. Skip past it (row length + row length field).
                         final int rowLength = b.getInt();
-                        if (b.position() + rowLength > b.limit()) {
-                            System.out.println(rowLength);
-                        }
                         b.position(b.position() + rowLength);
                     }
                     return null;
@@ -386,6 +387,7 @@ public class StreamBlockQueue {
         assert(m_memoryDeque.isEmpty());
         return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
 
+            @Override
             public ExportSequenceNumberTracker scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();

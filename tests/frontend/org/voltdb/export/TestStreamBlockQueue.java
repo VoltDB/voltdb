@@ -72,6 +72,7 @@ public class TestStreamBlockQueue extends TestCase {
                 null, g_seqNo, 1, 0L, -1, false);
     }
 
+    @Override
     @Before
     public void setUp() throws Exception {
         m_mockVoltDB = new MockVoltDB();
@@ -92,6 +93,7 @@ public class TestStreamBlockQueue extends TestCase {
         defaultBuffer.clear();
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         try {
@@ -121,7 +123,7 @@ public class TestStreamBlockQueue extends TestCase {
         StreamBlock sb = null;
         assertTrue(m_sbq.isEmpty());
         sb = getStreamBlockWithFill((byte)1);
-        m_sbq.offer(sb, null, false);
+        m_sbq.offer(sb);
         StreamBlock fromPeek = m_sbq.peek();
         assertEquals(sb.startSequenceNumber(), fromPeek.startSequenceNumber());
         assertEquals(sb.totalSize(), fromPeek.totalSize());
@@ -176,7 +178,7 @@ public class TestStreamBlockQueue extends TestCase {
                 case 5:
                 case 0:
                     System.out.println("Iteration " + iteration + " Action offer");
-                    m_sbq.offer(getStreamBlockWithFill(zero), null, false);
+                m_sbq.offer(getStreamBlockWithFill(zero));
                     break;
                 case 1:
                     System.out.println("Iteration " + iteration + " Action sync");
@@ -216,7 +218,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testIterator() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
             if (ii == 2) {
                 m_sbq.poll().discard();
             }
@@ -276,7 +278,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testIterator2() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
             if (ii == 2) {
                 m_sbq.poll().discard();
                 m_sbq.poll().discard();
@@ -338,7 +340,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testIterator2WithSync() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
             if (ii == 2) {
                 m_sbq.poll().discard();
                 m_sbq.poll().discard();
@@ -403,7 +405,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testSyncReopenThenPop() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
             if (ii == 2) {
                 m_sbq.poll().discard();
                 m_sbq.poll().discard();
@@ -469,7 +471,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testIterator3() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
             if (ii == 3) {
                 m_sbq.poll().discard();
                 m_sbq.poll().discard();
@@ -533,7 +535,7 @@ public class TestStreamBlockQueue extends TestCase {
     public void testIterator4() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);
-            m_sbq.offer(sb, null, false);
+            m_sbq.offer(sb);
         }
         //Strange scenario where one block in the memory deque is persisted and the others isn't
         long weirdSizeValue = 1024 * 1024 * 2 * 32;
