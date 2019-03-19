@@ -59,7 +59,7 @@ public class PlanChecker extends CalcitePlannerTestCase {
      * @param path The path of the DDL file.
      * @throws Exception
      */
-    private void initWithDDL(String path) throws Exception {
+    void initWithDDL(String path) throws Exception {
         setupSchema(new File(path).toURI().toURL(), "testcalcite", false);
         init();
     }
@@ -68,21 +68,12 @@ public class PlanChecker extends CalcitePlannerTestCase {
      * Check and compare a single SQL statement.
      * @param sql
      */
-    private void checkPlan(String sql) {
+    void checkPlan(String sql) {
         // remove the semi colon at the end of the sql statement
         sql = sql.replaceAll(";$", "");
-        // we don't want to check DDLs.
-        try {
-            if (VoltFastSqlParser.parse(sql).isA(SqlKind.DDL)) {
-                return;
-            }
-            if (!CALCITE_CHECKS.check(sql)) {
-                // The query cannot pass the compatibility check, we just ignore it.
-                return;
-            }
-        } catch (SqlParseException e) {
-            return;
-        }
+
+        if (!isValid(sql)) return;
+
         CompiledPlan calcitePlan;
         CompiledPlan voltdbPlan;
         try {
@@ -111,10 +102,32 @@ public class PlanChecker extends CalcitePlannerTestCase {
     }
 
     /**
+     * Check if the SQL statement is not a DDL and can pass the compatibility check
+     *
+     * @param sql
+     * @return True if the SQL statement is not a DDL and can pass the compatibility check,
+     * otherwise False.
+     */
+    boolean isValid(String sql) {
+        try {
+            if (VoltFastSqlParser.parse(sql).isA(SqlKind.DDL)) {
+                return false;
+            }
+            if (!CALCITE_CHECKS.check(sql)) {
+                // The query cannot pass the compatibility check, we just ignore it.
+                return false;
+            }
+        } catch (SqlParseException e) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Check and compare all SQL statements contains in the file.
      * @param filePath The path of the sql file to compare.
      */
-    private void checkPlans(String filePath) {
+    void checkPlans(String filePath) {
         try (Stream<String> stream = Files.lines(Paths.get(filePath))) {
             stream.forEach(this::checkPlan);
         } catch (IOException e) {
@@ -122,7 +135,7 @@ public class PlanChecker extends CalcitePlannerTestCase {
         }
     }
 
-    private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, String sql) {
+    void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, String sql) {
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlanNode);
         PlanNodeTree voltPlanTree = new PlanNodeTree(voltdbPlanNode);
 
