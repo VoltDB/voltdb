@@ -1100,8 +1100,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (updateMigrate && m_shadowStream != nullptr) {
-        migratingAdd(ec->currentTxnId(), sourceTupleWithNewValues);
-        VOLT_TRACE("migrating tuple to stream %s", m_name.c_str());
+        migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
         m_shadowStream->insertTuple(sourceTupleWithNewValues);
     }
 
@@ -1179,7 +1178,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // undo migrating indexes
     if (m_shadowStream != nullptr) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        migratingRemove(ec->currentTxnId(), sourceTupleWithNewValues);
+        migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
     }
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
@@ -2430,27 +2429,29 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
-    if (m_shadowStream != nullptr) {
-        MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
-        int32_t deletedRows = 0;
-        if (it != m_migratingRows.end()) {
-            TableTuple targetTuple(m_schema);
-            MigratingRows::iterator currIt = m_migratingRows.begin();
-            do {
-                MigratingBatch& batch = currIt->second;
-                deletedRows += batch.size();
-                BOOST_FOREACH (auto toDelete, batch) {
-                    targetTuple.move(toDelete);
-                    deleteTuple(targetTuple);
-                }
-            } while (deletedRows <= maxRowCount && currIt->first <= it->first);
-            return currIt == m_migratingRows.end() || currIt->first > it->first;
-        }
-        else {
-            return true;
-        }
+    if (m_shadowStream == nullptr) {
+        return false;
     }
-    return false;
+    MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
+    if (it == m_migratingRows.end()) {
+        return true;
+    }
+    int32_t deletedRows = 0;
+    MigratingRows::iterator currIt = m_migratingRows.begin();
+    do {
+        MigratingBatch& batch = currIt->second;
+        deletedRows += batch.size();
+        BOOST_FOREACH (auto toDelete, batch) {
+           TableTuple targetTuple(m_schema);
+           targetTuple.move(toDelete);
+           deleteTuple(targetTuple);
+       }
+       currIt++;
+       if (currIt == m_migratingRows.end()) {
+           return true;
+       }
+    } while (deletedRows <= maxRowCount && currIt->first <= it->first);
+    return currIt->first > it->first;
 }
 
 } // namespace voltdb
