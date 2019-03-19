@@ -71,7 +71,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static VoltProjectBuilder project;
     protected boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
 
-    static class ServerListener extends Thread {
+    public static class ServerListener extends Thread {
 
         private ServerSocket ssocket;
         private int m_port;
@@ -245,7 +245,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         return client;
     }
 
-    protected void quiesce(final Client client) throws Exception {
+    protected static void quiesce(final Client client) throws Exception {
         client.drain();
         client.callProcedure("@Quiesce");
     }
@@ -292,7 +292,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @param client
      * @throws Exception
      */
-    public void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
+    public static void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
         boolean passed = false;
 
         // Quiesce to see all data flushed.
