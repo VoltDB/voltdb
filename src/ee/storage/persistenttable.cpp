@@ -2405,6 +2405,9 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     }
     it->second.erase(tuple.address());
     size_t found = it->second.erase(tuple.address());
+    if (it->second.empty()) {
+        m_migratingRows.erase(it);
+    }
     assert(found <= 1);
     return found == 1;
 }
@@ -2423,8 +2426,12 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowC
                     targetTuple.move(toDelete);
                     deleteTuple(targetTuple);
                 }
+                currIt = m_migratingRows.erase(currIt);
+                if (currIt == m_migratingRows.end()) {
+                    return true;
+                }
             } while (deletedRows <= maxRowCount && currIt->first <= it->first);
-            return currIt == m_migratingRows.end() || currIt->first > it->first;
+            return currIt->first > it->first;
         }
         else {
             return true;
