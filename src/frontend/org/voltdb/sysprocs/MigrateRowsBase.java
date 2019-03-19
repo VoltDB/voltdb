@@ -90,7 +90,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             }
             for (ColumnRef colRef : idx.getColumns()) {
                 // we only care about the first index
-                if (colRef.getIndex() == 0 && colRef.getColumn().equals(column)) {
+                if (colRef.getIndex() == 0 && colRef.getColumn()==column) {
                     candidates.add(idx);
                 }
             }
@@ -170,7 +170,6 @@ public class MigrateRowsBase extends VoltSystemProcedure {
 
         // verify all required indices
         verifyRequiredIndices(catTable, column);
-
         // so far should only be single column, single row table
         int columnCount = paramTable.getColumnCount();
         if (columnCount > 1) {
@@ -191,7 +190,6 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             throw new VoltAbortException(String.format("Parameter type %s doesn't match column type %s",
                             actualType.toString(), expectedType.toString()));
         }
-
         ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getMigrateProcRunner(

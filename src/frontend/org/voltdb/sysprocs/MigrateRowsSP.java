@@ -22,7 +22,7 @@ import org.voltdb.VoltTable;
 
 public class MigrateRowsSP extends MigrateRowsBase {
 
-        public VoltTable run(SystemProcedureExecutionContext ctx,
+        public VoltTable run(SystemProcedureExecutionContext ctx, int partitionParam,
                              String tableName, String columnName,
                              String compStr, VoltTable parameter, long chunksize) {
             return migrateRowsCommon(ctx,
