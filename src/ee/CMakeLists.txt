@@ -202,7 +202,6 @@ SET (VOLTDB_SRC
   expressions/scalarvalueexpression.cpp
   expressions/subqueryexpression.cpp
   expressions/tupleaddressexpression.cpp
-  expressions/vectorexpression.cpp
   indexes/CoveringCellIndex.cpp
   indexes/IndexStats.cpp
   indexes/tableindex.cpp

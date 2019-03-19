@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -956,6 +957,14 @@ public abstract class AbstractParsedStmt {
         // a constant/tuple/param value operand).
         AbstractExpression leftExpr = parseExpressionNode(leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
+        // Forbid user from creating filter like NOT NOT_MIGRATED(), because this will give
+        // wrong results, due to how the partial index of MIGRATING index is created.
+        // This, however, does not do more thorough check on more complex expressions.
+        if (exprType == ExpressionType.OPERATOR_NOT && leftExpr instanceof FunctionExpression &&
+                ((FunctionExpression) leftExpr).hasFunctionId(
+                        FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_NOT_MIGRATED)) {
+            throw new PlanningErrorException("\"NOT NOT_MIGRATED()\" is an invalid predicate.");
+        }
         expr.setLeft(leftExpr);
 
         // get the second (right) node that is an element (might be null)

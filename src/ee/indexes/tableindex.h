@@ -78,6 +78,7 @@ struct TableIndexScheme {
                      AbstractExpression* a_predicate,
                      bool a_unique,
                      bool a_countable,
+                     bool migrating,
                      const std::string& a_expressionsAsText,
                      const std::string& a_predicateAsText,
                      const TupleSchema *a_tupleSchema);
@@ -100,6 +101,7 @@ struct TableIndexScheme {
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
                      bool a_unique,
                      bool a_countable,
+                     bool migrating,
                      const TupleSchema *a_tupleSchema) :
       name(a_name),
       type(a_type),
@@ -109,6 +111,7 @@ struct TableIndexScheme {
       allColumnIndices(a_columnIndices),
       unique(a_unique),
       countable(a_countable),
+      migrating(migrating),
       expressionsAsText(),
       predicateAsText(),
       tupleSchema(a_tupleSchema)
@@ -124,6 +127,7 @@ struct TableIndexScheme {
       allColumnIndices(other.allColumnIndices),
       unique(other.unique),
       countable(other.countable),
+      migrating(other.migrating),
       expressionsAsText(other.expressionsAsText),
       predicateAsText(other.predicateAsText),
       tupleSchema(other.tupleSchema)
@@ -139,16 +143,18 @@ struct TableIndexScheme {
         allColumnIndices = other.allColumnIndices;
         unique = other.unique;
         countable = other.countable;
+        migrating = other.migrating;
         expressionsAsText = other.expressionsAsText;
         predicateAsText = other.predicateAsText;
         tupleSchema = other.tupleSchema;
         return *this;
     }
 
-    static const std::vector<TableIndexScheme> noOptionalIndices()
-    {
+    static const std::vector<TableIndexScheme> noOptionalIndices() {
         return std::vector<TableIndexScheme>();
     }
+
+    void setMigrate();
 
     std::string name;
     TableIndexType type;
@@ -160,6 +166,7 @@ struct TableIndexScheme {
     std::vector<int32_t> allColumnIndices;
     bool unique;
     bool countable;
+    bool migrating;
     std::string expressionsAsText;
     std::string predicateAsText;
     const TupleSchema *tupleSchema;
@@ -407,6 +414,10 @@ public:
     inline bool isCountableIndex() const
     {
         return m_scheme.countable;
+    }
+
+    inline bool isMigratingIndex() const {
+       return m_scheme.migrating;
     }
 
     /**

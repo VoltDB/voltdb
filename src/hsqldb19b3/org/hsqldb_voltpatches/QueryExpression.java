@@ -687,7 +687,7 @@ public class QueryExpression {
         if (sortAndSlice.hasOrder()) {
             orderIndex = resultTable.createAndAddIndexStructure(null,
                     sortAndSlice.sortOrder, sortAndSlice.sortDescending,
-                    sortAndSlice.sortNullsLast, false, false, false);
+                    sortAndSlice.sortNullsLast, false, false, false, false);
         }
 
         int[] fullCols = new int[columnCount];
@@ -695,7 +695,7 @@ public class QueryExpression {
         ArrayUtil.fillSequence(fullCols);
 
         fullIndex = resultTable.createAndAddIndexStructure(null, fullCols,
-                null, null, false, false, false);
+                null, null, false, false, false, false);
         resultTable.fullIndex = fullIndex;
     }
 

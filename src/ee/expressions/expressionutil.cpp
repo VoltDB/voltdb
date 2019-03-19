@@ -47,12 +47,13 @@
 
 #include "common/ValueFactory.hpp"
 #include "expressions/expressions.h"
+#include "expressions/functionexpression.h"
+#include "expressions/vectorexpression.h"
 
 namespace voltdb {
 
 /** Parse JSON parameters to create a hash range expression */
-static AbstractExpression*
-hashRangeFactory(PlannerDomValue obj) {
+static AbstractExpression* hashRangeFactory(PlannerDomValue obj) {
     PlannerDomValue hashColumnValue = obj.valueForKey("HASH_COLUMN");
 
     PlannerDomValue rangesArray = obj.valueForKey("RANGES");
@@ -69,15 +70,14 @@ hashRangeFactory(PlannerDomValue obj) {
 }
 
 /** Parse JSON parameters to create a subquery expression */
-static AbstractExpression*
-subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
+static AbstractExpression* subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>& args) {
     int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
     std::vector<int> paramIdxs;
     if (obj.hasNonNullKey("PARAM_IDX")) {
         PlannerDomValue params = obj.valueForKey("PARAM_IDX");
         int paramSize = params.arrayLen();
         paramIdxs.reserve(paramSize);
-        if (args == NULL || args->size() != paramSize) {
+        if (args.size() != paramSize) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "subqueryFactory: parameter indexes/tve count mismatch");
         }
@@ -163,11 +163,7 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
    }
 }
 
-static AbstractExpression*
-getGeneral(ExpressionType c,
-           AbstractExpression *l,
-           AbstractExpression *r)
-{
+static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, AbstractExpression *r) {
     assert (l);
     assert (r);
     switch (c) {
@@ -202,8 +198,7 @@ getGeneral(ExpressionType c,
 
 
 template <typename L, typename R>
-static AbstractExpression*
-getMoreSpecialized(ExpressionType c, L* l, R* r)
+static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
 {
     assert (l);
     assert (r);
@@ -238,23 +233,15 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
 
 /** convert the enumerated value type into a concrete c type for the
  * comparison helper templates. */
-AbstractExpression *
-ExpressionUtil::comparisonFactory(PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
-{
+AbstractExpression* ExpressionUtil::comparisonFactory(
+      PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
     assert(lc);
 
     // more specialization available?
-    ConstantValueExpression *l_const =
-      dynamic_cast<ConstantValueExpression*>(lc);
-
-    ConstantValueExpression *r_const =
-      dynamic_cast<ConstantValueExpression*>(rc);
-
-    TupleValueExpression *l_tuple =
-      dynamic_cast<TupleValueExpression*>(lc);
-
-    TupleValueExpression *r_tuple =
-      dynamic_cast<TupleValueExpression*>(rc);
+    ConstantValueExpression *l_const = dynamic_cast<ConstantValueExpression*>(lc);
+    ConstantValueExpression *r_const = dynamic_cast<ConstantValueExpression*>(rc);
+    TupleValueExpression *l_tuple = dynamic_cast<TupleValueExpression*>(lc);
+    TupleValueExpression *r_tuple = dynamic_cast<TupleValueExpression*>(rc);
 
     // this will inline getValue(), hooray!
     if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
@@ -281,12 +268,275 @@ ExpressionUtil::comparisonFactory(PlannerDomValue obj, ExpressionType et, Abstra
     return getGeneral(et, lc, rc);
 }
 
+/** convert the enumerated value type into a concrete type for
+ * constant value expressions templated ctors */
+static AbstractExpression* constantValueFactory(
+      PlannerDomValue obj, ValueType vt, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
+    // read before ctor - can then instantiate fully init'd obj.
+    NValue newvalue;
+    bool isNull = obj.valueForKey("ISNULL").asBool();
+    if (isNull)
+    {
+        newvalue = NValue::getNullValue(vt);
+        return new ConstantValueExpression(newvalue);
+    }
+
+    PlannerDomValue valueValue = obj.valueForKey("VALUE");
+
+    switch (vt) {
+    case VALUE_TYPE_INVALID:
+       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+             "constantValueFactory: Value type should never be VALUE_TYPE_INVALID");
+    case VALUE_TYPE_NULL:
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+              "constantValueFactory: And they should be never be this either! VALUE_TYPE_NULL");
+    case VALUE_TYPE_TINYINT:
+        newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
+        break;
+    case VALUE_TYPE_SMALLINT:
+        newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
+        break;
+    case VALUE_TYPE_INTEGER:
+        newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
+        break;
+    case VALUE_TYPE_BIGINT:
+        newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
+        break;
+    case VALUE_TYPE_DOUBLE:
+        newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
+        break;
+    case VALUE_TYPE_VARCHAR:
+        newvalue = ValueFactory::getStringValue(valueValue.asStr());
+        break;
+    case VALUE_TYPE_VARBINARY:
+        // uses hex encoding
+        newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
+        break;
+    case VALUE_TYPE_TIMESTAMP:
+        newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
+        break;
+    case VALUE_TYPE_DECIMAL:
+        newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
+        break;
+    case VALUE_TYPE_BOOLEAN:
+        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
+        break;
+    default:
+        throw SerializableEEException(
+              VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "constantValueFactory: Unrecognized value type");
+    }
+
+    return new ConstantValueExpression(newvalue);
+}
+
+
+static AbstractExpression* castFactory(ValueType vt, AbstractExpression *lc) {
+    return new OperatorCastExpression(vt, lc);
+}
+
+static void raiseFunctionFactoryError(
+      const std::string& nameString, int functionId, const std::vector<AbstractExpression*>& args) {
+   char fn_message[1024];
+   snprintf(fn_message, sizeof(fn_message),
+         "Internal Error: SQL function '%s' with ID (%d) with (%lu) parameters is not implemented "
+         "in VoltDB (or may have been incorrectly parsed)",
+         nameString.c_str(), functionId, args.size());
+   DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
+   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+}
+
+AbstractExpression* ExpressionUtil::vectorFactory(
+      ValueType elementType, const std::vector<AbstractExpression*>& arguments) {
+    return new VectorExpression(elementType, arguments);
+}
+
+static AbstractExpression* caseWhenFactory(ValueType vt, AbstractExpression *lc, AbstractExpression *rc) {
+
+    OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
+    if (!rc) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "operator case when has incorrect expression");
+    }
+    return new OperatorCaseWhenExpression(vt, lc, alternative);
+}
+
+
+/** convert the enumerated value type into a concrete c type for
+ * parameter value expression templated ctors */
+static AbstractExpression* parameterValueFactory(
+      PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
+    // read before ctor - can then instantiate fully init'd obj.
+    int param_idx = obj.valueForKey("PARAM_IDX").asInt();
+    assert (param_idx >= 0);
+    return new ParameterValueExpression(param_idx);
+}
+
+/** convert the enumerated value type into a concrete c type for
+ * tuple value expression templated ctors */
+static AbstractExpression* tupleValueFactory(
+      PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
+    // read the tuple value expression specific data
+    int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
+    int tableIdx = 0;
+    if (obj.hasNonNullKey("TABLE_IDX")) {
+        tableIdx = obj.valueForKey("TABLE_IDX").asInt();
+    }
+
+    // verify input
+    if (columnIndex < 0) {
+        std::ostringstream message;
+        message << "tupleValueFactory: invalid column_idx " << columnIndex <<
+                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n";
+        StackTrace::streamStackTrace(message, "");
+        throw UnexpectedEEException(message.str());
+    }
+
+    return new TupleValueExpression(tableIdx, columnIndex);
+}
+
+
+AbstractExpression* ExpressionUtil::conjunctionFactory(
+      ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
+    switch (et) {
+    case (EXPRESSION_TYPE_CONJUNCTION_AND):
+        return new ConjunctionExpression<ConjunctionAnd>(et, lc, rc);
+    case (EXPRESSION_TYPE_CONJUNCTION_OR):
+        return new ConjunctionExpression<ConjunctionOr>(et, lc, rc);
+    default:
+        return NULL;
+    }
+
+}
+
+/** Given an expression type and a valuetype, find the best
+ * templated ctor to invoke. Several helpers, above, aid in this
+ * pursuit. Each instantiated expression must consume any
+ * class-specific serialization from serialize_io. */
+AbstractExpression* ExpressionUtil::expressionFactory(
+      PlannerDomValue obj, ExpressionType et, ValueType vt, int vs, AbstractExpression* lc, AbstractExpression* rc,
+      const std::vector<AbstractExpression*>& args) {
+   AbstractExpression *ret = NULL;
+   int functionId;
+   switch (et) {
+
+      // Casts
+      case (EXPRESSION_TYPE_OPERATOR_CAST):
+         ret = castFactory(vt, lc);
+         break;
+
+         // Operators
+      case (EXPRESSION_TYPE_OPERATOR_PLUS):
+      case (EXPRESSION_TYPE_OPERATOR_MINUS):
+      case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
+      case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
+      case (EXPRESSION_TYPE_OPERATOR_CONCAT):
+      case (EXPRESSION_TYPE_OPERATOR_MOD):
+      case (EXPRESSION_TYPE_OPERATOR_NOT):
+      case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+      case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+      case (EXPRESSION_TYPE_OPERATOR_UNARY_MINUS):
+         ret = ExpressionUtil::operatorFactory(et, lc, rc);
+         break;
+
+         // Comparisons
+      case (EXPRESSION_TYPE_COMPARE_EQUAL):
+      case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+      case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+      case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+      case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+      case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+      case (EXPRESSION_TYPE_COMPARE_LIKE):
+      case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
+      case (EXPRESSION_TYPE_COMPARE_IN):
+      case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+         ret = ExpressionUtil::comparisonFactory(obj, et, lc, rc);
+         break;
+
+         // Conjunctions
+      case (EXPRESSION_TYPE_CONJUNCTION_AND):
+      case (EXPRESSION_TYPE_CONJUNCTION_OR):
+         ret = ExpressionUtil::conjunctionFactory(et, lc, rc);
+         break;
+
+         // Functions and pseudo-functions
+      case (EXPRESSION_TYPE_FUNCTION):
+         // add the function id
+         functionId = obj.valueForKey("FUNCTION_ID").asInt();
+         ret = functionFactory(functionId, args);
+
+         if (ret == nullptr) {
+            std::string nameString;
+            if (obj.hasNonNullKey("NAME")) {
+               nameString = obj.valueForKey("NAME").asStr();
+            } else {
+               nameString = "?";
+            }
+            raiseFunctionFactoryError(nameString, functionId, args);
+         }
+         break;
+
+      case (EXPRESSION_TYPE_VALUE_VECTOR):
+         // Parse whatever is needed out of obj and pass the pieces to inListFactory
+         // to make it easier to unit test independently of the parsing.
+         // The first argument is used as the list element type.
+         // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
+         // a separate element type attribute will have to be serialized and passed in here.
+         ret = vectorFactory(vt, args);
+         break;
+
+         // Constant Values, parameters, tuples
+      case (EXPRESSION_TYPE_VALUE_CONSTANT):
+         ret = constantValueFactory(obj, vt, et, lc, rc);
+         break;
+
+      case (EXPRESSION_TYPE_VALUE_PARAMETER):
+         ret = parameterValueFactory(obj, et, lc, rc);
+         break;
+
+      case (EXPRESSION_TYPE_VALUE_TUPLE):
+         ret = tupleValueFactory(obj, et, lc, rc);
+         break;
+
+      case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
+         ret = new TupleAddressExpression();
+         break;
+      case (EXPRESSION_TYPE_VALUE_SCALAR):
+         ret = new ScalarValueExpression(lc);
+         break;
+      case (EXPRESSION_TYPE_HASH_RANGE):
+         ret = hashRangeFactory(obj);
+         break;
+      case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
+         ret = caseWhenFactory(vt, lc, rc);
+         break;
+      case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
+         ret = new OperatorAlternativeExpression(lc, rc);
+         break;
+
+         // Subquery
+      case (EXPRESSION_TYPE_ROW_SUBQUERY):
+      case (EXPRESSION_TYPE_SELECT_SUBQUERY):
+         ret = subqueryFactory(et, obj, args);
+         break;
+
+         // must handle all known expressions in this factory
+      default:
+
+         char message[256];
+         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
+               expressionToString(et).c_str(), (int)et);
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+   }
+   ret->setValueType(vt);
+   ret->setValueSize(vs);
+   // written thusly to ease testing/inspecting return content.
+   VOLT_TRACE("Created expression %p", ret);
+   return ret;
+}
+
 /** convert the enumerated value type into a concrete c type for the
  *  operator expression templated ctors */
-static AbstractExpression *
-operatorFactory(ExpressionType et,
-                AbstractExpression *lc, AbstractExpression *rc)
-{
+AbstractExpression* ExpressionUtil::operatorFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
     AbstractExpression *ret = NULL;
 
    switch(et) {
@@ -337,309 +587,12 @@ operatorFactory(ExpressionType et,
    return ret;
 }
 
-static AbstractExpression* castFactory(ValueType vt,
-                                       AbstractExpression *lc)
-{
-    return new OperatorCastExpression(vt, lc);
-}
-
-static AbstractExpression* caseWhenFactory(ValueType vt,
-                                       AbstractExpression *lc, AbstractExpression *rc)
-{
-
-    OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
-    if (!rc) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "operator case when has incorrect expression");
-    }
-    return new OperatorCaseWhenExpression(vt, lc, alternative);
-}
-
-
-/** convert the enumerated value type into a concrete type for
- * constant value expressions templated ctors */
-static AbstractExpression*
-constantValueFactory(PlannerDomValue obj,
-                     ValueType vt, ExpressionType et,
-                     AbstractExpression *lc, AbstractExpression *rc)
-{
-    // read before ctor - can then instantiate fully init'd obj.
-    NValue newvalue;
-    bool isNull = obj.valueForKey("ISNULL").asBool();
-    if (isNull)
-    {
-        newvalue = NValue::getNullValue(vt);
-        return new ConstantValueExpression(newvalue);
-    }
-
-    PlannerDomValue valueValue = obj.valueForKey("VALUE");
-
-    switch (vt) {
-    case VALUE_TYPE_INVALID:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Value type should"
-                                      " never be VALUE_TYPE_INVALID");
-    case VALUE_TYPE_NULL:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: And they should be"
-                                      " never be this either! VALUE_TYPE_NULL");
-    case VALUE_TYPE_TINYINT:
-        newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_SMALLINT:
-        newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_INTEGER:
-        newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_BIGINT:
-        newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_DOUBLE:
-        newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
-        break;
-    case VALUE_TYPE_VARCHAR:
-        newvalue = ValueFactory::getStringValue(valueValue.asStr());
-        break;
-    case VALUE_TYPE_VARBINARY:
-        // uses hex encoding
-        newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
-        break;
-    case VALUE_TYPE_TIMESTAMP:
-        newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
-        break;
-    case VALUE_TYPE_DECIMAL:
-        newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
-        break;
-    case VALUE_TYPE_BOOLEAN:
-        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
-        break;
-    default:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Unrecognized value"
-                                      " type");
-    }
-
-    return new ConstantValueExpression(newvalue);
-}
-
-
-/** convert the enumerated value type into a concrete c type for
- * parameter value expression templated ctors */
-static AbstractExpression*
-parameterValueFactory(PlannerDomValue obj,
-                      ExpressionType et,
-                      AbstractExpression *lc, AbstractExpression *rc)
-{
-    // read before ctor - can then instantiate fully init'd obj.
-    int param_idx = obj.valueForKey("PARAM_IDX").asInt();
-    assert (param_idx >= 0);
-    return new ParameterValueExpression(param_idx);
-}
-
-/** convert the enumerated value type into a concrete c type for
- * tuple value expression templated ctors */
-static AbstractExpression*
-tupleValueFactory(PlannerDomValue obj, ExpressionType et,
-                  AbstractExpression *lc, AbstractExpression *rc)
-{
-    // read the tuple value expression specific data
-    int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
-    int tableIdx = 0;
-    if (obj.hasNonNullKey("TABLE_IDX")) {
-        tableIdx = obj.valueForKey("TABLE_IDX").asInt();
-    }
-
-    // verify input
-    if (columnIndex < 0) {
-        std::ostringstream message;
-        message << "tupleValueFactory: invalid column_idx " << columnIndex <<
-                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n";
-        StackTrace::streamStackTrace(message, "");
-        throw UnexpectedEEException(message.str());
-    }
-
-    return new TupleValueExpression(tableIdx, columnIndex);
-}
-
-
-AbstractExpression *
-ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
-{
-    switch (et) {
-    case (EXPRESSION_TYPE_CONJUNCTION_AND):
-        return new ConjunctionExpression<ConjunctionAnd>(et, lc, rc);
-    case (EXPRESSION_TYPE_CONJUNCTION_OR):
-        return new ConjunctionExpression<ConjunctionOr>(et, lc, rc);
-    default:
-        return NULL;
-    }
-
-}
-
-static void raiseFunctionFactoryError(const std::string& nameString, int functionId,
-                  const std::vector<AbstractExpression*>* args)
-{
-    char fn_message[1024];
-    if (args) {
-        snprintf(fn_message, sizeof(fn_message),
-             "Internal Error: SQL function '%s' with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
-             nameString.c_str(), functionId, (int)args->size());
-    }
-    else {
-        snprintf(fn_message, sizeof(fn_message),
-             "Internal Error: SQL function '%s' with ID (%d) was serialized without its required parameters list.",
-             nameString.c_str(), functionId);
-    }
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
-}
-
-
-/** Given an expression type and a valuetype, find the best
- * templated ctor to invoke. Several helpers, above, aid in this
- * pursuit. Each instantiated expression must consume any
- * class-specific serialization from serialize_io. */
-AbstractExpression*
-ExpressionUtil::expressionFactory(PlannerDomValue obj,
-                  ExpressionType et, ValueType vt, int vs,
-                  AbstractExpression* lc,
-                  AbstractExpression* rc,
-                  const std::vector<AbstractExpression*>* args)
-{
-    AbstractExpression *ret = NULL;
-
-    switch (et) {
-
-    // Casts
-    case (EXPRESSION_TYPE_OPERATOR_CAST):
-        ret = castFactory(vt, lc);
-    break;
-
-    // Operators
-    case (EXPRESSION_TYPE_OPERATOR_PLUS):
-    case (EXPRESSION_TYPE_OPERATOR_MINUS):
-    case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
-    case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
-    case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-    case (EXPRESSION_TYPE_OPERATOR_MOD):
-    case (EXPRESSION_TYPE_OPERATOR_NOT):
-    case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
-    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
-    case (EXPRESSION_TYPE_OPERATOR_UNARY_MINUS):
-        ret = operatorFactory(et, lc, rc);
-    break;
-
-    // Comparisons
-    case (EXPRESSION_TYPE_COMPARE_EQUAL):
-    case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
-    case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
-    case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
-    case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
-    case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
-    case (EXPRESSION_TYPE_COMPARE_LIKE):
-    case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
-    case (EXPRESSION_TYPE_COMPARE_IN):
-    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
-        ret = comparisonFactory(obj, et, lc, rc);
-    break;
-
-    // Conjunctions
-    case (EXPRESSION_TYPE_CONJUNCTION_AND):
-    case (EXPRESSION_TYPE_CONJUNCTION_OR):
-        ret = conjunctionFactory(et, lc, rc);
-    break;
-
-    // Functions and pseudo-functions
-    case (EXPRESSION_TYPE_FUNCTION): {
-        // add the function id
-        int functionId = obj.valueForKey("FUNCTION_ID").asInt();
-
-        if (args) {
-            ret = functionFactory(functionId, args);
-        }
-
-        if ( ! ret) {
-            std::string nameString;
-            if (obj.hasNonNullKey("NAME")) {
-                nameString = obj.valueForKey("NAME").asStr();
-            }
-            else {
-                nameString = "?";
-            }
-            raiseFunctionFactoryError(nameString, functionId, args);
-        }
-    }
-    break;
-
-    case (EXPRESSION_TYPE_VALUE_VECTOR): {
-        // Parse whatever is needed out of obj and pass the pieces to inListFactory
-        // to make it easier to unit test independently of the parsing.
-        // The first argument is used as the list element type.
-        // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
-        // a separate element type attribute will have to be serialized and passed in here.
-        ret = vectorFactory(vt, args);
-    }
-    break;
-
-    // Constant Values, parameters, tuples
-    case (EXPRESSION_TYPE_VALUE_CONSTANT):
-        ret = constantValueFactory(obj, vt, et, lc, rc);
-        break;
-
-    case (EXPRESSION_TYPE_VALUE_PARAMETER):
-        ret = parameterValueFactory(obj, et, lc, rc);
-        break;
-
-    case (EXPRESSION_TYPE_VALUE_TUPLE):
-        ret = tupleValueFactory(obj, et, lc, rc);
-        break;
-
-    case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
-        ret = new TupleAddressExpression();
-        break;
-    case (EXPRESSION_TYPE_VALUE_SCALAR):
-        ret = new ScalarValueExpression(lc);
-        break;
-    case (EXPRESSION_TYPE_HASH_RANGE):
-        ret = hashRangeFactory(obj);
-        break;
-    case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
-        ret = caseWhenFactory(vt, lc, rc);
-        break;
-    case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
-        ret = new OperatorAlternativeExpression(lc, rc);
-        break;
-
-    // Subquery
-    case (EXPRESSION_TYPE_ROW_SUBQUERY):
-    case (EXPRESSION_TYPE_SELECT_SUBQUERY):
-        ret = subqueryFactory(et, obj, args);
-        break;
-
-        // must handle all known expressions in this factory
-    default:
-
-        char message[256];
-        snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
-                expressionToString(et).c_str(), (int)et);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
-
-    ret->setValueType(vt);
-    ret->setValueSize(vs);
-    // written thusly to ease testing/inspecting return content.
-    VOLT_TRACE("Created expression %p", ret);
-    return ret;
-}
-
-boost::shared_array<int>
-ExpressionUtil::convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions)
-{
+boost::shared_array<int> ExpressionUtil::convertIfAllTupleValues(
+      const std::vector<voltdb::AbstractExpression*>& expressions) {
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
     for (int i = 0; i < cnt; ++i) {
-        voltdb::TupleValueExpression* casted=
+        voltdb::TupleValueExpression* casted =
           dynamic_cast<voltdb::TupleValueExpression*>(expressions[i]);
         if (casted == NULL) {
             return boost::shared_array<int>();
@@ -649,9 +602,8 @@ ExpressionUtil::convertIfAllTupleValues(const std::vector<voltdb::AbstractExpres
     return ret;
 }
 
-boost::shared_array<int>
-ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions)
-{
+boost::shared_array<int> ExpressionUtil::convertIfAllParameterValues(
+      const std::vector<voltdb::AbstractExpression*> &expressions) {
     size_t cnt = expressions.size();
     boost::shared_array<int> ret(new int[cnt]);
     for (int i = 0; i < cnt; ++i) {
@@ -665,9 +617,8 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
     return ret;
 }
 
-void
-ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds)
-{
+void ExpressionUtil::extractTupleValuesColumnIdx(
+      const AbstractExpression* expr, std::vector<int> &columnIds) {
     if (expr == NULL)
     {
         return;
@@ -684,8 +635,8 @@ ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std:
     ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
 }
 
-void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
-{
+void ExpressionUtil::loadIndexedExprsFromJson(
+      std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring) {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
     PlannerDomValue expressionsArray = domRoot.rootObject();
     for (int i = 0; i < expressionsArray.arrayLen(); i++) {
@@ -695,10 +646,17 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
     }
 }
 
-AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring)
-{
+AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring) {
     PlannerDomRoot domRoot(jsonstring.c_str());
     return AbstractExpression::buildExpressionTree(domRoot.rootObject());
+}
+
+OperatorIsNullExpression* ExpressionUtil::columnIsNull(const int tableIndex, const int valueIndex) {
+   return new OperatorIsNullExpression(new TupleValueExpression(tableIndex, valueIndex));
+}
+
+OperatorNotExpression* ExpressionUtil::columnNotNull(const int tableIndex, const int valueIndex) {
+   return new OperatorNotExpression(columnIsNull(tableIndex, valueIndex));
 }
 
 }

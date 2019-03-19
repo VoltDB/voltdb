@@ -255,6 +255,7 @@ end
 begin Index                        "A index structure on a database table's columns"
   bool unique                      "May the index contain duplicate keys?"
   bool assumeUnique                "User allow unique index on partition table without including partition key?"
+  bool migrating                   "Does this index implicitly include hidden migrating column of a migrating table?"
   bool countable                   "Index counter feature"
   int type                         "What data structure is the index using and what kinds of keys does it support?"
   ColumnRef* columns               "Columns referenced by the index"
