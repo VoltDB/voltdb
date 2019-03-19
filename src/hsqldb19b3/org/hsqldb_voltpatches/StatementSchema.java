@@ -975,12 +975,13 @@ public class StatementSchema extends Statement {
                 Table    table;
                 HsqlName name;
                 int[]    indexColumns;
-                boolean  unique;
+                boolean  unique, migrating;
 
                 table        = (Table) arguments[0];
                 indexColumns = (int[]) arguments[1];
                 name         = (HsqlName) arguments[2];
                 unique       = ((Boolean) arguments[3]).booleanValue();
+                migrating    = ((Boolean) arguments[4]).booleanValue();
 
                 try {
                     /*
@@ -999,16 +1000,19 @@ public class StatementSchema extends Statement {
                     TableWorks tableWorks = new TableWorks(session, table);
 
                     // A VoltDB extension to support indexed expressions and partial indexes
-                    Expression predicate = (Expression) arguments[6];
+                    Expression predicate = (Expression) arguments[7];
                     @SuppressWarnings("unchecked")
-                    java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[4];
-                    boolean assumeUnique = ((Boolean) arguments[5]).booleanValue();
+                    java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[5];
+                    boolean assumeUnique = ((Boolean) arguments[6]).booleanValue();
                     if (indexExprs != null) {
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
+                        tableWorks.addExprIndex(
+                                indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]),
+                                name, unique, migrating, predicate)
+                                .setAssumeUnique(assumeUnique);
                         break;
                     }
                     org.hsqldb_voltpatches.index.Index addedIndex =
-                    tableWorks.addIndex(indexColumns, name, unique, predicate);
+                    tableWorks.addIndex(indexColumns, name, unique, migrating, predicate);
                     // End of VoltDB extension
                     // tableWorks.addIndex(indexColumns, name, unique);
                     // A VoltDB extension to support assume unique attribute

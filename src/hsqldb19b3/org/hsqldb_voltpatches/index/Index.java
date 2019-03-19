@@ -295,7 +295,13 @@ public interface Index extends SchemaObject {
      * VoltDB added method to allow unique index on partition table without partition key included.
      * @return true if user wants unique index without uniqueness guarantee on partition table without partition key included.
      */
-    public boolean isAssumeUnique();
+    boolean isAssumeUnique();
+
+    /**
+     * VoltDB added method to allow MIGRATING INDEX on a table.
+     * @return true if user wants the index to implicitly include the hidden migrating column.
+     */
+    boolean isMigrating();
 
     Index setAssumeUnique(boolean assumeUnique);
 

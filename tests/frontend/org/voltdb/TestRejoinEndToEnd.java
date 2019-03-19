@@ -35,6 +35,7 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthScheme;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -1084,5 +1085,25 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         cluster.shutDown();
+    }
+
+    @Test
+    public void testRejoinWithOnlyAStream() throws Exception {
+        LocalCluster lc = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.overrideAnyRequestForValgrind();
+        VoltProjectBuilder vpb = new VoltProjectBuilder();
+        vpb.setUseDDLSchema(true);
+        assertTrue(lc.compile(vpb));
+        lc.setHasLocalServer(false);
+        try {
+            lc.startUp();
+            Client client = lc.createClient(new ClientConfig());
+            client.callProcedure("@AdHoc", "CREATE STREAM stream_towns PARTITION ON COLUMN state "
+                    + "EXPORT TO TARGET stream_test1 (town VARCHAR(64), state VARCHAR(2) not null);");
+            lc.killSingleHost(1);
+            lc.recoverOne(1, 0, "");
+        } finally {
+            lc.shutDown();
+        }
     }
 }

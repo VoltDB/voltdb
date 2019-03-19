@@ -224,9 +224,9 @@ public:
      * In debug builds, asserts if there are no hidden columns. */
     size_t lengthOfAllHiddenColumns() const;
 
-private:
-
     uint16_t totalColumnCount() const;
+
+private:
 
     /** These methods are like their public counterparts, but accepts
      *  indexes >= m_columnCount, in order to access hidden columns or

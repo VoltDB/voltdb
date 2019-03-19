@@ -430,6 +430,7 @@ private:
                                 NULL,  // predicate
                                 true, // unique
                                 false, // countable
+                                false, // migrating
                                 "",    // expression as text
                                 "",    // predicate as text
                                 schema);
@@ -451,6 +452,7 @@ private:
                                 NULL,  // predicate
                                 false, // unique
                                 false, // countable
+                                false, // migrating
                                 "",    // expression as text
                                 "",    // predicate as text
                                 schema);
