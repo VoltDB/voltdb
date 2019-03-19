@@ -78,7 +78,7 @@ public class TestExportGeneration {
 
     static String testout_jar;
     static CatalogMap<Connector> m_connectors;
-    static String m_tableSignature;
+    static String m_streamName;
     static File m_tempRoot;
 
     @BeforeClass
@@ -106,11 +106,11 @@ public class TestExportGeneration {
         Connector defaultConnector = m_connectors.get("e1");
         defaultConnector.setEnabled(true);
 
-        m_tableSignature = defaultConnector
+        m_streamName = defaultConnector
                 .getTableinfo()
                 .getIgnoreCase("e1")
                 .getTable()
-                .getSignature();
+                .getTypeName();
     }
 
     File m_dataDirectory;
@@ -206,7 +206,7 @@ public class TestExportGeneration {
             cb.get();
         }
 
-        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName);
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
@@ -223,7 +223,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
@@ -235,7 +235,7 @@ public class TestExportGeneration {
         while( --retries >= 0 && ! active) {
             m_exportGeneration.pushExportBuffer(
                     m_part,
-                    m_tableSignature,
+                    m_streamName,
                     seqNo,
                     seqNo,
                     1,
@@ -267,7 +267,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.pushExportBuffer(
                 m_part,
-                m_tableSignature,
+                m_streamName,
                 /*seqNo*/1L,
                 1L,
                 1,
@@ -293,7 +293,7 @@ public class TestExportGeneration {
         Long hsid = getOtherMailboxHsid();
         assertNotNull( "other mailbox not listed in zookeeper",  hsid);
 
-        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_mbox.send(
                 hsid,
                 new AckPayloadMessage(m_part, tableName, 1L, 1).asVoltMessage()
@@ -319,7 +319,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.pushExportBuffer(
                 m_part,
-                m_tableSignature,
+                m_streamName,
                 /*seqNo*/1L,
                 1L,
                 1,
@@ -346,7 +346,7 @@ public class TestExportGeneration {
         assertNotNull( "other mailbox not listed in zookeeper",  hsid);
 
         // Send an ack message with a catalogVersion < the EDS catalogVersion
-        String tableName = ExportGeneration.tableNameFromSignature(m_tableSignature);
+        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_mbox.send(
                 hsid,
                 new AckPayloadMessage(m_part,

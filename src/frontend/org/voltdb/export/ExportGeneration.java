@@ -838,7 +838,7 @@ public class ExportGeneration implements Generation {
 
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature,
+    public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, long committedSequenceNumber,
             int tupleCount, long uniqueId, long genId, ByteBuffer buffer, boolean sync) {
 
@@ -853,7 +853,6 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        String tableName = tableNameFromSignature(signature);
         ExportDataSource source = sources.get(tableName);
         if (source == null) {
             /*
