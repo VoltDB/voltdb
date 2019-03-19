@@ -327,12 +327,19 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 }
                 long m = stats.getLong("TUPLE_PENDING");
                 if (0 != m) {
-                    passedThisTime = false;
+                    String target = stats.getString("TARGET");
                     String ttable = stats.getString("SOURCE");
                     Long host = stats.getLong("HOST_ID");
                     Long pid = stats.getLong("PARTITION_ID");
-                    System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
-                    break;
+                    if (target.isEmpty()) {
+                        // Stream w/o target keeps pending data forever, log and skip counting this stream
+                        System.out.println("Pending export data is not zero but target is disabled: " +
+                                ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                    } else {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                        break;
+                    }
                 }
             }
             if (passedThisTime) {
