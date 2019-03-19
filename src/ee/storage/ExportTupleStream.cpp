@@ -155,7 +155,8 @@ size_t ExportTupleStream::appendTuple(
     assert(seqNo > 0 && m_nextSequenceNumber == seqNo);
     m_nextSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
-    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+    cout << "Appending row of size " << streamHeaderSz + io.position()
+            << " to uso " << m_currBlock->uso() + m_currBlock->offset()
             << " sequence number " << seqNo
             << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
