@@ -148,13 +148,9 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
 
             // Only care about the indexes associated with the hidden column for migrate
-            int hiddenColumnIndex = static_cast<int16_t>(targetTable->schema()->columnCount() + targetTable->schema()->hiddenColumnCount()) -1;
             BOOST_FOREACH(TableIndex *index, allIndexes) {
-                BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
-                    if (hiddenColumnIndex == colIndex) {
-                        indexesToUpdate.push_back(index);
-                        break;
-                    }
+                if (index->isMigratingIndex()) {
+                    indexesToUpdate.push_back(index);
                 }
             }
 

@@ -16,6 +16,7 @@
  */
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -42,7 +46,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
 
     private static ColumnInfo[] schema = new ColumnInfo[] {
             new ColumnInfo("MIGRATED_ROWS", VoltType.BIGINT),  /* number of rows be migrated in this invocation */
-            new ColumnInfo("LEFT_ROWS", VoltType.BIGINT)      /* number of rows to be deleted after this invocation */
+            new ColumnInfo("LEFT_ROWS", VoltType.BIGINT)       /* number of rows to be deleted after this invocation */
     };
 
     public long[] getPlanFragmentIds() {
@@ -76,6 +80,49 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         return voltExecuteSQL()[0];
     }
 
+    void verifyRequiredIndices(Table table, Column column) {
+        // look for all indexes where the first column matches our index
+        List<Index> candidates = new ArrayList<>();
+        boolean hasMigratingIndex = false;
+        for (Index idx : table.getIndexes()) {
+            if (!hasMigratingIndex) {
+                hasMigratingIndex = idx.getMigrating();
+            }
+            for (ColumnRef colRef : idx.getColumns()) {
+                // we only care about the first index
+                if (colRef.getIndex() == 0 && colRef.getColumn().equals(column)) {
+                    candidates.add(idx);
+                }
+            }
+        }
+        if (!hasMigratingIndex) {
+            String msg = String.format("Could not find migrating index. example: CREATE MIGRATING INDEX myindex ON %s()",
+                    table.getTypeName());
+            throw new VoltAbortException(msg);
+        }
+        // error no index found
+        if (candidates.size() == 0) {
+            String msg = String.format("Could not find index to support migrate on column %s.%s. ",
+                    table.getTypeName(), column.getTypeName());
+            msg += String.format("Please create an index where column %s.%s is the first or only indexed column.",
+                    table.getTypeName(), column.getTypeName());
+            throw new VoltAbortException(msg);
+        }
+        // now make sure index is countable (which also ensures ordered because countable non-ordered isn't a thing)
+        // note countable ordered indexes are the default... so something weird happened if this is the case
+        // Then go and pick the best index sorted by uniqueness, columncount
+        long indexCount = candidates.stream()
+                                    .filter(i -> i.getCountable())
+                                    .count();
+
+        if (indexCount == 0) {
+            String msg = String.format("Coudt not find index to support Migrate on column %s.%s. ",
+                    table.getTypeName(), column.getTypeName());
+            msg += String.format("Indexes must support ordering and ranking (as default indexes do).",
+                    table.getTypeName(), column.getTypeName());
+            throw new VoltAbortException(msg);
+        }
+   }
     /**
      * Migrate procedure for partitioned or replicated tables
      *
@@ -98,7 +145,6 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             VoltTable paramTable,
             long chunksize,
             boolean replicated) {
-        VoltTable table = new VoltTable(schema);
         // Some basic checks
         if (chunksize <= 0) {
             throw new VoltAbortException(
@@ -109,16 +155,11 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             throw new VoltAbortException(
                     String.format("Table %s doesn't present in catalog", tableName));
         }
-        Collection<Column> keys = CatalogUtil.getPrimaryKeyColumns(catTable);
-        if (keys.isEmpty()) {
-            throw new VoltAbortException(
-                    String.format("Primary key doesn't present in %s", catTable));
-        }
 
         if (replicated ^ catTable.getIsreplicated()) {
             throw new VoltAbortException(
                     String.format("%s incompatible with %s table %s.",
-                            replicated ? "@NibbleExportMP" : "@NibbleExportSP",
+                            replicated ? "@MigrateRowsMP" : "@MigrateRowsSP",
                             catTable.getIsreplicated() ? "replicated" : "partitioned", tableName));
         }
         Column column = catTable.getColumns().get(columnName);
@@ -127,7 +168,8 @@ public class MigrateRowsBase extends VoltSystemProcedure {
                     String.format("Column %s does not exist in table %s", columnName, tableName));
         }
 
-        // TO DO:verify all required indices
+        // verify all required indices
+        verifyRequiredIndices(catTable, column);
 
         // so far should only be single column, single row table
         int columnCount = paramTable.getColumnCount();
@@ -157,11 +199,12 @@ public class MigrateRowsBase extends VoltSystemProcedure {
 
         Procedure newCatProc = pr.getCatalogProcedure();
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
-        Statement migrateStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "1");
-        Statement valueAtStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "2");
+        Statement valueAtStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "1");
+        Statement migrateStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "2");
+
         if (countStmt == null || migrateStmt == null || valueAtStmt == null) {
             throw new VoltAbortException(
-                    String.format("Unable to find SQL statement for found table %s: BAD",
+                    String.format("Unable to find SQL statement for migrate on table %s",
                             tableName));
         }
 
@@ -183,11 +226,11 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         result = executePrecompiledSQL(migrateStmt,
                                        cutoffValue == null ? params : new Object[] {cutoffValue},
                                        replicated);
-        long deletedRows = result.asScalarLong();
+        long migratedRows = result.asScalarLong();
 
         // Return rows be deleted in this run and rows left for next run
         VoltTable retTable = new VoltTable(schema);
-        retTable.addRow(deletedRows, rowCount - deletedRows);
+        retTable.addRow(migratedRows, rowCount - migratedRows);
         return retTable;
     }
 }
