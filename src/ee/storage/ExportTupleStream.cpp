@@ -31,16 +31,15 @@ using namespace voltdb;
 
 const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 20; // committedSequenceNumber(8) + row count(4) + uniqueId(8)
 
-ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
-                                     std::string signature, const std::string &tableName,
-                                     const std::vector<std::string> &columnNames)
+ExportTupleStream::ExportTupleStream(CatalogId partitionId,
+                                     int64_t siteId,
+                                     int64_t generation,
+                                     const std::string &tableName)
     : TupleStreamBase(EL_BUFFER_SIZE, s_EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
-      m_signature(signature),
       m_generation(generation),
       m_tableName(tableName),
-      m_columnNames(columnNames),
       m_nextSequenceNumber(1),
       m_committedSequenceNumber(0),
       m_flushPending(false),
@@ -50,11 +49,23 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int6
     extendBufferChain(m_defaultCapacity);
 }
 
-void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {
-    assert(generation > m_generation);
-    assert(signature == m_signature || m_signature == string(""));
+ExportTupleStream::ExportTupleStream(const ExportTupleStream &otherStream)
+    : TupleStreamBase(EL_BUFFER_SIZE, s_EXPORT_BUFFER_HEADER_SIZE),
+      m_partitionId(otherStream.m_partitionId),
+      m_siteId(otherStream.m_siteId),
+      m_generation(otherStream.m_generation),
+      m_tableName(otherStream.m_tableName),
+      m_nextSequenceNumber(otherStream.m_nextSequenceNumber),
+      m_committedSequenceNumber(otherStream.m_committedSequenceNumber),
+      m_flushPending(otherStream.m_flushPending),
+      m_nextFlushStream(otherStream.m_nextFlushStream),
+      m_prevFlushStream(otherStream.m_prevFlushStream)
+{
+    extendBufferChain(m_defaultCapacity);
+}
 
-    m_signature = signature;
+void ExportTupleStream::setGeneration(int64_t generation) {
+    assert(generation >= m_generation);
     m_generation = generation;
 }
 
@@ -73,7 +84,6 @@ size_t ExportTupleStream::appendTuple(
         int partitionColumn,
         ExportTupleStream::Type type)
 {
-    assert(m_columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
 
@@ -145,9 +155,9 @@ size_t ExportTupleStream::appendTuple(
     assert(seqNo > 0 && m_nextSequenceNumber == seqNo);
     m_nextSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
-//    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-//            << " sequence number " << seqNo
-//            << " offset " << m_currBlock->offset() << std::endl;
+    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+            << " sequence number " << seqNo
+            << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
@@ -282,7 +292,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block, bool sync) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
-                    m_signature,
+                    m_tableName,
                     block,
                     sync,
                     m_generation);
@@ -291,7 +301,7 @@ void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block, bool sync) {
 void ExportTupleStream::pushEndOfStream() {
     ExecutorContext::getPhysicalTopend()->pushEndOfStream(
                     m_partitionId,
-                    m_signature);
+                    m_tableName);
 }
 
 /*

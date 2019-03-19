@@ -354,10 +354,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                ByteBuffer schemaBuf = null;
-                                if (cont.schema() != null) {
-                                    schemaBuf = cont.schema();
-                                }
+                                ByteBuffer schemaBuf = cont.schema();
                                 if (schemaBuf != null) {
                                     schemaBuf.position(0);
                                     schemaBuf.order(ByteOrder.LITTLE_ENDIAN);

@@ -345,6 +345,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = true;
         m_client = processor.getExportClient(m_tableName);
         if (m_client != null) {
+            m_exportTargetName = m_client.getTargetName();
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
                 exportLog.debug(toString() + " is a replicated export stream");
@@ -423,6 +424,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = false;
         m_client = processor.getExportClient(m_tableName);
         if (m_client != null) {
+            m_exportTargetName = m_client.getTargetName();
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
                 exportLog.debug(toString() + " is a replicated export stream");
