@@ -1182,14 +1182,9 @@ function alertNodeClicked(obj) {
                 return;
             } else {
                 voltDbRenderer.drTablesArray = [];
-                voltDbRenderer.exportTablesArray = [];
                 for (var key in tableData) {
                     if (tableData[key]['drEnabled'] == "true") {
                         voltDbRenderer.drTablesArray.push(tableData[key]['TABLE_NAME']);
-                    }
-
-                    if (tableData[key]['TABLE_TYPE1'] == "EXPORT") {
-                        voltDbRenderer.exportTablesArray.push(tableData[key]['TABLE_NAME']);
                     }
                 }
             }
@@ -2691,11 +2686,11 @@ function alertNodeClicked(obj) {
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
             var procedures = connection.Metadata['@SystemCatalog_PROCEDURES' + suffix].data;
             var procedureColumns = connection.Metadata['@SystemCatalog_PROCEDURECOLUMNS' + suffix].data;
+            const rawExportStreams = connection.Metadata['@Statistics_EXPORT' + suffix].data;
 
             var tables = [];
             var exports = [];
             var views = [];
-
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
                 var isView = false;
@@ -2718,6 +2713,12 @@ function alertNodeClicked(obj) {
                     exports[tableName] = item;
                 else
                     tables[tableName] = item;
+            }
+
+            // update the stream schema from @Statistic EXPORT.
+            for (var k = 0; k < rawExportStreams.length; k++) {
+                const streamName = rawExportStreams[k][5];
+                exports[streamName] = { name: streamName, key: null, indexes: null, columns: null };
             }
 
             connection.Metadata['tables'] = tables;
@@ -2857,6 +2858,16 @@ function alertNodeClicked(obj) {
             var tupleCountPartitions = [];
             var partitionData = {};
             var averageRowCount = 0;
+
+            // update the exportTablesArray from @Statistics EXPORT.
+            if (connection.Metadata["@Statistics_EXPORT"] !== undefined || connection.Metadata["@Statistics_EXPORT"] != null) {
+                const rawExportStreams = connection.Metadata['@Statistics_EXPORT'].data;
+                const exportTablesSet = new Set();
+                for (let i = 0; i < rawExportStreams.length; i++) {
+                    exportTablesSet.add(rawExportStreams[i][5]);
+                }
+                voltDbRenderer.exportTablesArray = Array.from(exportTablesSet);
+            }
 
             if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     tableMetadata = connection.Metadata["@Statistics_TABLE"].data;
