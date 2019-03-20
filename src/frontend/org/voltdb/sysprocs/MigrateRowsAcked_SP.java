@@ -58,7 +58,6 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
                            int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
     {
         VoltTable[] results = null;
-System.out.println("deleting........" + deletableTxnId);
         try {
             final TransactionState txnState = m_runner.getTxnState();
             boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
