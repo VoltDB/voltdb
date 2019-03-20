@@ -69,7 +69,7 @@ public class TestExportConstraintsSuite extends TestExportBaseSocketExport {
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
     public void testExportConstraints() throws Exception {
