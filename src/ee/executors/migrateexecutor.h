@@ -56,15 +56,32 @@ namespace voltdb {
 class MigrateExecutor : public AbstractExecutor {
 public:
     MigrateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node) {}
+        : AbstractExecutor(engine, abstract_node) {
+         m_inputTargetMapSize = -1;
+         m_inputTable = NULL;
+         m_engine = engine;
+         m_partitionColumn = -1;
+    }
 
 protected:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
-private:
+    std::vector<std::pair<int, int> > m_inputTargetMap;
+    int m_inputTargetMapSize;
+
+    AbstractTempTable* m_inputTable;
+
     MigratePlanNode* m_node;
     TableTuple m_inputTuple;
+
+    int m_partitionColumn;
+    bool m_partitionColumnIsString;
+
+    static int64_t s_modifiedTuples;
+
+    /** reference to the engine/context to store the number of modified tuples */
+    VoltDBEngine* m_engine;
 };
 
 }

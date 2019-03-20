@@ -639,17 +639,18 @@ inline bool isTableWithExport(TableType tableType) {
     return tableType == PERSISTENT_EXPORT;
 }
 
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+}
+
 inline bool tableTypeNeedsTupleStream(TableType tableType) {
-    return tableTypeIsExportStream(tableType) || isTableWithExport(tableType);
+    return tableTypeIsExportStream(tableType) || isTableWithStream(tableType);
 }
 
 inline bool isTableWithMigrate(TableType tableType) {
     return tableType == PERSISTENT_MIGRATE;
 }
 
-inline bool isTableWithStream(TableType tableType) {
-    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
-}
 
 // ------------------------------------------------------------------
 // Utility functions.

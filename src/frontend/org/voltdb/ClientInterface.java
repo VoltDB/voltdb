@@ -158,6 +158,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
     public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
+    public static final long MIGRATE_ROWS_DELETE_CID    = Long.MIN_VALUE + 11;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids

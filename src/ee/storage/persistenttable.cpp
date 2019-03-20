@@ -738,6 +738,15 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
     }
 }
+void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& tuple) {
+    assert(tuple.getSchema()->isTableWithStream());
+    uint16_t migrateColumnIndex = tuple.getSchema()->hiddenColumnCount() -1;
+    if (tuple.getHiddenNValue(migrateColumnIndex).isNull()) {
+        int64_t txnId = ec->currentSpHandle();
+        VOLT_TRACE("Migrated row transaction id:%ld", (long)txnId);
+        tuple.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(txnId));
+    }
+}
 
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
     // If the current table does not have a delta table, return.
@@ -954,7 +963,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
                                                      TableTuple& sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const& indexesToUpdate,
                                                      bool fallible,
-                                                     bool updateDRTimestamp) {
+                                                     bool updateDRTimestamp,
+                                                     bool updateMigrate) {
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
     int tupleLength = targetTupleToUpdate.tupleLength();
@@ -995,12 +1005,15 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn() && updateDRTimestamp) {
+    if (hasDRTimestampColumn() && updateDRTimestamp && !updateMigrate) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
+    if (updateMigrate && m_shadowStream != nullptr) {
+        setMigrateTxnIdForTuple(ec, sourceTupleWithNewValues);
+    }
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (doDRActions(drStream)) {
+    if (!updateMigrate && doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -1015,7 +1028,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
+            m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -1090,6 +1103,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
+    if (updateMigrate && m_shadowStream != nullptr) {
+        migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
+        m_shadowStream->insertTuple(sourceTupleWithNewValues);
+    }
+
     if (uq) {
         /*
          * Create and register an undo action with copies of the "before" and "after" tuple storage
@@ -1161,6 +1179,11 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
+    // undo migrating indexes
+    if (m_shadowStream != nullptr) {
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
+    }
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         BOOST_FOREACH (auto index, m_indexes) {

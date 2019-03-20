@@ -199,6 +199,10 @@ public interface SiteProcedureConnection {
                                                      Column column,
                                                      ComparisonOperation op);
 
+    public ProcedureRunner getMigrateProcRunner(String procName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op);
     /**
      * @return SystemProcedureExecutionContext
      */

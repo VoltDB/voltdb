@@ -1875,4 +1875,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
     }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return m_loadedProcedures.getMigrateProcRunner(procName, catTable, column, op);
+    }
 }

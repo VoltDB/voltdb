@@ -179,6 +179,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
+    private MigrateRowsDeleter m_migrateRowsDeleter;
 
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
 
@@ -1144,7 +1145,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 schemaContainer,
                                 first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
-                                first_unpolled_block.committedSequenceNumber());
+                                first_unpolled_block.committedSequenceNumber(),
+                                m_migrateRowsDeleter);
                 try {
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1164,13 +1166,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         BBContainer m_schemaCont;
         long m_startTime = 0;
         long m_commitSpHandle = 0;
+        final MigrateRowsDeleter m_migrateRowsDeleter;
 
-        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq) {
+        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq,
+                MigrateRowsDeleter migrateRowsDeleter) {
             super(cont.b());
             m_lastSeqNo = seq;
             m_commitSeqNo = commitSeq;
             m_backingCont = cont;
             m_schemaCont = schemaCont;
+            m_migrateRowsDeleter = migrateRowsDeleter;
         }
 
         public void updateStartTime(long startTime) {
@@ -1249,6 +1254,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 }
                             } finally {
                                 forwardAckToOtherReplicas();
+                            }
+                            if (m_migrateRowsDeleter != null) {
+                                m_migrateRowsDeleter.delete(m_commitSpHandle);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1963,6 +1971,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
         if (committedSeqNo > m_committedSeqNo) {
             m_committedSeqNo  = committedSeqNo;
+        }
+    }
+
+    public void setupMigrateRowsDeleter(int batchSize) {
+        if (batchSize > 0) {
+            m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, m_partitionId, batchSize);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + m_partitionId);
+            }
         }
     }
 
