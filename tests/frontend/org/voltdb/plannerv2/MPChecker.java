@@ -49,12 +49,17 @@ public class MPChecker extends PlanChecker {
 
         if (!isValid(sql)) return;
 
-        CompiledPlan calcitePlan;
-        CompiledPlan voltdbPlan;
+        CompiledPlan calcitePlan = null;
+        CompiledPlan voltdbPlan = null;
         try {
-            calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
             voltdbPlan = compileAdHocPlan(sql, true, true);
+            calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
         } catch (Exception e) {
+            if (e.getMessage().contains("MP query not supported in Calcite planner") &&
+                    voltdbPlan != null && voltdbPlan.subPlanGraph == null) {
+                // if the SQL is fallback as MP in Calcite but SP in Volt, print the SQL statement.
+                System.err.println(sql);
+            }
             // The SQL is invalid in VOLT or is not supported in Calcite planner, stop checking and print nothing
             return;
         }
