@@ -1027,6 +1027,10 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         }
     }
 
+    if (m_tableStreamer != NULL) {
+            m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
+    }
+
     /**
      * Remove the current tuple from any indexes.
      */
