@@ -68,7 +68,6 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.PBDSegment;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -89,6 +88,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
+
+    private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
+            8 + // generation id
+            4; // schema size
 
     private final String m_database;
     private final String m_tableName;
@@ -139,7 +142,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Map<Long, QueryResponse> m_queryResponses = new HashMap<>();
 
     private volatile boolean m_closed = false;
-    private final StreamBlockQueue m_buffers;
+    private final StreamBlockQueue m_committedBuffers;
     private Runnable m_onMastership;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
@@ -267,8 +270,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_tableName = tableName;
         m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
         String nonce = m_tableName + "_" + partitionId;
-        m_buffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
-        m_gapTracker = m_buffers.scanForGap();
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_gapTracker = m_committedBuffers.scanForGap();
         // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
 
@@ -412,8 +415,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         final String nonce = m_tableName + "_" + m_partitionId;
-        m_buffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
-        m_gapTracker = m_buffers.scanForGap();
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_gapTracker = m_committedBuffers.scanForGap();
 
         // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
@@ -484,11 +487,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
-        while (!m_buffers.isEmpty() && releaseSeqNo >= m_buffers.peek().startSequenceNumber()) {
-            StreamBlock sb = m_buffers.peek();
+        while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
+            StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 try {
-                    m_buffers.pop();
+                    m_committedBuffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
@@ -517,7 +520,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Truncating tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString() +
-                    ", m_buffers.isEmpty() " + m_buffers.isEmpty());
+                    ", m_committedBuffers.isEmpty() " + m_committedBuffers.isEmpty());
         }
         return;
     }
@@ -620,7 +623,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_buffers.sizeInBytes();
+                    return m_committedBuffers.sizeInBytes();
                 }
             }).get();
         } catch (RejectedExecutionException e) {
@@ -757,12 +760,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tupleCount += newTuples;
                 m_tuplesPending.addAndGet((int)newTuples);
 
-                assert (genId >= m_previousGenId);
-                // This serializer is used to write stream schema to pbd
-                StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
-                        VoltDB.instance().getCatalogContext(), m_tableName);
-                // check generation id change at every push to tell when to create new segment
-                m_buffers.offer(sb, ds, genId != m_previousGenId);
+                if (genId != m_previousGenId) {
+                    assert (genId > m_previousGenId);
+                    // This serializer is used to write stream schema to pbd
+                    StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
+                            VoltDB.instance().getCatalogContext(), m_tableName);
+                    // check generation id change at every push to tell when to update the header
+                    m_committedBuffers.updateSchema(ds);
+                }
+                m_committedBuffers.offer(sb);
                 m_previousGenId = genId;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -848,7 +854,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     m_partitionId);
                             return;
                         }
-                        m_buffers.truncateToSequenceNumber(sequenceNumber);
+                        m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
                         // export data after truncation point will be regenerated by c/l replay
                         m_gapTracker.truncateAfter(sequenceNumber);
                         if (exportLog.isDebugEnabled()) {
@@ -877,7 +883,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void run() {
             try {
-                m_buffers.sync(m_nofsync);
+                m_committedBuffers.sync(m_nofsync);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -932,7 +938,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         ack.internalDiscard();
                     }
-                    m_buffers.closeAndDelete();
+                    m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
@@ -949,7 +955,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_buffers.close();
+                    m_committedBuffers.close();
                     m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e.getMessage(), e);
@@ -1001,7 +1007,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             boolean hasSchema = cont.schema() != null;
                             if (!hasSchema) {
                                 // Ensure this first block has a schema
-                                BBContainer schemaContainer = m_buffers.pollSchema();
+                                BBContainer schemaContainer = m_committedBuffers.pollSchema();
                                 if (schemaContainer == null) {
                                     pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo));
                                     return;
@@ -1055,13 +1061,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
-            //outside of the m_buffers critical section
+            //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
             //Inside this critical section do the work to find out
             //what block should be returned by the next poll.
             //Copying and sending the data will take place outside the critical section
             try {
-                Iterator<StreamBlock> iter = m_buffers.iterator();
+                Iterator<StreamBlock> iter = m_committedBuffers.iterator();
                 long firstUnpolledSeq = m_firstUnpolledSeqNo;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("polling data from seqNo " + firstUnpolledSeq);
@@ -1130,7 +1136,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 BBContainer schemaContainer = null;
                 if (pollTask.forcePollSchema()) {
-                    schemaContainer = m_buffers.pollSchema();
+                    schemaContainer = m_committedBuffers.pollSchema();
                 } else {
                     schemaContainer = first_unpolled_block.getSchemaContainer();
                 }
@@ -1412,7 +1418,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
       * @throws IOException
       */
      private void handleDrainedSource() throws IOException {
-         if (!inCatalog() && m_buffers.isEmpty()) {
+         if (!inCatalog() && m_committedBuffers.isEmpty()) {
              //Returning null indicates end of stream
              try {
                  if (m_pollTask != null) {
@@ -2049,7 +2055,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public void serialize(ByteBuffer buf) throws IOException {
             buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
             buf.putLong(m_catalogContext.m_genId);
-            buf.putInt(buf.limit() - PBDSegment.EXPORT_SCHEMA_HEADER_BYTES); // size of schema
+            buf.putInt(buf.limit() - EXPORT_SCHEMA_HEADER_BYTES); // size of schema
             buf.putInt(m_streamName.length());
             buf.put(m_streamName.getBytes(Constants.UTF8ENCODING));
 
@@ -2078,7 +2084,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             for (Column c : CatalogUtil.getSortedCatalogItems(streamTable.getColumns(), "index")) {
                 size += 4 + c.getName().length() + 1 + 4;
             }
-            return  PBDSegment.EXPORT_SCHEMA_HEADER_BYTES + /*schema size*/
+            return EXPORT_SCHEMA_HEADER_BYTES + /* schema size */
                     4 /*name length*/ + m_streamName.length() +
                     4 /*name length*/ + VOLT_TRANSACTION_ID.length() + 1 /*column type*/ + 4 /*column length*/ +
                     4 + VOLT_EXPORT_TIMESTAMP.length() + 1 + 4 +

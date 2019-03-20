@@ -119,7 +119,8 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
                                                 + columnName
                                                 + ", "
                                                 + expr.getDifferentiator()
-                                                + "> in common table expression.  Please notify VoltDB Support.");
+                                                + "> in common table expression. Please update your query.",
+                                            1);
         }
         SchemaColumn schemaCol = getOutputSchema().getColumn(idx);
 

@@ -871,7 +871,8 @@ SnapshotCompletionInterest, Promotable
             if (! fullTableNames.isEmpty()) {
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
                                    .append(s.getNonce())
-                                   .append(" because this is a partial snapshot.");
+                                   .append(" because this is a partial snapshot.")
+                                   .append(" Tables missing in snapshot: " + fullTableNames);
                 return null;
             }
         } catch (IOException ioe) {

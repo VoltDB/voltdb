@@ -210,9 +210,9 @@ public class ParserDDL extends ParserRoutine {
                 // $FALL-THROUGH$
             // End of VoltDB extension
             case Tokens.UNIQUE :
+                unique = token.tokenType == Tokens.UNIQUE;
                 read();
                 checkIsThis(Tokens.INDEX);
-                unique = token.tokenType == Tokens.UNIQUE;
                 assert ! migratingIndex || ! (unique || assumeUnique) :
                         "MIGRATING index cannot be UNIQUE or ASSUMEUNIQUE";
                 // A VoltDB extension to support the assume unique attribute
