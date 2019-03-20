@@ -78,10 +78,18 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         for (int i=0; i < 1000; i++) {
             client.callProcedure("@AdHoc", "INSERT INTO NIBBLE_EXPORT VALUES(" + i + ", CURRENT_TIMESTAMP(), 'xx', 'yy');");
         }
-        Thread.sleep(30000);
+        Thread.sleep(60000);
         VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
+        long count = 0;
+        while (vt.advanceRow()) {
+            if ("TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
+                count +=vt.getLong("TUPLE_COUNT");
+            }
+        }
         System.out.println(vt.toFormattedString());
         vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT").getResults()[0];
+        assert(vt.asScalarLong() == 0);
+        assert(count == 1000);
     }
 
     static public junit.framework.Test suite() throws Exception {

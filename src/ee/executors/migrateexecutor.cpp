@@ -141,9 +141,6 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            // determine which indices are updated by this executor
-            // iterate through all target table indices and see if they contain
-            // columns mutated by this executor
             std::vector<TableIndex*> indexesToUpdate;
             const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
 
@@ -157,6 +154,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             assert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
+            uint16_t migrateColumnIndex = targetTuple.getSchema()->hiddenColumnCount() -1;
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
                 // tuple to update in the target table.
@@ -182,8 +180,10 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                     }
                 }
 
-                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                if (targetTuple.getHiddenNValue(migrateColumnIndex).isNull()) {
+                     targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                             indexesToUpdate, true, false, true);
+                }
             }
             modified_tuples = m_inputTable->tempTableTupleCount();
             if (m_replicatedTableOperation) {
