@@ -443,21 +443,41 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     }
 
     @Test
-    public void testExportTable() throws Exception
+    public void testDropStream() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25"));
-        assertEquals(getTableType("T25"), "EXPORT");
-        //Export table created with STREAM syntax
-        assertTrue(findTableInSystemCatalogResults("T25S"));
-        assertEquals(getTableType("T25S"), "EXPORT");
+        assertFalse("Stream T25D1 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D1"));
+        assertFalse("Stream T25D2 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D2"));
+    }
+
+    @Test
+    public void testCreateStream() throws Exception
+    {
+        assertTrue  ("Stream T25S should exist",   findTableInSystemCatalogResults("T25S"));
+        assertEquals("Stream T25S has wrong type", "EXPORT", getTableType("T25S"));
     }
 
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25N"));
-        assertEquals(getTableType("T25N"), "EXPORT");
-        assertEquals(getTableType("VT25N"), "VIEW");
+        assertTrue  ("Stream T25N should exist",         findTableInSystemCatalogResults("T25N"));
+        assertEquals("Stream T25N has wrong type",       "EXPORT", getTableType("T25N"));
+        assertTrue  ("Stream View VT25N should exist",   findTableInSystemCatalogResults("VT25N"));
+        assertEquals("Stream View VT25N has wrong type", "VIEW", getTableType("VT25N"));
+    }
+
+    @Test
+    public void testTableWithTTL() throws Exception
+    {
+        assertTrue  ("Table T63 should exist",    findTableInSystemCatalogResults("T63"));
+        assertEquals("Stream T63 has wrong type", "TABLE", getTableType("T63"));
+
+        // TODO: add more tests, once TTL info (e.g. TTL value, time-unit,
+        // batch size # rows, max frequency value) is available from
+        // '@SystemCatalog "COLUMNS"' (or in some other way)
+
+        // Table T64 also specifies BATCH_SIZE and MAX_FREQUENCY
+        assertTrue  ("Table T64 should exist",    findTableInSystemCatalogResults("T64"));
+        assertEquals("Stream T64 has wrong type", "TABLE", getTableType("T64"));
     }
 
 //    @Test
