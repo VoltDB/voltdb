@@ -215,7 +215,7 @@ public class QueryPlanner implements AutoCloseable {
             final TupleValueExpression columnExpression = new TupleValueExpression(
                     targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
             if (! ExpressionUtil.collectTerminals(
-                    ExpressionUtil.from(
+                    ExpressionUtil.from(db,
                             VoltXMLElementHelper.getFirstChild(
                                     VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
                                     "operation")))
