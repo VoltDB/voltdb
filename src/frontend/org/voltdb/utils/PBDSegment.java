@@ -38,11 +38,9 @@ public abstract class PBDSegment {
     private static final String SCANNER_CURSOR = "__scanner__";
     protected static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
 
-    static final int NO_FLAGS = 0;
-    static final int FLAG_COMPRESSED = 1;
-
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
+
     // Segment Header layout:
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
@@ -50,11 +48,12 @@ public abstract class PBDSegment {
     public static final int HEADER_CRC_OFFSET = 0;
     public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
-    static final int SEGMENT_HEADER_BYTES = 12;
+    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = 12;
+    static final int SEGMENT_HEADER_BYTES = 16;
 
-    public static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + //export buffer version
-                                                         8 + //generation id
-                                                         4;  //schema size
+    static final int NO_FLAGS = 0;
+    static final int FLAG_COMPRESSED = 1;
+
     // Export Segment Entry Header layout (each segment has multiple entries):
     //  - crc of segment entry (4 bytes),
     //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
@@ -158,14 +157,8 @@ public abstract class PBDSegment {
         int sizeInBytes = 0;
 
         DBBPool.BBContainer cont;
-        DBBPool.BBContainer schemaCont = null;
-        boolean isFinal = isFinal();
         while (true) {
             final long beforePos = reader.readOffset();
-
-            if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(!isFinal);
-            }
 
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
             if (cont == null) {
@@ -215,10 +208,6 @@ public abstract class PBDSegment {
                 }
             } finally {
                 cont.discard();
-                if (schemaCont != null) {
-                    schemaCont.discard();
-                    schemaCont = null;
-                }
             }
         }
         int entriesScanned = reader.readIndex();
@@ -240,7 +229,9 @@ public abstract class PBDSegment {
      * @throws IOException
      */
     ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
-        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
+        if (!m_closed) {
+            throw new IOException(("Segment should not be open before truncation"));
+        }
 
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
@@ -255,7 +246,7 @@ public abstract class PBDSegment {
         while (true) {
             // Start to read a new segment
             if (reader.readIndex() == 0) {
-                schemaCont = reader.getSchema(false);
+                schemaCont = reader.getExtraHeader();
             }
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
             if (cont == null) {

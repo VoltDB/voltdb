@@ -519,6 +519,7 @@ public class StatsAgent extends OpsAgent
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:
+        case IDLETIME:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
         case QUEUE:

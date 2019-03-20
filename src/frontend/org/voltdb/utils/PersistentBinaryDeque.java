@@ -132,8 +132,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public BBContainer getSchema(long segmentIndex, boolean restoreReaderOffset, boolean checkCRC)
-                throws IOException {
+        public BBContainer getExtraHeader(long segmentIndex) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
@@ -152,23 +151,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     segment = m_segment;
                 }
 
-                long originalOffset = -1;
-                try {
-                    segmentReader = segment.getReader(m_cursorId);
-                    if (segmentReader == null) {
-                        segmentReader = segment.openForRead(m_cursorId);
-                    } else if (segmentReader.isClosed()) {
-                        segmentReader.reopen(false, false);
-                    }
-                    // need to restore the read offset
-                    originalOffset = segmentReader.readOffset();
-                    segmentReader.setReadOffset(PBDSegment.ENTRY_HEADER_BYTES);
-                    return segmentReader.getSchema(checkCRC);
-                } finally {
-                    if (segmentReader != null && restoreReaderOffset) {
-                        segmentReader.setReadOffset(originalOffset);
-                    }
+                segmentReader = segment.getReader(m_cursorId);
+                if (segmentReader == null) {
+                    segmentReader = segment.openForRead(m_cursorId);
+                } else if (segmentReader.isClosed()) {
+                    segmentReader.reopen(false, false);
                 }
+                // need to restore the read offset
+                return segmentReader.getExtraHeader();
             }
         }
 
@@ -364,6 +354,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
     // used for a *previous* segment (or inserting a segment *before* the others.
     private long m_segmentCounter = 0L;
 
+    private DeferredSerialization m_extraHeader;
+
     /**
      * Create a persistent binary deque with the specified nonce and storage
      * back at the specified path.
@@ -384,12 +376,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * This is a convenience method for testing so that poll with delete can be tested.
      *
      * @param nonce
-     * @param schemaDS
+     * @param extraHeader
      * @param path
      * @param deleteEmpty
      * @throws IOException
      */
-    public PersistentBinaryDeque(final String nonce, DeferredSerialization schemaDS,
+    public PersistentBinaryDeque(final String nonce, DeferredSerialization extraHeader,
             final File path, VoltLogger logger,
             final boolean deleteEmpty) throws IOException {
         NativeLibraryLoader.loadVoltDB();
@@ -415,22 +407,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         Long writeSegmentIndex = lastEntry == null ? 1L : lastEntry.getKey() + 1;
 
         String fname = getSegmentFileName(curId, prevId);
-        PBDSegment writeSegment = newSegment(writeSegmentIndex, curId, new VoltFile(m_path, fname));
-
-        PBDSegment check = m_segments.put(writeSegmentIndex, writeSegment);
-        if (check != null) {
+        m_extraHeader = extraHeader;
+        PBDSegment writeSegment = initializeNewSegment(writeSegmentIndex, curId, new VoltFile(m_path, fname),
+                "initialization");
+        if (m_segments.put(writeSegmentIndex, writeSegment) != null) {
             // Sanity check
             throw new IllegalStateException("Overwriting segment " + writeSegmentIndex);
-        }
-        writeSegment.openForWrite(true);
-        writeSegment.setFinal(false);
-        if (schemaDS != null) {
-            writeSegment.writeExtraHeader(schemaDS);
-        }
-
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + writeSegment.file()
-                + " (final: " + writeSegment.isFinal() + "), has been opened for writing");
         }
 
         m_numObjects = countNumObjects();
@@ -727,21 +709,32 @@ public class PersistentBinaryDeque implements BinaryDeque {
         long prevId = lastSegment == null ? getNextSegmentId() : lastSegment.segmentId();
 
         String fname = getSegmentFileName(curId, prevId);
-        PBDSegment newSegment = newSegment(newSegmentIndex, curId, new VoltFile(m_path, fname));
-        newSegment.openForWrite(true);
-        // Ensure the new segment is not final
-        newSegment.setFinal(false);
-
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + newSegment.file()
-            + " (final: " + newSegment.isFinal() + "), has been created by PBD truncator");
-        }
+        PBDSegment newSegment = initializeNewSegment(newSegmentIndex, curId, new VoltFile(m_path, fname),
+                "PBD truncator");
         m_segments.put(newSegment.segmentIndex(), newSegment);
         assertions();
     }
 
     private PBDSegment newSegment(long segmentIndex, long segmentId, File file) {
         return new PBDRegularSegment(segmentIndex, segmentId, file);
+    }
+
+    private PBDSegment initializeNewSegment(long segmentIndex, long segmentId, File file, String reason)
+            throws IOException {
+        PBDSegment segment = newSegment(segmentIndex, segmentId, file);
+        segment.openForWrite(true);
+        segment.setFinal(false);
+        if (m_extraHeader != null) {
+            segment.writeExtraHeader(m_extraHeader);
+        }
+
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug(
+                    "Segment " + segment.file() + " (final: " + segment.isFinal()
+                            + "), has been opened for writing because of " + reason);
+        }
+
+        return segment;
     }
 
     /**
@@ -801,15 +794,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public synchronized void offer(BBContainer object) throws IOException {
-        offer(object, null, true, false);
+    public void updateExtraHeader(DeferredSerialization extraHeaderSerializer) throws IOException {
+        m_extraHeader = extraHeaderSerializer;
+        addSegment(peekLastSegment());
     }
 
     @Override
-    public synchronized void offer( BBContainer object,
-                                    DeferredSerialization schemaDS,
-                                    boolean allowCompression,
-                                    boolean createNewFile) throws IOException {
+    public synchronized void offer(BBContainer object) throws IOException {
+        offer(object, true);
+    }
+
+    @Override
+    public synchronized void offer(BBContainer object, boolean allowCompression) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
@@ -817,11 +813,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         PBDSegment tail = peekLastSegment();
         final boolean compress = object.b().isDirect() && allowCompression;
-        if (createNewFile) {
-            tail = addSegment(tail, schemaDS);
-        }
         if (!tail.offer(object, compress)) {
-            tail = addSegment(tail, schemaDS);
+            tail = addSegment(tail);
             final boolean success = tail.offer(object, compress);
             if (!success) {
                 throw new IOException("Failed to offer object in PBD");
@@ -841,7 +834,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         PBDSegment tail = peekLastSegment();
         int written = tail.offer(ds);
         if (written < 0) {
-            tail = addSegment(tail, null);
+            tail = addSegment(tail);
             written = tail.offer(ds);
             if (written < 0) {
                 throw new IOException("Failed to offer object in PBD");
@@ -852,7 +845,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return written;
     }
 
-    private PBDSegment addSegment(PBDSegment tail, DeferredSerialization schemaDS) throws IOException {
+    private PBDSegment addSegment(PBDSegment tail) throws IOException {
         boolean previousTailIsDeleted = false;
         //Check to see if the tail is completely consumed so we can close and delete it
         if (tail.hasAllFinishedReading() && canDeleteSegment(tail)) {
@@ -868,16 +861,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         long curId = getNextSegmentId();
         String fname = getSegmentFileName(curId, lastId);
-        PBDSegment newSegment = newSegment(nextIndex, curId, new VoltFile(m_path, fname));
-        newSegment.openForWrite(true);
-        newSegment.setFinal(false);
-        if (schemaDS != null) {
-            newSegment.writeExtraHeader(schemaDS);
-        }
-        if (m_usageSpecificLog.isDebugEnabled()) {
-            m_usageSpecificLog.debug("Segment " + newSegment.file()
-                + " (final: " + newSegment.isFinal() + "), has been created because of an offer");
-        }
+        PBDSegment newSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "an offer");
         closeTailAndOffer(newSegment);
         if (previousTailIsDeleted) {
             advanceCursorTo(tail, newSegment);
@@ -946,16 +930,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             long prevId = getNextSegmentId();
             String fname = getSegmentFileName(curId, prevId);
 
-            PBDSegment writeSegment =
-                newSegment(
-                        nextIndex,
-                        curId,
-                        new VoltFile(m_path, fname));
-            writeSegment.openForWrite(true);
-            writeSegment.setFinal(false);
-            if (ds != null) {
-                writeSegment.writeExtraHeader(ds);
-            }
+            PBDSegment writeSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "a push");
 
             // Prepare for next file
             nextIndex--;
@@ -1189,6 +1164,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public int writeTruncatedObject(ByteBuffer output) throws IOException {
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             int bytesWritten = MiscUtils.writeDeferredSerialization(output, m_ds);
+            output.flip();
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             ByteBuffer header = output.duplicate();
             header.position(PBDSegment.ENTRY_HEADER_CRC_OFFSET);

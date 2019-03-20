@@ -2424,34 +2424,39 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     }
     it->second.erase(tuple.address());
     size_t found = it->second.erase(tuple.address());
+    if (it->second.empty()) {
+        m_migratingRows.erase(it);
+    }
     assert(found <= 1);
     return found == 1;
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
-    if (m_shadowStream == nullptr) {
-        return false;
+    if (m_shadowStream != nullptr) {
+        MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
+        int32_t deletedRows = 0;
+        if (it != m_migratingRows.end()) {
+            TableTuple targetTuple(m_schema);
+            MigratingRows::iterator currIt = m_migratingRows.begin();
+            do {
+                MigratingBatch& batch = currIt->second;
+                deletedRows += batch.size();
+                BOOST_FOREACH (auto toDelete, batch) {
+                    targetTuple.move(toDelete);
+                    deleteTuple(targetTuple);
+                }
+                currIt = m_migratingRows.erase(currIt);
+                if (currIt == m_migratingRows.end()) {
+                    return true;
+                }
+            } while (deletedRows <= maxRowCount && currIt->first <= it->first);
+            return currIt->first > it->first;
+        }
+        else {
+            return true;
+        }
     }
-    MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
-    if (it == m_migratingRows.end()) {
-        return true;
-    }
-    int32_t deletedRows = 0;
-    MigratingRows::iterator currIt = m_migratingRows.begin();
-    do {
-        MigratingBatch& batch = currIt->second;
-        deletedRows += batch.size();
-        BOOST_FOREACH (auto toDelete, batch) {
-           TableTuple targetTuple(m_schema);
-           targetTuple.move(toDelete);
-           deleteTuple(targetTuple);
-       }
-       currIt++;
-       if (currIt == m_migratingRows.end()) {
-           return true;
-       }
-    } while (deletedRows <= maxRowCount && currIt->first <= it->first);
-    return currIt->first > it->first;
+    return false;
 }
 
 } // namespace voltdb
