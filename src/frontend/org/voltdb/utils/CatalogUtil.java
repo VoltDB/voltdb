@@ -645,7 +645,19 @@ public abstract class CatalogUtil {
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table) {
-        return TableType.isStream(table.getTabletype());
+        // This implementation uses connectors instead of just looking at the tableType
+        // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static boolean isExportEnabled() {
