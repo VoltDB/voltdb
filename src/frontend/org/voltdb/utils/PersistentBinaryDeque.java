@@ -508,7 +508,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             // Handle common cases: no PBD files or just one
             if (filesById.size() == 0) {
-                m_usageSpecificLog.info("No PBD segments for " + m_nonce);
+                if (m_usageSpecificLog.isDebugEnabled()) {
+                    m_usageSpecificLog.debug("No PBD segments for " + m_nonce);
+                }
                 return;
             }
 
@@ -629,7 +631,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         assertions();
         if (m_segments.isEmpty()) {
-            m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            }
             return;
         }
 
@@ -1104,7 +1108,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_readCursors.clear();
 
         for (PBDSegment qs : m_segments.values()) {
-            m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
+            }
             closeAndDeleteSegment(qs);
         }
         m_segments.clear();
@@ -1245,7 +1251,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         assertions();
         if (m_segments.isEmpty()) {
-            m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            }
             return new ExportSequenceNumberTracker();
         }
 
