@@ -368,14 +368,14 @@ public class HTTPAdminListener {
 
     private static class HttpSessionIdManager extends DefaultSessionIdManager {
 
-        public HttpSessionIdManager(Server server) {
+        HttpSessionIdManager(Server server) {
             super(server);
         }
 
         //remove all sessions in cache
-        public void cleanSessions() throws Exception {
-            synchronized (this) {
-                doStop();
+        void cleanSessions() throws Exception {
+           for (SessionHandler sh:getSessionHandlers()) {
+               sh.getSessionCache().shutdown();
             }
         }
     }
