@@ -467,6 +467,7 @@ public class PBDRegularSegment extends PBDSegment {
                 m_fc.write(b);
             }
             m_extraHeaderSize = size;
+            writeOutHeader();
         } finally {
             destBuf.discard();
         }
