@@ -67,7 +67,7 @@ public class TestExportEndToEnd extends JUnit4LocalClusterTest {
     public void tearDown() {
         try {
             m_cluster.shutDown();
-            TestExportBaseSocketExport.closeClientAndServer();
+            TestExportBaseSocketExport.closeSocketExporterClientAndServer();
         } catch (Exception e) {
             fail();
         }
