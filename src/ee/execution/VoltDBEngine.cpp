@@ -2248,21 +2248,16 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    ExportTupleStream* oldestUnflushed = NULL;
-    ExportTupleStream* newestUnflushed = NULL;
-    ExportTupleStream* nextStreamToFlush = m_oldestExportStreamWithPendingRows;
-    while (nextStreamToFlush) {
-        // Get next stream before the flush because a successful flush sets next and prev to NULL
-        nextStreamToFlush = nextStreamToFlush->getNextFlushStream();
-        if (!m_oldestExportStreamWithPendingRows->periodicFlush(-1, lastCommittedSpHandle)) {
-            m_oldestExportStreamWithPendingRows->appendToList(&oldestUnflushed, &newestUnflushed);
-        }
-        m_oldestExportStreamWithPendingRows = nextStreamToFlush;
+    BOOST_FOREACH (auto exportStream, m_exportingStreams) {
+#ifndef NDEBUG
+        // A quiesce should be transactional so periodicFlush should always succeed
+        bool streamFlushed =
+#endif
+                exportStream.second->periodicFlush(-1, lastCommittedSpHandle);
+        assert(streamFlushed);
     }
-    // A quiesce should be transactional but in case we ever do this from the middle of an MP txn
-    // reinstate all streams that failed the flush into the next flush list.
-    m_oldestExportStreamWithPendingRows = oldestUnflushed;
-    m_newestExportStreamWithPendingRows = newestUnflushed;
+    m_oldestExportStreamWithPendingRows = NULL;
+    m_newestExportStreamWithPendingRows = NULL;
 
     m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {

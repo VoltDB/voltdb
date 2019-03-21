@@ -80,39 +80,11 @@ bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
     setDMLCountOutputTable(executorVector.limits());
 
     AbstractPlanNode *child = m_node->getChildren()[0];
-    ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
         VOLT_ERROR("Attempted to initialize migrate executor with NULL child");
         return false;
     }
 
-    PlanNodeType pnt = child->getPlanNodeType();
-    if (pnt == PLAN_NODE_TYPE_PROJECTION) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
-            pnt == PLAN_NODE_TYPE_INDEXSCAN) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(NULL != proj_node);
-    }
-
-    vector<string> output_column_names = proj_node->getOutputColumnNames();
-    const vector<string> &targettable_column_names = targetTable->getColumnNames();
-
-    /*
-     * The first output column is the tuple address expression and it isn't part of our output so we skip
-     * it when generating the map from input columns to the target table columns.
-     */
-    for (int ii = 1; ii < output_column_names.size(); ii++) {
-        for (int jj=0; jj < targettable_column_names.size(); ++jj) {
-            if (targettable_column_names[jj].compare(output_column_names[ii]) == 0) {
-                m_inputTargetMap.push_back(pair<int,int>(ii, jj));
-                break;
-            }
-        }
-    }
-
-    assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
-    m_inputTargetMapSize = (int)m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
 
     // for target table related info.
@@ -134,7 +106,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
-    int64_t modified_tuples = 0;
+    int64_t migrated_tuples = 0;
 
     {
         assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
@@ -161,33 +133,15 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 void *target_address = m_inputTuple.getNValue(0).castAsAddress();
                 targetTuple.move(target_address);
 
-                // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
-                // the values that we need to. The key thing to note here is that we
-                // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-                // we want to update). This ensures that if the input tuple is somehow
-                // bringing garbage with it, we're only going to copy what we really
-                // need to into the target tuple.
-                //
-                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-                for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-                    try {
-                        tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-                                        m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
-                    } catch (SQLException& ex) {
-                        std::string errorMsg = ex.message()
-                                + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].second) + "'";
-                        throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
-                    }
-                }
-
                 if (targetTuple.getHiddenNValue(migrateColumnIndex).isNull()) {
-                     targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                            indexesToUpdate, true, false, true);
+                    TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                    targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                                                                indexesToUpdate, true, false, true);
+                    migrated_tuples++;
                 }
             }
-            modified_tuples = m_inputTable->tempTableTupleCount();
             if (m_replicatedTableOperation) {
-                s_modifiedTuples = modified_tuples;
+                s_modifiedTuples = migrated_tuples;
             }
         }
         else {
@@ -205,10 +159,10 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     if (m_replicatedTableOperation) {
         // Use the static value assigned above to propagate the result to the other engines
         // that skipped the replicated table work
-        modified_tuples = s_modifiedTuples;
+        migrated_tuples = s_modifiedTuples;
     }
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(migrated_tuples));
     // try to put the tuple into the output table
     m_node->getOutputTable()->insertTuple(count_tuple);
 

@@ -57,7 +57,6 @@ class MigrateExecutor : public AbstractExecutor {
 public:
     MigrateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node) {
-         m_inputTargetMapSize = -1;
          m_inputTable = NULL;
          m_engine = engine;
          m_partitionColumn = -1;
@@ -66,9 +65,6 @@ public:
 protected:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
-
-    std::vector<std::pair<int, int> > m_inputTargetMap;
-    int m_inputTargetMapSize;
 
     AbstractTempTable* m_inputTable;
 
