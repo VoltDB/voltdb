@@ -235,9 +235,9 @@ namespace voltdb {
    static const int FUNC_VOLT_SET_FIELD                   = 20024;
 
    static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
-   // Check if the row has not been migrated. Returns true when the migrating column is NULL.
-   // Rows that had been migrated has that column set to txn-id of the migrating process.
-   static const int FUNC_VOLT_NOT_MIGRATED                = 21026;
+   // Check if the row has been migrated. Returns true when the migrating column is NOT NULL.
+   // Rows that had been migrating has that column set to txn-id (i.e. not null) of the migrating process.
+   static const int FUNC_VOLT_MIGRATING                   = 21026;
 
    static const int FUNC_VOLT_BITNOT                      = 20026;
    static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;

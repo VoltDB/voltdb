@@ -3419,53 +3419,55 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                     }
                 });
         final Object[][] expected_m1 = {{1, 11}, {2, 22}, {3, 33}, {4, 44}},
-                expected_m2 = {{1, 10}, {2, 20}, {3, 30}, {4, 40}};
+                expected_m2 = {{1, 10}, {2, 20}, {3, 30}, {4, 40}}, empty = {};
         final String errMsg = "SQL error while compiling query: \"NOT NOT_MIGRATED\\(\\)\" is an invalid predicate";
         ClientResponse cr;
         // select migrating rows
-        cr = client.callProcedure("@AdHoc", "select * from m1 where not_migrated() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select * from m1 where not migrating() order by a, b;");
         assertContentOfTable(expected_m1, cr.getResults()[0]);
 
-        cr = client.callProcedure("@AdHoc", "select * from m2 where not_migrated() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select * from m2 where not migrating() order by a, b;");
         assertContentOfTable(expected_m2, cr.getResults()[0]);
 
         // forbid select !migrating rows
-        verifyAdHocFails(client, errMsg,"select * from m1 where NOT not_migrated order by a, b;");
-        verifyAdHocFails(client, errMsg, "select * from m2 where NOT not_migrated order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select * from m1 where migrating order by a, b;");
+        assertContentOfTable(empty, cr.getResults()[0]);
+        cr = client.callProcedure("@AdHoc", "select * from m2 where migrating order by a, b;");
+        assertContentOfTable(empty, cr.getResults()[0]);
 
-        cr = client.callProcedure("@AdHoc", "select * from m1 where not_migrated() and a >= 3 order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select * from m1 where not migrating() and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{3, 33}, {4, 44}}, cr.getResults()[0]);
 
-        cr = client.callProcedure("@AdHoc", "select * from m2 where not_migrated and a >= 3 order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select * from m2 where not migrating and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{3, 30}, {4, 40}}, cr.getResults()[0]);
 
         // migrating with aggregate functions.
-        cr = client.callProcedure("@AdHoc", "select count(*) from m1 where not_migrated and a >= 3 order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select count(*) from m1 where not migrating and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from m2 where not_migrated and a >= 3 order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select count(*) from m2 where not migrating and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{2}}, cr.getResults()[0]);
 
         // migrate() in subquery select
-        cr = client.callProcedure("@AdHoc", "select t1.a from (select * from m2 where not_migrated and b < 30) as t1 order by t1.a");
+        cr = client.callProcedure("@AdHoc", "select t1.a from (select * from m2 where not migrating and b < 30) as t1 order by t1.a");
         assertContentOfTable(new Object[][]{{1}, {2}}, cr.getResults()[0]);
 
         // Can not apply MIGRATING function on non-migrating tables.
-        verifyAdHocFails(client, "Can not apply NOT_MIGRATED function on non-migrating tables.\\s*",
-                "select * from p1 where not_migrated();");
+        verifyAdHocFails(client, "Can not apply MIGRATING function on non-migrating tables.\\s*",
+                "select * from p1 where not migrating();");
 
         // we do not support migrating() in SELECT clause
         verifyAdHocFails(client, "A SELECT clause does not allow a BOOLEAN expression.\\s*",
-                "select not_migrated() from m1;");
+                "select not migrating() from m1;");
 
         // we do not support migrating() with joins
         verifyAdHocFails(client, "Join with filters that do not depend on joined tables is not supported in VoltDB\\s*",
-                "select * from m2, p1 where not_migrated;");
+                "select * from m2, p1 where not migrating;");
 
         // we do not support migrating() with subquery joins
         verifyAdHocFails(client, "Join with filters that do not depend on joined tables is not supported in VoltDB\\s*",
                 "select t1.a from "
-                        + "  (select * from m1 where not_migrated and b < 30) as t1 "
+                        + "  (select * from m1 where not migrating and b < 30) as t1 "
                         + "  inner join "
                         + "  (select * from m2 where a > 0) as t2 "
                         + "on t1.a = t2.a ");
