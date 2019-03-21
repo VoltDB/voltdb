@@ -550,21 +550,8 @@ public class PBDRegularSegment extends PBDSegment {
                             }
                         }
                         compressedBuf.b().flip();
-                        if (checkCRC) {
-                            m_crc32.reset();
-                            m_crc32.update(length);
-                            m_crc32.update(flags);
-                            m_crc32.update(compressedBuf.b());
-                            compressedBuf.b().flip();
-                            if (entryCRC != (int)m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
-                                LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
-                                        + "Truncate the file to last safe point.");
-                                PBDRegularSegment.this.close();
-                                openForWrite(false);
-                                initNumEntries(m_objectReadIndex, m_bytesRead);
-                                m_fc.truncate(m_readOffset);
-                                return null;
-                            }
+                        if (checkCRC && !checkEntryCrc(length, flags, compressedBuf.b(), entryCRC)) {
+                            return null;
                         }
 
                         uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
@@ -585,22 +572,9 @@ public class PBDRegularSegment extends PBDSegment {
                         }
                     }
                     retcont.b().flip();
-                    if (checkCRC) {
-                        m_crc32.reset();
-                        m_crc32.update(length);
-                        m_crc32.update(flags);
-                        m_crc32.update(retcont.b());
-                        retcont.b().flip();
-                        if (entryCRC != (int)m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
-                            LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
-                                    + "Truncate the file to last safe point.");
-                            PBDRegularSegment.this.close();
-                            openForWrite(false);
-                            initNumEntries(m_objectReadIndex, m_bytesRead);
-                            m_fc.truncate(m_readOffset);
-                            retcont.discard();
-                            return null;
-                        }
+                    if (checkCRC && !checkEntryCrc(length, flags, retcont.b(), entryCRC)) {
+                        retcont.discard();
+                        return null;
                     }
                 }
 
@@ -627,6 +601,26 @@ public class PBDRegularSegment extends PBDSegment {
                 m_readOffset = m_fc.position();
                 m_fc.position(writePos);
             }
+        }
+
+        private boolean checkEntryCrc(int length, int flags, ByteBuffer entry, int crc) throws IOException {
+            int origPosition = entry.position();
+            m_crc32.reset();
+            m_crc32.update(length);
+            m_crc32.update(flags);
+            m_crc32.update(entry);
+            entry.position(origPosition);
+
+            if (crc != (int) m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
+                LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
+                        + "Truncate the file to last safe point.");
+                PBDRegularSegment.this.close();
+                openForWrite(false);
+                initNumEntries(m_objectReadIndex, m_bytesRead);
+                m_fc.truncate(m_readOffset);
+                return false;
+            }
+            return true;
         }
 
         @Override
