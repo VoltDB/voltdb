@@ -190,7 +190,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
 
     private SynthesizedPlanFragment
     constructDistributeReplicatedTableAsReplicatedFragment(long sourceSiteId,
-                                                           long destinationSiteId)
+                                                           int destHostId)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -203,7 +203,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                destinationSiteId,
+                destHostId,
                 result_dependency_id,
                 getIsRecoverParam());
         return plan_fragment;
@@ -213,7 +213,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState {
     constructLoadReplicatedTableAggregatorFragment(boolean asPartitioned)
     {
         int result_dependency_id = getNextDependencyId();
-        //setRootDependencyId(resultDependencyId);
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
             SysProcFragmentId.PF_restoreReceiveResultTables;
