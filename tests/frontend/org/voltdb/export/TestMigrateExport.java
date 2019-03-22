@@ -101,8 +101,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
                 " A_INLINE_S2   VARCHAR(63)      NOT NULL," +
                 ") using TTL 5 seconds on column A_TIMESTAMP MIGRATE to TARGET NIBBLE_EXPORT;" +
                 " \nPARTITION table NIBBLE_EXPORT on column PKEY;" +
-                " \nCREATE INDEX MINDEX1 ON NIBBLE_EXPORT(A_TIMESTAMP);" +
-                " \nCREATE MIGRATING INDEX MINDEX2 ON NIBBLE_EXPORT();");
+                " \nCREATE INDEX MINDEX1 ON NIBBLE_EXPORT(A_TIMESTAMP) WHERE NOT MIGRATING;");
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
         Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
