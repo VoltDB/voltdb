@@ -552,53 +552,52 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         // UNION
         // parameters in both
-        // ENG-15160
-//        sql = "SELECT ID FROM R1 sub4_B WHERE ID > ? UNION SELECT ID FROM R1 sub4_C WHERE ID > ?;";
-//        vt = client.callProcedure("@AdHoc", sql, 0, 0).getResults()[0];
-//        assertEquals(3, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_MISS2);
-//
-//        verifyAdHocFails(client, String.format(pattern, 2, 1), sql, 0);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        vt = client.callProcedure("@AdHoc", sql, 1, 2).getResults()[0];
-//        assertEquals(2, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_HIT2);
-//
-//        verifyAdHocFails(client, String.format(pattern, 2, 3), sql, 0, 1, 2);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        // parameters on right
-//        sql = "SELECT ID FROM R1 sub4_B WHERE NUM = 0 UNION SELECT ID FROM R1 sub4_C WHERE ID < ?;";
-//        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
-//        assertEquals(2, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_MISS2);
-//
-//        vt = client.callProcedure("@AdHoc", sql, 3).getResults()[0];
-//        assertEquals(2, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_HIT2);
-//
-//        // parameters on left
-//        sql = "SELECT ID FROM R1 sub4_B WHERE NUM > ? UNION SELECT ID FROM R1 sub4_C WHERE ID > 1;";
-//        vt = client.callProcedure("@AdHoc", sql, 0).getResults()[0];
-//        assertEquals(2, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_MISS2);
-//
-//        vt = client.callProcedure("@AdHoc", sql, -1).getResults()[0];
-//        assertEquals(3, vt.getRowCount());
-//        checkPlannerCache(client, CACHE_HIT2);
-//
-//        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+        sql = "SELECT ID FROM R1 sub4_B WHERE ID > ? UNION SELECT ID FROM R1 sub4_C WHERE ID > ?;";
+        vt = client.callProcedure("@AdHoc", sql, 0, 0).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS2);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 1), sql, 0);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        vt = client.callProcedure("@AdHoc", sql, 1, 2).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 3), sql, 0, 1, 2);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        // parameters on right
+        sql = "SELECT ID FROM R1 sub4_B WHERE NUM = 0 UNION SELECT ID FROM R1 sub4_C WHERE ID < ?;";
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql, 3).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        // parameters on left
+        sql = "SELECT ID FROM R1 sub4_B WHERE NUM > ? UNION SELECT ID FROM R1 sub4_C WHERE ID > 1;";
+        vt = client.callProcedure("@AdHoc", sql, 0).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql, -1).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
 
         //
         // Subquery should not make a difference here, but add some tests to make sure at least
