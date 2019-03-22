@@ -326,6 +326,57 @@ public class ParserDML extends ParserDQL {
     }
 
     /**
+     * Creates a MIGRATE-type statement from this parser context (i.e.
+     * MIGRATE FROM tbl WHERE ...
+     * @param outerRanges
+     * @return compiled statement
+     */
+    StatementDMQL compileMigrateStatement(RangeVariable[] outerRanges) {
+
+        final Expression condition;
+        assert token.tokenType == Tokens.MIGRATE;
+        read();
+        readThis(Tokens.FROM);
+
+        RangeVariable[] rangeVariables = { readSimpleRangeVariable(StatementTypes.MIGRATE_WHERE) };
+        Table table     = rangeVariables[0].getTable();
+
+        if (token.tokenType == Tokens.WHERE) {
+            read();
+
+            condition = XreadBooleanValueExpression();
+
+            HsqlList unresolved =
+                    condition.resolveColumnReferences(outerRanges, null);
+
+            unresolved = Expression.resolveColumnSet(rangeVariables,
+                    unresolved, null);
+
+            ExpressionColumn.checkColumnsResolved(unresolved);
+            condition.resolveTypes(session, null);
+
+            if (condition.isParam()) {
+                condition.dataType = Type.SQL_BOOLEAN;
+            }
+
+            if (condition.getDataType() != Type.SQL_BOOLEAN) {
+                throw Error.error(ErrorCode.X_42568);
+            }
+        } else {
+            throw Error.error(ErrorCode.X_47000);
+        }
+        // check WHERE condition
+        RangeVariableResolver resolver =
+                new RangeVariableResolver(rangeVariables, condition,
+                        compileContext);
+        resolver.processConditions();
+
+        rangeVariables = resolver.rangeVariables;
+
+        return new StatementDML(session, table, rangeVariables, compileContext);
+    }
+
+    /**
      * Creates a DELETE-type Statement from this parse context.
      */
     StatementDMQL compileDeleteStatement(RangeVariable[] outerRanges) {

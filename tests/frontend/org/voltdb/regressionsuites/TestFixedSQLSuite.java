@@ -2457,7 +2457,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // where desc in ?
         // scalar parameter fails
-        verifyProcFails(client, "rhs of IN expression is of a non-list type varchar",
+        verifyProcFails(client, "rhs of IN expression is of a non-list type VARCHAR",
                 "@AdHoc", adHocQueryWithListParam, "scalar param");
 
         // where desc in (?)

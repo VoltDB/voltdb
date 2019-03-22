@@ -246,18 +246,6 @@ public class UpdateCore extends VoltSystemProcedure {
         }
     }
 
-    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
-    static {
-        m_versionMap.put(45, "Java 1.1");
-        m_versionMap.put(46, "Java 1.2");
-        m_versionMap.put(47, "Java 1.3");
-        m_versionMap.put(48, "Java 1.4");
-        m_versionMap.put(49, "Java 5");
-        m_versionMap.put(50, "Java 6");
-        m_versionMap.put(51, "Java 7");
-        m_versionMap.put(52, "Java 8");
-    }
-
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -313,6 +301,9 @@ public class UpdateCore extends VoltSystemProcedure {
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
+
+                // Bring the DR and Export buffer update to date.
+                context.getSiteProcedureConnection().quiesce();
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =

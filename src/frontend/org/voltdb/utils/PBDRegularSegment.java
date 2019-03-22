@@ -22,12 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
@@ -53,10 +54,13 @@ public class PBDRegularSegment extends PBDSegment {
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
+    private int m_extraHeaderSize = 0;
 
-    private DBBPool.BBContainer m_tmpHeaderBuf = null;
+    private DBBPool.BBContainer m_segmentHeaderBuf = null;
+    private DBBPool.BBContainer m_entryHeaderBuf = null;
+    Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    public PBDRegularSegment(Long index, Long  id, File file) {
+    public PBDRegularSegment(Long index, long id, File file) {
         super(file);
         m_index = index;
         m_id = id;
@@ -84,30 +88,22 @@ public class PBDRegularSegment extends PBDSegment {
     public void reset()
     {
         m_syncedSinceLastEdit = false;
-        if (m_tmpHeaderBuf != null) {
-            m_tmpHeaderBuf.discard();
-            m_tmpHeaderBuf = null;
+        if (m_segmentHeaderBuf != null) {
+            m_segmentHeaderBuf.discard();
+            m_segmentHeaderBuf = null;
         }
+        if (m_entryHeaderBuf != null) {
+            m_entryHeaderBuf.discard();
+            m_entryHeaderBuf = null;
+        }
+        m_segmentHeaderCRC.reset();
+        m_entryCRC.reset();
     }
 
     @Override
-    public int getNumEntries() throws IOException
+    public int getNumEntries(boolean crcCheck) throws IOException
     {
-        boolean wasClosed = false;
-        if (m_closed) {
-            wasClosed = true;
-            open(false, false);
-        }
-        if (m_fc.size() >= SEGMENT_HEADER_BYTES) {
-            m_tmpHeaderBuf.b().clear();
-            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), 0);
-            m_numOfEntries = m_tmpHeaderBuf.b().getInt();
-            m_size = m_tmpHeaderBuf.b().getInt();
-        } else {
-            m_numOfEntries = 0;
-            m_size = 0;
-        }
-        if (wasClosed) closeReadersAndFile();
+        initializeFromHeader(crcCheck);
         return m_numOfEntries;
     }
 
@@ -149,6 +145,11 @@ public class PBDRegularSegment extends PBDSegment {
         open(true, emptyFile);
     }
 
+    int getExtraHeaderSize() throws IOException {
+        initializeFromHeader(false);
+        return m_extraHeaderSize;
+    }
+
     private void open(boolean forWrite, boolean emptyFile) throws IOException {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
@@ -163,41 +164,96 @@ public class PBDRegularSegment extends PBDSegment {
         assert(m_ras == null);
         m_ras = new RandomAccessFile( m_file, forWrite ? "rw" : "r");
         m_fc = m_ras.getChannel();
-        m_tmpHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
+        m_segmentHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
+        m_entryHeaderBuf = DBBPool.allocateDirect(ENTRY_HEADER_BYTES);
 
+        // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
             initNumEntries(0, 0);
         }
-        m_fc.position(SEGMENT_HEADER_BYTES);
+        if (forWrite) {
+            m_fc.position(m_fc.size());
+        } else {
+            m_fc.position(SEGMENT_HEADER_BYTES);
+        }
 
         m_closed = false;
     }
 
+    private void initializeFromHeader(boolean crcCheck) throws IOException {
+        if (m_numOfEntries != -1) {
+            return;
+        }
+        boolean wasClosed = false;
+        if (m_closed) {
+            wasClosed = true;
+            open(false, false);
+        }
+        try {
+            if (m_fc.size() >= SEGMENT_HEADER_BYTES) {
+                ByteBuffer b = m_segmentHeaderBuf.b();
+                b.clear();
+                PBDUtils.readBufferFully(m_fc, b, 0);
+                int crc = b.getInt();
+                int numOfEntries = b.getInt();
+                int size = b.getInt();
+                int extraHeaderSize = b.getInt();
+                if (crcCheck) {
+                    m_segmentHeaderCRC.reset();
+                    m_segmentHeaderCRC.update(numOfEntries);
+                    m_segmentHeaderCRC.update(size);
+                    m_segmentHeaderCRC.update(extraHeaderSize);
+                    if (crc != (int) m_segmentHeaderCRC.getValue()) {
+                        LOG.warn("File corruption detected in" + m_file.getName() + ": invalid file header. ");
+                        throw new IOException(
+                                "File corruption detected in" + m_file.getName() + ": invalid file header.");
+                    }
+                }
+                m_numOfEntries = numOfEntries;
+                m_size = size;
+                m_extraHeaderSize = extraHeaderSize;
+            } else {
+                m_numOfEntries = 0;
+                m_size = 0;
+            }
+        } finally {
+            if (wasClosed) {
+                closeReadersAndFile();
+            }
+        }
+    }
+
+    private void writeOutHeader() throws IOException {
+        // Update segment header CRC
+        m_segmentHeaderCRC.reset();
+        m_segmentHeaderCRC.update(m_numOfEntries);
+        m_segmentHeaderCRC.update(m_size);
+        m_segmentHeaderCRC.update(m_extraHeaderSize);
+
+        ByteBuffer b = m_segmentHeaderBuf.b();
+        b.clear();
+        // the checksum here is really an unsigned int, store integer to save 4 bytes
+        b.putInt((int) m_segmentHeaderCRC.getValue());
+        b.putInt(m_numOfEntries);
+        b.putInt(m_size);
+        b.putInt(m_extraHeaderSize);
+        b.flip();
+        PBDUtils.writeBuffer(m_fc, m_segmentHeaderBuf.bDR(), PBDSegment.HEADER_CRC_OFFSET);
+        m_syncedSinceLastEdit = false;
+    }
 
     @Override
     protected void initNumEntries(int count, int size) throws IOException {
         m_numOfEntries = count;
         m_size = size;
-
-        m_tmpHeaderBuf.b().clear();
-        m_tmpHeaderBuf.b().putInt(m_numOfEntries);
-        m_tmpHeaderBuf.b().putInt(m_size);
-        m_tmpHeaderBuf.b().flip();
-        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf.bDR(), COUNT_OFFSET);
-        m_syncedSinceLastEdit = false;
+        writeOutHeader();
     }
 
     private void incrementNumEntries(int size) throws IOException
     {
         m_numOfEntries++;
         m_size += size;
-
-        m_tmpHeaderBuf.b().clear();
-        m_tmpHeaderBuf.b().putInt(m_numOfEntries);
-        m_tmpHeaderBuf.b().putInt(m_size);
-        m_tmpHeaderBuf.b().flip();
-        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf.bDR(), COUNT_OFFSET);
-        m_syncedSinceLastEdit = false;
+        writeOutHeader();
     }
 
     /**
@@ -205,7 +261,7 @@ public class PBDRegularSegment extends PBDSegment {
      * @return
      */
     private int remaining() throws IOException {
-        //Subtract 8 for the length and size prefix
+        //Subtract 12 for the crc, number of entries and size prefix
         return (int)(PBDSegment.CHUNK_SIZE - m_fc.position()) - SEGMENT_HEADER_BYTES;
     }
 
@@ -260,7 +316,9 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public void sync() throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
         if (!m_syncedSinceLastEdit) {
             m_fc.force(true);
         }
@@ -269,9 +327,13 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public boolean hasAllFinishedReading() throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
 
-        if (m_readCursors.size() == 0) return false;
+        if (m_readCursors.size() == 0) {
+            return false;
+        }
 
         for (SegmentReader reader : m_readCursors.values()) {
             if (reader.m_objectReadIndex < m_numOfEntries) {
@@ -282,44 +344,52 @@ public class PBDRegularSegment extends PBDSegment {
         return true;
     }
 
+    // Used by Export path
     @Override
     public boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException
     {
-        if (m_closed) throw new IOException("Segment closed");
+        if (m_closed) {
+            throw new IOException("Segment closed");
+        }
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
-        if (remaining < 32 || !buf.isDirect()) compress = false;
-        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + OBJECT_HEADER_BYTES;
-        if (remaining() < maxCompressedSize) return false;
+        if (remaining < 32 || !buf.isDirect()) {
+            compress = false;
+        }
+        final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + ENTRY_HEADER_BYTES;
+        if (remaining() < maxCompressedSize) {
+            return false;
+        }
 
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = cont;
-
         try {
-            m_tmpHeaderBuf.b().clear();
+            m_entryCRC.reset();
+            m_entryHeaderBuf.b().clear();
 
             if (compress) {
                 destBuf = DBBPool.allocateDirectAndPool(maxCompressedSize);
                 final int compressedSize = CompressionService.compressBuffer(buf, destBuf.b());
                 destBuf.b().limit(compressedSize);
-
-                m_tmpHeaderBuf.b().putInt(compressedSize);
-                m_tmpHeaderBuf.b().putInt(FLAG_COMPRESSED);
+                PBDUtils.writeEntryHeader(m_entryCRC, m_entryHeaderBuf.b(), destBuf.b(),
+                        compressedSize, FLAG_COMPRESSED);
             } else {
                 destBuf = cont;
-                m_tmpHeaderBuf.b().putInt(remaining);
-                m_tmpHeaderBuf.b().putInt(NO_FLAGS);
+                PBDUtils.writeEntryHeader(m_entryCRC, m_entryHeaderBuf.b(), destBuf.b(),
+                        remaining, NO_FLAGS);
+            }
+            // Write entry header
+            m_entryHeaderBuf.b().flip();
+            while (m_entryHeaderBuf.b().hasRemaining()) {
+                m_fc.write(m_entryHeaderBuf.b());
             }
 
-            m_tmpHeaderBuf.b().flip();
-            while (m_tmpHeaderBuf.b().hasRemaining()) {
-                m_fc.write(m_tmpHeaderBuf.b());
-            }
-
+            // Write entry
+            destBuf.b().flip();
             while (destBuf.b().hasRemaining()) {
                 m_fc.write(destBuf.b());
             }
-
+            // Update segment header
             incrementNumEntries(remaining);
         } finally {
             destBuf.discard();
@@ -331,24 +401,39 @@ public class PBDRegularSegment extends PBDSegment {
         return true;
     }
 
+    // Used by DR path
     @Override
     public int offer(DeferredSerialization ds) throws IOException
     {
-        if (m_closed) throw new IOException("closed");
-        final int fullSize = ds.getSerializedSize() + OBJECT_HEADER_BYTES;
-        if (remaining() < fullSize) return -1;
+        if (m_closed) {
+            throw new IOException("closed");
+        }
+        final int fullSize = ds.getSerializedSize();
+        if (remaining() < fullSize) {
+            return -1;
+        }
 
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = DBBPool.allocateDirectAndPool(fullSize);
 
         try {
-            final int written = PBDUtils.writeDeferredSerialization(destBuf.b(), ds);
+            m_entryCRC.reset();
+            m_entryHeaderBuf.b().clear();
+            final int written = MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
             destBuf.b().flip();
-
+            // Write entry header
+            PBDUtils.writeEntryHeader(m_entryCRC, m_entryHeaderBuf.b(), destBuf.b(),
+                    written, PBDSegment.NO_FLAGS);
+            m_entryHeaderBuf.b().flip();
+            while (m_entryHeaderBuf.b().hasRemaining()) {
+                m_fc.write(m_entryHeaderBuf.b());
+            }
+            // Write entry
+            destBuf.b().flip();
             while (destBuf.b().hasRemaining()) {
                 m_fc.write(destBuf.b());
             }
-
+            // Update segment header
             incrementNumEntries(written);
             return written;
         } finally {
@@ -365,7 +450,8 @@ public class PBDRegularSegment extends PBDSegment {
     protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException
     {
         int written = 0;
-        final DBBPool.BBContainer partialCont = DBBPool.allocateDirect(OBJECT_HEADER_BYTES + entry.getTruncatedBuffSize());
+        final DBBPool.BBContainer partialCont =
+                DBBPool.allocateDirect(ENTRY_HEADER_BYTES + entry.getTruncatedBuffSize());
         try {
             written += entry.writeTruncatedObject(partialCont.b());
             partialCont.b().flip();
@@ -379,25 +465,41 @@ public class PBDRegularSegment extends PBDSegment {
         return written;
     }
 
+    @Override
+    public void writeExtraHeader(DeferredSerialization ds) throws IOException {
+        if (m_numOfEntries != 0 || m_extraHeaderSize != 0) {
+            throw new IllegalStateException("Extra header must be written before any entries");
+        }
+        int size = ds.getSerializedSize();
+        DBBPool.BBContainer destBuf = DBBPool.allocateDirect(size);
+        try {
+            ByteBuffer b = destBuf.b();
+            b.order(ByteOrder.LITTLE_ENDIAN);
+            ds.serialize(b);
+            b.flip();
+            while (b.hasRemaining()) {
+                m_fc.write(b);
+            }
+            m_extraHeaderSize = size;
+        } finally {
+            destBuf.discard();
+        }
+    }
+
     private class SegmentReader implements PBDSegmentReader {
         private final String m_cursorId;
-        private long m_readOffset = SEGMENT_HEADER_BYTES;
+        private long m_readOffset;
         //Index of the next object to read, not an offset into the file
         private int m_objectReadIndex = 0;
         private int m_bytesRead = 0;
         private int m_discardCount = 0;
-        private boolean m_closed = false;
+        private boolean m_readerClosed = false;
+        private CRC32 m_crc32 = new CRC32();
 
-        public SegmentReader(String cursorId) {
+        public SegmentReader(String cursorId) throws IOException {
             assert(cursorId != null);
             m_cursorId = cursorId;
-        }
-
-        private void resetReader() {
-            m_objectReadIndex = 0;
-            m_bytesRead = 0;
-            m_readOffset = SEGMENT_HEADER_BYTES;
-            m_discardCount = 0;
+            m_readOffset = SEGMENT_HEADER_BYTES + getExtraHeaderSize();
         }
 
         @Override
@@ -411,8 +513,11 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
-        public BBContainer poll(OutputContainerFactory factory) throws IOException {
-            if (m_closed) throw new IOException("Reader closed");
+        public DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCRC) throws IOException {
+
+            if (m_readerClosed) {
+                throw new IOException("Reader closed");
+            }
 
             if (!hasMoreEntries()) {
                 return null;
@@ -423,21 +528,28 @@ public class PBDRegularSegment extends PBDSegment {
 
             try {
                 //Get the length and size prefix and then read the object
-                m_tmpHeaderBuf.b().clear();
-                while (m_tmpHeaderBuf.b().hasRemaining()) {
-                    int read = m_fc.read(m_tmpHeaderBuf.b());
+                m_entryHeaderBuf.b().clear();
+                while (m_entryHeaderBuf.b().hasRemaining()) {
+                    int read = m_fc.read(m_entryHeaderBuf.b());
                     if (read == -1) {
                         throw new EOFException();
                     }
                 }
-                m_tmpHeaderBuf.b().flip();
-                final int length = m_tmpHeaderBuf.b().getInt();
-                final int flags = m_tmpHeaderBuf.b().getInt();
+                m_entryHeaderBuf.b().flip();
+                final int entryCRC = m_entryHeaderBuf.b().getInt();
+                final int length = m_entryHeaderBuf.b().getInt();
+                final int flags = m_entryHeaderBuf.b().getInt();
                 final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
                 final int uncompressedLen;
 
-                if (length < 1) {
-                    throw new IOException("Read an invalid length");
+                if (length < 1 || length > PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES) {
+                    LOG.warn("File corruption detected in " + m_file.getName() + ": invalid entry length. "
+                            + "Truncate the file to last safe point.");
+                    PBDRegularSegment.this.close();
+                    openForWrite(false);
+                    initNumEntries(m_objectReadIndex, m_bytesRead);
+                    m_fc.truncate(m_readOffset);
+                    return null;
                 }
 
                 final DBBPool.BBContainer retcont;
@@ -451,6 +563,22 @@ public class PBDRegularSegment extends PBDSegment {
                             }
                         }
                         compressedBuf.b().flip();
+                        if (checkCRC) {
+                            m_crc32.reset();
+                            m_crc32.update(length);
+                            m_crc32.update(flags);
+                            m_crc32.update(compressedBuf.b());
+                            compressedBuf.b().flip();
+                            if (entryCRC != (int)m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
+                                LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
+                                        + "Truncate the file to last safe point.");
+                                PBDRegularSegment.this.close();
+                                openForWrite(false);
+                                initNumEntries(m_objectReadIndex, m_bytesRead);
+                                m_fc.truncate(m_readOffset);
+                                return null;
+                            }
+                        }
 
                         uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
                         retcont = factory.getContainer(uncompressedLen);
@@ -470,6 +598,21 @@ public class PBDRegularSegment extends PBDSegment {
                         }
                     }
                     retcont.b().flip();
+                    if (checkCRC) {
+                        m_crc32.update(length);
+                        m_crc32.update(flags);
+                        m_crc32.update(retcont.b());
+                        retcont.b().flip();
+                        if (entryCRC != (int)m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
+                            LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
+                                    + "Truncate the file to last safe point.");
+                            PBDRegularSegment.this.close();
+                            openForWrite(false);
+                            initNumEntries(m_objectReadIndex, m_bytesRead);
+                            m_fc.truncate(m_readOffset);
+                            return null;
+                        }
+                    }
                 }
 
                 m_bytesRead += uncompressedLen;
@@ -498,8 +641,47 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
+        public DBBPool.BBContainer getExtraHeader() throws IOException {
+            if (m_readerClosed) {
+                throw new IOException("Reader closed");
+            }
+
+            int extraHeaderSize = getExtraHeaderSize();
+            if (extraHeaderSize == 0) {
+                return null;
+            }
+
+            final long writePos = m_fc.position();
+            m_fc.position(SEGMENT_HEADER_BYTES);
+
+            DBBPool.BBContainer schemaBuf = null;
+            try {
+                schemaBuf = DBBPool.allocateDirect(extraHeaderSize);
+                ByteBuffer schemaBuffer = schemaBuf.b();
+                do {
+                    int read = m_fc.read(schemaBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                } while (schemaBuffer.hasRemaining());
+                schemaBuffer.order(ByteOrder.LITTLE_ENDIAN).flip();
+                return schemaBuf;
+            } catch (Exception e) {
+                if (schemaBuf != null) {
+                    schemaBuf.discard();
+                }
+                LOG.error(e);
+                return null;
+            } finally {
+                m_fc.position(writePos);
+            }
+        }
+
+        @Override
         public int uncompressedBytesToRead() {
-            if (m_closed) throw new RuntimeException("Reader closed");
+            if (m_readerClosed) {
+                throw new RuntimeException("Reader closed");
+            }
 
             return m_size - m_bytesRead;
         }
@@ -521,7 +703,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public void close() throws IOException {
-            m_closed = true;
+            m_readerClosed = true;
             m_readCursors.remove(m_cursorId);
             m_closedCursors.put(m_cursorId, this);
             if (m_readCursors.isEmpty()) {
@@ -531,7 +713,19 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public boolean isClosed() {
-            return m_closed;
+            return m_readerClosed;
+        }
+
+        @Override
+        public void reopen(boolean forWrite, boolean emptyFile) throws IOException {
+            if (m_readerClosed) {
+                open(forWrite, emptyFile);
+                m_readerClosed = false;
+            }
+            if (m_cursorId != null) {
+                m_closedCursors.remove(m_cursorId);
+                m_readCursors.put(m_cursorId, this);
+            }
         }
     }
 }

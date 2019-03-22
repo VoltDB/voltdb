@@ -687,6 +687,7 @@ public class ExportManager
             long startSequenceNumber,
             long tupleCount,
             long uniqueId,
+            long genId,
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync) {
@@ -702,7 +703,7 @@ public class ExportManager
                 return;
             }
             generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
-                    (int)tupleCount, uniqueId, buffer, sync);
+                    (int)tupleCount, uniqueId, genId, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);

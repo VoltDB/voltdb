@@ -108,7 +108,8 @@ public interface SiteProcedureConnection {
             VoltTable data,
             boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean undo);
+            boolean undo,
+            boolean elastic);
 
     /**
      * Execute a set of plan fragments.

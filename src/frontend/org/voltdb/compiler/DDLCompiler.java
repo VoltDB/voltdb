@@ -20,21 +20,12 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
+import java.util.stream.StreamSupport;
+
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -77,6 +68,7 @@ import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.TupleValueExpression;
@@ -1402,6 +1394,13 @@ public class DDLCompiler {
             }
         }
 
+        final String migratingIndexName =
+                StreamSupport.stream(((Iterable<Index>) () -> table.getIndexes().iterator()).spliterator(), false)
+                        .filter(Index::getMigrating)
+                        .map(Index::getTypeName)
+                        .findAny()
+                        .orElse(null);
+
         if (ttlNode != null) {
             TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
             String column = ttlNode.attributes.get("column");
@@ -1416,6 +1415,10 @@ public class DDLCompiler {
             if (!StringUtil.isEmpty(migrationTarget)) {
                 ttl.setMigrationtarget(migrationTarget);
                 table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
+            } else if (migratingIndexName != null) {
+                throw m_compiler.new VoltCompilerException(
+                        String.format("Cannot create migrating index \"%s\" on non-migrating table \"%s\"",
+                                migratingIndexName, name));
             }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
@@ -1423,6 +1426,10 @@ public class DDLCompiler {
                     break;
                 }
             }
+        } else if (migratingIndexName != null) {
+            throw new PlanningErrorException(
+                    String.format("Cannot create a migrating index \"%s\" on a non-TTL table \"%s\"",
+                            migratingIndexName, name));
         }
 
         // Warn user if DR table don't have any unique index.
@@ -1704,13 +1711,13 @@ public class DDLCompiler {
             HashMap<String, Index> indexMap,
             HashMap<String, Column> columnMap,
             VoltCompiler compiler)
-            throws VoltCompilerException
-    {
+            throws VoltCompilerException {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
-        boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        final boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+        final boolean isMigrating = Boolean.parseBoolean(node.getStringAttribute("migrating", "false"));
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, null, db);
         dummy.setDDLIndexedTable(table);
@@ -1774,40 +1781,41 @@ public class DDLCompiler {
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
-            if (columns[i] == null) {
+            //  Allow creation of empty migrating index which has no explicit columns.
+            if (!isMigrating && columns[i] == null) {
                 return;
             }
         }
 
-        if (exprs == null) {
+        // Empty columns of migrating index ==> colNames = {""}
+        if (exprs == null && (!isMigrating || colNames.length > 1)) {
             for (int i = 0; i < colNames.length; i++) {
-                VoltType colType = VoltType.get((byte)columns[i].getType());
+                VoltType colType = VoltType.get((byte) columns[i].getType());
 
-                if (! colType.isIndexable()) {
-                    String emsg = "Cannot create index \""+ name + "\" because " +
+                if (!colType.isIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
-                if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
-                    String emsg = "Cannot create index \""+ name + "\" because " +
+                if ((unique || assumeUnique) && !colType.isUniqueIndexable()) {
+                    String emsg = "Cannot create index \"" + name + "\" because " +
                             colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
-                if (! colType.isBackendIntegerType()) {
+                if (!colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
                     has_geo_col = colType.equals(VoltType.GEOGRAPHY);
                     if (has_geo_col && colNames.length > 1) {
-                        String emsg = "Cannot create index \""+ name + "\" because " +
+                        String emsg = "Cannot create index \"" + name + "\" because " +
                                 colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
                         throw compiler.new VoltCompilerException(emsg);
                     }
                 }
             }
-        }
-        else {
+        } else if (exprs != null) {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
 
@@ -1841,6 +1849,9 @@ public class DDLCompiler {
                 }
                 expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
+        } else {
+            assert isMigrating && colNames.length == 1 :
+                    "Encountered with an index that does not include columns or expressions";
         }
 
         Index index = table.getIndexes().add(name);
@@ -1883,10 +1894,12 @@ public class DDLCompiler {
         // need to set other index data here (column, etc)
         // For expression indexes, the columns listed in the catalog do not correspond to the values in the index,
         // but they still represent the columns that will trigger an index update when their values change.
-        for (int i = 0; i < columns.length; i++) {
-            ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
-            cref.setColumn(columns[i]);
-            cref.setIndex(i);
+        if (columns.length > 1 || columns[0] != null) {
+            for (int i = 0; i < columns.length; i++) {
+                ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
+                cref.setColumn(columns[i]);
+                cref.setIndex(i);
+            }
         }
 
         if (exprs != null) {
@@ -1913,6 +1926,7 @@ public class DDLCompiler {
             index.setUnique(true);
         }
         index.setAssumeunique(assumeUnique);
+        index.setMigrating(isMigrating);
 
         if (predicate != null) {
             try {

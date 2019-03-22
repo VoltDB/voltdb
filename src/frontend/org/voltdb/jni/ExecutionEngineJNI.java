@@ -513,7 +513,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long uniqueId,
         boolean returnUniqueViolations,
         boolean shouldDRStream,
-        long undoToken) throws EEException
+        long undoToken,
+        boolean elastic) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -527,7 +528,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken);
+                                              returnUniqueViolations, shouldDRStream, undoToken, elastic);
         checkErrorCode(errorCode);
 
         try {

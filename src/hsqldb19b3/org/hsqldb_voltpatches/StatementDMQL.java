@@ -529,6 +529,7 @@ public abstract class StatementDMQL extends Statement {
             case StatementTypes.DELETE_WHERE :
             case StatementTypes.INSERT :
             case StatementTypes.UPDATE_WHERE :
+            case StatementTypes.MIGRATE_WHERE :
                 return ResultMetaData.emptyResultMetaData;
 
             default :

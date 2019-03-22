@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -29,13 +30,19 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.compiler.VoltXMLElementHelper;
 import org.voltdb.exceptions.PlanningErrorException;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -190,13 +197,48 @@ public class QueryPlanner implements AutoCloseable {
             throw new PlanningErrorException(e.getMessage());
         }
 
-        if (m_isUpsert) {
+        if (m_xmlSQL.name.equals("migrate")) {
+            validateMigrateStmt(m_sql, m_xmlSQL, m_db);
+        } else if (m_isUpsert) {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));
             // for AdHoc cache distinguish purpose which is based on the XML
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
+    }
+
+    /**
+     * Check that "MIGRATE FROM tbl WHERE..." statement is valid.
+     * @param sql SQL statement
+     * @param xmlSQL HSQL parsed tree
+     * @param db database catalog
+     */
+    private static void validateMigrateStmt(String sql, VoltXMLElement xmlSQL, Database db) {
+        final Map<String, String> attributes = xmlSQL.attributes;
+        assert attributes.size() == 1;
+        final Table targetTable = db.getTables().get(attributes.get("table"));
+        assert targetTable != null;
+        final CatalogMap<TimeToLive> ttls = targetTable.getTimetolive();
+        if (ttls.isEmpty()) {
+            throw new PlanningErrorException(String.format(
+                    "%s: Cannot migrate from table %s because it does not have a TTL column",
+                    sql, targetTable.getTypeName()));
+        } else {
+            final Column ttl = ttls.iterator().next().getTtlcolumn();
+            final TupleValueExpression columnExpression = new TupleValueExpression(
+                    targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
+            if (! ExpressionUtil.collectTerminals(
+                    ExpressionUtil.from(db,
+                            VoltXMLElementHelper.getFirstChild(
+                                    VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
+                                    "operation")))
+                    .contains(columnExpression)) {
+                throw new PlanningErrorException(String.format(
+                        "%s: Cannot migrate from table %s because the WHERE caluse does not contain TTL column %s",
+                        sql, targetTable.getTypeName(), ttl.getName()));
+            }
+        }
     }
 
     // Generate a Volt XML tree for a hypothetical SWAP TABLE statement.

@@ -810,7 +810,7 @@ public class TestDRCatalogDiffs {
 
         String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
         Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
-        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
+        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog, (byte) 0);
     }
 
     private Catalog createCatalog(String schema) throws Exception {
