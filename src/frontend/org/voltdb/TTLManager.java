@@ -332,9 +332,6 @@ public class TTLManager extends StatsSource{
                     hostLog.warn(String.format("Fail to execute nibble export on table: %s, column: %s, status: %s",
                             task.tableName, task.getColumnName(), resp.getStatusString()));
                 }
-                if (resp.getResults() != null && resp.getResults().length > 0) {
-
-                }
                 latch.countDown();
             }
         };

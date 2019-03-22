@@ -596,11 +596,11 @@ public:
 
     void migratingAdd(int64_t txnId, TableTuple& tuple);
     bool migratingRemove(int64_t txnId, TableTuple& tuple);
-
+    void migratingUndo(TableTuple& tuple);
     /**
      * Delete the rows that have completed the migration process
      */
-    bool deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount);
+    int32_t deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount);
 
 private:
     // Zero allocation size uses defaults.
@@ -736,7 +736,8 @@ private:
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
-    void setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& tuple);
+    void setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
+            TableTuple& sourceTupleWithNewValues);
 
     void computeSmallestUniqueIndex();
 

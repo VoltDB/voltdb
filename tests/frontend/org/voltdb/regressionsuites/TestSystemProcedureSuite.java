@@ -327,8 +327,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                     "  PRICE FLOAT," +
                     "  NONID INTEGER NOT NULL," +
-                    "  ID INTEGER ").append(internalExtras)
-            .append(");\n")
+                    "  ID INTEGER NOT NULL ").append(internalExtras)
+            .append(") USING TTL 10 SECONDS ON COLUMN ID;\n")
             .append(externalExtras);
         }
         //*enable to debug*/ System.out.println(schema.toString());

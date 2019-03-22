@@ -828,7 +828,7 @@ public abstract class StatementCompiler {
         addStatement(table, proc, sb.toString(), "0");
 
          // Get cutoff value
-        sb = new StringBuilder();
+        sb.setLength(0);
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
         sb.append(" WHERE not_migrated ORDER BY " + column.getName());
         if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
@@ -839,7 +839,7 @@ public abstract class StatementCompiler {
         addStatement(table, proc, sb.toString(), "1");
 
         // Migrate
-        sb = new StringBuilder();
+        sb.setLength(0);
         sb.append("MIGRATE FROM " + table.getTypeName());
         sb.append(" WHERE not_migrated AND " + column.getName() + " " + comparison.toString() + " ?;");
         addStatement(table, proc, sb.toString(), "2");

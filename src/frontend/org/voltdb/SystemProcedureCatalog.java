@@ -225,6 +225,7 @@ public class SystemProcedureCatalog {
         builder.put("@MigrateRowsSP",           new Config("org.voltdb.sysprocs.MigrateRowsSP",            true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   true,             true,         true  ));
         builder.put("@MigrateRowsMP",           new Config("org.voltdb.sysprocs.MigrateRowsMP",            false, false, false, 0,    VoltType.VARBINARY, false, false, false,     true,   true,             true,         false ));
         builder.put("@MigrateRowsNT",           new Config("org.voltdb.sysprocs.MigrateRowsNT",            true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   false,            false,        false ));
+        builder.put("@MigrateRowsDeleterNT",    new Config("org.voltdb.sysprocs.MigrateRowsDeleterNT",     true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   false,            false,        false ));
 
         listing = builder.build();
     }

@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -37,6 +38,7 @@ import org.voltdb.VoltType;
   */
 public class MigrateRowsAcked_MP extends VoltSystemProcedure {
 
+    VoltLogger exportLog = new VoltLogger("EXPORT");
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{SysProcFragmentId.PF_migrateRows, SysProcFragmentId.PF_migrateRowsAggregate};
@@ -53,11 +55,11 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
                 final int maxRowCount = (Integer) params.toArray()[2];
 
                 final TransactionState txnState = m_runner.getTxnState();
-                boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+                int txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
                         txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
                         tableName, deletableTxnId, maxRowCount);
-                VoltTable results = new VoltTable(new ColumnInfo("txnDeleted", VoltType.TINYINT));
-                results.addRow(txnDeleted ? 1 : 0);
+                VoltTable results = new VoltTable(new ColumnInfo("RowsRemainingDeleted", VoltType.BIGINT));
+                results.addRow(txnRemainingDeleted);
                 return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_migrateRows, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_migrateRowsAggregate) {
@@ -66,7 +68,7 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
             }
         }
         catch (Exception ex) {
-            ex.printStackTrace();
+            exportLog.warn(String.format("Migrating delete error: %s", ex.getMessage()));
         }
         return null;
     }
@@ -83,9 +85,8 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
                     SysProcFragmentId.PF_migrateRowsAggregate,
                     ParameterSet.fromArrayNoCopy(tableName, deletableTxnId, maxRowCount));
         } catch (Exception ex) {
-            ex.printStackTrace();
+            exportLog.warn(String.format("Migrating delete error on table %s, error: %s", tableName, ex.getMessage()));
         }
         return result;
     }
-
 }

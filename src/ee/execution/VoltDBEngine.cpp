@@ -2594,7 +2594,7 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
         std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
@@ -2609,9 +2609,9 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
                 (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            bool txnIdFound = false;
+            int32_t rowsToBeDeleted = 0;
             try {
-                txnIdFound = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId, maxRowCount);
             }
             catch (const SQLException &sqe) {
                 s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
@@ -2627,7 +2627,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
 
             // Indicate to other threads that load happened successfully.
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
-            return txnIdFound;
+            return rowsToBeDeleted;
         }
         else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
             // An sql exception was thrown on the lowest site thread and
@@ -2653,7 +2653,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 
-    return false;
+    return 0;
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string streamName) {

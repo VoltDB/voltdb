@@ -239,7 +239,7 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
-    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId, int maxRowCount);
 
     public VoltTable[] getStats(StatsSelector selector, int[] locators,

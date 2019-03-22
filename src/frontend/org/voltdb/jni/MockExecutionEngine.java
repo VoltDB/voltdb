@@ -202,9 +202,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
-        return false;
+        return 0;
     }
 
     @Override

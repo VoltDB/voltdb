@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -40,6 +41,13 @@ public class SwapTables extends AdHocNTBase {
         CatalogContext context = VoltDB.instance().getCatalogContext();
         List<String> sqlStatements = new ArrayList<>(1);
         sqlStatements.add(sql);
+
+        for (Table t: context.database.getTables()) {
+            if (t.getTypeName().equalsIgnoreCase(theTable) && t.getTimetolive() != null) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                        String.format("Table %s cannot be swaped since it uses TTL.",theTable));
+            }
+        }
 
         return runNonDDLAdHoc(context,
                 sqlStatements,

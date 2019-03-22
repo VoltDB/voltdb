@@ -459,6 +459,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     public static void wireupExportTableToSocketExport(String tableName) {
+        wireupExportTableToSocketExport(tableName, true);
+    }
+
+    public static void wireupExportTableToSocketExport(String tableName, boolean enabled) {
         String streamName = tableName;
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
@@ -469,7 +473,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(enabled, "custom", props, streamName);
     }
 
     public static void wireupExportTableToRejectingExport(String tableName) {

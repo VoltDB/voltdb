@@ -26,14 +26,17 @@ package org.voltdb.export;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestMigrateExport extends TestExportBaseSocketExport {
@@ -65,7 +68,6 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         closeClientAndServer();
     }
 
-
     public void testMigrateExport() throws Exception
     {
         System.out.println("testMigrateExport");
@@ -78,19 +80,66 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         for (int i=0; i < 1000; i++) {
             client.callProcedure("@AdHoc", "INSERT INTO NIBBLE_EXPORT VALUES(" + i + ", CURRENT_TIMESTAMP(), 'xx', 'yy');");
         }
-        Thread.sleep(60000);
-        VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
-        long count = 0;
-        while (vt.advanceRow()) {
-            if ("TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
-                count +=vt.getLong("TUPLE_COUNT");
+
+//        VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT;").getResults()[0];
+//        assert(vt.asScalarLong() == 1000);
+//
+//        client.callProcedure("@AdHoc", "DELETE FROM NIBBLE_EXPORT WHERE PKEY < 100;");
+//        vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT;").getResults()[0];
+//        assert(vt.asScalarLong() == 900);
+//
+//        client.callProcedure("@AdHoc", "UPDATE NIBBLE_EXPORT SET A_INLINE_S2='MYTEST' WHERE PKEY >= 900;");
+//        vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT WHERE A_INLINE_S2='MYTEST';").getResults()[0];
+//        assert(vt.asScalarLong() == 100);
+//
+//        // enable export
+//        final String newCatalogURL = Configuration.getPathToCatalogForTest("test_migrate_export.jar");
+//        final String deploymentURL = Configuration.getPathToCatalogForTest("test_migrate_export.xml");
+//
+//
+//
+//        @SuppressWarnings("deprecation")
+//        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+//                                                                            new File(deploymentURL));
+//        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        verifyExport(client, 1000);
+        Thread.sleep(30000);
+        VoltTable vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT").getResults()[0];
+        assert(vt.asScalarLong() == 0);
+    }
+
+    private static void verifyExport(Client client, int expectedCount){
+
+        //allow time to get the stats
+        final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+        boolean success = false;
+        long start = System.currentTimeMillis();
+        while (!success) {
+            try {
+                VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
+                System.out.println(vt.toFormattedString());
+                vt.resetRowPosition();
+                long count = 0;
+                while (vt.advanceRow()) {
+                    if ("TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
+                        count +=vt.getLong("TUPLE_COUNT");
+                    }
+                }
+                if (count == expectedCount) {
+                    success = true;
+                } else {
+                    if (maxSleep < (System.currentTimeMillis() - start)) {
+                        break;
+                    }
+                    try { Thread.sleep(1000); } catch (Exception ignored) { }
+                }
+            } catch (Exception e) {
             }
         }
-        System.out.println(vt.toFormattedString());
-        vt = client.callProcedure("@AdHoc", "select count(*) from NIBBLE_EXPORT").getResults()[0];
-        assert(vt.asScalarLong() == 0);
-        assert(count == 1000);
+        assert(success);
     }
+
 
     static public junit.framework.Test suite() throws Exception {
         StringBuilder schema = new StringBuilder();
@@ -99,7 +148,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
                 " A_TIMESTAMP   TIMESTAMP        NOT NULL," +
                 " A_INLINE_S1   VARCHAR(4)       NOT NULL," +
                 " A_INLINE_S2   VARCHAR(63)      NOT NULL," +
-                ") using TTL 5 seconds on column A_TIMESTAMP MIGRATE to TARGET NIBBLE_EXPORT;" +
+                ") using TTL 5 seconds on column A_TIMESTAMP BATCH_SIZE 100 MIGRATE to TARGET NIBBLE_EXPORT;" +
                 " \nPARTITION table NIBBLE_EXPORT on column PKEY;" +
                 " \nCREATE INDEX MINDEX1 ON NIBBLE_EXPORT(A_TIMESTAMP);" +
                 " \nCREATE MIGRATING INDEX MINDEX2 ON NIBBLE_EXPORT();");
@@ -115,9 +164,9 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         project.addRoles(GROUPS);
         project.addUsers(USERS);
         project.addLiteralSchema(schema.toString());
-        wireupExportTableToSocketExport("NIBBLE_EXPORT");
+        wireupExportTableToSocketExport("NIBBLE_EXPORT", true);
 
-        LocalCluster config = new LocalCluster("testNibbleExport.jar", 10, 3, k_factor,
+        LocalCluster config = new LocalCluster("testMigrateExport.jar", 10, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
@@ -125,7 +174,22 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         assertTrue(compile);
         builder.addServerConfig(config, false);
 
+
+        project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true, true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addLiteralSchema(schema.toString());
+        wireupExportTableToSocketExport("NIBBLE_EXPORT", true);
+
+        config = new LocalCluster("test_migrate_export.jar", 10, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        config.setHasLocalServer(false);
+        config.setMaxHeap(1024);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("test_migrate_export.xml"));
         return builder;
     }
-
 }

@@ -65,6 +65,7 @@
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "common/ValuePeeker.hpp"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -738,13 +739,23 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
     }
 }
-void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& tuple) {
-    assert(tuple.getSchema()->isTableWithStream());
-    uint16_t migrateColumnIndex = tuple.getSchema()->hiddenColumnCount() -1;
-    if (tuple.getHiddenNValue(migrateColumnIndex).isNull()) {
-        int64_t txnId = ec->currentSpHandle();
-        VOLT_TRACE("Migrated row transaction id:%ld", (long)txnId);
-        tuple.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(txnId));
+
+void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
+        TableTuple& sourceTupleWithNewValues) {
+    assert(targetTupleToUpdate.getSchema()->isTableWithStream());
+    uint16_t migrateColumnIndex = sourceTupleWithNewValues.getSchema()->hiddenColumnCount() -1;
+    NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
+
+    // If the migrate hidden column has transaction id, reset it to null and remove the tuple
+    // from index (update path).Otherwise set the transaction id to the migrate hidden column (migrate path)
+    if (txnId.isNull()) {
+        int64_t spHandle = ec->currentSpHandle();
+        VOLT_DEBUG("Add migrating index.....%ld", (long)spHandle);
+        sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
+    } else {
+        sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        VOLT_DEBUG("Remove migrating index.....%ld", (long)(ValuePeeker::peekBigInt(txnId)));
+        migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
     }
 }
 
@@ -952,6 +963,9 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             target.debugNoHeader().c_str());
     }
+
+    // add tuple back to migrating index
+    migratingUndo(target);
 }
 
 /*
@@ -1009,8 +1023,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    if (updateMigrate && m_shadowStream != nullptr) {
-        setMigrateTxnIdForTuple(ec, sourceTupleWithNewValues);
+    if (m_shadowStream != nullptr) {
+        setMigrateTxnIdForTuple(ec, targetTupleToUpdate, sourceTupleWithNewValues);
     }
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (!updateMigrate && doDRActions(drStream)) {
@@ -1028,7 +1042,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     if (m_tableStreamer != NULL) {
-            m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
+        m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -1181,6 +1195,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 
     // undo migrating indexes
     if (m_shadowStream != nullptr) {
+
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
     }
@@ -1220,6 +1235,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
             }
         }
     }
+    migratingUndo(targetTupleToUpdate);
 }
 
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
@@ -2435,7 +2451,17 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     return found == 1;
 }
 
-bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
+void PersistentTable::migratingUndo(TableTuple& tuple) {
+    if (m_shadowStream != nullptr) {
+        uint16_t migrateColumnIndex = tuple.getSchema()->hiddenColumnCount() -1;
+        NValue txnId = tuple.getHiddenNValue(migrateColumnIndex);
+        if (!txnId.isNull()) {
+            migratingAdd(ValuePeeker::peekBigInt(txnId), tuple);
+        }
+    }
+}
+
+int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
     if (m_shadowStream != nullptr) {
         MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
         int32_t deletedRows = 0;
@@ -2451,16 +2477,20 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowC
                 }
                 currIt = m_migratingRows.erase(currIt);
                 if (currIt == m_migratingRows.end()) {
-                    return true;
+                    return 0;
                 }
             } while (deletedRows <= maxRowCount && currIt->first <= it->first);
-            return currIt->first > it->first;
-        }
-        else {
-            return true;
+
+            int32_t remainingRows = 0;
+            while (currIt->first < it->first) {
+                MigratingBatch& batch = currIt->second;
+                remainingRows += batch.size();
+                currIt++;
+            }
+            return remainingRows;
         }
     }
-    return false;
+    return 0;
 }
 
 } // namespace voltdb

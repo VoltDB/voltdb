@@ -394,6 +394,7 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
+        VOLT_DEBUG("GET.............VALUE.......%d", idx);
         assert(idx < m_schema->columnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);

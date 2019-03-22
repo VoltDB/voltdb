@@ -1160,9 +1160,9 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * @param deletableTxnId The transactionId of the last row that can be deleted
  * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
  * @param undoToken The token marking the rollback point for this transaction
- * @return true if every row up to and including deletableTxnId have been deleted.
+ * @return number of rows to be deleted
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
         JNIEnv *env, jobject obj, jlong engine_ptr,
         jlong txnId, jlong spHandle, jlong uniqueId,
         jbyteArray tableName, jlong deletableTxnId, jint maxRowCount, jlong undoToken)

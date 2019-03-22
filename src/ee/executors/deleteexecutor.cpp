@@ -128,8 +128,19 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                     void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
                     targetTuple.move(targetAddress);
 
+
                     // Delete from target table
                     targetTable->deleteTuple(targetTuple, true);
+
+                    // delete migrating index if needed
+                    if (targetTable->getStreamedTable() != nullptr) {
+                        uint16_t migrateColumnIndex = targetTuple.getSchema()->hiddenColumnCount() -1;
+                        NValue txnId = targetTuple.getHiddenNValue(migrateColumnIndex);
+                        if (!txnId.isNull()) {
+                            VOLT_DEBUG("Delete migrating index.....%ld", (long)(ValuePeeker::peekBigInt(txnId)));
+                            targetTable->migratingRemove(ValuePeeker::peekBigInt(txnId), targetTuple);
+                        }
+                    }
                 }
                 modified_tuples = m_inputTable->tempTableTupleCount();
                 VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
