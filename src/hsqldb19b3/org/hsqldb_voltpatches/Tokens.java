@@ -2340,8 +2340,8 @@ public class Tokens {
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE,
-            // A VoltDB extension to support the MIGRATEING index attribute.
-            MIGRATING,
+            // A VoltDB extension to support the MIGRATING index attribute.
+            // MIGRATING,
             // End of VoltDB extension
             // A VoltDB extension APPROX_COUNT_DISTINCT
             APPROX_COUNT_DISTINCT,
