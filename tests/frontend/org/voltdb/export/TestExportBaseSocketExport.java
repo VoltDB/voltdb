@@ -140,7 +140,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return null;
         }
 
-        public int getSize() {
+        public int getReceivedRowCount() {
             return m_queue.size();
         }
 
@@ -432,13 +432,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-    public void quiesceAndVerifyStream(final Client client, ExportTestExpectedData tester) throws Exception {
-        client.drain();
-        waitForStreamedTableAllocatedMemoryZero(client);
-        tester.verifyRows();
-        System.out.println("Passed!");
-    }
-
     public void quiesceAndVerifyTarget(final Client client, ExportTestExpectedData tester) throws Exception {
         client.drain();
         waitForStreamedTargetAllocatedMemoryZero(client);
@@ -498,7 +491,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
     }
 
-    public static void closeClientAndServer() throws IOException {
+    public static void closeSocketExporterClientAndServer() throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
             ServerListener m_serverSocket = m_serverSockets.remove(target.getKey());
             if (m_serverSocket != null) {

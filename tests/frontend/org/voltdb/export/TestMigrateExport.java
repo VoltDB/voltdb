@@ -62,7 +62,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
 

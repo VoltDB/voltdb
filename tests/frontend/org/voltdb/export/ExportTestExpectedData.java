@@ -40,9 +40,10 @@ public class ExportTestExpectedData {
     // hash table name + partition to verifier
     public final Map<String, ExportToSocketTestVerifier> m_verifiers = new HashMap<>();
     public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
-    public final Map<String, Integer> m_count = new HashMap<>();
+    public final Map<String, Integer> m_expectedRowCount = new HashMap<>();
 
     private final Map<String, ServerListener> m_severSockets;
+    // TODO: support per-table replicated stream check
     private final boolean m_replicated;
     private final boolean m_exact;
     private final long m_copies;
@@ -67,12 +68,12 @@ public class ExportTestExpectedData {
             m_seen_verifiers.put(tableName + partition, Boolean.TRUE);
         }
         verifier.addRow(data);
-        Integer count = m_count.get(tableName);
+        Integer count = m_expectedRowCount.get(tableName);
         if (count == null) {
-            m_count.put(tableName,1);
+            m_expectedRowCount.put(tableName,1);
         }
          else {
-            m_count.put(tableName,count+1);
+            m_expectedRowCount.put(tableName,count+1);
         }
     }
 
@@ -85,7 +86,7 @@ public class ExportTestExpectedData {
             System.out.println("Processing Table:" + tableName);
 
             String next[] = null;
-            assertEquals(getSize(tableName), f.getValue().getSize());
+            assertEquals(getExpectedRowCount(tableName), f.getValue().getReceivedRowCount());
             while ((next = f.getValue().getNext()) != null) {
                 final int partitionId = Integer.valueOf(next[3]);
                 StringBuilder sb = new StringBuilder();
@@ -106,8 +107,8 @@ public class ExportTestExpectedData {
         }
     }
 
-    private int getSize(String tableName) {
-        return m_count.containsKey(tableName) ? m_count.get(tableName) : 0;
+    private int getExpectedRowCount(String tableName) {
+        return m_expectedRowCount.containsKey(tableName) ? m_expectedRowCount.get(tableName) : 0;
     }
 
     public long getExportedDataCount() {
