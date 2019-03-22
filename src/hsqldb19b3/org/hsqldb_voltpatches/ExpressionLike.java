@@ -337,18 +337,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 like    = true;
             }
 
-            if (!between && !larger) {
-// A VoltDB extension to disable LIKE pattern escape characters
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-// End of VoltDB extension
-                return;
-            }
-
             Expression leftBound =
                 new ExpressionValue(likeObject.getRangeLow(),
                                     Type.SQL_VARCHAR);
@@ -374,14 +362,6 @@ public final class ExpressionLike extends ExpressionLogical {
                                                        rightBound);
                 ExpressionLike newLike = new ExpressionLike(this);
 
-// A VoltDB extension to disable LIKE pattern escape characters
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-// End of VoltDB extension
                 nodes        = new Expression[BINARY];
                 likeObject   = null;
                 nodes[LEFT]  = new ExpressionLogical(OpTypes.AND, gte, lte);
@@ -398,16 +378,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
             }
-// A VoltDB extension to disable LIKE pattern escape characters
-            else {
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-            }
-// End of VoltDB extension
         }
     }
 

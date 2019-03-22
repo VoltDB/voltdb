@@ -889,20 +889,17 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+    public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
                                                 boolean isRecover, boolean isRejoin,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
-
-        String tableName = tableNameFromSignature(signature);
-
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
         List<ListenableFuture<?>> tasks = new ArrayList<>();
         Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
         // It is possible that for restore the partitions have changed, in which case what we are doing is silly
         if (dataSource != null) {
-            ExportDataSource source = dataSource.get(tableName);
+            ExportDataSource source = dataSource.get(streamName);
             if (source != null) {
                 Pair<Long, Long> usoAndSeq = sequenceNumberPerPartition.get(partitionId);
                 if (usoAndSeq != null) {
@@ -1094,22 +1091,6 @@ public class ExportGeneration implements Generation {
     @Override
     public String toString() {
         return "Export Generation";
-    }
-
-    /**
-     * Return table name from signature
-     *
-     * The method handles both signatures (e.g. "name|vv") and
-     * straight table names (e.g. "name")
-     *
-     * FIXME: needs EE change to drop signatures
-     *
-     * @param signature
-     * @return table name
-     */
-    public static String tableNameFromSignature(String signature) {
-        int idx = signature.indexOf("|");
-        return idx == -1 ? signature : signature.substring(0,  idx);
     }
 
     @Override

@@ -1065,7 +1065,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return true;
             } catch (Exception e) {
                 // unable to hash to a site, return an error
-                assert(clientResponse == null);
+                assert(clientResponse == null || clientResponse.getStatus() == ClientResponse.TXN_MISROUTED);
+                hostLog.warn("Unexpected error trying to restart misrouted txn", e);
                 clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
                 return false;
             }

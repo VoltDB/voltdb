@@ -206,8 +206,7 @@ public class TestExportGeneration {
             cb.get();
         }
 
-        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
-        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName);
+        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
 
@@ -223,8 +222,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(tableName).setOnMastership(promoted::countDown);
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
@@ -247,7 +245,7 @@ public class TestExportGeneration {
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, tableName, seqNo));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
 
             cont.discard();
@@ -293,10 +291,9 @@ public class TestExportGeneration {
         Long hsid = getOtherMailboxHsid();
         assertNotNull( "other mailbox not listed in zookeeper",  hsid);
 
-        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, tableName, 1L, 1).asVoltMessage()
+                new AckPayloadMessage(m_part, m_streamName, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -346,11 +343,10 @@ public class TestExportGeneration {
         assertNotNull( "other mailbox not listed in zookeeper",  hsid);
 
         // Send an ack message with a catalogVersion < the EDS catalogVersion
-        String tableName = ExportGeneration.tableNameFromSignature(m_streamName);
         m_mbox.send(
                 hsid,
                 new AckPayloadMessage(m_part,
-                        tableName, 1L,
+                        m_streamName, 1L,
                         m_expDs.getCatalogVersionCreated() - 1) // stale catalogVersion
                     .asVoltMessage()
                 );

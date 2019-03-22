@@ -65,7 +65,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
     public void testMigrateExport() throws Exception
@@ -150,8 +150,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
                 " A_INLINE_S2   VARCHAR(63)      NOT NULL," +
                 ") using TTL 5 seconds on column A_TIMESTAMP BATCH_SIZE 100 MIGRATE to TARGET NIBBLE_EXPORT;" +
                 " \nPARTITION table NIBBLE_EXPORT on column PKEY;" +
-                " \nCREATE INDEX MINDEX1 ON NIBBLE_EXPORT(A_TIMESTAMP);" +
-                " \nCREATE MIGRATING INDEX MINDEX2 ON NIBBLE_EXPORT();");
+                " \nCREATE INDEX MINDEX1 ON NIBBLE_EXPORT(A_TIMESTAMP) WHERE NOT MIGRATING;");
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
         Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");

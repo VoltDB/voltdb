@@ -524,17 +524,18 @@ public class PBDRegularSegment extends PBDSegment {
 
             try {
                 //Get the length and size prefix and then read the object
-                m_entryHeaderBuf.b().clear();
-                while (m_entryHeaderBuf.b().hasRemaining()) {
-                    int read = m_fc.read(m_entryHeaderBuf.b());
+                ByteBuffer b = m_entryHeaderBuf.b();
+                b.clear();
+                while (b.hasRemaining()) {
+                    int read = m_fc.read(b);
                     if (read == -1) {
                         throw new EOFException();
                     }
                 }
-                m_entryHeaderBuf.b().flip();
-                final int entryCRC = m_entryHeaderBuf.b().getInt();
-                final int length = m_entryHeaderBuf.b().getInt();
-                final int flags = m_entryHeaderBuf.b().getInt();
+                b.flip();
+                final int entryCRC = b.getInt();
+                final int length = b.getInt();
+                final int flags = b.getInt();
                 final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
                 final int uncompressedLen;
 
