@@ -129,7 +129,7 @@ CREATE TABLE export_partitioned_table2
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET default ;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET default1;
 PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
 
 CREATE TABLE export_mirror_partitioned_table
@@ -243,7 +243,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE TABLE  export_replicated_table EXPORT TO TARGET abc
+CREATE TABLE  export_replicated_table
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -310,7 +310,7 @@ CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPO
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid export to target default
+CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid EXPORT TO TARGET default2
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
