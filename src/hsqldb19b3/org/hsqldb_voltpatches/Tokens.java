@@ -1149,7 +1149,7 @@ public class Tokens {
     // A VoltDB extension to support the assume unique index attribute
     public static final int ASSUMEUNIQUE                     = 1303;
     // A VoltDB extension to support the MIGRATING index attribute
-    public static final int MIGRATING                        = 1304;
+    public static final int MIGRATING                        = 1306;
     // End of VoltDB extension
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
@@ -1968,7 +1968,9 @@ public class Tokens {
         // A VoltDB extension to support the assume unique index attribute
         reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);
         // A VoltDB extension to support the migrating index attribute
-        reservedKeys.put(Tokens.T_MIGRATING, MIGRATING);
+        // TODO: by making MIGRATING not reserved key word, we allow HSQL to parse MIGRATING as a SQL function name.
+        // In future (ENG-15699), we shall remove code introduced for CREATE MIGRATING INDEX syntax.
+        //reservedKeys.put(Tokens.T_MIGRATING, MIGRATING);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
