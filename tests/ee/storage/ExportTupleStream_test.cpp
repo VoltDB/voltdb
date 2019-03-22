@@ -55,34 +55,6 @@ static const int BUFFER_HEADER_SIZE = MAGIC_HEADER_SPACE_FOR_JAVA + ExportTupleS
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
-class MockVoltDBEngine : public VoltDBEngine {
-public:
-    MockVoltDBEngine()
-    {
-        m_enginesOldest = NULL;
-        m_enginesNewest = NULL;
-    }
-
-    ~MockVoltDBEngine() { }
-
-
-    ExportTupleStream** getNewestExportStreamWithPendingRowsForAssignment() {
-        return &m_enginesNewest;
-    }
-
-    ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
-        return &m_enginesOldest;
-    }
-
-    bool streamsToFlush() {
-        assert(m_enginesNewest == m_enginesOldest);
-        return m_enginesOldest != NULL;
-    }
-
-private:
-    ExportTupleStream* m_enginesOldest;
-    ExportTupleStream* m_enginesNewest;
-};
 
 class MockVoltDBEngine : public VoltDBEngine {
 public:

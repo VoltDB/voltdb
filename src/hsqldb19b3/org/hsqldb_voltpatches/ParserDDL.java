@@ -1089,10 +1089,6 @@ public class ParserDDL extends ParserRoutine {
             migrationTarget = readMigrateTarget();
         }
 
-        if (token.tokenType == Tokens.MIGRATE) {
-            migrationTarget = readMigrateTarget();
-        }
-
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
@@ -1114,10 +1110,6 @@ public class ParserDDL extends ParserRoutine {
                     throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
                 }
             }
-        }
-
-        if (token.tokenType == Tokens.MIGRATE) {
-            migrationTarget = readMigrateTarget();
         }
 
         if (token.tokenType == Tokens.MIGRATE) {

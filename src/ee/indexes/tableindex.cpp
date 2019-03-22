@@ -80,9 +80,6 @@ TableIndexScheme::TableIndexScheme(
             // Collect predicate column indicies
             ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
         }
-        if (migrating) {
-           setMigrate();
-        }
         // Deprecating "CREATE MIGRATING INDEX ..." syntax, but
         // retain the catalog flag. Do not modify the index.
     }

@@ -25,3 +25,4 @@ public class CalcitePlanningException extends PlanningErrorException {
         super(msg);
     }
 }
+
