@@ -144,15 +144,15 @@ public class TestLogicalSetOpsRules extends Plannerv2TestCase {
     public void testUnsupportedSetOps() {
         m_validationTester.sql("select ^si^ from R1 union ALL select v from R2")
                 .exception("Type mismatch in column 1 of UNION ALL")
-                .fail();
+                .pass();
 
         m_validationTester.sql("select si from R1 union ALL select max(si) as msi from R2 order by ^msi^")
                 .exception("Column 'MSI' not found in any table")
-                .fail();
+                .pass();
 
         m_validationTester.sql("select si + 1 from R1 union ALL select si from R2 order by ^si^+1")
                 .exception("Column 'SI' not found in any table")
-                .fail();
+                .pass();
 
     }
 

@@ -82,6 +82,17 @@ public:
                                           const std::vector<bool>&      hiddenAllowNull,
                                           const std::vector<bool>&      hiddenColumnInBytes);
 
+    /** Static factory method to create a TupleSchema that contains hidden columns */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>&   columnSizes,
+                                          const std::vector<bool>&      allowNull,
+                                          const std::vector<bool>&      columnInBytes,
+                                          const std::vector<ValueType>& hiddenColumnTypes,
+                                          const std::vector<int32_t>&   hiddenColumnSizes,
+                                          const std::vector<bool>&      hiddenAllowNull,
+                                          const std::vector<bool>&      hiddenColumnInBytes,
+                                          const bool isTableWithStream);
+
     /** Static factory method to create a TupleSchema for index keys */
     static TupleSchema* createKeySchema(const std::vector<ValueType>&   columnTypes,
                                         const std::vector<int32_t>&     columnSizes,
@@ -139,6 +150,9 @@ public:
 
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
+
+    /** Return true if there is a hidden column on the table with stream. */
+    inline bool isTableWithStream() const;
 
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
@@ -210,9 +224,9 @@ public:
      * In debug builds, asserts if there are no hidden columns. */
     size_t lengthOfAllHiddenColumns() const;
 
-private:
-
     uint16_t totalColumnCount() const;
+
+private:
 
     /** These methods are like their public counterparts, but accepts
      *  indexes >= m_columnCount, in order to access hidden columns or
@@ -261,6 +275,9 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
+    // has a hidden column for table with stream
+    bool m_isTableWithStream;
+
     /*
      * Data storage for:
      *   - An array of int16_t, containing the 0-based ordinal position
@@ -294,6 +311,10 @@ inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
 }
 
+inline bool TupleSchema::isTableWithStream() const {
+    return m_isTableWithStream;
+}
+
 inline uint16_t TupleSchema::totalColumnCount() const {
     return static_cast<uint16_t>(m_columnCount + m_hiddenColumnCount);
 }
@@ -325,12 +346,12 @@ inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnInde
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    assert(columnIndex < m_columnCount);
+    assert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    assert(columnIndex < m_columnCount);
+    assert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 

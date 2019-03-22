@@ -78,6 +78,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableCompressor;
+import org.voltdb.TableType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -809,6 +810,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         DrRoleType.XDCR.value().equals(m_cluster.getDrrole())
                         && new_catalog_table.getIsdred();
                 final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
+                final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
 
                 Boolean needsConversion = null;
                 while (savefile.hasMoreChunks()) {
@@ -824,7 +826,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                             needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                                   preserveDRHiddenColumn,
-                                                                                  preserveViewHiddenColumn);
+                                                                                  preserveViewHiddenColumn,
+                                                                                  preserveMigrateHiddenColumn);
                         }
 
                         if (needsConversion) {
@@ -832,7 +835,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b() , true);
                             table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                      preserveDRHiddenColumn,
-                                                                     preserveViewHiddenColumn);
+                                                                     preserveViewHiddenColumn,
+                                                                     preserveMigrateHiddenColumn);
                         } else {
                             ByteBuffer copy = ByteBuffer.allocate(c.b().remaining());
                             copy.put(c.b());
@@ -1905,6 +1909,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     // If the table is a snapshotted persistent table view, we will try to
                     // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
+                } else if (table.getMaterializer() != null
+                        && !CatalogUtil.isSnapshotableStreamedTableView(m_database, table)) {
+                    SNAP_LOG.info("Skipping restore of " + table.getTypeName()
+                            + " which normally would not be in a snapshot for the current schema");
+                    /*
+                     * This is a table which would have been excluded by SnapshotUtil.getTablesToSave(). This can happen
+                     * if the schema of the current cluster is different from the snapshot so that a previously
+                     * replicated view is now a randomly partitioned view
+                     */
+                    continue;
                 }
                 tables_to_restore.add(table);
             }
@@ -2158,6 +2172,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final boolean preserveDRHiddenColumn =
             DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && newCatalogTable.getIsdred();
         final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(newCatalogTable);
+        final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(newCatalogTable.getTabletype());
+
         Boolean needsConversion = null;
         Map<Long, Integer> sitesToPartitions = null;
         int partitionCount = ctx.getNumberOfPartitions();
@@ -2195,14 +2211,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(oldTable, newCatalogTable,
                                                                               preserveDRHiddenColumn,
-                                                                              preserveViewHiddenColumn);
+                                                                              preserveViewHiddenColumn,
+                                                                              preserveMigrateHiddenColumn);
                     }
                     final VoltTable oldTable = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(oldTable, newCatalogTable,
                                                                  preserveDRHiddenColumn,
-                                                                 preserveViewHiddenColumn);
+                                                                 preserveViewHiddenColumn,
+                                                                 preserveMigrateHiddenColumn);
                     } else {
                         table = oldTable;
                     }
@@ -2373,6 +2391,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final boolean preserveDRHiddenColumn =
                 DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
             final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
+            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
             while (hasMoreChunks()) {
                 VoltTable table = null;
 
@@ -2392,14 +2411,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                               preserveDRHiddenColumn,
-                                                                              preserveViewHiddenColumn);
+                                                                              preserveViewHiddenColumn,
+                                                                              preserveMigrateHiddenColumn);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                  preserveDRHiddenColumn,
-                                                                 preserveViewHiddenColumn);
+                                                                 preserveViewHiddenColumn,
+                                                                 preserveMigrateHiddenColumn);
                     } else {
                         table = old_table;
                     }

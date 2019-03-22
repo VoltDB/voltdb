@@ -1056,7 +1056,7 @@ public class Table extends TableBase implements SchemaObject {
             // End of VoltDB extension
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
-                                          idx.isUnique(), idx.isConstraint(),
+                                          idx.isUnique(), idx.isMigrating(), idx.isConstraint(),
                                           idx.isForward());
 
             // A VoltDB extension to support indexed expressions and assume unique attribute and partial indexes
@@ -1849,7 +1849,7 @@ public class Table extends TableBase implements SchemaObject {
 
         try {
             Index index = createAndAddIndexStructure(indexName, columns, null,
-                null, false, false, false);
+                null, false, false, false, false);
 
             return index;
         } catch (Throwable t) {
@@ -2744,9 +2744,10 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     // A VoltDB extension to support indexed expressions
-    public final Index createAndAddExprIndexStructure(HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean constraint) {
+    public final Index createAndAddExprIndexStructure(
+            HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean migrating, boolean constraint) {
 
-        Index newExprIndex = createIndexStructure(name, columns, null, null, unique, constraint, false);
+        Index newExprIndex = createIndexStructure(name, columns, null, null, unique, migrating, constraint, false);
         newExprIndex = newExprIndex.withExpressions(indexExprs);
         addIndex(newExprIndex);
         return newExprIndex;

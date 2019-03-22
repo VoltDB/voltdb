@@ -397,7 +397,7 @@ function exit-with-code() {
         errcode=$(($errcode|$TT_EXIT_CODE))
     fi
     if [[ "$errcode" -ne "0" || (-n "$PRINT_ERROR_CODE" && "$PRINT_ERROR_CODE" -ne "0") ]]; then
-        echo "\nError code:" $errcode
+        echo -e "\nError code:" $errcode
     fi
     exit $errcode
 }

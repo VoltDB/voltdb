@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -35,6 +36,7 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthScheme;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -1084,5 +1086,52 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         cluster.shutDown();
+    }
+
+    @Test
+    public void testRejoinWithOnlyAStream() throws Exception {
+        LocalCluster lc = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.overrideAnyRequestForValgrind();
+        VoltProjectBuilder vpb = new VoltProjectBuilder();
+        vpb.setUseDDLSchema(true);
+        assertTrue(lc.compile(vpb));
+        lc.setHasLocalServer(false);
+        try {
+            lc.startUp();
+            Client client = lc.createClient(new ClientConfig());
+            client.callProcedure("@AdHoc", "CREATE STREAM stream_towns PARTITION ON COLUMN state "
+                    + "EXPORT TO TARGET stream_test1 (town VARCHAR(64), state VARCHAR(2) not null);");
+            lc.killSingleHost(1);
+            lc.recoverOne(1, 0, "");
+        } finally {
+            lc.shutDown();
+        }
+    }
+
+    /*
+     * Test that the initial data timeout will trip if set really low and a rejoin is initiated while a snapshot is
+     * occurring
+     */
+    @Test
+    public void testTimeoutWaitingForInitialDataFromSnapshot() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+        LocalCluster lc = new LocalCluster("rejoin.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.overrideAnyRequestForValgrind();
+        lc.setJavaProperty("REJOIN_INITIAL_DATA_TIMEOUT_MS", "2");
+        assertTrue(lc.compile(builder));
+        lc.setHasLocalServer(false);
+
+        try {
+            lc.startUp();
+
+            lc.killSingleHost(1);
+
+            Client client = lc.createClient(new ClientConfig());
+            client.callProcedure("@SnapshotSave", "{nonce:\"mydb\",block:true,format:\"csv\"}");
+
+            assertFalse(lc.recoverOne(1, 0, ""));
+        } finally {
+            lc.shutDown();
+        }
     }
 }

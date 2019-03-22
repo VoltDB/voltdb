@@ -92,6 +92,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
+
         DuplicateCounterKey(long txnId, long spHandle) {
             m_txnId = txnId;
             m_spHandle = spHandle;
@@ -256,7 +257,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
     // lock deliver() is synchronized on.)
     @Override
-    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId)
+    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState)
     {
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[SpScheduler.updateReplicas] replicas to " + CoreUtils.hsIdCollectionToString(replicas) +
@@ -278,16 +280,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_sendToHSIds = Longs.toArray(sendToHSIds);
 
         // A new site joins in, forward the current txn (stream snapshot save) message to new site
-        if (m_isLeader && snapshotSaveTxnId != -1) {
-            // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
-            // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
-            Entry<DuplicateCounterKey, DuplicateCounter> snapshotFragment =
-                    m_duplicateCounters.floorEntry(new DuplicateCounterKey(snapshotSaveTxnId, Long.MAX_VALUE));
-            assert(snapshotFragment != null);
-            snapshotFragment.getValue().addReplicas(replicasAdded);
+        if (m_isLeader && snapshotTransactionState != null) {
+            // Look up the DuplicateCounter for this snapshots fragment
+            DuplicateCounterKey key = new DuplicateCounterKey(snapshotTransactionState.txnId,
+                    snapshotTransactionState.m_spHandle);
+            DuplicateCounter duplicateCounter = m_duplicateCounters.get(key);
+            assert (duplicateCounter != null);
+            duplicateCounter.addReplicas(replicasAdded);
             // Forward fragment message to new replica
-            m_mailbox.send(replicasAdded, snapshotFragment.getValue().getOpenMessage());
+            m_mailbox.send(replicasAdded, duplicateCounter.getOpenMessage());
         }
+
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
@@ -335,7 +338,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "had no responses.  This should be impossible?");
             }
         }
-        SettableFuture<Boolean> written = writeIv2ViableReplayEntry();
+
+        long uniqueId;
+        if (snapshotTransactionState == null) {
+            uniqueId = m_uniqueIdGenerator.getLastUniqueId();
+        } else {
+            // When there is a snapshot transaction state use the lastSpUniqueId from that
+            uniqueId = snapshotTransactionState.m_lastSpUniqueId;
+        }
+        SettableFuture<Boolean> written = writeIv2ViableReplayEntry(uniqueId);
 
         // Get the fault log status here to ensure the leader has written it to disk
         // before initiating transactions again.
@@ -965,6 +976,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
+            msg.setLastSpUniqueId(m_uniqueIdGenerator.getLastUniqueId());
             logRepair(msg);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
@@ -1553,19 +1565,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * the replay entry was never followed through due to conditions, it will be null. If the attempt
      * to write the replay entry went through but could not be done internally, the future will be false.
      */
-    SettableFuture<Boolean> writeIv2ViableReplayEntry()
+    private SettableFuture<Boolean> writeIv2ViableReplayEntry()
     {
+        return writeIv2ViableReplayEntry(m_uniqueIdGenerator.getLastUniqueId());
+    }
+
+    private SettableFuture<Boolean> writeIv2ViableReplayEntry(long lastUniqueId) {
         SettableFuture<Boolean> written = null;
-        if (m_replayComplete) {
-            if (m_isLeader) {
-                // write the viable set locally
-                long faultSpHandle = advanceTxnEgo().getTxnId();
-                written = writeIv2ViableReplayEntryInternal(faultSpHandle);
-                // Generate Iv2LogFault message and send it to replicas
-                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
-                m_mailbox.send(m_sendToHSIds,
-                        faultMsg);
-            }
+        if (m_replayComplete && m_isLeader) {
+            // write the viable set locally
+            long faultSpHandle = advanceTxnEgo().getTxnId();
+            written = writeIv2ViableReplayEntryInternal(faultSpHandle);
+            // Generate Iv2LogFault message and send it to replicas
+            Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, lastUniqueId);
+            m_mailbox.send(m_sendToHSIds, faultMsg);
         }
         return written;
     }
@@ -1785,39 +1798,32 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // set of every partition, it creates a window that may cause task log on rejoin node miss sp txns.
     // To fix it, leader forwards to rejoin node any sp txn that are queued in backlog between leader receives the
     // first fragment of stream snapshot and site runs the first fragment.
-    public void forwardPendingTaskToRejoinNode(long[] replicasAdded, long txnId) {
+    public void forwardPendingTaskToRejoinNode(long[] replicasAdded, long snapshotSpHandle) {
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Forward pending tasks in backlog to rejoin node: " + Arrays.toString(replicasAdded));
         }
         if (replicasAdded.length == 0) {
             return;
         }
-        boolean forwarding = false;
-        // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
-        // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
-        DuplicateCounterKey snapshotFragment = m_duplicateCounters.floorKey(new DuplicateCounterKey(txnId, Long.MAX_VALUE));
-        assert (snapshotFragment != null);
-        long snapshotSpHandle = snapshotFragment.m_spHandle;
+        boolean sentAny = false;
         for (Map.Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
-            // First find the mp fragment currently running
-            if (!forwarding && entry.getKey().m_spHandle > snapshotSpHandle) {
-                forwarding = true;
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Start forwarding pending tasks to rejoin node.");
+            if (snapshotSpHandle < entry.getKey().m_spHandle) {
+                if (!sentAny) {
+                    sentAny = true;
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Start forwarding pending tasks to rejoin node.");
+                    }
                 }
-            }
-            // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
-            if (forwarding && entry.getKey().m_txnId != snapshotFragment.m_txnId) {
+
+                // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(entry.getValue().getOpenMessage().getMessageInfo());
                 }
                 m_mailbox.send(replicasAdded, entry.getValue().getOpenMessage());
             }
         }
-        if (forwarding) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Finish forwarding pending tasks to rejoin node.");
-            }
+        if (sentAny && tmLog.isDebugEnabled()) {
+            tmLog.debug("Finish forwarding pending tasks to rejoin node.");
         }
     }
 
@@ -1854,8 +1860,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
         ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
         for (ThreadInfo t : threadInfos) {
-            if (t.getThreadName().startsWith("SP") || t.getThreadName().startsWith("MP Site") || t.getThreadName().startsWith("RO MP Site"))
-            threadDumps.append(t);
+            if (t.getThreadName().startsWith("SP") || t.getThreadName().startsWith("MP Site") || t.getThreadName().startsWith("RO MP Site")) {
+                threadDumps.append(t);
+            }
         }
         return threadDumps.toString();
     }

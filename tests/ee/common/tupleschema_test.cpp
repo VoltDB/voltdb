@@ -35,6 +35,7 @@ using voltdb::VALUE_TYPE_DECIMAL;
 using voltdb::VALUE_TYPE_INTEGER;
 using voltdb::VALUE_TYPE_TIMESTAMP;
 using voltdb::VALUE_TYPE_VARCHAR;
+using voltdb::VALUE_TYPE_TINYINT;
 
 class TupleSchemaTest : public Test
 {
@@ -84,7 +85,7 @@ TEST_F(TupleSchemaTest, Basic)
 TEST_F(TupleSchemaTest, HiddenColumn)
 {
     voltdb::TupleSchemaBuilder builder(2,  // 2 visible columns
-                                       1); // 1 hidden column
+                                       2); // 1 hidden column
     builder.setColumnAtIndex(0, VALUE_TYPE_INTEGER);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR,
                              256,   // column size
@@ -92,12 +93,12 @@ TEST_F(TupleSchemaTest, HiddenColumn)
                              true); // size is in bytes
 
     builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
-
+    builder.setHiddenColumnAtIndex(1, VALUE_TYPE_TINYINT);
     ScopedTupleSchema schema(builder.build());
 
     ASSERT_NE(NULL, schema.get());
     ASSERT_EQ(2, schema->columnCount());
-    ASSERT_EQ(1, schema->hiddenColumnCount());
+    ASSERT_EQ(2, schema->hiddenColumnCount());
 
     EXPECT_EQ(1, schema->getUninlinedObjectColumnCount());
     EXPECT_EQ(1, schema->getUninlinedObjectColumnInfoIndex(0));
@@ -105,11 +106,12 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     // 8 bytes for the hidden bigint
     // 4 bytes for the integer
     // 8 bytes for the string pointer
-    EXPECT_EQ(20, schema->tupleLength());
+    // 1 byte  for the hidden tinyint
+    EXPECT_EQ(21, schema->tupleLength());
 
     EXPECT_EQ(0, schema->getUninlinedObjectHiddenColumnCount());
     EXPECT_EQ(12, schema->offsetOfHiddenColumns());
-    EXPECT_EQ(8, schema->lengthOfAllHiddenColumns());
+    EXPECT_EQ(9, schema->lengthOfAllHiddenColumns());
 
     // Verify that the visible columns are as expected
     const TupleSchema::ColumnInfo *colInfo = schema->getColumnInfo(0);
@@ -139,6 +141,15 @@ TEST_F(TupleSchemaTest, HiddenColumn)
     EXPECT_EQ(true, colInfo->allowNull);
     EXPECT_EQ(true, colInfo->inlined);
     EXPECT_EQ(false, colInfo->inBytes);
+
+    colInfo = schema->getHiddenColumnInfo(1);
+       ASSERT_NE(NULL, colInfo);
+       EXPECT_EQ(20, colInfo->offset);
+       EXPECT_EQ(1, colInfo->length);
+       EXPECT_EQ(VALUE_TYPE_TINYINT, colInfo->type);
+       EXPECT_EQ(true, colInfo->allowNull);
+       EXPECT_EQ(true, colInfo->inlined);
+       EXPECT_EQ(false, colInfo->inBytes);
 }
 
 TEST_F(TupleSchemaTest, EqualsAndCompatibleForMemcpy)

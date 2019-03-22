@@ -217,8 +217,8 @@ int FunctionTest::testNullary(int operation,
         std::cout << "Expected out:  " << output << std::endl;
     }
     // This is an empty vector, but functionFactory wants it.
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
-    AbstractExpression* const_exp = ExpressionUtil::functionFactory(operation, argument);
+    std::vector<AbstractExpression*> argument;
+    AbstractExpression* const_exp = functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
@@ -261,10 +261,10 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
 
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *> argument;
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
-    argument->push_back(const_val_exp);
-    AbstractExpression* unary_exp = ExpressionUtil::functionFactory(operation, argument);
+    argument.push_back(const_val_exp);
+    AbstractExpression* unary_exp = functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
@@ -334,14 +334,14 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
         std::cout << "Right:         " << rinput << std::endl;
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *>argument;
     ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
     ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
-    argument->push_back(lhsexp);
-    argument->push_back(rhsexp);
+    argument.push_back(lhsexp);
+    argument.push_back(rhsexp);
 
     NValue expected = getSomeValue(output);
-    AbstractExpression *bin_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression *bin_exp = functionFactory(operation, argument);
     int cmpout;
     NValue answer;
     try {
@@ -414,16 +414,16 @@ int FunctionTest::testTernary(int operation, LEFT_INPUT_TYPE linput, MIDDLE_INPU
         std::cout << "Right:         " << rinput << std::endl;
         std::cout << "Expected out:  " << output << std::endl;
     }
-    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    std::vector<AbstractExpression *> argument;
     ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
     ConstantValueExpression *mdlexp = new ConstantValueExpression(getSomeValue(minput));
     ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
-    argument->push_back(lhsexp);
-    argument->push_back(mdlexp);
-    argument->push_back(rhsexp);
+    argument.push_back(lhsexp);
+    argument.push_back(mdlexp);
+    argument.push_back(rhsexp);
 
     NValue expected = getSomeValue(output);
-    AbstractExpression *ternary_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression *ternary_exp = functionFactory(operation, argument);
     int cmpout;
     NValue answer;
     try {

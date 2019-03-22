@@ -31,7 +31,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 
 /**
@@ -78,7 +78,8 @@ public class TaskLogImpl implements TaskLog {
 
         m_partitionId = partitionId;
         m_cursorId = "TaskLog-" + partitionId;
-        m_buffers = new PersistentBinaryDeque(Integer.toString(partitionId), overflowDir, new VoltLogger("REJOIN"));
+        m_buffers = new PersistentBinaryDeque(
+                Integer.toString(partitionId), null, overflowDir, new VoltLogger("REJOIN"));
         m_reader = m_buffers.openForRead(m_cursorId);
         m_es = CoreUtils.getSingleThreadExecutor("TaskLog partition " + partitionId);
     }
@@ -172,7 +173,7 @@ public class TaskLogImpl implements TaskLog {
                 @Override
                 public void run() {
                     try {
-                        BBContainer cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+                        BBContainer cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
                         if (cont != null) {
                            m_headBuffers.offer(new RejoinTaskBuffer(cont));
                         }

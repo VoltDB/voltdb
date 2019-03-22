@@ -149,7 +149,7 @@ def test_java_version(output):
     if not java:
         utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
     javaVersion = utility.get_java_version(javaHome=java, verbose=True)
-    if '1.8.' in javaVersion:
+    if '1.8.' in javaVersion or '11.' in javaVersion:
         output['Java'] = ["PASS", javaVersion.strip()]
     elif len(javaVersion) > 0:
         output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly and JAVA_HOME has been setup correctly."]

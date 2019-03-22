@@ -110,9 +110,7 @@ TEST_F(PoolTest, OversizeTest) {
     EXPECT_NE(space, NULL);
 }
 
-// Tests voltdb::allocator with multiple threads. Run this test
-// only for the moderately new compilers.
-#if defined __GNUC__ && __GNUC__ >= 5
+// Tests voltdb::allocator with multiple threads.
 #include <algorithm>
 #include <cassert>
 #include <deque>
@@ -206,12 +204,13 @@ template<typename T> using Alloc = voltdb::allocator<T>;
  */
 TEST_F(PoolTest, AllocatorTest) {
    using Cont1 = std::vector<S1, Alloc<S1>>;
-   using Cont2 = std::deque<S2, Alloc<S2>>;
 #if defined __GNUC__ && __GNUC__ > 5
-   using Cont3 = std::list<S3, Alloc<S3>>;              // GCC-5 std::list's allocator requires a different allocator's construct() method
+   using Cont2 = std::deque<S2, Alloc<S2>>;
+   using Cont3 = std::list<S3, Alloc<S3>>;
    using Cont4 = std::list<S4, Alloc<S4>>;
 #else
-   using Cont3 = std::deque<S3, Alloc<S3>>;
+   using Cont2 = std::vector<S4, Alloc<S4>>;
+   using Cont3 = std::vector<S4, Alloc<S4>>;
    using Cont4 = std::vector<S4, Alloc<S4>>;
 #endif
    using Cont5 = std::vector<S5, Alloc<S5>>;
@@ -250,7 +249,6 @@ TEST_F(PoolTest, AllocatorTest) {
    }
    std::for_each(threads.begin(), threads.end(), [](std::thread& thrd) { thrd.join(); });
 }
-#endif
 
 int main() {
     return TestSuite::globalInstance()->runAll();

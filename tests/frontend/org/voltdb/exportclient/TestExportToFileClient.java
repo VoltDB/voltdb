@@ -431,7 +431,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 + "does not exist but cannot be created, or cannot be opened for any other reason");
 
         // throw IOexception first two times on create new FileOutputStream (mock cannot create csv file case)
-        PowerMockito.whenNew(FileOutputStream.class).withArguments(Matchers.anyString(),Matchers.anyBoolean()).
+        PowerMockito.whenNew(FileOutputStream.class).withParameterTypes(File.class, boolean.class).withArguments(Matchers.any(), Matchers.anyBoolean()).
             thenThrow(fnfe).
             thenThrow(fnfe).
             thenReturn(fos);

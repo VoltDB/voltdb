@@ -146,14 +146,14 @@ public class ParserCommand extends ParserDDL {
 
                 break;
             }
+            case Tokens.TRUNCATE :
             case Tokens.DELETE : {
                 cs = compileDeleteStatement(RangeVariable.emptyArray);
 
                 break;
             }
-            case Tokens.TRUNCATE : {
-                cs = compileDeleteStatement(RangeVariable.emptyArray);
-
+            case Tokens.MIGRATE : {
+                cs = compileMigrateStatement(RangeVariable.emptyArray);
                 break;
             }
 

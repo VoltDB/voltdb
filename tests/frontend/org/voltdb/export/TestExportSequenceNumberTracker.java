@@ -141,4 +141,13 @@ public class TestExportSequenceNumberTracker {
         nonOverlapSize = tracker.addRange(4L, 41L);
         assertEquals(3, nonOverlapSize);
     }
+
+    @Test
+    public void testAddNotConnectedRange_ENG_15510() {
+        tracker.addRange(5L, 10L);
+        tracker.addRange(20L, 30L);
+        tracker.addRange(40L, 50L);
+        tracker.addRange(8L, 12L);
+    }
+
 }
