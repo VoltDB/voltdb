@@ -23,6 +23,7 @@
 #include "catalog/statement.h"
 #include "execution/ExecutorVector.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/CoveringCellIndex.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexscannode.h"
 
@@ -227,6 +228,10 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
     if (minMaxIndexIncludesAggCol(selectedIndex, m_groupByColumnCount)) {
         // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
+        // we can not use CoveringCellIndex for value comparison.
+        assert(selectedIndex->getKeySchema()->getColumnInfo(
+                static_cast<int>(m_groupByColumnCount))->getVoltType() !=
+               VALUE_TYPE_POINT);
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, numCountStar, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
@@ -486,7 +491,11 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
                             newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx, numCountStar);
                         }
                         // indexscan if an index is available, otherwise tablescan
-                        else if (m_indexForMinMax[minMaxAggIdx]) {
+                        else if (m_indexForMinMax[minMaxAggIdx] &&
+                                 // CoveringCellIndex is to accelerate queries that use the
+                                 // CONTAINS function which tests to see if a point is contained by a polygon.
+                                 // But NOT for value comparison, so we can't use it here.
+                                 dynamic_cast<CoveringCellIndex *>(m_indexForMinMax[minMaxAggIdx]) == NULL) {
                             newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
                                                                       reversedForMin, aggIndex, minMaxAggIdx, numCountStar);
                         }

@@ -28,6 +28,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import org.junit.Rule;
+import org.junit.Test;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
@@ -44,9 +47,12 @@ import org.voltdb.utils.VoltFile;
  * @author akhanzode
  */
 public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     private static ServerListener m_serverSocket;
     private static LocalCluster config;
+
     @Override
     public void setUp() throws Exception {
         m_username = "default";
@@ -68,6 +74,8 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         } catch (Exception e) {}
     }
 
+    @Test
+    @Flaky(description="TestExportSuiteReplicatedSocketExport.testExportReplicatedExportToSocket")
     public void testExportReplicatedExportToSocket() throws Exception {
         System.out.println("testExportReplicatedExportToSocket");
         final Client client = getClient();
@@ -120,6 +128,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         verifyExportedTuples(45000);
     }
 
+    @Test
     public void testExportReplicatedExportToSocketRejoin() throws Exception {
         ClientConfig cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
         Client client = ClientFactory.createClient(cconfig);

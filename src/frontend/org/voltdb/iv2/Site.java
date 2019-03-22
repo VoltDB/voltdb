@@ -74,8 +74,8 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogSerializer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
@@ -723,7 +723,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
-        final int exportFlushTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
+        int configuredTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
+        final int exportFlushTimeout = configuredTimeout > 0 ? configuredTimeout : 4*1000;
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting
@@ -1621,7 +1622,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
             for (Table t : oldTables) {
                 if (t.getIsdred()) {
-                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    DRCatalogChange |= diffCmds.contains(CatalogSerializer.getDeleteDiffStatement(t, "tables"));
                     if (DRCatalogChange) {
                         break;
                     }
@@ -1771,16 +1772,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, -1, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logs[])
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logs[])
             throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
         paramBuffer.put(logs);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, remoteTxnUniqueId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

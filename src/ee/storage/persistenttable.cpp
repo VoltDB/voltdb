@@ -300,10 +300,9 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
 void PersistentTable::drLogTruncate(ExecutorContext* ec, bool fallible) {
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
-        int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn,
+        size_t drMark = drStream->truncateTable(m_signature, m_name, m_partitionColumn,
                 currentSpHandle, currentUniqueId);
 
         UndoQuantum* uq = ec->getCurrentUndoQuantum();
@@ -554,7 +553,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
         UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, NULL, this);
+        SynchronizedThreadLock::addTruncateUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
     else {
         if (fallible) {
@@ -829,10 +828,9 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+        size_t drMark = drStream->appendTuple(m_signature, m_partitionColumn, currentSpHandle,
                                               currentUniqueId, target, DR_RECORD_INSERT);
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
@@ -887,7 +885,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
             //* enable for debug */           << " { " << target.debugNoHeader() << " } "
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
-            SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+            SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
         }
     }
 
@@ -1000,10 +998,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+        size_t drMark = drStream->appendUpdateRecord(m_signature, m_partitionColumn, currentSpHandle,
                                                      currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
@@ -1097,7 +1094,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+        SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
     }
     else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -1213,10 +1210,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
-        int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+        size_t drMark = drStream->appendTuple(m_signature, m_partitionColumn, currentSpHandle,
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
         if (createUndoAction) {
@@ -1234,7 +1230,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         ++m_invisibleTuplesPendingDeleteCount;
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), &m_surgeon);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, this);
+        SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
     }
 
     // handle any materialized views, insert the tuple into delta table,

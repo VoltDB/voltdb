@@ -149,6 +149,7 @@ public class Table extends TableBase implements SchemaObject {
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
     TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
+    private boolean isStream = false;          //is this a stream (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2219,6 +2220,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 store.indexRow(null, newrow);
             }
+            this.timeToLive = from.timeToLive;
         } catch (Throwable t) {
             store.release();
 
@@ -2521,7 +2523,6 @@ public class Table extends TableBase implements SchemaObject {
     void updateRowSet(Session session, HashMappedList rowSet, int[] cols,
                       boolean isTriggeredSet) {
 
-        boolean         hasLob = false;
         PersistentStore store  = session.sessionData.getRowStore(this);
 
         for (int i = 0; i < rowSet.size(); i++) {
@@ -2732,8 +2733,9 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
             ttl.attributes.put("unit",  timeToLive.ttlUnit);
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
-            ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
+            ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
+            ttl.attributes.put("migrationTarget", timeToLive.migrationTarget);
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
@@ -2765,17 +2767,20 @@ public class Table extends TableBase implements SchemaObject {
     // End of VoltDB extension
 
     // A VoltDB extension to support TTL
-    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize,
+            int maxFrequency, String streamName) {
         dropTTL();
-        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)), batchSize, maxFrequency);
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)),
+                batchSize, maxFrequency, streamName);
     }
 
     public TimeToLiveVoltDB getTTL() {
         return timeToLive;
     }
 
-    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
-        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn,
+            int batchSize, int maxFrequency, String streamName) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, streamName);
     }
 
     public void dropTTL() {
@@ -2790,5 +2795,16 @@ public class Table extends TableBase implements SchemaObject {
     public String toString() {
         return super.toString() + ":" + getName().name;
     }
-    /**********************************************************************/
+
+    public boolean isStream() {
+        return isStream;
+    }
+
+    public void setStream(boolean isStream) {
+        this.isStream = isStream;
+    }
+
+    public boolean isForMigration() {
+        return (timeToLive != null && !StringUtil.isEmpty(timeToLive.migrationTarget));
+    }
 }

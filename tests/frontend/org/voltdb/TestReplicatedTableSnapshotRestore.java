@@ -29,7 +29,9 @@ import static org.junit.Assert.assertTrue;
 import java.util.Collections;
 
 import org.junit.After;
+import org.junit.Rule;
 import org.junit.Test;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.NullCallback;
@@ -39,6 +41,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
 public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     @After
     public void tearDown() throws Exception {
@@ -50,6 +54,7 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
      * https://issues.voltdb.com/browse/ENG-15174
      */
     @Test
+    @Flaky(description="TestReplicatedTableSnapshotRestore.testMultiBlockSnapshotRestore")
     public void testMultiBlockSnapshotRestore() throws Exception {
         // Create a table with a very large VARCHAR column, so it will be very easy for
         // the snapshot to have more than one block during restore.

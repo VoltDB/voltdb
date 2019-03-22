@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -331,10 +331,10 @@ public class LocalCluster extends VoltServerConfig {
         numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
-        m_additionalProcessEnv = env==null ? new HashMap<>() : env;
-        if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+        m_additionalProcessEnv = env == null ? new HashMap<>() : env;
+        if (Boolean.getBoolean(NativeLibraryLoader.USE_JAVA_LIBRARY_PATH)) {
             // set use.javalib for LocalCluster so that Eclipse runs will be OK.
-            m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+            m_additionalProcessEnv.put(NativeLibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
         }
         // get the name of the calling class
         StackTraceElement[] traces = Thread.currentThread().getStackTrace();

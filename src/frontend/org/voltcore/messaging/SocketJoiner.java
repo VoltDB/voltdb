@@ -700,9 +700,9 @@ public class SocketJoiner {
             SocketAddress hostAddr,
             ConnectStrategy mode) throws IOException
     {
-        SocketChannel socket = null;
+        SocketChannel socket;
         int connectAttempts = 0;
-        while (socket == null) {
+        do {
             try {
                 socket = SocketChannel.open();
                 socket.socket().connect(hostAddr, 5000);
@@ -718,16 +718,15 @@ public class SocketJoiner {
                 if (mode == ConnectStrategy.PROBE) {
                     return null;
                 }
-                if (connectAttempts >= 8) {
-                    LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
+                if ((++connectAttempts % 8) == 0) {
+                    LOG.warn("Joining primary failed: " + e + " retrying..");
                 }
                 try {
                     Thread.sleep(250); //  milliseconds
                 }
                 catch (InterruptedException dontcare) {}
             }
-            ++connectAttempts;
-        }
+        } while (socket == null);
         return socket;
     }
 

@@ -536,7 +536,7 @@ JNITopend::~JNITopend() {
 void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string signature,
-        StreamBlock *block,
+        ExportStreamBlock *block,
         bool sync) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
 
@@ -551,8 +551,8 @@ void JNITopend::pushExportBuffer(
                 m_pushExportBufferMID,
                 partitionId,
                 signatureString,
-                block->startExportSequenceNumber(),
-                block->getRowCountforExport(),
+                block->startSequenceNumber(),
+                block->getRowCount(),
                 block->lastSpUniqueId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
@@ -595,7 +595,7 @@ void JNITopend::pushEndOfStream(
     }
 }
 
-int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+int64_t JNITopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
     int64_t retval = -1;
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
@@ -620,7 +620,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     return retval;
 }
 
-void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) {
+void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {
     jstring jReason = m_jniEnv->NewStringUTF(reason.c_str());
 
     if (block != NULL) {

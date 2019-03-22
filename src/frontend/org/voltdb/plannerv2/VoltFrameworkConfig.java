@@ -19,6 +19,7 @@ package org.voltdb.plannerv2;
 
 import java.util.Objects;
 
+import org.apache.calcite.config.Lex;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.ConventionTraitDef;
@@ -38,7 +39,6 @@ import org.apache.calcite.sql.parser.SqlParser.Config;
 import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.validate.SqlConformance;
-import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
@@ -65,9 +65,12 @@ public class VoltFrameworkConfig implements FrameworkConfig {
             ConventionTraitDef.INSTANCE,
             RelCollationTraitDef.INSTANCE);
 
-    static final Config PARSER_CONFIG =
-            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY)
-                    .setConformance(VoltSqlConformance.INSTANCE).build();
+    static final Config PARSER_CONFIG = SqlParser.configBuilder()
+                         .setParserFactory(SqlDdlParserImpl.FACTORY)
+                         .setQuoting(Lex.VOLTDB.quoting)
+                         .setUnquotedCasing(Lex.VOLTDB.unquotedCasing)
+                         .setQuotedCasing(Lex.VOLTDB.quotedCasing)
+                         .setConformance(VoltSqlConformance.INSTANCE).build();
     static final String DEFAULT_SCHEMA_NAME = "public";
 
     // -- Additional states that do not belong to the original FrameworkConfig interface.

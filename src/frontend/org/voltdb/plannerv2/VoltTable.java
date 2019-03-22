@@ -138,7 +138,7 @@ public class VoltTable implements TranslatableTable {
     }
 
     @Override public Integer getPartitionColumn() {
-        if (m_catTable.getIsreplicated()) {
+        if (m_catTable.getPartitioncolumn() == null) {  // could be either replicated table, or view
             return null;
         } else {
             return m_catTable.getPartitioncolumn().getIndex();

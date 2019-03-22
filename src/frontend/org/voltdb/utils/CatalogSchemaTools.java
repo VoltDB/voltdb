@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -111,13 +112,14 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
         }
         else {
-            if (isExportOnly) {
+            if (TableType.isStream(catalog_tbl.getTabletype())) {
                 table_sb.append("CREATE STREAM ").append(catalog_tbl.getTypeName());
                 if (streamPartitionColumn != null && viewQuery == null) {
                     table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
                 }
                 //Default target means no target.
-                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME) &&
+                        TableType.isStream(catalog_tbl.getTabletype())) {
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
             } else {
@@ -330,6 +332,10 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
                 table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
+
+                if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
+                    table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
+                }
             }
             table_sb.append(";\n");
         }

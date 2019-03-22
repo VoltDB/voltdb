@@ -14,9 +14,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.plannerv2.rules.logical;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Sets;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
@@ -27,9 +27,7 @@ import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
 import org.voltdb.exceptions.PlanningErrorException;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -91,6 +89,25 @@ final class RelDistributionUtils {
                     }}));
         }
         return r;
+    }
+
+    /**
+     * Map column indices from a table scan node using the Calc node's Program's projection. The result is
+     * @param program The Program from Calc node that contains projection
+     * @param indices column indices with reference to table scan
+     * @return  column indices with reference to given Program's projection relation
+     */
+    static Set<Integer> adjustProjection(RexProgram program, Collection<Integer> indices) {
+        final List<RexLocalRef> projections = program.getProjectList();
+        final List<RexNode> expressions = program.getExprList();
+        return IntStream.range(0, projections.size())
+                .filter(index -> {
+                    final int localIndex = projections.get(index).getIndex();
+                    assert localIndex < expressions.size() :
+                            "RexLocalRef index out of bounds: " + localIndex + " >= " + expressions.size();
+                    final RexNode node = expressions.get(localIndex);
+                    return node instanceof RexInputRef && indices.contains(((RexInputRef) node).getIndex());
+                }).boxed().collect(Collectors.toSet());
     }
 
     /**
@@ -314,7 +331,9 @@ final class RelDistributionUtils {
         final RexProgram prog = calc.getProgram();
         final Map<Integer, RexNode> mapsToLiteral = new HashMap<>();
         final Set<Set<Integer>> eqCols = new HashSet<>();
-        getEqualValuePredicate(prog.getCondition(), prog.getExprList(), mapsToLiteral, eqCols);
+        if (prog.getCondition() != null) {
+            getEqualValuePredicate(prog.getCondition(), prog.getExprList(), mapsToLiteral, eqCols);
+        }
         return transExpand(mapsToLiteral, eqCols);
     }
 
@@ -323,18 +342,19 @@ final class RelDistributionUtils {
      * The matching set must include all non-null partition columns given. If no such equivalent set
      * exists, returns empty.
      * @param equalCols Equivalent set of column indices
-     * @param outerPartCols partition columns of outer rel, or null if it is not partitioned
-     * @param innerPartCols partition columns of inner rel, or null if it is not partitioned
+     * @param outerPartCols partition columns of outer rel. It is empty when the outer rel is not partitioned; or when
+     *                      the projection does not include partition columns.
+     * @param innerPartCols partition columns of inner rel. It is empty when the outer rel is not partitioned; or when*
+     *                      the projection does not include partition columns.
      * @param outerTableColumns Number of columns of outer relation, used to tell from equivalent set which indices are
      *                          from the inner rel, and convert to their table-wise column indices.
      * @return an equivalent set of column indices that includes all given partition columns. It is either
      * Optional.empty(), or a non-empty set of equivalent indices that includes all (adjusted) partition column indices
      * from both relations.
      */
-    private static Optional<Set<Integer>> searchEqualPartitionColumns(
+    private static Set<Integer> searchEqualPartitionColumns(
             Set<Set<Integer>> equalCols, Set<Integer> outerPartCols, Set<Integer> innerPartCols,
             int outerTableColumns) {
-        assert ! outerPartCols.isEmpty() || ! innerPartCols.isEmpty();
         final Set<Integer> adjustedInnerPartCols =      // to relative column indices, by adding outerTableColumns
                 innerPartCols.stream().map(col -> col + outerTableColumns).collect(Collectors.toSet());
         return equalCols.stream()
@@ -346,7 +366,7 @@ final class RelDistributionUtils {
                     expanded.addAll(outerPartCols);
                     expanded.addAll(adjustedInnerPartCols);
                     return expanded;
-                }).findAny();
+                }).findAny().orElse(Collections.emptySet());
     }
 
     /**
@@ -366,7 +386,6 @@ final class RelDistributionUtils {
      */
     private static Pair<Set<Integer>, Set<Integer>> separateColumns(
             Set<Integer> eqCols, Set<Integer> partCol1, Set<Integer> partCol2, int outerTableColumns) {
-        assert ! partCol1.isEmpty() || ! partCol2.isEmpty();
         final Set<Integer> adjustedPartCol2 =
                 partCol2.stream().map(col -> col + outerTableColumns).collect(Collectors.toSet());
         final Set<Integer> outer = new HashSet<>(), inner = new HashSet<>();
@@ -435,8 +454,10 @@ final class RelDistributionUtils {
         final private RexNode m_literal;
         final private Set<Integer> m_partCols;      // relative column index to the join node
         JoinState(boolean isSP, RexNode literal, Set<Integer> partCols) {
-            Preconditions.checkArgument(literal == null || ! partCols.isEmpty(),
-                    "When a partition equal value is set, the partition columns must be present");
+            // NOTE: it could be that partCols.isEmpty() && literal != null, in cases like:
+            // SELECT * FROM (SELECT j FROM P1 WHERE i = 5), (SELECT j FROM P2 WHERE i = 5);
+            // Here, both relations are partitioned, but their projections do not include partition columns;
+            // still, we need their respective literal values in the JOIN node.
             m_isSP = isSP;
             m_literal = literal;
             m_partCols = partCols;
@@ -527,8 +548,8 @@ final class RelDistributionUtils {
                         innerPartColumns.stream().map(col -> col + outerTableColumns).collect(Collectors.toSet()),
                 combinedPartColumns = new HashSet<>(outerPartColumns);
         combinedPartColumns.addAll(adjustedInnerPartColumns);
-        final boolean outerIsPartitioned = !outerPartColumns.isEmpty(),
-                innerIsPartitioned = ! innerPartColumns.isEmpty(),
+        final boolean outerIsPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
+                innerIsPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
                 outerHasPartitionKey = outerDist.getPartitionEqualValue() != null,
                 innerHasPartitionKey = innerDist.getPartitionEqualValue() != null;
         final RexNode srcLitera = literalOr(outerDist.getPartitionEqualValue(), innerDist.getPartitionEqualValue());
@@ -537,8 +558,8 @@ final class RelDistributionUtils {
                 if (outerIsPartitioned || innerIsPartitioned) {
                     if (join.getCondition().isA(SqlKind.LITERAL)) {
                         assert join.getCondition().isAlwaysFalse() || join.getCondition().isAlwaysTrue();
-                        if (join.getCondition().isAlwaysFalse()) {        // TODO: could join condition ever be false?
-                            assert false;
+                        if (join.getCondition().isAlwaysFalse()) {
+                            // join condition might be false (TestBooleanLiteralsSuite)
                             return new JoinState(true, srcLitera, combinedPartColumns);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
                             return new JoinState(
@@ -556,8 +577,7 @@ final class RelDistributionUtils {
                     // Check that partition columns must be in equal-relations
                     final Set<Integer> equalPartitionColumns =
                             searchEqualPartitionColumns(
-                                    joinColumnSets, outerPartColumns, innerPartColumns, outerTableColumns)
-                                    .orElse(Collections.emptySet());
+                                    joinColumnSets, outerPartColumns, innerPartColumns, outerTableColumns);
                     if (equalPartitionColumns.isEmpty()) {
                         if (outerHasPartitionKey && ! innerIsPartitioned || innerHasPartitionKey && ! outerIsPartitioned) {
                             // The partitioned rel has equal key (but depending on its isSP flag, it
@@ -643,7 +663,7 @@ final class RelDistributionUtils {
                     } else {    // no equal-filter on partition column
                         return new JoinState(false, srcLitera, combinedPartColumns);
                     }
-                } else { // else Both are replicated: SP
+                } else { // else Both are replicated or SP subqueries: SP
                     return new JoinState(true, srcLitera, combinedPartColumns);
                 }
             default: // Not inner-join type involving at least a partitioned table
@@ -744,7 +764,7 @@ final class RelDistributionUtils {
      * @param calc Calc node on top of scan node
      * @return whether the top node is SP, and the partition equal value, if it is partitioned table and SP.
      */
-    static Pair<Boolean, RexNode> isCalcScanSP(VoltLogicalTableScan scan, VoltLogicalCalc calc) {
+    static Pair<Boolean, RexNode> isCalcScanSP(TableScan scan, Calc calc) {
         final RelDistribution dist = scan.getTable().getDistribution(); // distribution for the scanned table
         final RelDistribution calcDist = calc.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         switch (dist.getType()) {
