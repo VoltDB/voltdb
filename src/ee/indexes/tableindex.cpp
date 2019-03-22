@@ -83,6 +83,8 @@ TableIndexScheme::TableIndexScheme(
         if (migrating) {
            setMigrate();
         }
+        // Deprecating "CREATE MIGRATING INDEX ..." syntax, but
+        // retain the catalog flag. Do not modify the index.
     }
 
 void TableIndexScheme::setMigrate() {

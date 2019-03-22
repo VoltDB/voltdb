@@ -69,9 +69,8 @@ import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.exceptions.PlanningErrorException;
-import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.*;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
@@ -79,6 +78,7 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.plannerv2.utils.DropTableUtils;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -105,6 +105,18 @@ public class DDLCompiler {
     private final HSQLInterface m_hsql;
     private final VoltCompiler m_compiler;
     private final MaterializedViewProcessor m_mvProcessor;
+    private static final AbstractExpression NOT_MIGRATING =
+            new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                    new FunctionExpression("migrating", null,   // MIGRATING() function
+                            FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING),
+                    null);
+
+    static {
+        final AbstractExpression migrating_node = NOT_MIGRATING.getLeft();
+        migrating_node.setValueType(VoltType.BOOLEAN);
+        migrating_node.setArgs(Collections.emptyList());
+        migrating_node.setValueSize(1);
+    }
 
     private String m_fullDDL = "";
 
@@ -1717,7 +1729,7 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         final boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
-        final boolean isMigrating = Boolean.parseBoolean(node.getStringAttribute("migrating", "false"));
+        boolean isMigrating = Boolean.parseBoolean(node.getStringAttribute("migrating", "false"));
 
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, null, db);
         dummy.setDDLIndexedTable(table);
@@ -1911,6 +1923,11 @@ public class DDLCompiler {
             }
         }
 
+        // For non-migrating index, we need to check whether the predicate contains a 'NOT MIGRATING' piece, and
+        // set the isMigrating flag in the catalog if it does. We only check the leaf node for simplicity, meaning that
+        // there could possibly be misses/false alarms for complex predicate like `WHERE NOT (MIGRATING AND a > 0)`,
+        // `WHERE NOT MIGRATING OR a > 0`, or `WHERE NOT NOT MIGRATING`, etc.
+        isMigrating |= ExpressionUtil.reduce(predicate, NOT_MIGRATING::equals);
         index.setUnique(unique);
         if (! index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) && table.getIsreplicated() && assumeUnique) {
             // Warn and convert AssumeUnique -> Unique index only on

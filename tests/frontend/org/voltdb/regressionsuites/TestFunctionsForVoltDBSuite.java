@@ -3422,7 +3422,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 });
         final Object[][] expected_m1 = {{1, 11}, {2, 22}, {3, 33}, {4, 44}},
                 expected_m2 = {{1, 10}, {2, 20}, {3, 30}, {4, 40}}, empty = {};
-        final String errMsg = "SQL error while compiling query: \"NOT NOT_MIGRATED\\(\\)\" is an invalid predicate";
         ClientResponse cr;
         // select migrating rows
         cr = client.callProcedure("@AdHoc", "select * from m1 where not migrating() order by a, b;");
