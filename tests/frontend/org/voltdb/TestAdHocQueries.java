@@ -368,6 +368,32 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
+    public void testENG15572() {
+        // Test subqueries on either side of LIKE/START WITH expression
+        final TestEnv env = new TestEnv("CREATE TABLE R0(v VARCHAR(100));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) STARTS WITH V LIMIT 1;",
+                    "SELECT * FROM R0 WHERE V STARTS WITH (SELECT MAX('s') FROM R0);",
+                    "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) LIKE V LIMIT 1;",
+                    "SELECT * FROM R0 WHERE V LIKE (SELECT MAX('s') FROM R0);")
+            .forEachOrdered(query -> {
+                try {
+                    assertEquals("Query \"" + query + "\" Should have passed",
+                            ClientResponse.SUCCESS,
+                            env.m_client.callProcedure("@AdHoc", query).getStatus());
+                } catch (IOException | ProcCallException e) {
+                    fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                }
+            });
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
     public void testSimple() throws Exception {
         System.out.println("Starting testSimple");
         TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);

@@ -28,7 +28,6 @@ import java.io.IOException;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
@@ -79,17 +78,6 @@ public class TestLikeQueries extends TestCase {
         }
     }
 
-    static class UnsupportedLikeTest extends LikeTest {
-        public UnsupportedLikeTest(String pattern, int matches) {
-            super(pattern, matches, true, false, null);
-        }
-    }
-
-    static class UnsupportedEscapeLikeTest extends LikeTest {
-        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
-            super(pattern, matches, true, false, escape);
-        }
-    }
 
     static class LikeTestData {
         public final String val;
@@ -150,19 +138,20 @@ public class TestLikeQueries extends TestCase {
             new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
-            new EscapeLikeTest("aaa", 0, "|")
+            new EscapeLikeTest("aaa", 0, "|"),
+            new EscapeLikeTest("abcd!%%", 0, "!"),
+            // User can choose to confuse himself
+            new EscapeLikeTest("abccccccccc%", 1, "c"),
     };
 
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
             new LikeTest("â_x一xxéyyԱ", 1),
-            // Patterns that fail (unsupported until we fix the parser)
-            new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };
 
     public static class LikeSuite {
-        public void doTests(Client client, boolean forHSQLcomparison) throws IOException, NoConnectionsException, ProcCallException {
+        public void doTests(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             loadForTests(client);
             if (forHSQLcomparison == false) {
                 doViaStoredProc(client);
@@ -170,7 +159,7 @@ public class TestLikeQueries extends TestCase {
             doViaAdHoc(client, forHSQLcomparison);
         }
 
-        private void loadForTests(Client client) throws IOException, NoConnectionsException, ProcCallException {
+        private void loadForTests(Client client) throws IOException, ProcCallException {
             int id = 0;
             for (LikeTestData data : rowData) {
                 id++;
@@ -181,7 +170,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        protected void doViaStoredProc(Client client) throws IOException, NoConnectionsException {
+        protected void doViaStoredProc(Client client) throws IOException {
             // Tests based on LikeTest list
             for (LikeTest test : tests) {
                 doTestViaStoredProc(client, test);
@@ -191,7 +180,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doViaAdHoc(Client client, boolean forHSQLcomparison) throws IOException, NoConnectionsException, ProcCallException {
+        private void doViaAdHoc(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             // Test parameter values used as like expression
             for (LikeTest test : tests) {
                 doTestViaAdHoc(client, test);
@@ -223,7 +212,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doTestViaStoredProc(Client client, LikeTest test) throws IOException, NoConnectionsException {
+        private void doTestViaStoredProc(Client client, LikeTest test) throws IOException {
             String procName = null;
             if (test.getClass() == LikeTest.class) {
                 procName = "SelectLike";
@@ -249,7 +238,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        private void doTestViaAdHoc(Client client, LikeTest test) throws IOException, NoConnectionsException {
+        private void doTestViaAdHoc(Client client, LikeTest test) throws IOException {
             String clause = test.getClause();
             String query = String.format("select * from strings where val %s", clause);
             System.out.printf("LIKE clause \"%s\"\n", clause);
@@ -302,16 +291,11 @@ public class TestLikeQueries extends TestCase {
         }
         finally {
             if (client != null) client.close();
-            client = null;
 
             if (localServer != null) {
                 localServer.shutdown();
                 localServer.join();
             }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
         }
     }
 }

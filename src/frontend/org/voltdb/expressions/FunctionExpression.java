@@ -92,6 +92,11 @@ public class FunctionExpression extends AbstractExpression {
         setExpressionType(ExpressionType.FUNCTION);
     }
 
+    public FunctionExpression(String name, String impliedArgs, int id) {
+        this();
+        setAttributes(name, impliedArgs, id);
+    }
+
     public void setAttributes(String name, String impliedArgument, int id) {
         assert(name != null);
         m_name = name;
