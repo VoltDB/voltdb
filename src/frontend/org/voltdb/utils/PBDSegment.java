@@ -157,10 +157,10 @@ public abstract class PBDSegment {
         int sizeInBytes = 0;
 
         DBBPool.BBContainer cont;
+        boolean isFinal = isFinal();
         while (true) {
             final long beforePos = reader.readOffset();
-
-            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
+            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal);
             if (cont == null) {
                 break;
             }
@@ -237,17 +237,12 @@ public abstract class PBDSegment {
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
 
         DBBPool.BBContainer cont = null;
-        DBBPool.BBContainer schemaCont = null;
         int initialEntryCount = getNumEntries(true);
         if (initialEntryCount == 0) {
             reader.close();
             return tracker;
         }
         while (true) {
-            // Start to read a new segment
-            if (reader.readIndex() == 0) {
-                schemaCont = reader.getExtraHeader();
-            }
             cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
             if (cont == null) {
                 break;
@@ -259,10 +254,6 @@ public abstract class PBDSegment {
 
             } finally {
                 cont.discard();
-                if (schemaCont != null) {
-                    schemaCont.discard();
-                    schemaCont = null;
-                }
             }
         }
         int entriesScanned = reader.readIndex();
