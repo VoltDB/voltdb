@@ -118,6 +118,14 @@ PARTITION TABLE P4 ON COLUMN i;
 create table P5(j float, i varchar(8) not null, k varchar(8));
 PARTITION TABLE P5 ON COLUMN i;
 
+create table P6 (
+    i integer not null,
+    si smallint,
+    ti integer not null,
+    bi bigint);
+partition table P6 on column ti;
+
+
 create table PI1 (
     i integer not null PRIMARY KEY,
     si smallint,

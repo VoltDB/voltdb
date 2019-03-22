@@ -484,6 +484,53 @@ final class RelDistributionUtils {
     }
 
     /**
+     * Check whether a given set op relation is SP.
+     * Set Op is SP if all of its children are SP and their partitioning values are
+     * either NULL (a child is a replicated scan) or equal each other (implies that there is a
+     * "WHERE partitionColumn = LITERAL_VALUE" for each child)
+     *
+     * @param setOpNodes SetOp children
+     * @return true if the result is SP.
+     */
+    public static JoinState isSetOpSP(List<RelNode> setOpNodes) {
+        JoinState initSetOpState = new JoinState(true, null, Sets.newHashSet());
+        JoinState finalSetOpState = setOpNodes.stream().reduce(
+                initSetOpState,
+                (currentState, nextChild) -> {
+                    final RelDistribution nextDist = getDistribution(nextChild);
+                    if (!currentState.isSP() || !nextDist.getIsSP()) {
+                        // Either accumulated state or the next child is a MP and the whole result is MP
+                        return new JoinState(false, currentState.getLiteral(), currentState.getPartCols());
+                    } else {
+                        // Accumulated state and the next child are both SP.
+                        // Make sure their partitioning values are compatible
+                        RexNode currentPartitioningValue = currentState.getLiteral();
+                        RexNode nextPartitioningValue = nextDist.getPartitionEqualValue();
+                        if (currentPartitioningValue != null && nextPartitioningValue != null) {
+                            if (currentPartitioningValue.equals(nextPartitioningValue)) {
+                                // Same partitioning value
+                                return currentState;
+                            } else {
+                                // Partitioning values do not match. SetOp is MP
+                                return new JoinState(false, currentPartitioningValue, currentState.getPartCols());
+                            }
+                        } else {
+                            if (currentPartitioningValue == null) {
+                                // All previous nodes were replicated and the next one is a MP with non-null
+                                // partitioning value
+                                return new JoinState(true, nextPartitioningValue, Sets.newHashSet(nextDist.getKeys()));
+                            } else {
+                                // The next child is replicated
+                                return currentState;
+                            }
+                        }
+                    }
+                },
+                (currentState, nextState) -> nextState);
+        return finalSetOpState;
+    }
+
+    /**
      * Check whether the given join relation is SP.
      * If it is SP, and contains partitioned tables, (which implies that there is a
      * "WHERE partitionColumn = LITERAL_VALUE"), then also set the literal value in the distribution trait.

@@ -390,4 +390,63 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select * from P1 where NOT i <> si").fail();
     }
+
+    public void testSetOp() {
+        // All tables are replicated. Pass
+        m_tester.sql("select I from R1 union (select I from R2 except select II from R3)").pass();
+
+        // Only one table is partitioned but it has an equality filter based on its partitioning column. Pass
+        m_tester.sql("select I from R1 union (select I from P1 where I = 1 except select II from R3)").pass();
+
+        // Only one table is partitioned but it has an equality filter based on its partitioning column. Pass
+        m_tester.sql("select I from R1 union select I from P1 where I = 1 union select II from R3").pass();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns with
+        // equal partitioning values. Positions of partitioning columns do not match. Pass
+        m_tester.sql("select I, SI from P1  where I = 1 union " +
+                     "select I, SI from R1 union " +
+                     "select SI, I from P2   where I = 1").pass();
+
+        // SP Join of two partitioned table and another partitioned table with
+        // compatible partitioning values
+        m_tester.sql("select P1.I, P2.SI from P1, P2  where P1.I = P2.I and P1.I = 1 union " +
+                "select SI, I from P3 where P3.I = 1").pass();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns.
+        // Two SetOps. Fail.
+        m_tester.sql("select I from P1  where I = 1 except " +
+                     "(select I from R1 intersect select I from P2  where I = 1)").pass();
+
+        // Only one table is partitioned without an equality filter based on its partitioning column. Fail
+        m_tester.sql("select I from R1 union (select I from P1 except select II from R3)").fail();
+
+        // Two partitioned tables, one has an equality filter based on its partitioning column.
+        // Only one SetOp with three children. Fail
+        m_tester.sql("select I from P1  where I = 1 union " +
+                     "select I from R1 union " +
+                     "select I from P2").fail();
+
+        // Two partitioned tables, one has an equality filter based on its partitioning column.
+        // Two SetOps. Fail.
+        m_tester.sql("select I from P1  where I = 1 except " +
+                     "(select I from R1 intersect select I from P2)").fail();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns with
+        // non-equal partitioning values. Fail
+        m_tester.sql("select I from P1  where I = 1 union " +
+                     "select I from R1 union " +
+                     "select I from P2   where I = 2").fail();
+
+        // Two partitioned tables, both have equality filters based on their partitioning columns.
+        // Two SetOps. Fail.
+        m_tester.sql("select I from P1  where I = 1 except " +
+                     "(select I from R1 intersect select I from P2  where I = 2)").fail();
+
+        // SP Join of two partitioned table and another partitioned table with
+        // incompatible partitioning values
+        m_tester.sql("select P1.I, P2.SI from P1, P2  where P1.I = P2.I and P1.I = 1 union " +
+                "select SI, I from P3 where P3.I = 2").fail();
+
+    }
+
 }

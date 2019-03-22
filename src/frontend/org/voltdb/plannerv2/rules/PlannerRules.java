@@ -23,11 +23,14 @@ import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
+import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.rel.rules.ReduceExpressionsRule;
+import org.apache.calcite.rel.rules.UnionMergeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -40,9 +43,11 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
+import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
 import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
@@ -50,6 +55,7 @@ import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 /**
@@ -112,6 +118,12 @@ public class PlannerRules {
             FilterProjectTransposeRule.INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
+            // combining two non-distinct SetOps into a single
+            UnionMergeRule.INSTANCE,
+            UnionMergeRule.INTERSECT_INSTANCE,
+            UnionMergeRule.MINUS_INSTANCE,
+            ProjectSetOpTransposeRule.INSTANCE,
+            FilterSetOpTransposeRule.INSTANCE,
 
             // Reduces constants inside a LogicalCalc.
             ReduceExpressionsRule.CALC_INSTANCE,
@@ -121,7 +133,10 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
-            VoltLJoinRule.INSTANCE
+            VoltLJoinRule.INSTANCE,
+            VoltLSetOpsRule.INSTANCE_UNION,
+            VoltLSetOpsRule.INSTANCE_INTERSECT,
+            VoltLSetOpsRule.INSTANCE_EXCEPT
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -153,7 +168,8 @@ public class PlannerRules {
 
     private static final RuleSet MP_FALLBACK = RuleSets.ofList(
             MPQueryFallBackRule.INSTANCE,
-            MPJoinQueryFallBackRule.INSTANCE
+            MPJoinQueryFallBackRule.INSTANCE,
+            MPSetOpsQueryFallBackRule.INSTANCE
     );
 
     private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
@@ -162,7 +178,10 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
-            VoltPJoinRule.INSTANCE
+            VoltPJoinRule.INSTANCE,
+            VoltPSetOpsRule.INSTANCE_UNION,
+            VoltPSetOpsRule.INSTANCE_INTERSECT,
+            VoltPSetOpsRule.INSTANCE_EXCEPT
     );
 
     private static final RuleSet INLINE = RuleSets.ofList(
