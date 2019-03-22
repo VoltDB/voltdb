@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -53,7 +54,7 @@ public final class ExpressionUtil {
        put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
        put("equal", ExpressionType.COMPARE_EQUAL);
        put("in", ExpressionType.COMPARE_IN);
-       put("not", ExpressionType.COMPARE_EQUAL);
+       put("not", ExpressionType.OPERATOR_NOT);
        put("exists", ExpressionType.OPERATOR_EXISTS);
        put("add", ExpressionType.OPERATOR_PLUS);
        put("subtract", ExpressionType.OPERATOR_MINUS);
@@ -289,10 +290,35 @@ public final class ExpressionUtil {
         }
     }
 
+    /**
+     * Collect/dedup all terminal/leaf nodes of an expression tree
+     * @param expr source expression tree
+     * @return dedup-ed terminal expressions
+     */
     public static Set<AbstractExpression> collectTerminals(AbstractExpression expr) {
         final Set<AbstractExpression> result = new HashSet<>();
         collectTerminals(expr, result);
         return result;
+    }
+
+    /**
+     * Check if any node of given expression tree satisfies given predicate
+     * @param expr source expression tree
+     * @param pred predicate to check against any expression node to find if any node satisfies.
+     *             Note that it should be able to handle null.
+     * @return true if there exists a node that satisfies the predicate
+     */
+    public static boolean reduce(AbstractExpression expr, Predicate<AbstractExpression> pred) {
+        final boolean current = pred.test(expr);
+        if (current) {
+            return true;
+        } else if (expr == null) {
+            return pred.test(null);
+        } else {
+            return pred.test(expr.getLeft()) || pred.test(expr.getRight()) ||
+                    expr.getArgs() != null && expr.getArgs().stream().anyMatch(pred);
+        }
+
     }
 
     public static void finalizeValueTypes(AbstractExpression exp)
