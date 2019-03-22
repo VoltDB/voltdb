@@ -1232,7 +1232,32 @@ public class TestPersistentBinaryDeque {
         }
     }
 
+    @Test
+    public void testPollingWithCrcCheck() throws Exception {
+
+        for (int i = 0; i < 5; ++i) {
+            m_pbd.offer(defaultContainer(), false);
+        }
+        for (int i = 0; i < 5; ++i) {
+            m_pbd.offer(defaultContainer(), true);
+        }
+        for (int i = 0; i < 10; ++i) {
+            m_pbd.offer(defaultContainer(), (i & 0x1) == 0x1);
+        }
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+
+        ByteBuffer entry = defaultBuffer();
+        for (int i = 0; i < 20; ++i) {
+            pollOnceAndVerify(reader, entry.asReadOnlyBuffer(), true);
+        }
+        assertNull(pollOnceWithoutDiscard(reader));
+    }
+
     private BBContainer pollOnceWithoutDiscard(BinaryDequeReader reader) throws IOException {
+        return pollOnceWithoutDiscard(reader, false);
+    }
+
+    private BBContainer pollOnceWithoutDiscard(BinaryDequeReader reader, boolean checkCrc) throws IOException {
         BBContainer schema = null;
         try {
             if (reader.isStartOfSegment()) {
@@ -1240,7 +1265,7 @@ public class TestPersistentBinaryDeque {
                 assertNotNull(schema);
                 assertFalse(reader.isEmpty());
             }
-            return reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            return reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, checkCrc);
         } finally {
             if (schema != null) {
                 schema.discard();
@@ -1249,42 +1274,24 @@ public class TestPersistentBinaryDeque {
     }
 
     private void pollOnce(BinaryDequeReader reader) throws IOException {
-        BBContainer schema = null;
-        BBContainer retval = null;
-        try {
-            if (reader.isStartOfSegment()) {
-                schema = reader.getExtraHeader(-1);
-                assertNotNull(schema);
-                assertFalse(reader.isEmpty());
-            }
-            retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
-        } finally {
-            if (retval != null) {
-                retval.discard();
-            }
-            if (schema != null) {
-                schema.discard();
-            }
+        BBContainer retval = pollOnceWithoutDiscard(reader);
+        if (retval != null) {
+            retval.discard();
         }
     }
 
     private void pollOnceAndVerify(BinaryDequeReader reader, ByteBuffer destBuf) throws IOException {
-        BBContainer schema = null;
-        BBContainer retval = null;
+        pollOnceAndVerify(reader, destBuf, false);
+    }
+
+    private void pollOnceAndVerify(BinaryDequeReader reader, ByteBuffer destBuf, boolean checkCrc) throws IOException {
+        BBContainer retval = pollOnceWithoutDiscard(reader, checkCrc);
         try {
-            if (reader.isStartOfSegment()) {
-                schema = reader.getExtraHeader(-1);
-                assertNotNull(schema);
-                assertFalse(reader.isEmpty());
-            }
-            retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            assertNotNull(retval);
             assertEquals(destBuf, retval.b());
         } finally {
             if (retval != null) {
                 retval.discard();
-            }
-            if (schema != null) {
-                schema.discard();
             }
         }
     }
