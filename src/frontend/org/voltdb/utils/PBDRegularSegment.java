@@ -585,6 +585,7 @@ public class PBDRegularSegment extends PBDSegment {
                     }
                     retcont.b().flip();
                     if (checkCRC) {
+                        m_crc32.reset();
                         m_crc32.update(length);
                         m_crc32.update(flags);
                         m_crc32.update(retcont.b());
@@ -596,6 +597,7 @@ public class PBDRegularSegment extends PBDSegment {
                             openForWrite(false);
                             initNumEntries(m_objectReadIndex, m_bytesRead);
                             m_fc.truncate(m_readOffset);
+                            retcont.discard();
                             return null;
                         }
                     }
