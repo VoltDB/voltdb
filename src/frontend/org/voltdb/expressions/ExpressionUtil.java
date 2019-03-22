@@ -53,7 +53,7 @@ public final class ExpressionUtil {
        put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
        put("equal", ExpressionType.COMPARE_EQUAL);
        put("in", ExpressionType.COMPARE_IN);
-       put("not", ExpressionType.COMPARE_EQUAL);
+       put("not", ExpressionType.OPERATOR_NOT);
        put("exists", ExpressionType.OPERATOR_EXISTS);
        put("add", ExpressionType.OPERATOR_PLUS);
        put("subtract", ExpressionType.OPERATOR_MINUS);
