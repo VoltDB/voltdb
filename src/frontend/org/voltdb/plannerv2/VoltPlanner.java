@@ -193,6 +193,10 @@ public class VoltPlanner implements Planner {
         m_state = State.STATE_1_READY;
     }
 
+    public SqlToRelConverter getSqlToRelConverter() {
+        return m_sqlToRelConverter;
+    }
+
     @Override public void reset() {
         m_validatedSqlNode = null;
         m_relRoot = null;

@@ -537,4 +537,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .pass();
     }
+
+    public void testProjectionPushDown() {
+        m_tester.sql("select R1.i from R1 inner join R2 on R1.v = R2.v").transform("").pass();
+    }
 }

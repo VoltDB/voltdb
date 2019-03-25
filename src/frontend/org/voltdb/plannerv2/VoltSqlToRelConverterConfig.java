@@ -39,7 +39,7 @@ public class VoltSqlToRelConverterConfig implements SqlToRelConverter.Config {
 
     @Override
     public boolean isTrimUnusedFields() {
-        return this.DEFAULT.isTrimUnusedFields();
+        return true;
     }
 
     @Override

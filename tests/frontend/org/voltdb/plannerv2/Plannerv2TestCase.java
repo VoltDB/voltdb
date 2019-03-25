@@ -178,6 +178,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
             super.pass();
             try {
                 m_root = m_planner.rel(m_validatedNode);
+                m_root = m_root.withRel(m_planner.getSqlToRelConverter().trimUnusedFields(true, m_root.rel));
                 if (m_expectedPlan != null) {
                     assertEquals(m_expectedPlan, m_root.toString());
                 }
