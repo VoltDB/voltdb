@@ -1308,6 +1308,14 @@ public class TestPersistentBinaryDeque {
         runParseAndTruncateOnNewPbd();
     }
 
+    @Test
+    public void testCloseLastReader() throws Exception {
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        pollOnceAndVerify(reader, null);
+        m_pbd.closeCursor(CURSOR_ID);
+        m_pbd.offer(defaultContainer());
+    }
+
     private void runParseAndTruncateOnNewPbd() throws IOException {
         PersistentBinaryDeque pbd = new PersistentBinaryDeque(TEST_NONCE, m_ds, TEST_DIR, logger);
         try {
