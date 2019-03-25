@@ -590,7 +590,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private void recoverSegment(PBDSegment qs) throws IOException {
 
         if (qs.getNumEntries() == 0) {
-            qs.setFinal(false);
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug(
                         "Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + qs.file().getName());
@@ -672,7 +671,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             // Reopen the last segment for write - ensure it is not final
             PBDSegment lastSegment = peekLastSegment();
             lastSegment.openNewSegment(m_compress);
-            lastSegment.setFinal(false);
 
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug("Segment " + lastSegment.file()
@@ -694,7 +692,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             iterator.remove();
 
             // Ensure the file is not final before closing and truncating
-            segment.setFinal(false);
             segment.closeAndDelete();
 
             if (m_usageSpecificLog.isDebugEnabled()) {
@@ -728,7 +725,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         PBDSegment segment = newSegment(segmentIndex, segmentId, file);
         try {
             segment.openNewSegment(m_compress);
-            segment.setFinal(false);
             if (m_extraHeader != null) {
                 segment.writeExtraHeader(m_extraHeader);
             }
@@ -833,11 +829,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
             closeAndDeleteSegment(tail);
             previousTailIsDeleted = true;
         } else {
-            tail.sync();
+            tail.finalize();
             if (!tail.isBeingPolled()) {
                 tail.close();
             }
-            tail.setFinal(true);
 
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug(
@@ -859,7 +854,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private void closeAndDeleteSegment(PBDSegment segment) throws IOException {
         int toDelete = segment.getNumEntries();
-        segment.setFinal(false);
         if (m_usageSpecificLog.isDebugEnabled()) {
             m_usageSpecificLog.debug("Closing and deleting segment " + segment.file()
                 + " (final: " + segment.isFinal() + ")");
@@ -932,8 +926,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
             // If this segment is to become the writing segment, don't close and
             // finalize it.
             if (!m_segments.isEmpty()) {
+                writeSegment.finalize();
                 writeSegment.close();
-                writeSegment.setFinal(true);
             }
 
             if (m_usageSpecificLog.isDebugEnabled()) {
@@ -1063,8 +1057,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             // When closing a PBD, all segments may be finalized because on
             // recover a new segment will be opened for writing
+            segment.finalize();
             segment.close();
-            segment.setFinal(true);
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug("Closed segment " + segment.file()
                     + " (final: " + segment.isFinal() + "), on PBD close");
