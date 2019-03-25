@@ -17,6 +17,8 @@
 
 package org.voltdb.export;
 
+import java.io.IOException;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StoredProcedureInvocation;
@@ -26,6 +28,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.utils.MiscUtils;
 
 public class MigrateRowsDeleter {
 
@@ -65,8 +68,17 @@ public class MigrateRowsDeleter {
                 }
                 m_partitionKey = getHashinatorPartitionKey(m_partitionId);
                 StoredProcedureInvocation retryDeleteSPI = new StoredProcedureInvocation();
+                if (m_partitionId == MpInitiator.MP_INIT_PID) {
+                    m_deleterSPI.setProcName("@MigrateRowsAcked_MP");
+                } else {
+                    m_deleterSPI.setProcName("@MigrateRowsAcked_SP");
+                }
                 retryDeleteSPI.setParams(m_partitionKey, m_tableName, m_deletableTxnId, m_batchSize);
-                ExportManager.instance().invokeMigrateRowsDelete(m_deleterSPI, m_partitionId, new DeleterCB(m_deletableTxnId));
+                try {
+                    retryDeleteSPI = MiscUtils.roundTripForCL(retryDeleteSPI);
+                    ExportManager.instance().invokeMigrateRowsDelete(retryDeleteSPI, m_partitionId, new DeleterCB(m_deletableTxnId));
+                }
+                catch (IOException e) {}
             }
             else
             if (responseStatus != ClientResponse.SUCCESS) {
@@ -97,7 +109,11 @@ public class MigrateRowsDeleter {
         }
         try {
             m_deleterSPI.setParams(m_partitionKey, m_tableName, deletableTxnId, m_batchSize);
-            ExportManager.instance().invokeMigrateRowsDelete(m_deleterSPI, m_partitionId, new DeleterCB(deletableTxnId));
+            try {
+                StoredProcedureInvocation serializedSPI = MiscUtils.roundTripForCL(m_deleterSPI);
+                ExportManager.instance().invokeMigrateRowsDelete(serializedSPI, m_partitionId, new DeleterCB(deletableTxnId));
+            }
+            catch (IOException e) {}
         } catch (Exception e) {
             logger.error("Error deleting migrated rows", e);
         } catch (Error e) {

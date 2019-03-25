@@ -39,7 +39,8 @@ public abstract class SavedTableConverter
                                           Table outputTableSchema,
                                           boolean preserveDRHiddenColumn,
                                           boolean preserveViewHiddenColumn,
-                                          boolean presereMigrateHiddenColumn) {
+                                          boolean presereMigrateHiddenColumn,
+                                          boolean isRecover) {
         int columnsToMatch = inputTable.getColumnCount()
                 - (preserveDRHiddenColumn ? 1 : 0)
                 - (preserveViewHiddenColumn ? 1 : 0)
@@ -68,6 +69,10 @@ public abstract class SavedTableConverter
 
         // There may be more than one hidden column. The one for migrate is the last one
         if (presereMigrateHiddenColumn) {
+           if (!isRecover) {
+               // For restore we need to mutate the migrate column to nulls
+               return true;
+           }
            int migrateHiddenIndex = columnsToMatch + ((preserveDRHiddenColumn || preserveViewHiddenColumn) ? 1 : 0);
            if (inputTable.getColumnType(migrateHiddenIndex) != VoltType.BIGINT) {
                return true;
@@ -100,21 +105,21 @@ public abstract class SavedTableConverter
                                          Table outputTableSchema,
                                          boolean preserveDRHiddenColumn,
                                          boolean preserveViewHiddenColumn,
-                                         boolean preserveMigrateHiddenColumn) throws VoltTypeException {
+                                         boolean preserveMigrateHiddenColumn,
+                                         boolean isRecover) throws VoltTypeException {
         VoltTable newTable;
         // if the DR hidden column should be preserved in conversion, append it to the end of target schema
+        int drColumnInx = -1;
         if (preserveDRHiddenColumn) {
             if (preserveMigrateHiddenColumn) {
                 newTable = CatalogUtil.getVoltTable(outputTableSchema,  CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+                drColumnInx = newTable.getColumnCount() - 2;
             } else {
                 newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+                drColumnInx = newTable.getColumnCount() - 1;
             }
         } else if (preserveViewHiddenColumn) {
-            if (preserveMigrateHiddenColumn) {
-                newTable = CatalogUtil.getVoltTable(outputTableSchema,  CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
-            } else {
-                newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO);
-            }
+            newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO);
         } else if (preserveMigrateHiddenColumn) {
             newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
         } else {
@@ -131,7 +136,7 @@ public abstract class SavedTableConverter
         }
         // if original table does not have hidden column present, we need to add
         boolean addDRHiddenColumn = preserveDRHiddenColumn &&
-                !columnCopyIndexMap.containsKey(newTable.getColumnCount() - 1);
+                !columnCopyIndexMap.containsKey(drColumnInx);
         Column catalogColumnForHiddenColumn = null;
         if (addDRHiddenColumn) {
             catalogColumnForHiddenColumn = new Column();
@@ -153,6 +158,10 @@ public abstract class SavedTableConverter
             catalogColumnForMigrateHiddenColumn.setSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             catalogColumnForMigrateHiddenColumn.setInbytes(false);
             catalogColumnForMigrateHiddenColumn.setNullable(true);
+            if (!isRecover) {
+                // If this is a restore force all migrate values to NULL
+                columnCopyIndexMap.remove(newTable.getColumnCount()-1);
+            }
         }
 
         // Copy all the old tuples into the new table

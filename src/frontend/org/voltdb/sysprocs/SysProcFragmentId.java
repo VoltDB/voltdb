@@ -270,7 +270,7 @@ public class SysProcFragmentId
     public static final int PF_cancelShutdown = 360;
     public static final int PF_cancelShutdownAggregate = 361;
 
-    // @MigrateRowsAcked_SP
+    // @MigrateRowsAcked_MP
     public static final int PF_migrateRows = 370;
     public static final int PF_migrateRowsAggregate = 371;
 
