@@ -59,6 +59,8 @@ class PBDRegularSegment extends PBDSegment {
 
     // Persistent ID of this segment, based on managing a monotonic counter
     private final long m_id;
+    // Whether or not this is the current active segment being written to
+    boolean m_isActive = false;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
@@ -192,6 +194,7 @@ class PBDRegularSegment extends PBDSegment {
             setFinal(false);
             initNumEntries(0, 0);
             m_compress = compress;
+            m_isActive = true;
         }
         if (forWrite) {
             m_fc.position(m_fc.size());
@@ -328,6 +331,12 @@ class PBDRegularSegment extends PBDSegment {
     private int remaining() throws IOException {
         //Subtract 12 for the crc, number of entries and size prefix
         return (int)(PBDSegment.CHUNK_SIZE - m_fc.position()) - SEGMENT_HEADER_BYTES;
+    }
+
+    @Override
+    public void finalize() throws IOException {
+        m_isActive = false;
+        super.finalize();
     }
 
     @Override
@@ -783,7 +792,7 @@ class PBDRegularSegment extends PBDSegment {
             if (keep) {
                 m_closedCursors.put(m_cursorId, this);
             }
-            if (m_readCursors.isEmpty()) {
+            if (m_readCursors.isEmpty() && !m_isActive) {
                 closeReadersAndFile();
             }
         }
