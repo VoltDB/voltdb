@@ -42,7 +42,6 @@ import com.google_voltpatches.common.base.Preconditions;
  */
 public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
@@ -54,7 +53,6 @@ public class PBDRegularSegment extends PBDSegment {
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
-    private long m_writeOffset = SEGMENT_HEADER_BYTES;
     private int m_extraHeaderSize = 0;
 
     private DBBPool.BBContainer m_segmentHeaderBuf = null;
@@ -69,24 +67,24 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public long segmentIndex()
+    long segmentIndex()
     {
         return m_index;
     }
 
     @Override
-    public long segmentId() {
+    long segmentId() {
         return m_id;
     }
 
     @Override
-    public File file()
+    File file()
     {
         return m_file;
     }
 
     @Override
-    public void reset()
+    void reset()
     {
         m_syncedSinceLastEdit = false;
         if (m_segmentHeaderBuf != null) {
@@ -102,25 +100,25 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public int getNumEntries(boolean crcCheck) throws IOException
+    int getNumEntries() throws IOException
     {
         initializeFromHeader(crcCheck);
         return m_numOfEntries;
     }
 
     @Override
-    public boolean isBeingPolled()
+    boolean isBeingPolled()
     {
         return !m_readCursors.isEmpty();
     }
 
     @Override
-    public boolean isOpenForReading(String cursorId) {
+    boolean isOpenForReading(String cursorId) {
         return m_readCursors.containsKey(cursorId);
     }
 
     @Override
-    public PBDSegmentReader openForRead(String cursorId) throws IOException
+    PBDSegmentReader openForRead(String cursorId) throws IOException
     {
         Preconditions.checkNotNull(cursorId, "Reader id must be non-null");
         if (m_readCursors.containsKey(cursorId) || m_closedCursors.containsKey(cursorId)) {
@@ -136,7 +134,7 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public PBDSegmentReader getReader(String cursorId) {
+    PBDSegmentReader getReader(String cursorId) {
         PBDSegmentReader reader = m_closedCursors.get(cursorId);
         return (reader == null) ? m_readCursors.get(cursorId) : reader;
     }
@@ -267,7 +265,7 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public void closeAndDelete() throws IOException {
+    void closeAndDelete() throws IOException {
         close();
         m_file.delete();
 
@@ -276,21 +274,15 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public boolean isClosed()
+    boolean isClosed()
     {
         return m_closed;
     }
 
     @Override
-    public void close() throws IOException {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Close PBD Segment " + m_file.getName());
-        }
-        if (m_fc != null) {
-            m_writeOffset = m_fc.position();
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Set writeOffset to " + m_writeOffset);
-            }
+    void close() throws IOException {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Close PBD Segment " + m_file.getName());
         }
         m_closedCursors.clear();
         closeReadersAndFile();
@@ -311,7 +303,7 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public void sync() throws IOException {
+    void sync() throws IOException {
         if (m_closed) {
             throw new IOException("Segment closed");
         }
@@ -322,7 +314,7 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public boolean hasAllFinishedReading() throws IOException {
+    boolean hasAllFinishedReading() throws IOException {
         if (m_closed) {
             throw new IOException("Segment closed");
         }
@@ -399,7 +391,7 @@ public class PBDRegularSegment extends PBDSegment {
 
     // Used by DR path
     @Override
-    public int offer(DeferredSerialization ds) throws IOException
+    int offer(DeferredSerialization ds) throws IOException
     {
         if (m_closed) {
             throw new IOException("closed");
@@ -438,7 +430,7 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public int size() {
+    int size() {
         return m_size;
     }
 
@@ -462,8 +454,8 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public void writeExtraHeader(DeferredSerialization ds) throws IOException {
-        if (m_numOfEntries != 0 || m_extraHeaderSize != 0) {
+    void writeExtraHeader(DeferredSerialization ds) throws IOException {
+        if (!(m_numOfEntries == 0 && m_extraHeaderSize == 0)) {
             throw new IllegalStateException("Extra header must be written before any entries");
         }
         int size = ds.getSerializedSize();
@@ -500,12 +492,12 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
-        public boolean hasMoreEntries() throws IOException {
+        public boolean hasMoreEntries() {
             return m_objectReadIndex < m_numOfEntries;
         }
 
         @Override
-        public boolean allReadAndDiscarded() throws IOException {
+        public boolean allReadAndDiscarded() {
             return m_discardCount == m_numOfEntries;
         }
 
