@@ -332,7 +332,6 @@ class PBDRegularSegment extends PBDSegment {
 
     @Override
     void closeAndDelete() throws IOException {
-        setFinal(false);
         try {
             close();
         } finally {
@@ -714,6 +713,7 @@ class PBDRegularSegment extends PBDSegment {
         private void truncateToCurrentReadIndex() throws IOException {
             PBDRegularSegment.this.close();
             openForTruncate();
+            setFinal(false);
             initNumEntries(m_objectReadIndex, m_bytesRead);
             m_fc.truncate(m_readOffset);
         }

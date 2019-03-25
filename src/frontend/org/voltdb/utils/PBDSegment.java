@@ -299,24 +299,29 @@ public abstract class PBDSegment {
      *
      * NOTES:
      *
-     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the
-     * operation is a no-op: this will be the case on filesystems that do no support extended file
-     * attributes. Also note that the {@code FileStore.supportsFileAttributeView} method does not provide
-     * a reliable way to test for the availability of the extended file attributes.
+     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the operation is a
+     * no-op: this will be the case on filesystems that do no support extended file attributes. Also note that the
+     * {@code FileStore.supportsFileAttributeView} method does not provide a reliable way to test for the availability
+     * of the extended file attributes.
      *
-     * Must be called with 'true' by segment owner when it has filled the segment, written all segment
-     * metadata, and after it has either closed or sync'd the segment file.
+     * Must be called with 'true' by segment owner when it has filled the segment, written all segment metadata, and
+     * after it has either closed or sync'd the segment file.
      *
      * Must be called with 'false' whenever opening segment for writing new data.
      *
-     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment
-     * itself generally lacks context to decide whether it's final or not.
+     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment itself generally
+     * lacks context to decide whether it's final or not.
      *
-     * @param isFinal   true if segment is set to final, false otherwise
+     * @param isFinal true if segment is set to final, false otherwise
+     * @throws IOException
      */
-    void setFinal(boolean isFinal) {
+    void setFinal(boolean isFinal) throws IOException {
         if (isFinal != m_isFinal) {
             if (setFinal(m_file, isFinal)) {
+                if (!isFinal) {
+                    // It is dangerous to leave final on a segment so make sure the metadata is flushed
+                    m_fc.force(true);
+                }
                 m_isFinal = isFinal;
             }
         }
