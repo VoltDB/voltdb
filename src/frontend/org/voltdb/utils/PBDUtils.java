@@ -47,13 +47,13 @@ public class PBDUtils {
     }
 
     public static void writeEntryHeader(CRC32 crc, ByteBuffer headerBuf,
-            ByteBuffer destBuf, int size, int flag) {
+            ByteBuffer destBuf, int size, char flag) {
         crc.update(size);
         crc.update(flag);
         crc.update(destBuf);
         // the checksum here is really an unsigned int, store integer to save 4 bytes
         headerBuf.putInt((int)crc.getValue());
         headerBuf.putInt(size);
-        headerBuf.putInt(flag);
+        headerBuf.putChar(flag);
     }
 }
