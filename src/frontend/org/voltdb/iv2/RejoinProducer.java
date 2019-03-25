@@ -51,6 +51,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
+    private static final long INITIAL_DATA_TIMEOUT_MS = Long.getLong("REJOIN_INITIAL_DATA_TIMEOUT_MS",
+            TimeUnit.HOURS.toMillis(1));
 
     private final AtomicBoolean m_currentlyRejoining;
     private static ScheduledFuture<?> m_timeFuture;
@@ -132,12 +134,30 @@ public class RejoinProducer extends JoinProducerBase {
     // Run if the watchdog isn't cancelled within the timeout period
     private static class TimerCallback implements Runnable
     {
+        final long m_timeout;
+        private final String m_reason;
+
+        static TimerCallback initialTimer() {
+            return new TimerCallback(INITIAL_DATA_TIMEOUT_MS, "initial data not being sent from active nodes");
+        }
+
+        static TimerCallback dataTimer() {
+            return new TimerCallback(StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
+                    "no data sent from active nodes");
+        }
+
+        private TimerCallback(long timeout, String reason) {
+            super();
+            m_timeout = timeout;
+            m_reason = reason;
+        }
+
         @Override
         public void run()
         {
             VoltDB.crashLocalVoltDB(String.format(
-                    "Rejoin process timed out due to no data sent from active nodes for %d seconds  Terminating rejoin.",
-                    StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS / 1000),
+                    "Rejoin process timed out due to " + m_reason + " for %d seconds  Terminating rejoin.",
+                    m_timeout / 1000),
                     false,
                     null);
         }
@@ -191,19 +211,19 @@ public class RejoinProducer extends JoinProducerBase {
 
     // cancel and maybe rearm the node-global snapshot data-segment watchdog.
     @Override
-    protected void kickWatchdog(boolean rearm)
+    protected void kickWatchdog(boolean rearm) {
+        kickWatchdog(rearm ? TimerCallback.dataTimer() : null);
+    }
+
+    private static void kickWatchdog(TimerCallback callback)
     {
         synchronized (RejoinProducer.class) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
             }
-            if (rearm) {
-                m_timeFuture = VoltDB.instance().scheduleWork(
-                        new TimerCallback(),
-                        StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
-                        0,
-                        TimeUnit.MILLISECONDS);
+            if (callback != null) {
+                m_timeFuture = VoltDB.instance().scheduleWork(callback, callback.m_timeout, 0, TimeUnit.MILLISECONDS);
             }
         }
     }
@@ -220,7 +240,7 @@ public class RejoinProducer extends JoinProducerBase {
             m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
             m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
             // Start the watchdog so if we never get data it will notice
-            kickWatchdog(true);
+            kickWatchdog(TimerCallback.initialTimer());
         } else {
             m_streamSnapshotMb = null;
             m_rejoinSiteProcessor = null;

@@ -268,7 +268,7 @@ public class CatalogDiffEngine {
         for (Map.Entry<CatalogType, TypeChanges> entry : ccg.groupChanges.entrySet()) {
             Set<String> fields = new HashSet<>();
             fields.addAll(entry.getValue().typeChanges.changedFields);
-            fields.remove(ignoredFields);
+            fields.removeAll(ignoredFields);
             if (fields.isEmpty()) {
                 groupModifications.remove(entry.getKey());
             }

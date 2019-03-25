@@ -26,10 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google_voltpatches.common.base.Preconditions;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.VoltUnsafe;
 import sun.nio.ch.DirectBuffer;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Method;
 
 #ifndef NO_MEMCHECK
 import java.util.List;

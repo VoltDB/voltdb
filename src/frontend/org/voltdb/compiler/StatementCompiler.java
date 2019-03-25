@@ -824,13 +824,13 @@ public abstract class StatementCompiler {
         // Select count(*)
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT COUNT(*) FROM " + table.getTypeName());
-        sb.append(" WHERE not_migrated AND " + column.getName() + " " + comparison.toString() + " ?;");
+        sb.append(" WHERE not migrating AND " + column.getName() + " " + comparison.toString() + " ?;");
         addStatement(table, proc, sb.toString(), "0");
 
          // Get cutoff value
         sb = new StringBuilder();
         sb.append("SELECT " + column.getName() + " FROM " + table.getTypeName());
-        sb.append(" WHERE not_migrated ORDER BY " + column.getName());
+        sb.append(" WHERE not migrating ORDER BY " + column.getName());
         if (comparison == ComparisonOperation.LTE || comparison == ComparisonOperation.LT) {
             sb.append(" ASC OFFSET ? LIMIT 1;");
         } else {
@@ -841,7 +841,7 @@ public abstract class StatementCompiler {
         // Migrate
         sb = new StringBuilder();
         sb.append("MIGRATE FROM " + table.getTypeName());
-        sb.append(" WHERE not_migrated AND " + column.getName() + " " + comparison.toString() + " ?;");
+        sb.append(" WHERE not migrating AND " + column.getName() + " " + comparison.toString() + " ?;");
         addStatement(table, proc, sb.toString(), "2");
 
         return proc;

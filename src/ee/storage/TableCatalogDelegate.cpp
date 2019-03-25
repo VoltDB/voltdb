@@ -159,7 +159,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
 
     // The catalog::Index object now has a list of columns that are to be
     // used
-    if (!catalogIndex.migrating() && catalogIndex.columns().size() == 0) {
+    if (catalogIndex.columns().size() == 0) {
        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns to use",
              catalogIndex.name().c_str(), catalogTable.name().c_str());
        return false;

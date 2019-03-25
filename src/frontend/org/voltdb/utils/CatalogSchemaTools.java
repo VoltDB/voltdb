@@ -360,9 +360,7 @@ public abstract class CatalogSchemaTools {
                 } else {
                     sb.append("CREATE UNIQUE INDEX ");
                 }
-            } else if (catalog_idx.getMigrating()) {
-                sb.append("CREATE MIGRATING INDEX ");
-            } else {
+            } else {    // MITGRATE flag does not imply any changes on the "CREATE INDEX" syntax
                 sb.append("CREATE INDEX ");
             }
 

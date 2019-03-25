@@ -394,7 +394,7 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        assert(idx < m_schema->columnCount());
+        assert(idx < m_schema->totalColumnCount());   // column index might point to a hidden column of migrating table
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
