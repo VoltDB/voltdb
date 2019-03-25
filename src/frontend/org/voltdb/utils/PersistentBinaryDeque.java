@@ -1243,7 +1243,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scaner) throws IOException
+    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scanner) throws IOException
     {
         if (m_closed) {
             throw new IOException("Cannot scanForGap(): PBD has been closed");
@@ -1266,7 +1266,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
          * Iterator all the objects in all the segments and pass them to the scanner
          */
         for (PBDSegment segment : m_segments.values()) {
-            ExportSequenceNumberTracker tracker = segment.scan(scaner);
+            ExportSequenceNumberTracker tracker = segment.scan(scanner);
             gapTracker.mergeTracker(tracker);
         }
         // Reopen the last segment for write
