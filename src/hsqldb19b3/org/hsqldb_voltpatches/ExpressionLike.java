@@ -35,7 +35,6 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.Type;
-import org.voltdb.planner.PlanningErrorException;
 
 import java.util.Objects;
 
@@ -339,7 +338,7 @@ public final class ExpressionLike extends ExpressionLogical {
             }
 
             if (!between && !larger && nodes.length > 2) {
-                throw new PlanningErrorException("ESCAPE not supported with non-constant LIKE pattern", 0);
+                throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
             }
 
             Expression leftBound =
@@ -361,7 +360,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 likeObject = null;
             } else if (between && like) {
                 if (nodes.length > 2) {
-                    throw new PlanningErrorException("ESCAPE not supported with non-constant LIKE pattern", 0);
+                    throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
                 }
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);
@@ -386,7 +385,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
             } else if (nodes.length > 2) {
-                throw new PlanningErrorException("ESCAPE not supported with non-constant LIKE pattern", 0);
+                throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
             }
         }
     }

@@ -29,7 +29,6 @@ import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class is built to create a single in-memory database
@@ -348,8 +347,6 @@ public class HSQLInterface {
             default:
                 throw new HSQLParseException("Error in \"" + sql + "\" - " + caught.getMessage(), caught);
             }
-        } catch (PlanningErrorException e) {
-           throw e;
         } catch (StackOverflowError caught) {
             // Handle this consistently in high level callers
             // regardless of where it is thrown.
