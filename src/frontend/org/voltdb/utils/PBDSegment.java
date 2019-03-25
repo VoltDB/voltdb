@@ -30,7 +30,6 @@ import java.util.zip.CRC32;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
 
@@ -42,26 +41,34 @@ public abstract class PBDSegment {
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
 
     // Segment Header layout:
+    // - version of segment headers (4 bytes)
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
     //  - total bytes of data (4 bytes, uncompressed size),
-    public static final int HEADER_CRC_OFFSET = 0;
-    public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
-    public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
-    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = 12;
-    static final int SEGMENT_HEADER_BYTES = 16;
+    //  - size in bytes of extra header ( 4 bytes )
+    //  - crc for the extra header ( 4 bytes )
+    public static final int HEADER_START_OFFSET = 0;
+    public static final int HEADER_VERSION_OFFSET = HEADER_START_OFFSET;
+    public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
+    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
+    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
+    static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
+    static final int HEADER_EXTRA_HEADER_OFFSET = SEGMENT_HEADER_BYTES;
 
-    static final int NO_FLAGS = 0;
-    static final int FLAG_COMPRESSED = 1;
+    static final char NO_FLAGS = 0;
+    static final char FLAG_COMPRESSED = 1;
 
     // Export Segment Entry Header layout (each segment has multiple entries):
     //  - crc of segment entry (4 bytes),
     //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
-    //  - entry flag (4 bytes)
-    public static final int ENTRY_HEADER_CRC_OFFSET = 0;
-    public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = 4;
-    public static final int ENTRY_HEADER_FLAG_OFFSET = 8;
-    public static final int ENTRY_HEADER_BYTES = 12;
+    //  - entry flag (2 bytes)
+    public static final int ENTRY_HEADER_START_OFFSET = 0;
+    public static final int ENTRY_HEADER_CRC_OFFSET = ENTRY_HEADER_START_OFFSET;
+    public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = ENTRY_HEADER_CRC_OFFSET + 4;
+    public static final int ENTRY_HEADER_FLAG_OFFSET = ENTRY_HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int ENTRY_HEADER_BYTES = ENTRY_HEADER_FLAG_OFFSET + 2;
 
     protected final File m_file;
 
@@ -70,14 +77,12 @@ public abstract class PBDSegment {
     protected FileChannel m_fc;
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
-    protected CRC32 m_segmentHeaderCRC;
-    protected CRC32 m_entryCRC;
+    protected CRC32 m_crc;
 
     public PBDSegment(File file)
     {
         m_file = file;
-        m_segmentHeaderCRC = new CRC32();
-        m_entryCRC = new CRC32();
+        m_crc = new CRC32();
     }
 
     abstract long segmentIndex();
@@ -86,7 +91,7 @@ public abstract class PBDSegment {
 
     abstract void reset();
 
-    abstract int getNumEntries(boolean crcCheck) throws IOException;
+    abstract int getNumEntries() throws IOException;
 
     abstract boolean isBeingPolled();
 
@@ -101,11 +106,19 @@ public abstract class PBDSegment {
     abstract PBDSegmentReader getReader(String cursorId);
 
     /**
-     * @param forWrite    Open the file in read/write mode
-     * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
+     * Open and initialize this segment as a new segment
+     *
+     * @param compress whether or not entries should be compressed by default
      * @throws IOException
      */
-    abstract protected void openForWrite(boolean emptyFile) throws IOException;
+    abstract void openNewSegment(boolean compress) throws IOException;
+
+    /**
+     * Open the segment for read and possible truncation
+     *
+     * @throws IOException
+     */
+    abstract void openForTruncate() throws IOException;
 
     abstract void initNumEntries(int count, int size) throws IOException;
 
@@ -119,7 +132,7 @@ public abstract class PBDSegment {
 
     abstract boolean hasAllFinishedReading() throws IOException;
 
-    abstract boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException;
+    abstract boolean offer(DBBPool.BBContainer cont) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
@@ -129,6 +142,13 @@ public abstract class PBDSegment {
     abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException;
 
     abstract void writeExtraHeader(DeferredSerialization ds) throws IOException;
+
+    /**
+     * Force a read and validation of the header and any extra header metadata which might exist
+     *
+     * @throws IOException If there was an error reading or validating the header
+     */
+    abstract void validateHeader() throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -141,11 +161,12 @@ public abstract class PBDSegment {
         if (!m_closed) {
             close();
         }
-        openForWrite(false);
+        openForTruncate();
         PBDSegmentReader reader = openForRead(TRUNCATOR_CURSOR);
 
         // Do stuff
-        final int initialEntryCount = getNumEntries(true);
+        validateHeader();
+        final int initialEntryCount = getNumEntries();
         int entriesTruncated = 0;
         // Zero entry count means the segment is empty or corrupted, in both cases
         // the segment can be deleted.
@@ -213,59 +234,58 @@ public abstract class PBDSegment {
         int entriesScanned = reader.readIndex();
         reader.close();
         close();
-        // If we checksum the file and it looks good, mark as final
-        if (!isFinal() && entriesScanned == initialEntryCount) {
-            setFinal(true);
+        if (entriesTruncated == 0) {
+            int entriesNotScanned = initialEntryCount - entriesScanned;
+            // If we checksum the file and it looks good, mark as final
+            if (!isFinal() && entriesNotScanned == 0) {
+                setFinal(true);
+            }
+            return entriesNotScanned;
         }
 
         return entriesTruncated;
     }
 
     /**
-     * Parse the segment and truncate the file if necessary.
-     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
-     * @return The number of objects that was truncated. This number will be subtracted from the total number
-     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     * Scan over all entries in a segment possibly truncating the segment if corruption is detected
+     *
+     * @param truncator A caller-supplied {@link BinaryDeque.BinaryDequeScanner} to scan the individual entries
+     * @return The number of objects that was truncated. This number will be subtracted from the total number of
+     *         available objects in the PBD.
      * @throws IOException
      */
-    ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
-        if (!m_closed) {
-            throw new IOException(("Segment should not be open before truncation"));
-        }
-
+    int scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
-        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
-
-        DBBPool.BBContainer cont = null;
-        int initialEntryCount = getNumEntries(true);
-        if (initialEntryCount == 0) {
-            reader.close();
-            return tracker;
-        }
-        while (true) {
-            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
-            if (cont == null) {
-                break;
+        try {
+            validateHeader();
+            DBBPool.BBContainer cont = null;
+            int initialEntryCount = getNumEntries();
+            if (initialEntryCount == 0) {
+                return 0;
             }
-            try {
-                //Handoff the object to the truncator and await a decision
-                ExportSequenceNumberTracker retval = scanner.scan(cont);
-                tracker.mergeTracker(retval);
-
-            } finally {
-                cont.discard();
+            while (true) {
+                cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                if (cont == null) {
+                    break;
+                }
+                try {
+                    scanner.scan(cont);
+                } finally {
+                    cont.discard();
+                }
             }
-        }
-        int entriesScanned = reader.readIndex();
-        reader.close();
-        // Forcefully close the file
-        close();
-        // Scan through entire file, everything looks good
-        if (!isFinal() && entriesScanned == initialEntryCount) {
-            setFinal(true);
-        }
+            int entriesScanned = reader.readIndex();
 
-        return tracker;
+            // Scan through entire file, everything looks good
+            int entriesTruncated = initialEntryCount - entriesScanned;
+            if (!isFinal() && entriesTruncated == 0) {
+                setFinal(true);
+            }
+
+            return entriesTruncated;
+        } finally {
+            reader.purge();
+        }
     }
 
     /**
