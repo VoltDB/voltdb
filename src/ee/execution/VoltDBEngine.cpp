@@ -1581,7 +1581,7 @@ void
 VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams) {
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
         if (entry.second) {
-            m_exportingStreams[entry.first] = NULL;
+            m_exportingStreams.erase(entry.first);
             entry.second->periodicFlush(-1L, -1L);
             entry.second->removeFromFlushList(this, false);
             entry.second->pushEndOfStream();
