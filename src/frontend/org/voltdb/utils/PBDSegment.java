@@ -79,6 +79,8 @@ public abstract class PBDSegment {
     protected CRC32 m_crc;
     // Mirror of the isFinal metadata on the filesystem
     private boolean m_isFinal;
+    // Whether or not this is the current active segment being written to
+    boolean m_isActive = false;
 
     public PBDSegment(File file)
     {
@@ -156,6 +158,13 @@ public abstract class PBDSegment {
      * @return {@code true} if this segment is eligible for finalization
      */
     abstract boolean canBeFinalized();
+
+    /**
+     * Update the segment to be read only
+     *
+     * @throws IOException If there was an error updating the segment to read only
+     */
+    abstract void setReadOnly() throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -240,15 +249,17 @@ public abstract class PBDSegment {
         }
         int entriesScanned = reader.readIndex();
         reader.close();
-        close();
+
         if (entriesTruncated == 0) {
             int entriesNotScanned = initialEntryCount - entriesScanned;
             // If we checksum the file and it looks good, mark as final
             if (!isFinal() && entriesNotScanned == 0) {
-                finalize();
+                finalize(true);
             }
             return entriesNotScanned;
         }
+
+        close();
 
         return entriesTruncated;
     }
@@ -285,8 +296,8 @@ public abstract class PBDSegment {
 
             // Scan through entire file, everything looks good
             int entriesTruncated = initialEntryCount - entriesScanned;
-            if (!isFinal() && entriesTruncated == 0) {
-                finalize();
+            if (!m_isActive && !isFinal() && entriesTruncated == 0) {
+                finalize(false);
             }
 
             return entriesTruncated;
@@ -328,11 +339,41 @@ public abstract class PBDSegment {
         }
     }
 
-    @Override
-    public void finalize() throws IOException {
-        if (canBeFinalized()) {
-            sync();
-            setFinal(true);
+    /**
+     * If this segment is in a good condition the data will be flushed to disk and the segment will either be closed or
+     * converted to read only depending on the argument {@code close}
+     *
+     * @param close If {@code true} this segment will be closed otherwise it will be made read only
+     * @throws IOException
+     */
+    void finalize(boolean close) throws IOException {
+        m_isActive = false;
+        IOException exception = null;
+        try {
+            if (canBeFinalized()) {
+                sync();
+                setFinal(true);
+            }
+        } catch (IOException e) {
+            exception = e;
+        } finally {
+            try {
+                if (close) {
+                    close();
+                } else {
+                    setReadOnly();
+                }
+            } catch (IOException e) {
+                if (exception == null) {
+                    exception = e;
+                } else {
+                    exception.addSuppressed(e);
+                }
+            }
+
+            if (exception != null) {
+                throw exception;
+            }
         }
     }
 

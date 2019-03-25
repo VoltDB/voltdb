@@ -829,10 +829,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             closeAndDeleteSegment(tail);
             previousTailIsDeleted = true;
         } else {
-            tail.finalize();
-            if (!tail.isBeingPolled()) {
-                tail.close();
-            }
+            tail.finalize(!tail.isBeingPolled());
 
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug(
@@ -926,8 +923,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             // If this segment is to become the writing segment, don't close and
             // finalize it.
             if (!m_segments.isEmpty()) {
-                writeSegment.finalize();
-                writeSegment.close();
+                writeSegment.finalize(true);
             }
 
             if (m_usageSpecificLog.isDebugEnabled()) {
@@ -1057,8 +1053,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             // When closing a PBD, all segments may be finalized because on
             // recover a new segment will be opened for writing
-            segment.finalize();
-            segment.close();
+            segment.finalize(true);
             if (m_usageSpecificLog.isDebugEnabled()) {
                 m_usageSpecificLog.debug("Closed segment " + segment.file()
                     + " (final: " + segment.isFinal() + "), on PBD close");

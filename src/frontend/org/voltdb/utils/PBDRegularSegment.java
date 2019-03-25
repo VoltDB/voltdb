@@ -27,6 +27,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -58,8 +59,6 @@ class PBDRegularSegment extends PBDSegment {
 
     // Persistent ID of this segment, based on managing a monotonic counter
     private final long m_id;
-    // Whether or not this is the current active segment being written to
-    boolean m_isActive = false;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
@@ -333,12 +332,6 @@ class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public void finalize() throws IOException {
-        m_isActive = false;
-        super.finalize();
-    }
-
-    @Override
     void closeAndDelete() throws IOException {
         try {
             close();
@@ -376,6 +369,11 @@ class PBDRegularSegment extends PBDSegment {
             m_closed = true;
             reset();
         }
+    }
+
+    @Override
+    void setReadOnly() throws IOException {
+        getFiileChannelWrapper().reopen(false);
     }
 
     @Override
@@ -555,9 +553,13 @@ class PBDRegularSegment extends PBDSegment {
     @Override
     boolean canBeFinalized() {
         if (m_fc != null) {
-            return ((FileChannelWrapper) m_fc).m_stable;
+            return getFiileChannelWrapper().m_stable;
         }
         return false;
+    }
+
+    private FileChannelWrapper getFiileChannelWrapper() {
+        return (FileChannelWrapper) m_fc;
     }
 
     private class SegmentReader implements PBDSegmentReader {
@@ -721,9 +723,16 @@ class PBDRegularSegment extends PBDSegment {
         private void truncateToCurrentReadIndex() throws IOException {
             PBDRegularSegment.this.close();
             openForTruncate();
-            setFinal(false);
-            initNumEntries(m_objectReadIndex, m_bytesRead);
-            m_fc.truncate(m_readOffset);
+            boolean wasReadOnly = getFiileChannelWrapper().reopen(true);
+            try {
+                setFinal(false);
+                initNumEntries(m_objectReadIndex, m_bytesRead);
+                m_fc.truncate(m_readOffset);
+            } finally {
+                if (wasReadOnly) {
+                    setReadOnly();
+                }
+            }
         }
 
         @Override
@@ -819,13 +828,30 @@ class PBDRegularSegment extends PBDSegment {
      * by the delegate
      */
     private static final class FileChannelWrapper extends FileChannel {
-        private final FileChannel m_delegate;
+        private final Path m_path;
+        private FileChannel m_delegate;
+        boolean m_writable;
         boolean m_stable = true;
 
         FileChannelWrapper(File file, boolean forWrite) throws IOException {
-            m_delegate = FileChannel.open(file.toPath(),
-                    forWrite ? EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
-                            : EnumSet.of(StandardOpenOption.READ));
+            m_path = file.toPath();
+            open(forWrite);
+        }
+
+        boolean reopen(boolean forWrite) throws IOException {
+            if (forWrite != m_writable) {
+                m_delegate.close();
+                open(forWrite);
+                return true;
+            }
+            return false;
+        }
+
+        private void open(boolean forWrite) throws IOException {
+            m_delegate = FileChannel.open(m_path, forWrite
+                    ? EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
+                    : EnumSet.of(StandardOpenOption.READ));
+            m_writable = forWrite;
         }
 
         @Override
