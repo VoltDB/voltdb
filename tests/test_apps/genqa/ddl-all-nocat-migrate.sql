@@ -75,6 +75,7 @@ CREATE TABLE export_partitioned_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET abc ;
 PARTITION TABLE export_partitioned_table ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_idx ON  export_partitioned_table(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_partitioned_table_foo
 (
@@ -103,6 +104,7 @@ CREATE TABLE export_partitioned_table_foo
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET foo ;
 PARTITION TABLE export_partitioned_table_foo ON COLUMN rowid;
+CREATE INDEX export_partitioned_table_foo_idx ON  export_partitioned_table_foo(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_partitioned_table2
 (
@@ -131,6 +133,7 @@ CREATE TABLE export_partitioned_table2
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET default1;
 PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
+CREATE INDEX export_partitioned_table2_idx ON  export_partitioned_table2(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_mirror_partitioned_table
 (
@@ -269,6 +272,7 @@ CREATE TABLE  export_replicated_table
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET abc;
+CREATE INDEX export_replicated_table_idx ON  export_replicated_table(type_not_null_timestamp)  where not migrating;
 
 CREATE TABLE export_replicated_table_foo
 (
@@ -296,7 +300,7 @@ CREATE TABLE export_replicated_table_foo
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 ) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET foo;
-
+CREATE INDEX export_replicated_table_foo_idx ON  export_replicated_table_foo(type_not_null_timestamp)  where not migrating;
 
 CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
 (
