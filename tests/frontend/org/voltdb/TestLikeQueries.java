@@ -78,6 +78,11 @@ public class TestLikeQueries extends TestCase {
         }
     }
 
+    static class UnsupportedEscapeLikeTest extends LikeTest {
+        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
+            super(pattern, matches, true, false, escape);
+        }
+    }
 
     static class LikeTestData {
         public final String val;
@@ -139,15 +144,14 @@ public class TestLikeQueries extends TestCase {
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
             new EscapeLikeTest("aaa", 0, "|"),
-            new EscapeLikeTest("abcd!%%", 0, "!"),
-            // User can choose to confuse himself
-            new EscapeLikeTest("abccccccccc%", 1, "c"),
+            new EscapeLikeTest("abccccccccc%", 1, "c"), // User can choose to confuse himself
     };
 
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
             new LikeTest("â_x一xxéyyԱ", 1),
+            new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };
 
     public static class LikeSuite {
