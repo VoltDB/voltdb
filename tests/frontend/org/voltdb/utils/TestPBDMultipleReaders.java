@@ -39,7 +39,8 @@ public class TestPBDMultipleReaders {
 
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
-    private static final int s_segmentFillCount = 47;
+    // Number of entries which fit in a segment. 64MB segment / (2MB entries + headers) = 31 entries per segment.
+    private static final int s_segmentFillCount = 31;
     private PersistentBinaryDeque m_pbd;
 
     private class PBDReader {
@@ -166,7 +167,7 @@ public class TestPBDMultipleReaders {
 
         BinaryDequeReader reader = m_pbd.openForRead("reader0");
         for (int i=0; i<numSegments; i++) {
-            for (int j=0; j<46; j++) {
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
                 BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
             }
@@ -196,7 +197,7 @@ public class TestPBDMultipleReaders {
         BinaryDequeReader reader1 = m_pbd.openForRead("reader1");
         // Position first reader0 on penultimate segment and reader1 on first segment
         for (int i=0; i<numSegments-1; i++) {
-            for (int j=0; j<46; j++) {
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
                 BBContainer bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
                 if (i==0) {
@@ -222,7 +223,7 @@ public class TestPBDMultipleReaders {
 
         // reader0 at penultimate. Move reader1 through segments and check open segments
         for (int i=1; i<numSegments-1; i++) {
-            for (int j=0; j<46; j++) {
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
                 bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
             }
