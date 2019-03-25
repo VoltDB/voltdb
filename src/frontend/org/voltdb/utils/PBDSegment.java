@@ -76,11 +76,14 @@ public abstract class PBDSegment {
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
     protected CRC32 m_crc;
+    // Mirror of the isFinal metadata on the filesystem
+    private boolean m_isFinal;
 
     public PBDSegment(File file)
     {
         m_file = file;
         m_crc = new CRC32();
+        m_isFinal = isFinal(m_file);
     }
 
     abstract long segmentIndex();
@@ -147,6 +150,11 @@ public abstract class PBDSegment {
      * @throws IOException If there was an error reading or validating the header
      */
     abstract void validateHeader() throws IOException;
+
+    /**
+     * @return {@code true} if this segment is eligible for finalization
+     */
+    abstract boolean canBeFinalized();
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -236,7 +244,7 @@ public abstract class PBDSegment {
             int entriesNotScanned = initialEntryCount - entriesScanned;
             // If we checksum the file and it looks good, mark as final
             if (!isFinal() && entriesNotScanned == 0) {
-                setFinal(true);
+                finalize();
             }
             return entriesNotScanned;
         }
@@ -277,7 +285,7 @@ public abstract class PBDSegment {
             // Scan through entire file, everything looks good
             int entriesTruncated = initialEntryCount - entriesScanned;
             if (!isFinal() && entriesTruncated == 0) {
-                setFinal(true);
+                finalize();
             }
 
             return entriesTruncated;
@@ -306,20 +314,34 @@ public abstract class PBDSegment {
      *
      * @param isFinal   true if segment is set to final, false otherwise
      */
-    public void setFinal(boolean isFinal) {
-        setFinal(m_file, isFinal);
+    void setFinal(boolean isFinal) {
+        if (isFinal != m_isFinal) {
+            if (setFinal(m_file, isFinal)) {
+                m_isFinal = isFinal;
+            }
+        }
     }
 
-    public static void setFinal(File file, boolean isFinal) {
+    @Override
+    public void finalize() throws IOException {
+        if (canBeFinalized()) {
+            sync();
+            setFinal(true);
+        }
+    }
+
+    public static boolean setFinal(File file, boolean isFinal) {
 
         try {
             UserDefinedFileAttributeView view = getFileAttributeView(file);
             if (view != null) {
-                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(Boolean.toString(isFinal)));
             }
+            return true;
         } catch (IOException e) {
             // No-op
         }
+        return false;
     }
 
     /**
@@ -329,7 +351,7 @@ public abstract class PBDSegment {
      * @return true if file is final, false otherwise
      */
     public boolean isFinal() {
-        return isFinal(m_file);
+        return m_isFinal;
     }
 
     public static boolean isFinal(File file) {

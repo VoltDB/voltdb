@@ -22,7 +22,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -178,14 +182,13 @@ class PBDRegularSegment extends PBDSegment {
             m_syncedSinceLastEdit = false;
         }
         assert (m_fc == null);
-        m_fc = FileChannel.open(m_file.toPath(),
-                forWrite ? EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
-                        : EnumSet.of(StandardOpenOption.READ));
+        m_fc = new FileChannelWrapper(m_file, forWrite);
         m_segmentHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
         m_entryHeaderBuf = DBBPool.allocateDirect(ENTRY_HEADER_BYTES);
 
         // Those asserts ensure the file is opened with correct flag
         if (emptyFile) {
+            setFinal(false);
             initNumEntries(0, 0);
             m_compress = compress;
         }
@@ -328,8 +331,12 @@ class PBDRegularSegment extends PBDSegment {
 
     @Override
     void closeAndDelete() throws IOException {
-        close();
-        m_file.delete();
+        setFinal(false);
+        try {
+            close();
+        } finally {
+            m_file.delete();
+        }
 
         m_numOfEntries = -1;
         m_size = -1;
@@ -535,6 +542,14 @@ class PBDRegularSegment extends PBDSegment {
             destBuf.discard();
         }
         writeOutHeader();
+    }
+
+    @Override
+    boolean canBeFinalized() {
+        if (m_fc != null) {
+            return ((FileChannelWrapper) m_fc).m_stable;
+        }
+        return false;
     }
 
     private class SegmentReader implements PBDSegmentReader {
@@ -786,6 +801,196 @@ class PBDRegularSegment extends PBDSegment {
             if (m_cursorId != null) {
                 m_closedCursors.remove(m_cursorId);
                 m_readCursors.put(m_cursorId, this);
+            }
+        }
+    }
+
+    /**
+     * A simple delegation wrapper around a {@link FileChannel} which tracks whether or not any exceptions were thrown
+     * by the delegate
+     */
+    private static final class FileChannelWrapper extends FileChannel {
+        private final FileChannel m_delegate;
+        boolean m_stable = true;
+
+        FileChannelWrapper(File file, boolean forWrite) throws IOException {
+            m_delegate = FileChannel.open(file.toPath(),
+                    forWrite ? EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
+                            : EnumSet.of(StandardOpenOption.READ));
+        }
+
+        @Override
+        public String toString() {
+            return m_delegate.toString();
+        }
+
+        @Override
+        public int read(ByteBuffer dst) throws IOException {
+            try {
+                return m_delegate.read(dst);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long read(ByteBuffer[] dsts, int offset, int length) throws IOException {
+            try {
+                return m_delegate.read(dsts, offset, length);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public int write(ByteBuffer src) throws IOException {
+            try {
+                return m_delegate.write(src);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
+            try {
+                return m_delegate.write(srcs, offset, length);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long position() throws IOException {
+            try {
+                return m_delegate.position();
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public FileChannel position(long newPosition) throws IOException {
+            try {
+                return m_delegate.position(newPosition);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long size() throws IOException {
+            try {
+                return m_delegate.size();
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public FileChannel truncate(long size) throws IOException {
+            try {
+                return m_delegate.truncate(size);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public void force(boolean metaData) throws IOException {
+            try {
+                m_delegate.force(metaData);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long transferTo(long position, long count, WritableByteChannel target) throws IOException {
+            try {
+                return m_delegate.transferTo(position, count, target);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public long transferFrom(ReadableByteChannel src, long position, long count) throws IOException {
+            try {
+                return m_delegate.transferFrom(src, position, count);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public int read(ByteBuffer dst, long position) throws IOException {
+            try {
+                return m_delegate.read(dst, position);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public int write(ByteBuffer src, long position) throws IOException {
+            try {
+                return m_delegate.write(src, position);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public MappedByteBuffer map(MapMode mode, long position, long size) throws IOException {
+            try {
+                return m_delegate.map(mode, position, size);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public FileLock lock(long position, long size, boolean shared) throws IOException {
+            try {
+                return m_delegate.lock(position, size, shared);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        public FileLock tryLock(long position, long size, boolean shared) throws IOException {
+            try {
+                return m_delegate.tryLock(position, size, shared);
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
+            }
+        }
+
+        @Override
+        protected void implCloseChannel() throws IOException {
+            try {
+                m_delegate.close();
+            } catch (Throwable e) {
+                m_stable = false;
+                throw e;
             }
         }
     }
