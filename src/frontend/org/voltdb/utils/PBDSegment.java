@@ -19,7 +19,6 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
@@ -73,7 +72,6 @@ public abstract class PBDSegment {
     protected final File m_file;
 
     protected boolean m_closed = true;
-    protected RandomAccessFile m_ras;
     protected FileChannel m_fc;
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;

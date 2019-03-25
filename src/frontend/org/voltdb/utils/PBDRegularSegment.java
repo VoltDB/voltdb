@@ -20,9 +20,11 @@ package org.voltdb.utils;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -176,9 +178,10 @@ class PBDRegularSegment extends PBDSegment {
             }
             m_syncedSinceLastEdit = false;
         }
-        assert(m_ras == null);
-        m_ras = new RandomAccessFile( m_file, forWrite ? "rw" : "r");
-        m_fc = m_ras.getChannel();
+        assert (m_fc == null);
+        m_fc = FileChannel.open(m_file.toPath(),
+                forWrite ? EnumSet.of(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
+                        : EnumSet.of(StandardOpenOption.READ));
         m_segmentHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
         m_entryHeaderBuf = DBBPool.allocateDirect(ENTRY_HEADER_BYTES);
 
@@ -351,11 +354,10 @@ class PBDRegularSegment extends PBDSegment {
     private void closeReadersAndFile() throws IOException {
         m_readCursors.clear();
         try {
-            if (m_ras != null) {
-                m_ras.close();
+            if (m_fc != null) {
+                m_fc.close();
             }
         } finally {
-            m_ras = null;
             m_fc = null;
             m_closed = true;
             reset();
