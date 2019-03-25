@@ -75,6 +75,7 @@ public abstract class PBDSegment {
     protected FileChannel m_fc;
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
+    // Reusable crc calculator. Must be reset before each use
     protected CRC32 m_crc;
     // Mirror of the isFinal metadata on the filesystem
     private boolean m_isFinal;
