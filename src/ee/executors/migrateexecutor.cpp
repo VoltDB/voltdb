@@ -120,6 +120,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             BOOST_FOREACH(TableIndex *index, allIndexes) {
                 if (index->isMigratingIndex()) {
                     indexesToUpdate.push_back(index);
+                    VOLT_DEBUG("MigrateExecutor: updating migrating index.");
                 }
             }
 

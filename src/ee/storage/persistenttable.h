@@ -597,6 +597,7 @@ public:
     void migratingAdd(int64_t txnId, TableTuple& tuple);
     bool migratingRemove(int64_t txnId, TableTuple& tuple);
     void migratingUndo(TableTuple& tuple);
+    uint16_t getMigrateColumnIndex();
     /**
      * Delete the rows that have completed the migration process
      */

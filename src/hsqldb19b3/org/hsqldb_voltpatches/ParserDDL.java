@@ -1161,11 +1161,9 @@ public class ParserDDL extends ParserRoutine {
                 if (StringUtil.isEmpty(oldTarget) && !StringUtil.isEmpty(migrationTargetName)) {
                     throw unexpectedToken("The migration target cannot be added.");
                 }
-
-                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equals(migrationTargetName)) {
-                    throw unexpectedToken("The migration target cannot be added.");
+                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equalsIgnoreCase(migrationTargetName)) {
+                    throw unexpectedToken("The migration target cannot be altered.");
                 }
-
             } else if (!StringUtil.isEmpty(migrationTargetName)) {
                 throw unexpectedToken("The migration target cannot be added.");
             }

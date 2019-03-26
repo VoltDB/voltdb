@@ -34,7 +34,7 @@ import org.voltdb.iv2.MpInitiator;
 public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
+    static final long TIMEOUT = TimeUnit.MINUTES.toMillis(Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2));
 
     static int getHashinatorPartitionKey(int partitionId) {
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
@@ -74,27 +74,28 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
             }
         } catch (Exception ex) {
             ret.addRow((rowsRemaining != Long.MAX_VALUE) ? rowsRemaining : -1, ClientResponse.UNEXPECTED_FAILURE, ex.getMessage());
+            return ret;
         }
         ret.addRow(rowsRemaining, ClientResponse.SUCCESS, "");
         return ret;
     }
 
     private ClientResponse deleteRows(int partitionId, String tableName, long deletableTxnId, int maxRowCount) throws InterruptedException, ExecutionException, TimeoutException {
-            CompletableFuture<ClientResponse> cf = null;
-            if (partitionId == MpInitiator.MP_INIT_PID) {
-                cf = callProcedure("@MigrateRowsAcked_MP", tableName, deletableTxnId, maxRowCount);
-            } else {
-                cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, maxRowCount);
-            }
-            ClientResponse cr = cf.get(1, TimeUnit.MINUTES);
-            ClientResponseImpl cri = (ClientResponseImpl) cr;
-            switch(cri.getStatus()) {
-            case ClientResponse.TXN_MISPARTITIONED:
-                cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, maxRowCount);
-                cr = cf.get(1, TimeUnit.MINUTES);
-                return cr;
-            default:
-                return cr;
-            }
+        CompletableFuture<ClientResponse> cf = null;
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            cf = callProcedure("@MigrateRowsAcked_MP", tableName, deletableTxnId, maxRowCount);
+        } else {
+            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, maxRowCount);
+        }
+        ClientResponse cr = cf.get(1, TimeUnit.MINUTES);
+        ClientResponseImpl cri = (ClientResponseImpl) cr;
+        switch(cri.getStatus()) {
+        case ClientResponse.TXN_MISPARTITIONED:
+            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, maxRowCount);
+            cr = cf.get(1, TimeUnit.MINUTES);
+            return cr;
+        default:
+            return cr;
+        }
     }
 }

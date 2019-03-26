@@ -743,18 +743,18 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
         TableTuple& sourceTupleWithNewValues) {
     assert(targetTupleToUpdate.getSchema()->isTableWithStream());
-    uint16_t migrateColumnIndex = sourceTupleWithNewValues.getSchema()->hiddenColumnCount() -1;
+    uint16_t migrateColumnIndex = getMigrateColumnIndex();
     NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
 
     // If the migrate hidden column has transaction id, reset it to null and remove the tuple
-    // from index (update path).Otherwise set the transaction id to the migrate hidden column (migrate path)
+    // from migrating index (update path).Otherwise set the transaction id to the migrate hidden column (migrate path)
     if (txnId.isNull()) {
         int64_t spHandle = ec->currentSpHandle();
-        VOLT_DEBUG("Add migrating index.....%ld", (long)spHandle);
+        VOLT_DEBUG("Add migrating index for txnId: %ld", (long)spHandle);
         sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
     } else {
         sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
-        VOLT_DEBUG("Remove migrating index.....%ld", (long)(ValuePeeker::peekBigInt(txnId)));
+        VOLT_DEBUG("Remove migrating index for txnId: %ld", (long)(ValuePeeker::peekBigInt(txnId)));
         migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
     }
 }
@@ -964,7 +964,7 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
                             target.debugNoHeader().c_str());
     }
 
-    // add tuple back to migrating index
+    // Add tuple back to migrating index if needed
     migratingUndo(target);
 }
 
@@ -982,6 +982,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
     int tupleLength = targetTupleToUpdate.tupleLength();
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
+
     /**
      * Check for index constraint violations.
      */
@@ -1018,14 +1020,15 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn() && updateDRTimestamp && !updateMigrate) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
+    // Set or reset txnId on migrate hidden column
     if (m_shadowStream != nullptr) {
         setMigrateTxnIdForTuple(ec, targetTupleToUpdate, sourceTupleWithNewValues);
     }
+
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (!updateMigrate && doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
@@ -1119,6 +1122,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     if (updateMigrate && m_shadowStream != nullptr) {
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
+        VOLT_DEBUG("Inserting tuple to shadow stream for txnId %ld", (long)(ec->currentSpHandle()));
         m_shadowStream->insertTuple(sourceTupleWithNewValues);
     }
 
@@ -1149,9 +1153,14 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         if (!indexRequiresUpdate[i]) {
             continue;
         }
+
+        // For migrate, the hidden index should not be added back
+        if (updateMigrate && index->isMigratingIndex()) {
+            continue;
+        }
         index->addEntry(&targetTupleToUpdate, &conflict);
         if (!conflict.isNullTuple()) {
-            throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
+             throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
                                 m_name.c_str(), index->getName().c_str());
         }
     }
@@ -1193,12 +1202,6 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
-    // undo migrating indexes
-    if (m_shadowStream != nullptr) {
-
-        ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
-    }
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         BOOST_FOREACH (auto index, m_indexes) {
@@ -1912,7 +1915,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
     if (m_shadowStream != nullptr) {
         // This assumes the last column is the migrate column. This will need to be fixed
         // if more columns are added.
-        int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(m_schema->hiddenColumnCount()-1));
+        int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
             assert(it != m_migratingRows.end());
@@ -2453,12 +2456,20 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 
 void PersistentTable::migratingUndo(TableTuple& tuple) {
     if (m_shadowStream != nullptr) {
-        uint16_t migrateColumnIndex = tuple.getSchema()->hiddenColumnCount() -1;
-        NValue txnId = tuple.getHiddenNValue(migrateColumnIndex);
+        NValue txnId = tuple.getHiddenNValue(getMigrateColumnIndex());
         if (!txnId.isNull()) {
+            // Add the index back
             migratingAdd(ValuePeeker::peekBigInt(txnId), tuple);
+        } else {
+            // Remove the index
+            ExecutorContext* ec = ExecutorContext::getExecutorContext();
+            migratingRemove(ec->currentSpHandle(), tuple);
         }
     }
+}
+
+uint16_t PersistentTable::getMigrateColumnIndex() {
+    return (m_schema->hiddenColumnCount() -1);
 }
 
 int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {

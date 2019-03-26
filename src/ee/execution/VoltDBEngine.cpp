@@ -971,6 +971,9 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                         purgedStreams[name] = streamedtable->getWrapper();
                         //Unset wrapper so it can be deleted after last push.
                         streamedtable->setWrapper(NULL);
+
+                        // do not reuse  wrapper for shadow stream
+                        m_exportingStreams[name] = NULL;
                     }
                     m_exportingTables.erase(name);
                 }
