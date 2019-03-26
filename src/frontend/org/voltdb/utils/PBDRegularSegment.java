@@ -619,9 +619,8 @@ class PBDRegularSegment extends PBDSegment {
                 final int uncompressedLen;
 
                 if (length < 1 || length > PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES) {
-                    LOG.warn("File corruption detected in " + m_file.getName() + ": invalid entry length. "
-                            + "Truncate the file to last safe point.");
-                    truncateToCurrentReadIndex();
+                    handleCorruptHeader("File corruption detected in " + m_file.getName() + ": invalid entry length.",
+                            checkCRC);
                     return null;
                 }
 
@@ -680,6 +679,18 @@ class PBDRegularSegment extends PBDSegment {
             } finally {
                 m_readOffset = m_fc.position();
                 m_fc.position(writePos);
+            }
+        }
+
+        private void handleCorruptHeader(String message, boolean checkCrc) throws IOException {
+            if (checkCrc) {
+                message += " Truncate the file to last safe point.";
+            }
+            LOG.warn(message);
+            if (checkCrc) {
+                truncateToCurrentReadIndex();
+            } else {
+                throw new IOException(message);
             }
         }
 
