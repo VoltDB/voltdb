@@ -962,7 +962,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                 // FIXME: factorize deletion logic in common method
                 auto streamedtable = persistenttable->getStreamedTable();
                 if (streamedtable) {
-                    VOLT_TRACE("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
+                    VOLT_DEBUG("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
                     const std::string& name = streamedtable->name();
                     streamedtable->setGeneration(timestamp);
                     //Maintain the streams that will go away for which wrapper needs to be cleaned;
@@ -971,9 +971,6 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                         purgedStreams[name] = streamedtable->getWrapper();
                         //Unset wrapper so it can be deleted after last push.
                         streamedtable->setWrapper(NULL);
-
-                        // do not reuse  wrapper for shadow stream
-                        m_exportingStreams[name] = NULL;
                     }
                     m_exportingTables.erase(name);
                 }
@@ -1146,7 +1143,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 PersistentTable *persistentTable = tcd->getPersistentTable();
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
-                    VOLT_TRACE("setting up shadow stream for %s", persistentTable->name().c_str());
+                    VOLT_DEBUG("setting up shadow stream for %s", persistentTable->name().c_str());
                 }
             }
             if (streamedTable) {
@@ -1218,7 +1215,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 // Check if this table has a companion stream
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
-                    VOLT_TRACE("UPDATING companion stream for %s", persistentTable->name().c_str());
+                    VOLT_DEBUG("Updating companion stream for %s", persistentTable->name().c_str());
                 }
                 tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
             }
@@ -1288,6 +1285,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
                 // update exporting tables with new stream
                 StreamedTable* stream = tcd->getStreamedTable();
+                if (!stream) {
+                   PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(tcd->getTable());
+                   if (persistenttable) {
+                       stream = persistenttable->getStreamedTable();
+                   }
+                }
                 if (stream) {
                     m_exportingTables[stream->name()] = stream;
                 }
@@ -1497,7 +1500,7 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
                                         timestamp,
                                         streamName);
         streamedTable->setWrapper(wrapper);
-        VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
+        VOLT_DEBUG("created stream export wrapper stream %s", streamName.c_str());
     } else {
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
         // A case when exact same stream is dropped and added.

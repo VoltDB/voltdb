@@ -1403,7 +1403,6 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
 
     // Make sure that they are not trying to delete the same tuple twice
     assert(target.isActive());
-
     deleteFromAllIndexes(&target);
     deleteTupleFinalize(target); // also frees object columns
 }
@@ -2460,10 +2459,12 @@ void PersistentTable::migratingUndo(TableTuple& tuple) {
         if (!txnId.isNull()) {
             // Add the index back
             migratingAdd(ValuePeeker::peekBigInt(txnId), tuple);
+            VOLT_DEBUG("Undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
         } else {
             // Remove the index
             ExecutorContext* ec = ExecutorContext::getExecutorContext();
             migratingRemove(ec->currentSpHandle(), tuple);
+            VOLT_DEBUG("Undo remove migrating index for TxnId %ld", (long)ec->currentSpHandle());
         }
     }
 }
@@ -2493,11 +2494,15 @@ int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxR
             } while (deletedRows <= maxRowCount && currIt->first <= it->first);
 
             int32_t remainingRows = 0;
-            while (currIt->first < it->first) {
+            while (currIt->first <= it->first) {
                 MigratingBatch& batch = currIt->second;
                 remainingRows += batch.size();
                 currIt++;
+                if (currIt == m_migratingRows.end()) {
+                    break;
+                }
             }
+            VOLT_DEBUG("Migrated rows to be deleted: %d, deleted: %d", remainingRows, deletedRows);
             return remainingRows;
         }
     }

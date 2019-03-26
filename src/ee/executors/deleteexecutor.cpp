@@ -133,8 +133,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
                     // delete migrating index if needed
                     if (targetTable->getStreamedTable() != nullptr) {
-                        uint16_t migrateColumnIndex = targetTuple.getSchema()->hiddenColumnCount() -1;
-                        NValue txnId = targetTuple.getHiddenNValue(migrateColumnIndex);
+                        NValue txnId = targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex());
                         if (!txnId.isNull()) {
                             VOLT_DEBUG("Delete migrating index for txnId: %ld", (long)(ValuePeeker::peekBigInt(txnId)));
                             targetTable->migratingRemove(ValuePeeker::peekBigInt(txnId), targetTuple);

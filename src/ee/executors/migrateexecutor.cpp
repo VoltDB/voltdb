@@ -127,7 +127,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             assert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
-            uint16_t migrateColumnIndex = targetTuple.getSchema()->hiddenColumnCount() -1;
+            uint16_t migrateColumnIndex = targetTable->getMigrateColumnIndex();
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
                 // tuple to update in the target table.

@@ -73,17 +73,20 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+    public VoltTable run(SystemProcedureExecutionContext ctx,
                            String tableName,            // Name of table that can have rows deleted
                            long deletableTxnId,         // All rows with TxnIds before this can be deleted
                            int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
     {
-        VoltTable[] result = null;
+        VoltTable result = null;
 
         try {
-            result = createAndExecuteSysProcPlan(SysProcFragmentId.PF_migrateRows,
+            VoltTable [] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_migrateRows,
                     SysProcFragmentId.PF_migrateRowsAggregate,
                     ParameterSet.fromArrayNoCopy(tableName, deletableTxnId, maxRowCount));
+            if (results != null && results.length != 0) {
+                result = results[0];
+            }
         } catch (Exception ex) {
             exportLog.warn(String.format("Migrating delete error on table %s, error: %s", tableName, ex.getMessage()));
         }
