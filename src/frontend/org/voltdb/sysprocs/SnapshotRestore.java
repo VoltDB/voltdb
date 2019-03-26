@@ -827,7 +827,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                                   preserveDRHiddenColumn,
                                                                                   preserveViewHiddenColumn,
-                                                                                  preserveMigrateHiddenColumn);
+                                                                                  preserveMigrateHiddenColumn,
+                                                                                  isRecover);
                         }
 
                         if (needsConversion) {
@@ -836,7 +837,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                      preserveDRHiddenColumn,
                                                                      preserveViewHiddenColumn,
-                                                                     preserveMigrateHiddenColumn);
+                                                                     preserveMigrateHiddenColumn,
+                                                                     isRecover);
                         } else {
                             ByteBuffer copy = ByteBuffer.allocate(c.b().remaining());
                             copy.put(c.b());
@@ -2211,7 +2213,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         needsConversion = SavedTableConverter.needsConversion(oldTable, newCatalogTable,
                                                                               preserveDRHiddenColumn,
                                                                               preserveViewHiddenColumn,
-                                                                              preserveMigrateHiddenColumn);
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
                     final VoltTable oldTable = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
@@ -2219,7 +2222,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         table = SavedTableConverter.convertTable(oldTable, newCatalogTable,
                                                                  preserveDRHiddenColumn,
                                                                  preserveViewHiddenColumn,
-                                                                 preserveMigrateHiddenColumn);
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = oldTable;
                     }
@@ -2411,7 +2415,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                               preserveDRHiddenColumn,
                                                                               preserveViewHiddenColumn,
-                                                                              preserveMigrateHiddenColumn);
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b(), true);
@@ -2419,7 +2424,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                  preserveDRHiddenColumn,
                                                                  preserveViewHiddenColumn,
-                                                                 preserveMigrateHiddenColumn);
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = old_table;
                     }
