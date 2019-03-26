@@ -1107,10 +1107,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public int writeTruncatedObject(ByteBuffer output) {
+        public int writeTruncatedObject(ByteBuffer output, int entryId) {
             int objectSize = m_retval.remaining();
             // write entry header
-            PBDUtils.writeEntryHeader(m_crc, output, m_retval, objectSize, PBDSegment.NO_FLAGS);
+            PBDUtils.writeEntryHeader(m_crc, output, m_retval, entryId, PBDSegment.NO_FLAGS);
             // write buffer after resetting position changed by writeEntryHeader
             // Note: cannot do this in writeEntryHeader as it breaks JUnit tests
             m_retval.position(0);
@@ -1140,14 +1140,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
-        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+        public int writeTruncatedObject(ByteBuffer output, int entryId) throws IOException {
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             int bytesWritten = MiscUtils.writeDeferredSerialization(output, m_ds);
             output.flip();
             output.position(PBDSegment.ENTRY_HEADER_BYTES);
             ByteBuffer header = output.duplicate();
             header.position(PBDSegment.ENTRY_HEADER_START_OFFSET);
-            PBDUtils.writeEntryHeader(m_crc32, header, output, bytesWritten, PBDSegment.NO_FLAGS);
+            PBDUtils.writeEntryHeader(m_crc32, header, output, entryId, PBDSegment.NO_FLAGS);
             if (m_truncationCallback != null) {
                 m_truncationCallback.bytesWritten(bytesWritten);
             }
