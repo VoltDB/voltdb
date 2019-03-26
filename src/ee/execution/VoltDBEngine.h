@@ -697,11 +697,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExportTupleStream* m_newestExportStreamWithPendingRows;
 
         /*
-         * Map of table signatures to exporting stream wrappers.
-         */
-        std::map<std::string, ExportTupleStream*> m_exportingStreams;
-
-        /*
          * Only includes non-materialized tables
          */
         boost::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;

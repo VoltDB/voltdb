@@ -225,7 +225,6 @@ public class ExportSequenceNumberTracker {
      *         otherwise return null
      */
     public Pair<Long, Long> getRangeContaining(long seq) {
-        assert (!m_map.isEmpty());
         Range<Long> range = m_map.rangeContaining(seq);
         if (range != null) {
             return new Pair<Long, Long>(start(range), end(range));

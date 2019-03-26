@@ -743,7 +743,10 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
             int64_t seqNo;
             size_t streamBytesUsed;
             existingStreamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
-            ExportTupleStream* wrapper = new ExportTupleStream(*existingStreamedTable->getWrapper());
+            ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
+            // There should be no pending buffer at the time of UAC
+            assert(wrapper->getCurrBlock() == NULL || wrapper->getCurrBlock()->getRowCount() == 0);
+            existingStreamedTable->setWrapper(NULL);
             newStreamedTable->setWrapper(wrapper);
             newStreamedTable->setExportStreamPositions(seqNo, streamBytesUsed);
             migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
