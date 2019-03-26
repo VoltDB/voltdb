@@ -193,10 +193,6 @@ public class VoltPlanner implements Planner {
         m_state = State.STATE_1_READY;
     }
 
-    public SqlToRelConverter getSqlToRelConverter() {
-        return m_sqlToRelConverter;
-    }
-
     @Override public void reset() {
         m_validatedSqlNode = null;
         m_relRoot = null;
@@ -277,7 +273,7 @@ public class VoltPlanner implements Planner {
         m_relRoot = m_relRoot.withRel(RelDecorrelator.decorrelateQuery(m_relRoot.rel, m_relBuilder));
 
         // For each node, projects only the fields required by its consumer
-        m_relRoot = m_relRoot.withRel(getSqlToRelConverter().trimUnusedFields(true, m_relRoot.rel));
+        m_relRoot = m_relRoot.withRel(m_sqlToRelConverter.trimUnusedFields(true, m_relRoot.rel));
 
         m_state = State.STATE_3_CONVERTED;
         return m_relRoot;
