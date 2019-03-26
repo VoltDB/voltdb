@@ -29,6 +29,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
+import java.rmi.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,10 +44,7 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
@@ -59,14 +57,12 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SerializationHelper;
+import org.voltdb.utils.*;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -1496,5 +1492,98 @@ public class RegressionSuite extends TestCase {
                     alternatingKeysAndValues[ii+1]);
         }
         return properties;
+    }
+
+    /**
+     * Test environment with configured schema and server.
+     */
+    public static class RegresssionEnv {
+        final VoltProjectBuilder m_builder;
+        LocalCluster m_cluster;
+        public Client m_client = null;
+
+        public RegresssionEnv(String ddlText, String pathToCatalog, String pathToDeployment,
+                int siteCount, int hostCount, int kFactor, boolean debug) {
+
+            m_builder = new VoltProjectBuilder();
+            //Increase query tmeout as long literal queries taking long time.
+            m_builder.setQueryTimeout(60000);
+            try {
+                m_builder.addLiteralSchema(ddlText);
+
+                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
+                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                fail("Failed to set up schema");
+            }
+
+            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
+                    BackendTarget.NATIVE_EE_JNI,
+                    LocalCluster.FailureState.ALL_RUNNING,
+                    debug);
+            m_cluster.setHasLocalServer(true);
+            boolean success = m_cluster.compile(m_builder);
+            assert(success);
+
+            try {
+                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
+            }
+            catch (Exception e) {
+                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
+            }
+        }
+
+        public void setUp() {
+            m_cluster.startUp();
+
+            try {
+                // do the test
+                m_client = ClientFactory.createClient();
+                m_client.createConnection("localhost", m_cluster.port(0));
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
+            } catch (IOException e) {
+                e.printStackTrace();
+                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
+            }
+        }
+
+        public void tearDown() {
+            if (m_client != null) {
+                try {
+                    m_client.close();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to close client");
+                }
+            }
+            m_client = null;
+
+            if (m_cluster != null) {
+                try {
+                    m_cluster.shutDown();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to shut down cluster");
+                }
+            }
+            m_cluster = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+
+        public boolean isValgrind() {
+            if (m_cluster != null)
+                return m_cluster.isValgrind();
+            return true;
+        }
+
+        public boolean isMemcheckDefined() {
+            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
+        }
     }
 }

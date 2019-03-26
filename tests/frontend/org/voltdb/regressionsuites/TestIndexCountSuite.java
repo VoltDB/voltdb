@@ -24,12 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -46,7 +44,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
-    void callWithExpectedCount(Client client,int count, String procName, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+    void callWithExpectedCount(Client client,int count, String procName, Object... params) throws IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
@@ -426,6 +424,10 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (3, 14, 3, 7);");
         callAdHocFilterWithExpectedCount(client, "T_ENG_11096", "a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1;", 2);
         callAdHocFilterWithExpectedCount(client, "T_ENG_11096", "a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT);", 3);
+    }
+
+    public void testENG15719() throws Exception {
+
     }
 
     void testENG4959Float() throws Exception {

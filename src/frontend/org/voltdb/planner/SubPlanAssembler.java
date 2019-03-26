@@ -17,13 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
@@ -2242,6 +2236,13 @@ public abstract class SubPlanAssembler {
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        if (! path.index.getPredicatejson().isEmpty()) {
+            try {
+                path.otherExprs.add(AbstractExpression.fromJSONString(path.index.getPredicatejson(), tableScan));
+            } catch (JSONException e) {
+                throw new PlanningErrorException(e.getMessage(), 0);
+            }
+        }
         scanNode.setPredicate(path.otherExprs);
         // Propagate the sorting information
         // into the scan node from the access path.
@@ -2250,13 +2251,12 @@ public abstract class SubPlanAssembler {
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
-        if (scanNode instanceof IndexSortablePlanNode) {
-            IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
-            indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
-            indexUse.setSortOrderFromIndexScan(path.sortDirection);
-            indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
-            indexUse.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
-        }
+        assert (scanNode instanceof IndexSortablePlanNode);
+        IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
+        indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
+        indexUse.setSortOrderFromIndexScan(path.sortDirection);
+        indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
+        indexUse.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
         return resultNode;
     }
 
