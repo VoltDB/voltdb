@@ -121,7 +121,7 @@ public interface BinaryDeque {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
 
-        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+        public int writeTruncatedObject(ByteBuffer output, int entryId) throws IOException {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
     }

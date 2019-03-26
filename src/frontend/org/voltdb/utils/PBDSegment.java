@@ -44,6 +44,7 @@ public abstract class PBDSegment {
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
     //  - total bytes of data (4 bytes, uncompressed size),
+    //  - random id assigned to segment ( 4 bytes )
     //  - size in bytes of extra header ( 4 bytes )
     //  - crc for the extra header ( 4 bytes )
     public static final int HEADER_START_OFFSET = 0;
@@ -51,7 +52,8 @@ public abstract class PBDSegment {
     public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
     public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
     public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
-    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_RANDOM_ID_OFFSET + 4;
     public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
     static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
     static final int HEADER_EXTRA_HEADER_OFFSET = SEGMENT_HEADER_BYTES;
@@ -62,11 +64,13 @@ public abstract class PBDSegment {
     // Export Segment Entry Header layout (each segment has multiple entries):
     //  - crc of segment entry (4 bytes),
     //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
+    //  - entry id (random segment id + entry number) (4 bytes),
     //  - entry flag (2 bytes)
     public static final int ENTRY_HEADER_START_OFFSET = 0;
     public static final int ENTRY_HEADER_CRC_OFFSET = ENTRY_HEADER_START_OFFSET;
     public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = ENTRY_HEADER_CRC_OFFSET + 4;
-    public static final int ENTRY_HEADER_FLAG_OFFSET = ENTRY_HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int ENTRY_HEADER_ENTRY_ID_OFFSET = ENTRY_HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int ENTRY_HEADER_FLAG_OFFSET = ENTRY_HEADER_ENTRY_ID_OFFSET + 4;
     public static final int ENTRY_HEADER_BYTES = ENTRY_HEADER_FLAG_OFFSET + 2;
 
     protected final File m_file;
@@ -143,7 +147,7 @@ public abstract class PBDSegment {
     // TODO: javadoc
     abstract int size();
 
-    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException;
+    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int entryNumber) throws IOException;
 
     abstract void writeExtraHeader(DeferredSerialization ds) throws IOException;
 
@@ -235,7 +239,7 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        final int written = writeTruncatedEntry(retval);
+                        final int written = writeTruncatedEntry(retval, reader.readIndex());
                         sizeInBytes += written;
                         initNumEntries(reader.readIndex(), sizeInBytes);
                         m_fc.truncate(partialEntryBeginOffset + written + ENTRY_HEADER_BYTES);
