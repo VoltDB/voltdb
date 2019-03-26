@@ -108,8 +108,6 @@ class PBDRegularSegment extends PBDSegment {
             m_entryHeaderBuf.discard();
             m_entryHeaderBuf = null;
         }
-        m_crc.reset();
-        m_crc.reset();
     }
 
     @Override
@@ -571,7 +569,7 @@ class PBDRegularSegment extends PBDSegment {
         private int m_bytesRead = 0;
         private int m_discardCount = 0;
         private boolean m_readerClosed = false;
-        private CRC32 m_crc32 = new CRC32();
+        private CRC32 m_crcReader = new CRC32();
 
         public SegmentReader(String cursorId) throws IOException {
             assert(cursorId != null);
@@ -704,13 +702,13 @@ class PBDRegularSegment extends PBDSegment {
             entry.position(origPosition);
 
             if (checkCrc) {
-                m_crc32.reset();
-                m_crc32.update(length);
-                m_crc32.update(flags);
-                m_crc32.update(entry);
+                m_crcReader.reset();
+                m_crcReader.update(length);
+                m_crcReader.update(flags);
+                m_crcReader.update(entry);
                 entry.position(origPosition);
 
-                if (crc != (int) m_crc32.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
+                if (crc != (int) m_crcReader.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
                     LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
                             + "Truncate the file to last safe point.");
                     truncateToCurrentReadIndex();
