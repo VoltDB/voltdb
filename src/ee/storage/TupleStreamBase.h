@@ -50,6 +50,7 @@ class TupleStreamBase {
 public:
 
     TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace, int maxBufferSize = -1);
+    TupleStreamBase(const TupleStreamBase &another);
 
     virtual ~TupleStreamBase()
     {
@@ -164,6 +165,26 @@ TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
       m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
+{}
+
+template <class SB>
+TupleStreamBase<SB>::TupleStreamBase(const TupleStreamBase &another)
+    : m_flushInterval(another.m_flushInterval),
+      m_lastFlush(another.m_lastFlush),
+      m_defaultCapacity(another.m_defaultCapacity),
+      m_maxCapacity(another.m_maxCapacity),
+      m_uso(another.m_uso),
+      m_currBlock(NULL),
+      // snapshot restores will call load table which in turn
+      // calls appendTupple with LONG_MIN transaction ids
+      // this allows initial ticks to succeed after rejoins
+      m_openSpHandle(another.m_openSpHandle),
+      m_openUniqueId(another.m_openUniqueId),
+      m_openTransactionUso(another.m_openTransactionUso),
+      m_committedSpHandle(another.m_committedSpHandle),
+      m_committedUso(another.m_committedUso),
+      m_committedUniqueId(another.m_committedUniqueId),
+      m_headerSpace(another.m_headerSpace)
 {}
 
 template <class SB>

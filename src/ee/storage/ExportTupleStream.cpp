@@ -50,7 +50,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
 }
 
 ExportTupleStream::ExportTupleStream(const ExportTupleStream &otherStream)
-    : TupleStreamBase(EL_BUFFER_SIZE, s_EXPORT_BUFFER_HEADER_SIZE),
+    : TupleStreamBase(otherStream),
       m_partitionId(otherStream.m_partitionId),
       m_siteId(otherStream.m_siteId),
       m_generation(otherStream.m_generation),
@@ -241,9 +241,6 @@ void ExportTupleStream::removeFromFlushList(VoltDBEngine* engine, bool moveToTai
 
 /*
  * Handoff fully committed blocks to the top end.
- *
- * This is the only function that should modify m_openSpHandle,
- * m_openTransactionUso.
  */
 void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentSpHandle, int64_t uniqueId)
 {
