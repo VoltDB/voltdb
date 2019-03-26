@@ -94,7 +94,7 @@ public:
     void pushPendingBlocks();
     void discardBlock(SB *sb);
 
-    const SB* getCurrBlockForTest() const {
+    const SB* getCurrBlock() const {
         return m_currBlock;
     }
 
