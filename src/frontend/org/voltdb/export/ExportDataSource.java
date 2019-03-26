@@ -1147,6 +1147,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
                                 first_unpolled_block.committedSequenceNumber(),
                                 m_migrateRowsDeleter);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Posting Export data for " + ackingContainer.toString());
+                }
                 try {
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1273,6 +1276,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                       m_schemaCont.discard();
                   }
             }
+        }
+
+        @Override
+        public String toString() {
+            return new String("Container: ending at " + m_lastSeqNo + " (Committed " + m_commitSeqNo + ")");
         }
     }
 
