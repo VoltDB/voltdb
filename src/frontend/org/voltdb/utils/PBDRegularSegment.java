@@ -32,6 +32,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
@@ -51,6 +52,8 @@ import com.google_voltpatches.common.base.Preconditions;
 class PBDRegularSegment extends PBDSegment {
     private static final int VERSION = 2;
     private static final VoltLogger LOG = new VoltLogger("HOST");
+    private static final Random RANDOM = new Random();
+
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
@@ -63,6 +66,7 @@ class PBDRegularSegment extends PBDSegment {
     private int m_numOfEntries = -1;
     private int m_size = -1;
     private boolean m_compress;
+    private int m_segmentRandomId;
     private int m_extraHeaderSize = 0;
     // Not guaranteed to be valid unless m_extraHeaderSize > 0
     private int m_extraHeaderCrc = 0;
@@ -191,6 +195,7 @@ class PBDRegularSegment extends PBDSegment {
             initNumEntries(0, 0);
             m_compress = compress;
             m_isActive = true;
+            m_segmentRandomId = RANDOM.nextInt();
         }
         if (forWrite) {
             m_fc.position(m_fc.size());
@@ -230,10 +235,12 @@ class PBDRegularSegment extends PBDSegment {
                 int crc = b.getInt();
                 int numOfEntries = b.getInt();
                 int size = b.getInt();
+                int segmentRandomId = b.getInt();
                 int extraHeaderSize = b.getInt();
                 int extraHeaderCrc = b.getInt();
                 if (crcCheck) {
-                    if (crc != calculateSegmentHeaderCrc(numOfEntries, size, extraHeaderSize, extraHeaderCrc)) {
+                    if (crc != calculateSegmentHeaderCrc(numOfEntries, size, segmentRandomId, extraHeaderSize,
+                            extraHeaderCrc)) {
                         LOG.warn("File corruption detected in " + m_file.getName() + ": invalid file header. ");
                         throw new IOException(
                                 "File corruption detected in " + m_file.getName() + ": invalid file header.");
@@ -258,6 +265,7 @@ class PBDRegularSegment extends PBDSegment {
                 }
                 m_numOfEntries = numOfEntries;
                 m_size = size;
+                m_segmentRandomId = segmentRandomId;
                 m_extraHeaderSize = extraHeaderSize;
                 m_extraHeaderCrc = extraHeaderCrc;
             } else {
@@ -272,7 +280,8 @@ class PBDRegularSegment extends PBDSegment {
     }
 
     private void writeOutHeader() throws IOException {
-        int crc = calculateSegmentHeaderCrc(m_numOfEntries, m_size, m_extraHeaderSize, m_extraHeaderCrc);
+        int crc = calculateSegmentHeaderCrc(m_numOfEntries, m_size, m_segmentRandomId, m_extraHeaderSize,
+                m_extraHeaderCrc);
 
         ByteBuffer b = m_segmentHeaderBuf.b();
         b.clear();
@@ -281,6 +290,7 @@ class PBDRegularSegment extends PBDSegment {
         b.putInt(crc);
         b.putInt(m_numOfEntries);
         b.putInt(m_size);
+        b.putInt(m_segmentRandomId);
         b.putInt(m_extraHeaderSize);
         b.putInt(m_extraHeaderCrc);
         b.flip();
@@ -288,11 +298,13 @@ class PBDRegularSegment extends PBDSegment {
         m_syncedSinceLastEdit = false;
     }
 
-    private int calculateSegmentHeaderCrc(int numOfEntries, int size, int extraHeaderSize, int extraHeaderCrc) {
+    private int calculateSegmentHeaderCrc(int numOfEntries, int size, int segmentRandomId, int extraHeaderSize,
+            int extraHeaderCrc) {
         m_crc.reset();
         m_crc.update(VERSION);
         m_crc.update(numOfEntries);
         m_crc.update(size);
+        m_crc.update(segmentRandomId);
         m_crc.update(extraHeaderSize);
         if (extraHeaderSize > 0) {
             m_crc.update(extraHeaderCrc);
@@ -423,19 +435,16 @@ class PBDRegularSegment extends PBDSegment {
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = cont;
         try {
-            m_crc.reset();
             m_entryHeaderBuf.b().clear();
 
             if (compress) {
                 destBuf = DBBPool.allocateDirectAndPool(maxCompressedSize);
                 final int compressedSize = CompressionService.compressBuffer(buf, destBuf.b());
                 destBuf.b().limit(compressedSize);
-                PBDUtils.writeEntryHeader(m_crc, m_entryHeaderBuf.b(), destBuf.b(),
-                        compressedSize, FLAG_COMPRESSED);
+                writeEntryHeader(destBuf.b(), PBDSegment.FLAG_COMPRESSED);
             } else {
                 destBuf = cont;
-                PBDUtils.writeEntryHeader(m_crc, m_entryHeaderBuf.b(), destBuf.b(),
-                        remaining, NO_FLAGS);
+                writeEntryHeader(destBuf.b(), PBDSegment.NO_FLAGS);
             }
             // Write entry header
             m_entryHeaderBuf.b().flip();
@@ -476,13 +485,11 @@ class PBDRegularSegment extends PBDSegment {
         DBBPool.BBContainer destBuf = DBBPool.allocateDirectAndPool(fullSize);
 
         try {
-            m_crc.reset();
             m_entryHeaderBuf.b().clear();
             final int written = MiscUtils.writeDeferredSerialization(destBuf.b(), ds);
             destBuf.b().flip();
             // Write entry header
-            PBDUtils.writeEntryHeader(m_crc, m_entryHeaderBuf.b(), destBuf.b(),
-                    written, PBDSegment.NO_FLAGS);
+            writeEntryHeader(destBuf.b(), PBDSegment.NO_FLAGS);
             m_entryHeaderBuf.b().flip();
             while (m_entryHeaderBuf.b().hasRemaining()) {
                 m_fc.write(m_entryHeaderBuf.b());
@@ -500,19 +507,23 @@ class PBDRegularSegment extends PBDSegment {
         }
     }
 
+    private void writeEntryHeader(ByteBuffer data, char flags) {
+        PBDUtils.writeEntryHeader(m_crc, m_entryHeaderBuf.b(), data, m_segmentRandomId + m_numOfEntries + 1, flags);
+    }
+
     @Override
     int size() {
         return m_size;
     }
 
     @Override
-    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException
+    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int entryNumber) throws IOException
     {
         int written = 0;
         final DBBPool.BBContainer partialCont =
                 DBBPool.allocateDirect(ENTRY_HEADER_BYTES + entry.getTruncatedBuffSize());
         try {
-            written += entry.writeTruncatedObject(partialCont.b());
+            written += entry.writeTruncatedObject(partialCont.b(), m_segmentRandomId + entryNumber);
             partialCont.b().flip();
 
             while (partialCont.b().hasRemaining()) {
@@ -613,6 +624,7 @@ class PBDRegularSegment extends PBDSegment {
                 b.flip();
                 final int entryCRC = b.getInt();
                 final int length = b.getInt();
+                final int entryId = b.getInt();
                 final char flags = b.getChar();
                 final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
                 final int uncompressedLen;
@@ -623,11 +635,17 @@ class PBDRegularSegment extends PBDSegment {
                     return null;
                 }
 
+                if (entryId != m_segmentRandomId + m_objectReadIndex + 1) {
+                    handleCorruptHeader("File corruption detected in " + m_file.getName() + ": invalid entry id.",
+                            checkCRC);
+                    return null;
+                }
+
                 final DBBPool.BBContainer retcont;
                 if (compressed) {
                     final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
                     try {
-                        if (!fillBuffer(compressedBuf.b(), flags, entryCRC, checkCRC)) {
+                        if (!fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCRC)) {
                             return null;
                         }
 
@@ -642,7 +660,7 @@ class PBDRegularSegment extends PBDSegment {
                     uncompressedLen = length;
                     retcont = factory.getContainer(length);
                     retcont.b().limit(length);
-                    if (!fillBuffer(retcont.b(), flags, entryCRC, checkCRC)) {
+                    if (!fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCRC)) {
                         retcont.discard();
                         return null;
                     }
@@ -693,9 +711,9 @@ class PBDRegularSegment extends PBDSegment {
             }
         }
 
-        private boolean fillBuffer(ByteBuffer entry, int flags, int crc, boolean checkCrc) throws IOException {
+        private boolean fillBuffer(ByteBuffer entry, int entryId, char flags, int crc, boolean checkCrc)
+                throws IOException {
             int origPosition = entry.position();
-            int length = entry.remaining();
             while (entry.hasRemaining()) {
                 int read = m_fc.read(entry);
                 if (read == -1) {
@@ -712,18 +730,14 @@ class PBDRegularSegment extends PBDSegment {
             entry.position(origPosition);
 
             if (checkCrc) {
-                m_crcReader.reset();
-                m_crcReader.update(length);
-                m_crcReader.update(flags);
-                m_crcReader.update(entry);
-                entry.position(origPosition);
-
-                if (crc != (int) m_crcReader.getValue() || INJECT_PBD_CHECKSUM_ERROR) {
+                if (crc != PBDUtils.calculateEntryCrc(m_crcReader, entry, entryId, flags)
+                        || INJECT_PBD_CHECKSUM_ERROR) {
                     LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
                             + "Truncate the file to last safe point.");
                     truncateToCurrentReadIndex();
                     return false;
                 }
+                entry.position(origPosition);
             }
 
             return true;
