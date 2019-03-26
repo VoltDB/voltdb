@@ -530,14 +530,14 @@ TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
 TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
 {
     int tuples_to_fill = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
-    const StreamBlock *firstBlock = m_wrapper.getCurrBlockForTest();
+    const StreamBlock *firstBlock = m_wrapper.getCurrBlock();
     const StreamBlock *secondBlock = NULL;
 
     // fill one large buffer
     for (;;) {
         appendTuple(0, 1);
-        if (m_wrapper.getCurrBlockForTest() != firstBlock) {
-            secondBlock = m_wrapper.getCurrBlockForTest();
+        if (m_wrapper.getCurrBlock() != firstBlock) {
+            secondBlock = m_wrapper.getCurrBlock();
             EXPECT_EQ(LARGE_STREAM_BLOCK, secondBlock->type());
             break;
         }
@@ -553,8 +553,8 @@ TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
     m_wrapper.endTransaction(addPartitionId(2));
 
     // make sure we rolled, and the new buffer is a large buffer
-    EXPECT_NE(secondBlock, m_wrapper.getCurrBlockForTest());
-    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.getCurrBlockForTest()->type());
+    EXPECT_NE(secondBlock, m_wrapper.getCurrBlock());
+    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.getCurrBlock()->type());
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
@@ -758,8 +758,8 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
         appendTuple(1, 2);
     }
     m_wrapper.endTransaction(addPartitionId(2));
-    ASSERT_TRUE(m_wrapper.getCurrBlockForTest());
-    ASSERT_TRUE(m_wrapper.getCurrBlockForTest()->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
+    ASSERT_TRUE(m_wrapper.getCurrBlock());
+    ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
 
     appendTuple(2, 3);
 
@@ -771,7 +771,7 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     for (int i = 1; i < tuples_to_fill; i++) {
         appendTuple(2, 3);
     }
-    ASSERT_TRUE(m_wrapper.getCurrBlockForTest()->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
+    ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
 
     appendTuple(2, 3);
     m_wrapper.endTransaction(addPartitionId(3));

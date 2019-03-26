@@ -642,7 +642,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferRowByRow)
     }
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
-    ASSERT_EQ(m_wrapper->getCurrBlockForTest()->getRowCount(), 3);
+    ASSERT_EQ(m_wrapper->getCurrBlock()->getRowCount(), 3);
     ASSERT_TRUE(checkTargetFlushTime(1));
     periodicFlush(-1, 3);
     ASSERT_TRUE(testNoStreamsToFlush());
@@ -676,7 +676,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBufferByTxn)
     rollbackExportTo(lastAppendTupleMarker);
 
     ASSERT_FALSE(m_topend.receivedExportBuffer);
-    ASSERT_EQ(m_wrapper->getCurrBlockForTest()->getRowCount(), 3);
+    ASSERT_EQ(m_wrapper->getCurrBlock()->getRowCount(), 3);
     ASSERT_TRUE(checkTargetFlushTime(1));
     periodicFlush(-1, 3);
     ASSERT_TRUE(testNoStreamsToFlush());
@@ -721,14 +721,14 @@ TEST_F(ExportTupleStreamTest, PartialRollback)
     m_wrapper->rollbackExportTo(mark, seqNo);
     ASSERT_TRUE(checkTargetFlushTime(1));
     commit(11);
-    EXPECT_GT(m_wrapper->getCurrBlockForTest()->getRowCount(), 0);
+    EXPECT_GT(m_wrapper->getCurrBlock()->getRowCount(), 0);
     // Commit flushes the first buffer but leaves the tail of 11 (single row) as m_currBlock
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     m_wrapper->periodicFlush(-1, 11);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<ExportStreamBlock> results = m_topend.exportBlocks.front();
     m_topend.exportBlocks.pop_front();
-    EXPECT_EQ(m_wrapper->getCurrBlockForTest()->getRowCount(), 0);
+    EXPECT_EQ(m_wrapper->getCurrBlock()->getRowCount(), 0);
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
     EXPECT_EQ(results->getRowCount(), m_tuplesToFill);
