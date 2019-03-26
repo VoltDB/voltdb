@@ -276,6 +276,9 @@ public class VoltPlanner implements Planner {
 
         m_relRoot = m_relRoot.withRel(RelDecorrelator.decorrelateQuery(m_relRoot.rel, m_relBuilder));
 
+        // For each node, projects only the fields required by its consumer
+        m_relRoot = m_relRoot.withRel(getSqlToRelConverter().trimUnusedFields(true, m_relRoot.rel));
+
         m_state = State.STATE_3_CONVERTED;
         return m_relRoot;
     }

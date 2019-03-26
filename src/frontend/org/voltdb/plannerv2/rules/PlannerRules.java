@@ -26,7 +26,6 @@ import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
@@ -119,7 +118,6 @@ public class PlannerRules {
             FilterProjectTransposeRule.INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
-            ProjectJoinTransposeRule.INSTANCE,
             // combining two non-distinct SetOps into a single
             UnionMergeRule.INSTANCE,
             UnionMergeRule.INTERSECT_INSTANCE,

@@ -305,34 +305,34 @@ public class TestInlineRules extends Plannerv2TestCase {
     public void testJoin() {
         m_tester.sql("select R1.i, R2.v from R1, R2 " +
                 "where R2.si = R1.i and R2.v = 'foo'")
-                .transform("VoltPhysicalCalc(expr#0..11=[{inputs}], I=[$t0], V=[$t11], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=(CAST($7):INTEGER, $0)], joinType=[inner], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], I=[$t0], V=[$t2], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[=(CAST($1):INTEGER, $0)], joinType=[inner], split=[1])\n" +
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], SI=[$t1], V=[$t5], $condition=[$t7])\n")
                 .pass();
 
         m_tester.sql("select R1.i, R2.v from R1 inner join R2 " +
                 "on R2.si = R1.i where R2.v = 'foo'")
-                .transform("VoltPhysicalCalc(expr#0..12=[{inputs}], I=[$t0], V=[$t11], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($12, $0)], joinType=[inner], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=['foo'], expr#8=[=($t5, $t7)], proj#0..6=[{exprs}], $condition=[$t8])\n")
+                .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[=($2, $0)], joinType=[inner], split=[1])\n" +
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=['foo'], expr#8=[=($t5, $t7)], V=[$t5], SI0=[$t6], $condition=[$t8])\n")
                 .pass();
 
         m_tester.sql("select R2.si, R1.i from R1 inner join " +
                 "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i")
-                .transform("VoltPhysicalCalc(expr#0..12=[{inputs}], SI=[$t8], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[AND(=($7, $6), >($2, $7))], joinType=[inner], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..6=[{exprs}], $condition=[$t8])\n" +
-                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n")
+                .transform("VoltPhysicalCalc(expr#0..6=[{inputs}], SI=[$t5], I=[$t0], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[AND(=($4, $3), >($2, $4))], joinType=[inner], split=[1])\n" +
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..2=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
+                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..1=[{exprs}], V=[$t5], $condition=[$t7])\n")
                 .pass();
 
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.si where R1.I + R2.ti = 5")
-                .transform("VoltPhysicalCalc(expr#0..11=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[AND(=($1, $7), =(+($0, $8), 5))], joinType=[inner], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[AND(=($1, $2), =(+($0, $3), 5))], joinType=[inner], split=[1])\n" +
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], SI=[$t1], TI=[$t2])\n")
                 .pass();
     }
 
@@ -340,13 +340,13 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
                 "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'")
-                .transform("VoltPhysicalCalc(expr#0..15=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($12, $14)], joinType=[inner], split=[1])\n" +
-                        "    VoltPhysicalCalc(expr#0..12=[{inputs}], expr#13=[CAST($t12):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12], V00=[$t13], split=[1])\n" +
-                        "      VoltPhysicalJoin(condition=[=($6, $7)], joinType=[inner], split=[1])\n" +
-                        "        VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..6=[{exprs}], $condition=[$t8])\n" +
-                        "        VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..1=[{exprs}], V00=[$t5], split=[1])\n" +
+                        "      VoltPhysicalJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
+                        "        VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..1=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
+                        "        VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], I=[$t0], V=[$t5])\n" +
+                        "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], VC=[$t1], $condition=[$t4])\n")
                 .pass();
     }
 
@@ -358,10 +358,10 @@ public class TestInlineRules extends Plannerv2TestCase {
                 + "  (select * from R2 where f = 30.3) as t2 "
                 + "on t1.i = t2.i "
                 + "where t1.i = 3")
-                .transform("VoltPhysicalCalc(expr#0..11=[{inputs}], V=[$t5], V0=[$t11], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($0, $6)], joinType=[inner], split=[1])\n" +
-                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], proj#0..5=[{exprs}], $condition=[$t10])\n" +
-                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8])\n")
+                .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], V=[$t1], V0=[$t3], split=[1])\n" +
+                        "  VoltPhysicalJoin(condition=[=($0, $2)], joinType=[inner], split=[1])\n" +
+                        "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10])\n" +
+                        "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], I=[$t0], V=[$t5], $condition=[$t8])\n")
                 .pass();
     }
 }
