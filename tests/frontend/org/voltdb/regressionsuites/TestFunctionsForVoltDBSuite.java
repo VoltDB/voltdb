@@ -373,7 +373,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select SQL_ERROR(123.5E-2) from P1", "Type FLOAT can't be cast as BIGINT");
     }
 
-    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testOctetLength() throws IOException, ProcCallException {
         System.out.println("STARTING OCTET_LENGTH");
         Client client = getClient();
         ClientResponse cr;
@@ -419,7 +419,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
+    public void testPosition() throws IOException, ProcCallException {
         System.out.println("STARTING Position");
         Client client = getClient();
         ClientResponse cr;
@@ -462,7 +462,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testCharLength() throws IOException, ProcCallException {
         System.out.println("STARTING Char length");
         Client client = getClient();
         ClientResponse cr;
@@ -524,7 +524,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODE() throws IOException, ProcCallException {
         subtestDECODE();
         subtestDECODENoDefault();
         subtestDECODEVeryLong();
@@ -533,7 +533,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         subtestDECODEWithNULL();
     }
 
-    private void subtestDECODE() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODE() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE");
         Client client = getClient();
         ClientResponse cr;
@@ -629,7 +629,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void subtestDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODENoDefault() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -650,7 +650,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(null,result.getString(1));
     }
 
-    private void subtestDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEVeryLong() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE Exceed Limit");
         Client client = getClient();
         ClientResponse cr;
@@ -671,9 +671,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
-    private void subtestDECODEInlineVarcharColumn_ENG5078()
-    throws NoConnectionsException, IOException, ProcCallException
-    {
+    private void subtestDECODEInlineVarcharColumn_ENG5078() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE inline varchar column pass-through");
         Client client = getClient();
         ClientResponse cr;
@@ -732,7 +730,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void subtestDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEAsInput() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -807,7 +805,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void subtestDECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEWithNULL() throws IOException, ProcCallException {
         System.out.println("STARTING DECODE with NULL");
         Client client = getClient();
         ClientResponse cr;
@@ -1073,7 +1071,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         //* enable for debug */ System.out.println(cr.getResults()[0]);
     }
 
-    public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
+    public void testTO_TIMESTAMP() throws IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
         ClientResponse cr;
@@ -2089,7 +2087,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("Xin@VoltDB", result.getString(1));
     }
 
-    public void testConcatMoreThan2Param() throws NoConnectionsException, IOException, ProcCallException {
+    public void testConcatMoreThan2Param() throws IOException, ProcCallException {
         System.out.println("STARTING test Concat with more than two parameters");
         Client client = getClient();
         ClientResponse cr;
@@ -2244,7 +2242,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testBitwiseShift() throws NoConnectionsException, IOException, ProcCallException {
+    public void testBitwiseShift() throws IOException, ProcCallException {
         System.out.println("STARTING test bitwise shifting tests");
 
         bitwiseShiftChecker(1, 1, 1); bitwiseShiftChecker(2, -1, 1);
@@ -2314,7 +2312,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
 
-    public void testHex() throws NoConnectionsException, IOException, ProcCallException {
+    public void testHex() throws IOException, ProcCallException {
         System.out.println("STARTING test HEX function tests");
 
         Client client = getClient();
@@ -2354,7 +2352,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testBin() throws NoConnectionsException, IOException, ProcCallException {
+    public void testBin() throws IOException, ProcCallException {
         System.out.println("STARTING test BIN function tests");
 
         Client client = getClient();
@@ -2395,7 +2393,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     private void validateIPv4Addr(Client client, String tableName, String presentation, Long binary)
-            throws IOException, NoConnectionsException, ProcCallException {
+            throws IOException, ProcCallException {
         ClientResponse cr;
         VoltTable vt;
 
@@ -2473,9 +2471,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void invalidIPAddr(Client client,
-                                 String tableName,
-                                 String presentation) throws Exception {
+    private void invalidIPAddr(Client client, String tableName, String presentation) throws Exception {
         ClientResponse cr;
         VoltTable vt;
 
@@ -2514,7 +2510,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     private void validateIPv6Addr(Client client, String tableName, String presentation, short[] addr)
-            throws IOException, NoConnectionsException, ProcCallException {
+            throws IOException, ProcCallException {
         ClientResponse cr;
         VoltTable vt;
         String actual_str;
@@ -2727,7 +2723,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                         "arglebargle");
     }
 
-    public void testDateadd() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDateadd() throws IOException, ProcCallException {
         System.out.println("STARTING test DATEADD function tests");
 
         /*
