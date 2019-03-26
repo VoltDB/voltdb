@@ -39,12 +39,12 @@ public abstract class SavedTableConverter
                                           Table outputTableSchema,
                                           boolean preserveDRHiddenColumn,
                                           boolean preserveViewHiddenColumn,
-                                          boolean presereMigrateHiddenColumn,
+                                          boolean preserveMigrateHiddenColumn,
                                           boolean isRecover) {
         int columnsToMatch = inputTable.getColumnCount()
                 - (preserveDRHiddenColumn ? 1 : 0)
                 - (preserveViewHiddenColumn ? 1 : 0)
-                - (presereMigrateHiddenColumn ? 1 : 0);
+                - (preserveMigrateHiddenColumn ? 1 : 0);
         // Cannot DR views! Those two flags must not be true at the same time!
         assert((preserveDRHiddenColumn && preserveViewHiddenColumn) == false);
         // We are expecting the hidden column in inputTable
@@ -68,7 +68,7 @@ public abstract class SavedTableConverter
         }
 
         // There may be more than one hidden column. The one for migrate is the last one
-        if (presereMigrateHiddenColumn) {
+        if (preserveMigrateHiddenColumn) {
            if (!isRecover) {
                // For restore we need to mutate the migrate column to nulls
                return true;
