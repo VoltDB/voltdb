@@ -442,7 +442,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @return  segment file name
      */
     private String getSegmentFileName(long currentId, long previousId) {
-        return PbdSegmentName.createName(m_nonce, currentId, previousId);
+        return PbdSegmentName.createName(m_nonce, currentId, previousId, false);
     }
 
     /**
