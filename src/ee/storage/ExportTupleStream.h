@@ -45,8 +45,6 @@ public:
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
-    ExportTupleStream(const ExportTupleStream &otherStream);
-
     virtual ~ExportTupleStream() {
     }
 

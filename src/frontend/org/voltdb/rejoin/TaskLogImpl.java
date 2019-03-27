@@ -131,8 +131,12 @@ public class TaskLogImpl implements TaskLog {
 
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException {
-        if (message.getSpHandle() <= m_snapshotSpHandle) return;
-        if (m_closed) throw new IOException("Closed");
+        if (message.getSpHandle() <= m_snapshotSpHandle) {
+            return;
+        }
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
 
         assert(message != null);
         bufferCatchup(message.getSerializedSize());
@@ -166,14 +170,16 @@ public class TaskLogImpl implements TaskLog {
      */
     @Override
     public TransactionInfoBaseMessage getNextMessage() throws IOException {
-        if (m_closed) throw new IOException("Closed");
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
         if (m_head == null) {
             // Get another buffer asynchronously
             final Runnable r = new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        BBContainer cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                        BBContainer cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                         if (cont != null) {
                            m_headBuffers.offer(new RejoinTaskBuffer(cont));
                         }
@@ -241,7 +247,9 @@ public class TaskLogImpl implements TaskLog {
 
     private boolean m_closed = false;
     public void close(boolean synchronous) throws IOException {
-        if (m_closed) return;
+        if (m_closed) {
+            return;
+        }
         m_closed = true;
         m_es.shutdown();
         if (synchronous) {

@@ -92,7 +92,7 @@ public class StreamBlockQueue {
         m_streamName = streamName;
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 VoltDB.instance().getCatalogContext(), m_streamName);
-        m_persistentDeque = new PersistentBinaryDeque( nonce, ds, new VoltFile(path), exportLog);
+        m_persistentDeque = new PersistentBinaryDeque(nonce, ds, new VoltFile(path), exportLog, !DISABLE_COMPRESSION);
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
@@ -125,7 +125,7 @@ public class StreamBlockQueue {
             if (m_reader.isStartOfSegment()) {
                 schemaCont = m_reader.getExtraHeader(-1);
             }
-            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error("Failed to poll from persistent binary deque:" + e);
         }
@@ -275,7 +275,7 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
+        m_persistentDeque.offer(streamBlock.asBBContainer());
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
@@ -381,7 +381,8 @@ public class StreamBlockQueue {
         m_persistentDeque.close();
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 VoltDB.instance().getCatalogContext(), m_streamName);
-        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog);
+        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog,
+                !DISABLE_COMPRESSION);
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
@@ -389,22 +390,21 @@ public class StreamBlockQueue {
 
     public ExportSequenceNumberTracker scanForGap() throws IOException {
         assert(m_memoryDeque.isEmpty());
-        return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
-
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+        m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
-            public ExportSequenceNumberTracker scan(BBContainer bbc) {
+            public void scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
                 final int tupleCount = b.getInt();
                 b.order(endianness);
-                ExportSequenceNumberTracker gapTracker = new ExportSequenceNumberTracker();
-                gapTracker.append(startSequenceNumber, startSequenceNumber + tupleCount - 1);
-                return gapTracker;
+                tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
             }
 
         });
+        return tracker;
     }
 
     @Override

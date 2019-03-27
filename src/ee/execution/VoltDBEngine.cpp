@@ -1283,6 +1283,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
+                // update exporting tables with new stream
+                StreamedTable* stream = tcd->getStreamedTable();
+                if (stream) {
+                    m_exportingTables[stream->name()] = stream;
+                }
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
@@ -1482,13 +1487,12 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
                                      std::map<std::string, ExportTupleStream*> & purgedStreams,
                                      int64_t timestamp) {
     m_exportingTables[streamName] = streamedTable;
-    ExportTupleStream *wrapper = m_exportingStreams[streamName];
+    ExportTupleStream* wrapper = streamedTable->getWrapper();
     if (wrapper == NULL) {
         wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
                                         m_executorContext->m_siteId,
                                         timestamp,
                                         streamName);
-        m_exportingStreams[streamName] = wrapper;
         streamedTable->setWrapper(wrapper);
         VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
     } else {
@@ -1581,7 +1585,6 @@ void
 VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams) {
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
         if (entry.second) {
-            m_exportingStreams.erase(entry.first);
             entry.second->periodicFlush(-1L, -1L);
             entry.second->removeFromFlushList(this, false);
             entry.second->pushEndOfStream();
@@ -2248,13 +2251,15 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    BOOST_FOREACH (auto exportStream, m_exportingStreams) {
+    for (auto const &streamTable : m_exportingTables) {
+        if (streamTable.second->getWrapper()) {
 #ifndef NDEBUG
-        // A quiesce should be transactional so periodicFlush should always succeed
-        bool streamFlushed =
+            // A quiesce should be transactional so periodicFlush should always succeed
+            bool streamFlushed =
 #endif
-                exportStream.second->periodicFlush(-1, lastCommittedSpHandle);
-        assert(streamFlushed);
+            streamTable.second->getWrapper()->periodicFlush(-1, lastCommittedSpHandle);
+            assert(streamFlushed);
+        }
     }
     m_oldestExportStreamWithPendingRows = NULL;
     m_newestExportStreamWithPendingRows = NULL;
