@@ -33,18 +33,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -71,11 +66,11 @@ public class TestPersistentBinaryDeque {
     private static final String CURSOR_ID = "testPBD";
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
-    private static ByteBuffer defaultBuffer() {
+    static ByteBuffer defaultBuffer() {
         return getFilledBuffer(42);
     }
 
-    private static BBContainer defaultContainer() {
+    static BBContainer defaultContainer() {
         return DBBPool.wrapBB(defaultBuffer());
     }
 
@@ -1228,76 +1223,6 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testCorruptedEntryWithParseAndTruncate() throws Exception {
-        m_pbd.offer(defaultContainer());
-        corruptLastSegment(ByteBuffer.allocateDirect(35), -35);
-
-        runParseAndTruncateOnNewPbd();
-    }
-
-    @Test
-    public void testCorruptedEntryWithScanForGap() throws Exception {
-        m_pbd.offer(defaultContainer());
-        corruptLastSegment(ByteBuffer.allocateDirect(35), -35);
-
-        runScanForGapOnNewPbd();
-    }
-
-    @Test
-    public void testCorruptedEntryLengthWithParseAndTruncate() throws Exception {
-        // set no extraHeader so it is easier to find the first entry header
-        m_pbd.updateExtraHeader(null);
-
-        BBContainer container = defaultContainer();
-        int origLength = container.b().remaining();
-        m_pbd.offer(container);
-
-        ByteBuffer bb = ByteBuffer.allocateDirect(Integer.BYTES);
-        bb.putInt(origLength - 100);
-        bb.flip();
-        corruptLastSegment(bb, PBDSegment.SEGMENT_HEADER_BYTES + PBDSegment.ENTRY_HEADER_TOTAL_BYTES_OFFSET);
-
-        runParseAndTruncateOnNewPbd();
-    }
-
-    @Test
-    public void testCorruptedEntryLengthWithScanForGap() throws Exception {
-        // set no extraHeader so it is easier to find the first entry header
-        m_pbd.updateExtraHeader(null);
-
-        BBContainer container = defaultContainer();
-        int origLength = container.b().remaining();
-        m_pbd.offer(container);
-
-        ByteBuffer bb = ByteBuffer.allocateDirect(Integer.BYTES);
-        bb.putInt(origLength - 100);
-        bb.flip();
-        corruptLastSegment(bb, PBDSegment.SEGMENT_HEADER_BYTES + PBDSegment.ENTRY_HEADER_TOTAL_BYTES_OFFSET);
-
-        runScanForGapOnNewPbd();
-    }
-
-    @Test(expected = IOException.class)
-    public void testCorruptSegmentHeaderWithParseAndTruncate() throws Exception {
-        m_pbd.offer(defaultContainer());
-        ByteBuffer bb = ByteBuffer.allocateDirect(Integer.BYTES);
-        bb.putInt(100);
-        bb.flip();
-        corruptLastSegment(bb, PBDSegment.HEADER_NUM_OF_ENTRY_OFFSET);
-
-        runParseAndTruncateOnNewPbd();
-    }
-
-    @Test(expected = IOException.class)
-    public void testCorruptExtraHeaderWithParseAndTruncate() throws Exception {
-        m_pbd.offer(defaultContainer());
-        ByteBuffer bb = ByteBuffer.allocateDirect(40);
-        corruptLastSegment(bb, PBDSegment.HEADER_EXTRA_HEADER_OFFSET + 15);
-
-        runParseAndTruncateOnNewPbd();
-    }
-
-    @Test
     public void testCloseLastReader() throws Exception {
         BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
         pollOnceAndVerify(reader, null);
@@ -1333,44 +1258,7 @@ public class TestPersistentBinaryDeque {
         }
     }
 
-    private void runParseAndTruncateOnNewPbd() throws IOException {
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque(TEST_NONCE, m_ds, TEST_DIR, logger);
-        try {
-            pbd.parseAndTruncate(b -> null);
-            pollOnceAndVerify(pbd.openForRead(CURSOR_ID), null);
-            pbd.offer(defaultContainer());
-            pollOnceAndVerify(pbd.openForRead(CURSOR_ID), defaultBuffer());
-        } finally {
-            pbd.close();
-        }
-    }
-
-    private void runScanForGapOnNewPbd() throws IOException {
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque(TEST_NONCE, m_ds, TEST_DIR, logger);
-        try {
-            pbd.scanEntries(b -> {});
-            pollOnceAndVerify(pbd.openForRead(CURSOR_ID), null);
-            pbd.offer(defaultContainer());
-            pollOnceAndVerify(pbd.openForRead(CURSOR_ID), defaultBuffer());
-        } finally {
-            pbd.close();
-        }
-    }
-
-    private void corruptLastSegment(ByteBuffer corruptData, int position) throws Exception {
-        File file = getSegmentMap().lastEntry().getValue().file();
-        try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
-            channel.write(corruptData, position < 0 ? channel.size() + position : position);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private NavigableMap<Long, PBDSegment> getSegmentMap() throws IllegalArgumentException, IllegalAccessException {
-        return ((NavigableMap<Long, PBDSegment>) FieldUtils
-                .getDeclaredField(PersistentBinaryDeque.class, "m_segments", true).get(m_pbd));
-    }
-
-    private BBContainer pollOnceWithoutDiscard(BinaryDequeReader reader) throws IOException {
+    static BBContainer pollOnceWithoutDiscard(BinaryDequeReader reader) throws IOException {
         BBContainer schema = null;
         try {
             if (reader.isStartOfSegment()) {
@@ -1386,14 +1274,14 @@ public class TestPersistentBinaryDeque {
         }
     }
 
-    private void pollOnce(BinaryDequeReader reader) throws IOException {
+    static void pollOnce(BinaryDequeReader reader) throws IOException {
         BBContainer retval = pollOnceWithoutDiscard(reader);
         if (retval != null) {
             retval.discard();
         }
     }
 
-    private void pollOnceAndVerify(BinaryDequeReader reader, ByteBuffer destBuf) throws IOException {
+    static void pollOnceAndVerify(BinaryDequeReader reader, ByteBuffer destBuf) throws IOException {
         BBContainer retval = pollOnceWithoutDiscard(reader);
         try {
             if (destBuf == null) {
