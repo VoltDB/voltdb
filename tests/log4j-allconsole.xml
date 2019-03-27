@@ -80,6 +80,11 @@
         <level value="TRACE"/>
     </logger> -->
 
+    <logger name="org.apache.calcite.plan.RelOptPlanner">
+        <level value="TRACE"/>
+        <appender-ref ref="console"/>
+    </logger>
+
     <root>
         <priority value="info" />
         <appender-ref ref="file" />

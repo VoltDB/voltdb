@@ -36,6 +36,12 @@
         </layout>
     </appender>
 
+    <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%5p [%t] (%F:%L) - %m%n"/>
+        </layout>
+    </appender>
+
     <logger name="kafka.consumer.SimpleConsumer" additivity="false">
         <level value="ERROR"/>
     </logger>
@@ -130,9 +136,15 @@
         <appender-ref ref="console"/>
     </logger>
 
+    <logger name="org.apache.calcite.plan.RelOptPlanner">
+        <level value="TRACE"/>
+        <appender-ref ref="stdout"/>
+    </logger>
+
     <root>
         <priority value="info" />
         <appender-ref ref="file" />
         <appender-ref ref="consolefiltered" />
     </root>
+
 </log4j:configuration>
