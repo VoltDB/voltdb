@@ -745,7 +745,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
             existingStreamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
             ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
             // There should be no pending buffer at the time of UAC
-            assert(wrapper->getCurrBlock() == NULL || wrapper->getCurrBlock()->getRowCount() == 0);
+            assert(wrapper == NULL ||
+                    wrapper->getCurrBlock() == NULL ||
+                    wrapper->getCurrBlock()->getRowCount() == 0);
             existingStreamedTable->setWrapper(NULL);
             newStreamedTable->setWrapper(wrapper);
             newStreamedTable->setExportStreamPositions(seqNo, streamBytesUsed);

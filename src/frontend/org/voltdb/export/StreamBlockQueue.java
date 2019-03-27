@@ -45,19 +45,27 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    -- Segment Header ---
- *    crc(4) + numberOfEntries(4) + totalBytes(4) + extraHeaderSize(4)
- *    -- Extra Header (for export it's schema) ---
+ *    version(4) + crc(4) + numberOfEntries(4) + totalBytes(4) + segmentRandomId(4) +
+ *    extraHeaderSize(4) + extraHeaderCrc(4)
+ *
+ *    -- Export Extra Segment Header ---
  *    exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length) +
- *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) +
+ *    colType(1) + colLength(4) + ...
+ *
  *    --- Common Entry Header   ---
- *    crc(4) + length(4) + flags(4)
+ *    crc(4) + length(4) + entryId(4) + flags(2)
+ *
  *    --- Export Entry Header   ---
  *    seqNo(8) + committedSeqNo(8) + tupleCount(4) + uniqueId(8)
+ *
  *    --- Row Header      ---
  *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
  *    nullArrayLength(4) + nullArray(var length)
+ *
  *    --- Metadata        ---
  *    TxnId(8) + timestamp(8) + seqNo(8) + partitionId(8) + siteId(8) + exportOperation(1)
+ *
  *    --- Row Data        ---
  *    rowData(var length)
  *
