@@ -1288,7 +1288,7 @@ public class TestPersistentBinaryDeque {
         runScanForGapOnNewPbd();
     }
 
-    @Test(expected = IOException.class)
+    @Test
     public void testCorruptSegmentHeaderWithParseAndTruncate() throws Exception {
         m_pbd.offer(defaultContainer());
         ByteBuffer bb = ByteBuffer.allocateDirect(Integer.BYTES);
@@ -1299,7 +1299,7 @@ public class TestPersistentBinaryDeque {
         runParseAndTruncateOnNewPbd();
     }
 
-    @Test(expected = IOException.class)
+    @Test
     public void testCorruptExtraHeaderWithParseAndTruncate() throws Exception {
         m_pbd.offer(defaultContainer());
         ByteBuffer bb = ByteBuffer.allocateDirect(40);

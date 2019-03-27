@@ -614,11 +614,8 @@ class PBDRegularSegment extends PBDSegment {
                 //Get the length and size prefix and then read the object
                 ByteBuffer b = m_entryHeaderBuf.b();
                 b.clear();
-                while (b.hasRemaining()) {
-                    int read = m_fc.read(b);
-                    if (read == -1) {
-                        throw new EOFException();
-                    }
+                if (!read(b, checkCRC)) {
+                    return null;
                 }
                 b.flip();
                 final int entryCRC = b.getInt();
@@ -713,17 +710,8 @@ class PBDRegularSegment extends PBDSegment {
         private boolean fillBuffer(ByteBuffer entry, int entryId, char flags, int crc, boolean checkCrc)
                 throws IOException {
             int origPosition = entry.position();
-            while (entry.hasRemaining()) {
-                int read = m_fc.read(entry);
-                if (read == -1) {
-                    if (!checkCrc) {
-                        throw new EOFException();
-                    }
-                    LOG.warn("File corruption detected in " + m_file.getName() + ": invalid entry length. "
-                            + "Truncate the file to last safe point.");
-                    truncateToCurrentReadIndex();
-                    return false;
-                }
+            if (!read(entry, checkCrc)) {
+                return false;
             }
 
             entry.position(origPosition);
@@ -739,6 +727,32 @@ class PBDRegularSegment extends PBDSegment {
                 entry.position(origPosition);
             }
 
+            return true;
+        }
+
+        private boolean read(ByteBuffer buffer, boolean canTruncate) throws IOException {
+            do {
+                try {
+                    int read = m_fc.read(buffer);
+                    if (read == -1) {
+                        String message = "EOF encountered reading " + m_file + " at position " + m_fc.position()
+                                + " expected to be able to read " + buffer.remaining() + " more bytes";
+                        if (canTruncate) {
+                            LOG.warn(message);
+                            truncateToCurrentReadIndex();
+                            return false;
+                        }
+                        throw new EOFException(message);
+                    }
+                } catch (IOException e) {
+                    if (canTruncate) {
+                        LOG.warn("Error encountered reading: " + m_file, e);
+                        truncateToCurrentReadIndex();
+                        return false;
+                    }
+                    throw new IOException("Error encountered reading: " + m_file, e);
+                }
+            } while (buffer.hasRemaining());
             return true;
         }
 
