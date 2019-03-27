@@ -21,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -53,7 +54,7 @@ public class MigrateRowsDeleter {
             };
             ExportManager.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, m_batchSize, deletableTxnId, cb);
             try {
-                latch.await(1, TimeUnit.MINUTES);
+                latch.await(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 logger.warn("Migrating delete was interrupted" + e.getMessage());
             }

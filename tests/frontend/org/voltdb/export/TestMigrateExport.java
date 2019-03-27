@@ -23,11 +23,18 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -40,12 +47,14 @@ import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
-public class TestMigrateExport extends TestExportBaseSocketExport {
+public class TestMigrateExport extends ExportLocalClusterBase {
+
+    private LocalCluster m_cluster = null;
 
     private static final String SCHEMA= "CREATE table NIBBLE_EXPORT (" +
             "PKEY          INTEGER          NOT NULL," +
@@ -86,7 +95,7 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
             voltExecuteSQL(false);
             voltQueueSQL(stmt2);
             return voltExecuteSQL(true);
-         }
+        }
     }
 
     public static class DeleteConstraintProc extends VoltProcedure {
@@ -97,46 +106,92 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
             voltExecuteSQL(false);
             voltQueueSQL(stmt2);
             return voltExecuteSQL(true);
-         }
+        }
     }
 
-    private static  final String PROCEDURES =
+    private static  final String PROCS =
             "CREATE PROCEDURE FROM CLASS org.voltdb.export.TestMigrateExport$UpdateConstraintProc;" +
-            "PARTITION PROCEDURE TestMigrateExport$UpdateConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;" +
-            "CREATE PROCEDURE FROM CLASS org.voltdb.export.TestMigrateExport$DeleteConstraintProc;" +
-            "PARTITION PROCEDURE TestMigrateExport$DeleteConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;";
+                    "PARTITION PROCEDURE TestMigrateExport$UpdateConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;" +
+                    "CREATE PROCEDURE FROM CLASS org.voltdb.export.TestMigrateExport$DeleteConstraintProc;" +
+                    "PARTITION PROCEDURE TestMigrateExport$DeleteConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;";
 
-    public TestMigrateExport(String s) {
-        super(s);
+    static void resetDir() throws IOException {
+        File f = new File("/tmp/" + System.getProperty("user.name"));
+        VoltFile.recursivelyDelete(f);
+        f.mkdirs();
     }
 
-    private static final int k_factor = 0;
+    private static final int k_factor = 1;
 
-    @Override
+    @Before
     public void setUp() throws Exception
     {
-        m_username = "default";
-        m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
-        super.setUp();
+        resetDir();
+        VoltFile.resetSubrootForThisProcess();
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
 
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addLiteralSchema(SCHEMA);
+        project.addLiteralSchema(SCHEMA1);
+        project.addLiteralSchema(SCHEMA2);
+        project.addLiteralSchema(PROCS);
+        project.addExport(true, "custom", createSocketExportProperties("NIBBLE_EXPORT", false ), "NIBBLE_EXPORT");
+        project.addExport(true, "custom", createSocketExportProperties("NIBBLE_EXPORT1", false ), "NIBBLE_EXPORT1");
+        project.addExport(true, "custom", createSocketExportProperties("NIBBLE_EXPORT2", false ), "NIBBLE_EXPORT2");
         startListener();
-        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
+
+        m_cluster = new LocalCluster("test_migrate_export_enabled.jar", 4, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        m_cluster.setHasLocalServer(false);
+        m_cluster.setMaxHeap(1024);
+        boolean compile = m_cluster.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("test_migrate_export_enabled.xml"));
+        m_cluster.startUp(true);
+
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(SCHEMA);
+        project.addLiteralSchema(SCHEMA1);
+        project.addLiteralSchema(SCHEMA2);
+        project.addLiteralSchema(PROCS);
+        project.addExport(false, "custom", createSocketExportProperties("NIBBLE_EXPORT", false ), "NIBBLE_EXPORT");
+        project.addExport(false, "custom", createSocketExportProperties("NIBBLE_EXPORT1", false ), "NIBBLE_EXPORT1");
+        project.addExport(false, "custom", createSocketExportProperties("NIBBLE_EXPORT2", false ), "NIBBLE_EXPORT2");
+
+        LocalCluster config = new LocalCluster("test_migrate_export_disabled.jar", 4, 3, k_factor,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        config.setHasLocalServer(false);
+        config.setMaxHeap(1024);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(),
+                Configuration.getPathToCatalogForTest("test_migrate_export_disabled.xml"));
+
+        m_verifier = new ExportTestExpectedData(m_serverSockets, false, true, k_factor + 1);
     }
 
-    @Override
+    @After
     public void tearDown() throws Exception {
-        super.tearDown();
         System.out.println("Shutting down client and server");
-        closeSocketExporterClientAndServer();
+        for (Entry<String, ServerListener> entry : m_serverSockets.entrySet()) {
+            ServerListener serverSocket = entry.getValue();
+            if (serverSocket != null) {
+                serverSocket.closeClient();
+                serverSocket.close();
+            }
+        }
+        m_cluster.shutDown();
     }
 
+    @Test
     public void testMigrateExport() throws Exception
     {
         System.out.println("testMigrateExport");
-        final Client client = getClient();
+        final Client client = getClient(m_cluster);
+
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -148,9 +203,10 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         verifyCount(client, String.format(COUNT1,"NIBBLE_EXPORT"),  0);
     }
 
-     public void testMigrateExportUpdate() throws Exception {
+    @Test
+    public void testMigrateExportUpdate() throws Exception {
         System.out.println("testMigrateExportUpdate");
-        final Client client = getClient();
+        final Client client = getClient(m_cluster);
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -195,21 +251,20 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         Thread.sleep(20000);
         verifyExport(client, 1100, false, "NIBBLE_EXPORT_UPDATE");
 
-
         // Enable the connector
         deploymentURL = Configuration.getPathToCatalogForTest("test_migrate_export_enabled.xml");
         depBytes = new String(ClientUtils.fileToBytes(new File(deploymentURL)), Constants.UTF8ENCODING);
         ClientResponse resp = client.callProcedure("@UpdateApplicationCatalog", null, depBytes);
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
 
-
         // All rows in persistent table are deleted
         verifyCount(client, String.format(COUNT1, "NIBBLE_EXPORT_UPDATE"), 0);
     }
 
+    @Test
     public void testMigrateExportDelete() throws Exception {
         System.out.println("testMigrateExportDelete");
-        final Client client = getClient();
+        final Client client = getClient(m_cluster);
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -281,8 +336,6 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
         while (!success) {
             try {
                 VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
-                System.out.println(vt.toFormattedString());
-                vt.resetRowPosition();
                 long count = 0;
                 while (vt.advanceRow()) {
                     if (tableName.equalsIgnoreCase(vt.getString("SOURCE")) && "TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
@@ -306,59 +359,5 @@ public class TestMigrateExport extends TestExportBaseSocketExport {
             }
         }
         assert(success);
-    }
-
-    static public junit.framework.Test suite() throws Exception {
-        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-        Map<String, String> additionalEnv = new HashMap<>();
-        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-
-        final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestMigrateExport.class);
-
-        project = new VoltProjectBuilder();
-        project.setSecurityEnabled(true, true);
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addLiteralSchema(SCHEMA);
-        project.addLiteralSchema(SCHEMA1);
-        project.addLiteralSchema(SCHEMA2);
-        project.addLiteralSchema(PROCEDURES);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT", true);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT1", true);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT2", true);
-
-        LocalCluster config = new LocalCluster("test_migrate_export_enabled.jar", 1, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("test_migrate_export_enabled.xml"));
-        builder.addServerConfig(config, true);
-
-
-        project = new VoltProjectBuilder();
-        project.setSecurityEnabled(true, true);
-        project.addRoles(GROUPS);
-        project.addUsers(USERS);
-        project.addLiteralSchema(SCHEMA);
-        project.addLiteralSchema(SCHEMA1);
-        project.addLiteralSchema(SCHEMA2);
-        project.addLiteralSchema(PROCEDURES);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT", false);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT1", false);
-        wireupExportTableToSocketExport("NIBBLE_EXPORT2", false);
-
-        config = new LocalCluster("test_migrate_export_disabled.jar", 1, 1, k_factor,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(1024);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(),
-                Configuration.getPathToCatalogForTest("test_migrate_export_disabled.xml"));
-        return builder;
     }
 }

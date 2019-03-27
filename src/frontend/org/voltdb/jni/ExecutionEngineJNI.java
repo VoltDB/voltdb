@@ -702,11 +702,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         int txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
                 getStringBytes(tableName), deletableTxnId, maxRowCount, undoToken);
-//        if (EXPORT_LOG.isDebugEnabled()) {
-//            EXPORT_LOG.debug("deleteMigrated rows from table " + tableName +
-//                    " up to txnId: " + TxnEgo.txnIdToString(deletableTxnId) +
-//                    (txnFullyDeleted ? " FULLY processed" : " PARTIALLY processed"));
-//        }
         return txnFullyDeleted;
     }
 

@@ -43,6 +43,7 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsSelector;
+import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -793,7 +794,7 @@ public class ExportManager
     }
 
     public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb) {
-        m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, 1000 * 120, cb,
+        m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId, batchSize});
     }
 }

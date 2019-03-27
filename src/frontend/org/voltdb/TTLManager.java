@@ -56,6 +56,7 @@ public class TTLManager extends StatsSource{
     static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1000);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
+    public static final int NT_PROC_TIMEOUT = Integer.getInteger("NT_PROC_TIMEOUT", 1000 * 120);
     static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
     public static class TTLStats {
         final String tableName;
@@ -335,11 +336,11 @@ public class TTLManager extends StatsSource{
                 latch.countDown();
             }
         };
-        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
-            latch.await(1, TimeUnit.MINUTES);
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             hostLog.warn("Nibble export waiting interrupted" + e.getMessage());
         }
@@ -383,11 +384,11 @@ public class TTLManager extends StatsSource{
                 latch.countDown();
             }
         };
-        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
                 "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
-            latch.await(1, TimeUnit.MINUTES);
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             hostLog.warn("TTL waiting interrupted" + e.getMessage());
         }
