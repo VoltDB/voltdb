@@ -1494,7 +1494,7 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
                                         timestamp,
                                         streamName);
         streamedTable->setWrapper(wrapper);
-        VOLT_TRACE("created stream export wrapper stream %s", name.c_str());
+        VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
     } else {
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
         // A case when exact same stream is dropped and added.
