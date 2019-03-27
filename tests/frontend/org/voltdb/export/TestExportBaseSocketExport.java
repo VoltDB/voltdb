@@ -362,6 +362,63 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     /**
+     * Wait for all Export Streams to be removed (after all the streams are dropped)
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedTargetDeallocated(Client client) throws Exception {
+        boolean passed = false;
+
+        // Quiesce to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        // Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            while (stats.advanceRow()) {
+                passedThisTime = false;
+                String target = stats.getString("TARGET");
+                String ttable = stats.getString("SOURCE");
+                Long host = stats.getLong("HOST_ID");
+                Long pid = stats.getLong("PARTITION_ID");
+                if (target.isEmpty()) {
+                    // Stream w/o target keeps pending data forever, log and skip counting this stream
+                    System.out.println("Stream Not Dropped but target is disabled: " +
+                            ttable + " host:" + host + " partid:" + pid);
+                } else {
+                    System.out.println("Stream Not Dropped: " + ttable + " to " + target + " host:" + host + " partid:" + pid);
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        // System.out.println(stats);
+        assertTrue(passed);
+    }
+
+    /**
      * Wait for export processor to catch up and have nothing to be exported.
      *
      * @param client

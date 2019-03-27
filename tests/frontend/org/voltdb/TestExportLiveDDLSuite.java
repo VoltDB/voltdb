@@ -185,8 +185,8 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             response = client.callProcedure("@AdHoc", "drop stream " + tab);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
-        //We should consume all again.
-        waitForStreamedTargetAllocatedMemoryZero(client);
+        //After drop there should be no stats rows for export.
+        waitForStreamedTargetDeallocated(client);
 
         //recreate tables and export again
         for (int i = 0; i < numOfStreams; i++) {
