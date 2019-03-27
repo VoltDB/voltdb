@@ -83,7 +83,6 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
-import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -3175,7 +3174,7 @@ public abstract class CatalogUtil {
         Map<String, Table> ttls = Maps.newHashMap();
         for (Table t : db.getTables()) {
             if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
-                ttls.put(t.getTypeName(),t);
+                ttls.put(t.getTypeName().toLowerCase(),t);
             }
         }
         return ttls;
