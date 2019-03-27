@@ -338,8 +338,11 @@ public abstract class PBDSegment {
                     // It is dangerous to leave final on a segment so make sure the metadata is flushed
                     m_fc.force(true);
                 }
-                m_isFinal = isFinal;
+            } else if (isFinal(m_file) && !isFinal) {
+                throw new IOException("Could not remove the final attribute from " + m_file.getName());
             }
+            // It is OK for m_isFinal to be true when isFinal(File) returns false but not the other way
+            m_isFinal = isFinal;
         }
     }
 
@@ -387,8 +390,8 @@ public abstract class PBDSegment {
             UserDefinedFileAttributeView view = getFileAttributeView(file);
             if (view != null) {
                 view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(Boolean.toString(isFinal)));
+                return true;
             }
-            return true;
         } catch (IOException e) {
             // No-op
         }
