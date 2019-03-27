@@ -39,7 +39,8 @@ public class TestPBDMultipleReaders {
 
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
-    private static final int s_segmentFillCount = 47;
+    // Number of entries which fit in a segment. 64MB segment / (2MB entries + headers) = 31 entries per segment.
+    private static final int s_segmentFillCount = 31;
     private PersistentBinaryDeque m_pbd;
 
     private class PBDReader {
@@ -57,7 +58,7 @@ public class TestPBDMultipleReaders {
             boolean done = false;
             int numRead = 0;
             for (int i=m_totalRead; i<end && !done; i++) {
-                BBContainer bbC = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                BBContainer bbC = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 if (bbC==null) {
                     done = true;
                     continue;
@@ -94,7 +95,9 @@ public class TestPBDMultipleReaders {
             for (int j=1; j<numReaders; j++) {
                 readers[j].readToEndOfSegment();
             }
-            if (i < numSegments-1) currNumSegments--;
+            if (i < numSegments-1) {
+                currNumSegments--;
+            }
             assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         }
     }
@@ -114,7 +117,7 @@ public class TestPBDMultipleReaders {
         }
 
         for (int j=0; j<numBuffers; j++) {
-            BBContainer bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false );
+            BBContainer bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
         }
         assertTrue(reader1.isEmpty());
@@ -143,7 +146,7 @@ public class TestPBDMultipleReaders {
         for (int i=0; i<3; i++) {
             for (int j=0; j<s_segmentFillCount; j++) {
                 m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)) );
-                BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
             }
             assertEquals(1, m_pbd.numOpenSegments());
@@ -164,14 +167,14 @@ public class TestPBDMultipleReaders {
 
         BinaryDequeReader reader = m_pbd.openForRead("reader0");
         for (int i=0; i<numSegments; i++) {
-            for (int j=0; j<46; j++) {
-                BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
+                BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
             }
             int expected = (i == numSegments-1) ? 1 : 2;
             assertEquals(expected, m_pbd.numOpenSegments());
 
-            BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
             // there should only be 1 open because last discard closes and deletes
             assertEquals(1, m_pbd.numOpenSegments());
@@ -194,16 +197,16 @@ public class TestPBDMultipleReaders {
         BinaryDequeReader reader1 = m_pbd.openForRead("reader1");
         // Position first reader0 on penultimate segment and reader1 on first segment
         for (int i=0; i<numSegments-1; i++) {
-            for (int j=0; j<46; j++) {
-                BBContainer bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
+                BBContainer bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
                 if (i==0) {
-                    bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+                    bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                     bbC.discard();
                 }
             }
 
-            BBContainer bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            BBContainer bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
             if (i==0) {
                 assertEquals(2, m_pbd.numOpenSegments());
@@ -212,7 +215,7 @@ public class TestPBDMultipleReaders {
             }
         }
 
-        BBContainer bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+        BBContainer bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         bbC.discard();
         // Both readers finished reading first segment, so that is closed and deleted,
         // which reduces the # of open segments by 1
@@ -220,14 +223,14 @@ public class TestPBDMultipleReaders {
 
         // reader0 at penultimate. Move reader1 through segments and check open segments
         for (int i=1; i<numSegments-1; i++) {
-            for (int j=0; j<46; j++) {
-                bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            for (int j = 0; j < s_segmentFillCount - 1; j++) {
+                bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
             }
             int expected = (i == numSegments-2) ? 2 : 3;
             assertEquals(expected, m_pbd.numOpenSegments());
 
-            bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
             expected = (i == numSegments-2) ? 1 : 2;
             assertEquals(expected, m_pbd.numOpenSegments());
@@ -235,9 +238,9 @@ public class TestPBDMultipleReaders {
 
         // read the last segment
         for (int j=0; j<s_segmentFillCount; j++) {
-            bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
-            bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
         }
         assertEquals(1, m_pbd.numOpenSegments());
