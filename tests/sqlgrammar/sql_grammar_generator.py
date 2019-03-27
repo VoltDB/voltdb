@@ -1361,6 +1361,8 @@ if __name__ == "__main__":
                             ['failed to create the transaction internally'],
                             ['ParameterValueExpression', 'cannot be cast', 'TupleValueExpression'],
                             ['SQL Aggregate function calls with subquery expression arguments are not allowed'],
+                            ['Column', 'not found', 'Please update your query'],
+                            ['Index: 0, Size: 0'],    # See ENG-15736
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
