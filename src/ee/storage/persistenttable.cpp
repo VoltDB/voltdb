@@ -1235,16 +1235,19 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 
     // Revert migrating indexes
-    if (m_shadowStream != nullptr) {
+    if (fromMigrate) {
+        assert(m_shadowStream != nullptr);
         NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
-        // This is update path, add migrating index back
-        if (!txnId.isNull() && !fromMigrate) {
-            migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
-        }
-        // This is migrate path, Remove migrating index
-        if (txnId.isNull() && fromMigrate){
+        if (txnId.isNull()) {
             ExecutorContext* ec = ExecutorContext::getExecutorContext();
             migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
+        }
+    } else {
+        if (m_shadowStream != nullptr) {
+            NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
+            if(!txnId.isNull()){
+                migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
+            }
         }
     }
 }
@@ -1279,7 +1282,6 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     deleteFromAllIndexes(&target);
     if (m_shadowStream != nullptr && removeMigratingIndex) {
         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
-        // This is update path, add migrating index back
         if (!txnId.isNull()) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
@@ -1926,8 +1928,6 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
         }
     }
     if (m_shadowStream != nullptr) {
-        // This assumes the last column is the migrate column. This will need to be fixed
-        // if more columns are added.
         int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
@@ -2468,6 +2468,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 }
 
 uint16_t PersistentTable::getMigrateColumnIndex() {
+    // The last column is the migrate column for now.
     return (m_schema->hiddenColumnCount() -1);
 }
 
