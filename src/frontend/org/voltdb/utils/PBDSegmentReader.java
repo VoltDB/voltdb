@@ -44,12 +44,10 @@ interface PBDSegmentReader {
      * Returns null if all entries in this segment were already read by this reader.
      *
      * @param factory
-     * @param checkCRC
-     * @return BBContainer with the bytes read
+     * @return BBContainer with the bytes read or {@code null} if all entries have been consumed
      * @throws IOException
      */
-    public DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory,
-            boolean checkCRC) throws IOException;
+    public DBBPool.BBContainer poll(BinaryDeque.OutputContainerFactory factory) throws IOException;
 
     /**
      * @return A {@link DBBPool.BBContainer} with the extra header supplied for the segment or {@code null} if one was
