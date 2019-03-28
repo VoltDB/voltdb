@@ -1289,6 +1289,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                    PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(tcd->getTable());
                    if (persistenttable) {
                        stream = persistenttable->getStreamedTable();
+                       assert(m_exportingTables[stream->name()] == NULL);
                    }
                 }
                 if (stream) {

@@ -742,7 +742,6 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 
 void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
         TableTuple& sourceTupleWithNewValues, bool updateMigrate) {
-    assert(targetTupleToUpdate.getSchema()->isTableWithStream());
     uint16_t migrateColumnIndex = getMigrateColumnIndex();
     NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
 
@@ -751,12 +750,10 @@ void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& t
     if (txnId.isNull()) {
         if (updateMigrate) {
             int64_t spHandle = ec->currentSpHandle();
-            VOLT_DEBUG("Add migrating index for txnId: %ld", (long)spHandle);
             sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
         }
      } else {
         sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
-        VOLT_DEBUG("Remove migrating index for txnId: %ld", (long)(ValuePeeker::peekBigInt(txnId)));
         migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
     }
 }
@@ -1130,7 +1127,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     if (updateMigrate && m_shadowStream != nullptr) {
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        VOLT_DEBUG("Inserting tuple to shadow stream for txnId %ld", (long)(ec->currentSpHandle()));
         m_shadowStream->insertTuple(sourceTupleWithNewValues);
     }
 

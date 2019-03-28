@@ -127,7 +127,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                     void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
                     targetTuple.move(targetAddress);
 
-
                     // Delete from target table
                     targetTable->deleteTuple(targetTuple, true);
                 }
