@@ -50,9 +50,10 @@ import com.google_voltpatches.common.base.Throwables;
  *
  */
 public class PersistentBinaryDeque implements BinaryDeque {
-    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
+        private static final VoltLogger LOG = new VoltLogger("HOST");
+
         @Override
         public BBContainer getContainer(int minimumSize) {
               final BBContainer origin = DBBPool.allocateUnsafeByteBuffer(minimumSize);
@@ -276,7 +277,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 closeAndDeleteSegment(segment);
                             }
                         } catch (IOException e) {
-                            LOG.error("Exception closing and deleting PBD segment", e);
+                            m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
                         }
                     }
                 }
@@ -544,7 +545,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
             }
         } catch (CyclicSequenceException e) {
-            LOG.error("Failed to parse files: " + e);
+            m_usageSpecificLog.error("Failed to parse files: " + e);
             throw new IOException(e);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException) {
@@ -603,7 +604,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         // Any recovered segment that is not final should be checked
         // for internal consistency.
         if (!qs.isFinal()) {
-            LOG.warn("Segment " + qs.file()
+            m_usageSpecificLog.warn("Segment " + qs.file()
             + " (final: " + qs.isFinal() + "), has been recovered but is not in a final state");
         } else if (m_usageSpecificLog.isDebugEnabled()) {
             m_usageSpecificLog.debug("Segment " + qs.file()
@@ -1000,7 +1001,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
         }
         catch (IOException e) {
-            LOG.error("Exception closing and deleting PBD segment", e);
+            m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
         }
     }
 
