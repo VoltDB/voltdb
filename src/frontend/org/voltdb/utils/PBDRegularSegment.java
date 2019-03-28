@@ -89,13 +89,12 @@ class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    long segmentId() {
+    public long segmentId() {
         return m_id;
     }
 
     @Override
-    File file()
-    {
+    public File file() {
         return m_file;
     }
 

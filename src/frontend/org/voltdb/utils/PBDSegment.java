@@ -30,7 +30,7 @@ import java.util.zip.CRC32;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 
-public abstract class PBDSegment {
+public abstract class PBDSegment implements PbdSegmentInfo {
 
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
@@ -94,8 +94,6 @@ public abstract class PBDSegment {
     }
 
     abstract long segmentIndex();
-    abstract long segmentId();
-    abstract File file();
 
     abstract void reset();
 
