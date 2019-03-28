@@ -1289,7 +1289,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                    PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(tcd->getTable());
                    if (persistenttable) {
                        stream = persistenttable->getStreamedTable();
-                       assert(m_exportingTables[stream->name()] == NULL);
                    }
                 }
                 if (stream) {
@@ -1501,6 +1500,7 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
                                         timestamp,
                                         streamName);
         streamedTable->setWrapper(wrapper);
+        assert(purgedStreams[streamName] == NULL);
         VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
     } else {
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
