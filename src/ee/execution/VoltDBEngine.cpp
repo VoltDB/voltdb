@@ -962,7 +962,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                 // FIXME: factorize deletion logic in common method
                 auto streamedtable = persistenttable->getStreamedTable();
                 if (streamedtable) {
-                    VOLT_TRACE("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
+                    VOLT_DEBUG("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
                     const std::string& name = streamedtable->name();
                     streamedtable->setGeneration(timestamp);
                     //Maintain the streams that will go away for which wrapper needs to be cleaned;
@@ -1143,7 +1143,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 PersistentTable *persistentTable = tcd->getPersistentTable();
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
-                    VOLT_TRACE("setting up shadow stream for %s", persistentTable->name().c_str());
+                    VOLT_DEBUG("setting up shadow stream for %s", persistentTable->name().c_str());
                 }
             }
             if (streamedTable) {
@@ -1215,7 +1215,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 // Check if this table has a companion stream
                 streamedTable = persistentTable->getStreamedTable();
                 if (streamedTable) {
-                    VOLT_TRACE("UPDATING companion stream for %s", persistentTable->name().c_str());
+                    VOLT_DEBUG("Updating companion stream for %s", persistentTable->name().c_str());
                 }
                 tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
             }
@@ -1285,6 +1285,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
                 // update exporting tables with new stream
                 StreamedTable* stream = tcd->getStreamedTable();
+                if (!stream) {
+                   PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(tcd->getTable());
+                   if (persistenttable) {
+                       stream = persistenttable->getStreamedTable();
+                   }
+                }
                 if (stream) {
                     m_exportingTables[stream->name()] = stream;
                 }
@@ -1494,6 +1500,7 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
                                         timestamp,
                                         streamName);
         streamedTable->setWrapper(wrapper);
+        assert(purgedStreams[streamName] == NULL);
         VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
     } else {
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
@@ -2599,7 +2606,7 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
         std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
@@ -2614,9 +2621,9 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
                 (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            bool txnIdFound = false;
+            int32_t rowsToBeDeleted = 0;
             try {
-                txnIdFound = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId, maxRowCount);
             }
             catch (const SQLException &sqe) {
                 s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
@@ -2632,7 +2639,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
 
             // Indicate to other threads that load happened successfully.
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
-            return txnIdFound;
+            return rowsToBeDeleted;
         }
         else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
             // An sql exception was thrown on the lowest site thread and
@@ -2658,7 +2665,7 @@ bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t u
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 
-    return false;
+    return 0;
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string streamName) {

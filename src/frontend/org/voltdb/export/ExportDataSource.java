@@ -1260,7 +1260,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             } finally {
                                 forwardAckToOtherReplicas();
                             }
-                            if (m_migrateRowsDeleter != null) {
+                            if (m_migrateRowsDeleter != null && m_mastershipAccepted.get()) {
                                 m_migrateRowsDeleter.delete(m_commitSpHandle);
                             }
                         } catch (Exception e) {

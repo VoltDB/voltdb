@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -36,6 +37,8 @@ import org.voltdb.VoltType;
   */
 public class MigrateRowsAcked_SP extends VoltSystemProcedure {
 
+    VoltLogger exportLog = new VoltLogger("EXPORT");
+
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -51,26 +54,26 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext context,
+    public VoltTable run(SystemProcedureExecutionContext context,
                            int partitionParam,          // Partition parameter
                            String tableName,            // Name of table that can have rows deleted
                            long deletableTxnId,         // All rows with TxnIds before this can be deleted
                            int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
     {
-        VoltTable[] results = null;
+        VoltTable result = new VoltTable(new ColumnInfo("RowsRemainingDeleted", VoltType.BIGINT));
         try {
             final TransactionState txnState = m_runner.getTxnState();
-            boolean txnDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+            int txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
                     txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
                     tableName, deletableTxnId, maxRowCount);
-            results = new VoltTable[1];
-            VoltTable result = new VoltTable(new ColumnInfo("txnDeleted", VoltType.TINYINT));
-            result.addRow(txnDeleted ? 1 : 0);
-            results[0] = result;
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(String.format("MigrateRowsAcked_SP: batch size %d, remaining %d on table %s, txnId: %d",
+                        maxRowCount, txnRemainingDeleted, tableName, deletableTxnId));
+            }
+            result.addRow(txnRemainingDeleted);
         } catch (Exception ex) {
-            ex.printStackTrace();
+            exportLog.warn(String.format("Migrating delete error on table %s, error: %s", tableName, ex.getMessage()));
         }
-        return results;
+        return result;
     }
-
 }

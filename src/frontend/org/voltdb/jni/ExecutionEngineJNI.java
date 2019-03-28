@@ -39,7 +39,6 @@ import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
@@ -698,16 +697,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
         m_nextDeserializer.clear();
-        boolean txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+        int txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
                 getStringBytes(tableName), deletableTxnId, maxRowCount, undoToken);
-        if (EXPORT_LOG.isDebugEnabled()) {
-            EXPORT_LOG.debug("deleteMigrated rows from table " + tableName +
-                    " up to txnId: " + TxnEgo.txnIdToString(deletableTxnId) +
-                    (txnFullyDeleted ? " FULLY processed" : " PARTIALLY processed"));
-        }
         return txnFullyDeleted;
     }
 

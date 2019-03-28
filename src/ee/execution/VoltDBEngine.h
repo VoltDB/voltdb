@@ -511,9 +511,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param deletableTxnId The transactionId of the last row that can be deleted
          * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
          * @param undoToken Commit/Rollback token for this delete call
-         * @return true if every row up to and including deletableTxnId have been deleted
+         * @return number of rows to be deleted
          */
-        bool deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+        int32_t deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
                 std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken);
 
         void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string streamName);

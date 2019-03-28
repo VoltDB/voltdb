@@ -800,7 +800,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Delete of migrated rows in the execution engine.
      */
-    public abstract boolean deleteMigratedRows(
+    public abstract int deleteMigratedRows(
             long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId, int maxRowCount, long undoToken);
 
@@ -1170,9 +1170,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param deletableTxnId The transactionId of the last row that can be deleted
      * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
      * @param undoToken The token marking the rollback point for this transaction
-     * @return true if every row up to and including deletableTxnId have been deleted.
+     * @return number of rows to be deleted
      */
-    protected native boolean nativeDeleteMigratedRows(long pointer,
+    protected native int nativeDeleteMigratedRows(long pointer,
             long txnid, long spHandle, long uniqueId,
             byte mTableName[], long deletableTxnId, int maxRowCount, long undoToken);
 

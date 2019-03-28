@@ -3929,6 +3929,15 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
         ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET TEST;\n" +
+                "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20 MIGRATE TO TARGET TEST;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        // does not alter target but other params
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+
+        ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
               "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET TEST;\n" +
               "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET NO_TEST;\n";
         pb = new VoltProjectBuilder();

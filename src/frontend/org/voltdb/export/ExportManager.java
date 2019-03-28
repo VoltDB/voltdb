@@ -43,7 +43,7 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.StatsSelector;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -52,6 +52,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -792,10 +793,8 @@ public class ExportManager
         m_ci.bindAdapter(m_adapter, null);
     }
 
-    public void invokeMigrateRowsDelete(StoredProcedureInvocation spi, int partition, SimpleClientResponseAdapter.Callback cb) {
-        Long handle = m_adapter.registerCallback(cb);
-        spi.setClientHandle(handle);
-        m_ci.createTransaction(m_adapter.connectionId(), spi, false, true, false, partition, spi.getSerializedSize(),
-                System.nanoTime());
+    public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb) {
+        m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
+                "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId, batchSize});
     }
 }

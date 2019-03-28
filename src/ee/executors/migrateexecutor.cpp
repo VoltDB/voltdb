@@ -120,25 +120,24 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             BOOST_FOREACH(TableIndex *index, allIndexes) {
                 if (index->isMigratingIndex()) {
                     indexesToUpdate.push_back(index);
+                    VOLT_DEBUG("MigrateExecutor: updating migrating index.");
                 }
             }
 
             assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             assert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
-            uint16_t migrateColumnIndex = targetTuple.getSchema()->hiddenColumnCount() -1;
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
                 // tuple to update in the target table.
                 void *target_address = m_inputTuple.getNValue(0).castAsAddress();
                 targetTuple.move(target_address);
 
-                if (targetTuple.getHiddenNValue(migrateColumnIndex).isNull()) {
-                    TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-                    targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                assert(targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull());
+                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                                 indexesToUpdate, true, false, true);
-                    migrated_tuples++;
-                }
+                migrated_tuples++;
             }
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;

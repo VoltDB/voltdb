@@ -1419,7 +1419,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public boolean deleteMigratedRows(long txnid,
+    public int deleteMigratedRows(long txnid,
                                       long spHandle,
                                       long uniqueId,
                                       String tableName,

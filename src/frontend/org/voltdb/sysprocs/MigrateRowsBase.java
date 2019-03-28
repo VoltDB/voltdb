@@ -17,7 +17,6 @@
 package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.voltcore.logging.VoltLogger;
@@ -30,7 +29,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
@@ -38,7 +36,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.VoltTable.ColumnInfo;
 
 public class MigrateRowsBase extends VoltSystemProcedure {
@@ -156,7 +153,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
                     String.format("Table %s doesn't present in catalog", tableName));
         }
 
-        if (replicated ^ catTable.getIsreplicated()) {
+        if (replicated != catTable.getIsreplicated()) {
             throw new VoltAbortException(
                     String.format("%s incompatible with %s table %s.",
                             replicated ? "@MigrateRowsMP" : "@MigrateRowsSP",

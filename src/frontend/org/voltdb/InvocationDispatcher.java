@@ -242,7 +242,7 @@ public final class InvocationDispatcher {
         m_NTProcedureService.update(m_catalogContext.get());
     }
 
-    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+    public LightweightNTClientResponseAdapter getInternelAdapterNT () {
         return m_NTProcedureService.m_internalNTClientAdapter;
     }
 

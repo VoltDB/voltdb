@@ -1587,7 +1587,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
             String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
         try {
             m_data.clear();
@@ -1608,8 +1608,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_connection.m_socketChannel.read(results);
             }
             results.flip();
-            boolean txnFullyDeleted = results.get() == 1 ? true : false;
-            return txnFullyDeleted;
+            return results.get();
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }

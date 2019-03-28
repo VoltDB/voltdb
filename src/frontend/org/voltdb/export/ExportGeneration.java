@@ -36,7 +36,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -58,7 +57,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.SpInitiator;
@@ -656,9 +654,7 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         adFilePartitions.add(source.getPartitionId());
         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        if (migrateBatchSize > 0) {
-            source.setupMigrateRowsDeleter(migrateBatchSize);
-        }
+        source.setupMigrateRowsDeleter(migrateBatchSize);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -721,9 +717,7 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        if (migrateBatchSize > 0) {
-                            exportDataSource.setupMigrateRowsDeleter(migrateBatchSize);
-                        }
+                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize);
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
