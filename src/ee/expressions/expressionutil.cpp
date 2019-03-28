@@ -629,22 +629,26 @@ boost::shared_array<int> ExpressionUtil::convertIfAllParameterValues(
     return ret;
 }
 
-void ExpressionUtil::extractTupleValuesColumnIdx(
-      const AbstractExpression* expr, std::vector<int> &columnIds) {
-    if (expr == NULL)
-    {
-        return;
-    }
-    if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE)
-    {
-        const TupleValueExpression* tve = dynamic_cast<const TupleValueExpression*>(expr);
-        assert(tve != NULL);
-        columnIds.push_back(tve->getColumnId());
-        return;
-    }
-    // Recurse
-    ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
-    ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+void ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds) {
+   if (expr != nullptr) {
+      if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+         auto const* tve = dynamic_cast<const TupleValueExpression*>(expr);
+         assert(tve != NULL);
+         columnIds.emplace_back(tve->getColumnId());
+      } else {
+         ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
+         ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+         for(auto const* e : expr->getArgs()) {
+            ExpressionUtil::extractTupleValuesColumnIdx(e, columnIds);
+         }
+      }
+   }
+}
+
+std::vector<int> ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr) {
+   std::vector<int> columnIds;
+   extractTupleValuesColumnIdx(expr, columnIds);
+   return columnIds;
 }
 
 void ExpressionUtil::loadIndexedExprsFromJson(
