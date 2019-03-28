@@ -50,6 +50,8 @@ import com.google_voltpatches.common.base.Preconditions;
  * for reading and writing, but not both at the same time.
  */
 class PBDRegularSegment extends PBDSegment {
+    private static final String TRUNCATOR_CURSOR = "__truncator__";
+    private static final String SCANNER_CURSOR = "__scanner__";
     private static final int VERSION = 2;
     private static final VoltLogger LOG = new VoltLogger("HOST");
     private static final Random RANDOM = new Random();
@@ -57,11 +59,16 @@ class PBDRegularSegment extends PBDSegment {
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
-    // Index of this segment in the in-memory segment map
-    private final long m_index;
-
-    // Persistent ID of this segment, based on managing a monotonic counter
-    private final long m_id;
+    private boolean m_closed = true;
+    private FileChannelWrapper m_fc;
+    // Avoid unnecessary sync with this flag
+    private boolean m_syncedSinceLastEdit = true;
+    // Reusable crc calculator. Must be reset before each use
+    private final CRC32 m_crc;
+    // Mirror of the isFinal metadata on the filesystem
+    private boolean m_isFinal;
+    // Whether or not this is the current active segment being written to
+    private boolean m_isActive = false;
 
     private int m_numOfEntries = -1;
     private int m_size = -1;
@@ -75,33 +82,14 @@ class PBDRegularSegment extends PBDSegment {
     private DBBPool.BBContainer m_entryHeaderBuf = null;
     Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    PBDRegularSegment(Long index, long id, File file) {
-        super(file);
-        m_index = index;
-        m_id = id;
+    PBDRegularSegment(long index, long id, File file) {
+        super(file, index, id);
+        m_crc = new CRC32();
+        m_isFinal = PBDSegment.isFinal(m_file);
         reset();
     }
 
-    @Override
-    long segmentIndex()
-    {
-        return m_index;
-    }
-
-    @Override
-    long segmentId() {
-        return m_id;
-    }
-
-    @Override
-    File file()
-    {
-        return m_file;
-    }
-
-    @Override
-    void reset()
-    {
+    private void reset() {
         m_syncedSinceLastEdit = false;
         if (m_segmentHeaderBuf != null) {
             m_segmentHeaderBuf.discard();
@@ -163,8 +151,12 @@ class PBDRegularSegment extends PBDSegment {
         open(true, true, compress);
     }
 
-    @Override
-    void validateHeader() throws IOException {
+    /**
+     * Force a read and validation of the header and any extra header metadata which might exist
+     *
+     * @throws IOException If there was an error reading or validating the header
+     */
+    private void validateHeader() throws IOException {
         readHeader(true, true);
     }
 
@@ -318,11 +310,215 @@ class PBDRegularSegment extends PBDSegment {
         return (int) m_crc.getValue();
     }
 
-    @Override
-    void initNumEntries(int count, int size) throws IOException {
+    private void initNumEntries(int count, int size) throws IOException {
         m_numOfEntries = count;
         m_size = size;
         writeOutHeader();
+    }
+
+    @Override
+    int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
+        if (!m_closed) {
+            close();
+        }
+        openForTruncate();
+        PBDSegmentReader reader = openForRead(TRUNCATOR_CURSOR);
+
+        // Do stuff
+        validateHeader();
+        final int initialEntryCount = getNumEntries();
+        int entriesTruncated = 0;
+        // Zero entry count means the segment is empty or corrupted, in both cases
+        // the segment can be deleted.
+        if (initialEntryCount == 0) {
+            reader.close();
+            close();
+            return Integer.MAX_VALUE;
+        }
+        int sizeInBytes = 0;
+
+        DBBPool.BBContainer cont;
+        while (true) {
+            final long beforePos = reader.readOffset();
+
+            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, !isFinal());
+            if (cont == null) {
+                break;
+            }
+
+            final int compressedLength = (int) (reader.readOffset() - beforePos - ENTRY_HEADER_BYTES);
+            final int uncompressedLength = cont.b().limit();
+
+            try {
+                // Handoff the object to the truncator and await a decision
+                BinaryDeque.TruncatorResponse retval = truncator.parse(cont);
+                if (retval == null) {
+                    // Nothing to do, leave the object alone and move to the next
+                    sizeInBytes += uncompressedLength;
+                } else {
+                    // If the returned bytebuffer is empty, remove the object and truncate the file
+                    if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
+                        if (reader.readIndex() == 1) {
+                            /*
+                             * If truncation is occurring at the first object Whammo! Delete the file.
+                             */
+                            entriesTruncated = Integer.MAX_VALUE;
+                        } else {
+                            entriesTruncated = initialEntryCount - (reader.readIndex() - 1);
+
+                            // Don't forget to update the number of entries in the file
+                            initNumEntries(reader.readIndex() - 1, sizeInBytes);
+                            m_fc.truncate(reader.readOffset() - (compressedLength + ENTRY_HEADER_BYTES));
+                        }
+                    } else {
+                        assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
+                        entriesTruncated = initialEntryCount - reader.readIndex();
+                        // Partial object truncation
+                        reader.rewindReadOffset(compressedLength + ENTRY_HEADER_BYTES);
+                        final long partialEntryBeginOffset = reader.readOffset();
+                        m_fc.position(partialEntryBeginOffset);
+
+                        final int written = writeTruncatedEntry(retval, reader.readIndex());
+                        sizeInBytes += written;
+                        initNumEntries(reader.readIndex(), sizeInBytes);
+                        m_fc.truncate(partialEntryBeginOffset + written + ENTRY_HEADER_BYTES);
+                    }
+
+                    break;
+                }
+            } finally {
+                cont.discard();
+            }
+        }
+        int entriesScanned = reader.readIndex();
+        reader.close();
+
+        if (entriesTruncated == 0) {
+            int entriesNotScanned = initialEntryCount - entriesScanned;
+            // If we checksum the file and it looks good, mark as final
+            if (!isFinal() && entriesNotScanned == 0) {
+                finalize(true);
+            }
+            return -entriesNotScanned;
+        }
+
+        close();
+
+        return entriesTruncated;
+    }
+
+    @Override
+    int scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
+        PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
+        try {
+            validateHeader();
+            DBBPool.BBContainer cont = null;
+            int initialEntryCount = getNumEntries();
+            if (initialEntryCount == 0) {
+                return 0;
+            }
+            while (true) {
+                cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                if (cont == null) {
+                    break;
+                }
+                try {
+                    scanner.scan(cont);
+                } finally {
+                    cont.discard();
+                }
+            }
+            int entriesScanned = reader.readIndex();
+
+            // Scan through entire file, everything looks good
+            int entriesTruncated = initialEntryCount - entriesScanned;
+            if (!m_isActive && !isFinal() && entriesTruncated == 0) {
+                finalize(false);
+            }
+
+            return entriesTruncated;
+        } finally {
+            reader.purge();
+        }
+    }
+
+    /**
+     * Set or clear segment as 'final', i.e. whether segment is complete and logically immutable.
+     *
+     * NOTES:
+     *
+     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the operation is a
+     * no-op: this will be the case on filesystems that do no support extended file attributes. Also note that the
+     * {@code FileStore.supportsFileAttributeView} method does not provide a reliable way to test for the availability
+     * of the extended file attributes.
+     *
+     * Must be called with 'true' by segment owner when it has filled the segment, written all segment metadata, and
+     * after it has either closed or sync'd the segment file.
+     *
+     * Must be called with 'false' whenever opening segment for writing new data.
+     *
+     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment itself generally
+     * lacks context to decide whether it's final or not.
+     *
+     * @param isFinal true if segment is set to final, false otherwise
+     * @throws IOException
+     */
+    void setFinal(boolean isFinal) throws IOException {
+        if (isFinal != m_isFinal) {
+            if (PBDSegment.setFinal(m_file, isFinal)) {
+                if (!isFinal) {
+                    // It is dangerous to leave final on a segment so make sure the metadata is flushed
+                    m_fc.force(true);
+                }
+            } else if (PBDSegment.isFinal(m_file) && !isFinal) {
+                throw new IOException("Could not remove the final attribute from " + m_file.getName());
+            }
+            // It is OK for m_isFinal to be true when isFinal(File) returns false but not the other way
+            m_isFinal = isFinal;
+        }
+    }
+
+    @Override
+    void finalize(boolean close) throws IOException {
+        m_isActive = false;
+        IOException exception = null;
+        try {
+            if (canBeFinalized()) {
+                sync();
+                setFinal(true);
+            }
+        } catch (IOException e) {
+            exception = e;
+        } finally {
+            try {
+                if (close) {
+                    close();
+                } else {
+                    setReadOnly();
+                }
+            } catch (IOException e) {
+                if (exception == null) {
+                    exception = e;
+                } else {
+                    exception.addSuppressed(e);
+                }
+            }
+
+            if (exception != null) {
+                throw exception;
+            }
+        }
+    }
+
+    /**
+     * Returns whether the file is final
+     *
+     * @see notes on {@code setFinal}
+     * @return true if file is final, false otherwise
+     */
+    @Override
+    boolean isFinal() {
+        return m_isFinal;
     }
 
     private void incrementNumEntries(int size) throws IOException
@@ -383,7 +579,7 @@ class PBDRegularSegment extends PBDSegment {
 
     @Override
     void setReadOnly() throws IOException {
-        getFiileChannelWrapper().reopen(false);
+        m_fc.reopen(false);
     }
 
     @Override
@@ -516,8 +712,7 @@ class PBDRegularSegment extends PBDSegment {
         return m_size;
     }
 
-    @Override
-    protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int entryNumber) throws IOException
+    private int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int entryNumber) throws IOException
     {
         int written = 0;
         final DBBPool.BBContainer partialCont =
@@ -559,16 +754,14 @@ class PBDRegularSegment extends PBDSegment {
         writeOutHeader();
     }
 
-    @Override
-    boolean canBeFinalized() {
+    /**
+     * @return {@code true} if this segment is eligible for finalization
+     */
+    private boolean canBeFinalized() {
         if (m_fc != null) {
-            return getFiileChannelWrapper().m_stable;
+            return m_fc.m_stable;
         }
         return false;
-    }
-
-    private FileChannelWrapper getFiileChannelWrapper() {
-        return (FileChannelWrapper) m_fc;
     }
 
     private class SegmentReader implements PBDSegmentReader {
@@ -752,9 +945,7 @@ class PBDRegularSegment extends PBDSegment {
         }
 
         private void truncateToCurrentReadIndex() throws IOException {
-            PBDRegularSegment.this.close();
-            openForTruncate();
-            boolean wasReadOnly = getFiileChannelWrapper().reopen(true);
+            boolean wasReadOnly = m_fc.reopen(true);
             try {
                 setFinal(false);
                 initNumEntries(m_objectReadIndex, m_bytesRead);
