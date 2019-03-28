@@ -37,3 +37,5 @@ if __name__ == "__main__":
 
     with open(os.path.join(os.path.dirname(__file__), '../../.classpath'), 'w') as f:
         f.write(classPathData)
+
+    print("Calcite debug output is off!")
