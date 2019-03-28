@@ -550,6 +550,37 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
     }
 
+    @Test
+    public void testENG15734() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                "ID INTEGER,\n" +
+                "FL FLOAT,\n" +
+                "V1 VARCHAR(63),\n" +
+                "V2 VARCHAR(64) DEFAULT '0'" +
+                ");\n" +
+                "CREATE INDEX DIDX4 ON P4(ID) WHERE V2 LIKE UPPER(V1);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(FL) VALUES(6.2);",
+                    "UPDATE P4 SET V1 = V2;",
+                    "TRUNCATE TABLE P4;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) { }
+        }
+    }
+
     private void createSchema(VoltDB.Configuration config,
                               String ddl,
                               final int sitesPerHost,

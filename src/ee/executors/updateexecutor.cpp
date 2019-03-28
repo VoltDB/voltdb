@@ -46,10 +46,12 @@
 #include <cassert>
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
+#include <set>
 
 #include "updateexecutor.h"
 
 #include "common/ExecuteWithMpMemory.h"
+#include "expressions/expressionutil.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/tablefactory.h"
@@ -149,24 +151,14 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             //
             // Shouldn't this be done in p_init?  See ticket ENG-8668.
             std::vector<TableIndex*> indexesToUpdate;
-            const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
-            BOOST_FOREACH(TableIndex *index, allIndexes) {
-                bool indexKeyUpdated = false;
-                BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
-                    std::pair<int, int> updateColInfo; // needs to be here because of macro failure
-                    BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
-                        if (updateColInfo.second == colIndex) {
-                            indexKeyUpdated = true;
-                            break;
-                        }
-                    }
-                    if (indexKeyUpdated) {
-                        break;
-                    }
-                }
-                if (indexKeyUpdated) {
-                    indexesToUpdate.push_back(index);
-                }
+            for(auto* index : targetTable->allIndexes()) {
+               auto const indicesArray = index->getAllColumnIndices();
+               std::set<int> const colIndices(indicesArray.cbegin(), indicesArray.cend());
+               if (m_inputTargetMap.cend() !=
+                     std::find_if(m_inputTargetMap.cbegin(), m_inputTargetMap.cend(),
+                        [&colIndices](std::pair<int, int> const& col) {return colIndices.count(col.second);})) {
+                  indexesToUpdate.push_back(index);
+               }
             }
 
             assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
@@ -218,8 +210,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = modified_tuples;
             }
-        }
-        else {
+        } else {
             if (s_modifiedTuples == -1) {
                 // An exception was thrown on the lowest site thread and we need to throw here as well so
                 // all threads are in the same state
