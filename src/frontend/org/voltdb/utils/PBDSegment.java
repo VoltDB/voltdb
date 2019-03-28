@@ -172,9 +172,11 @@ public abstract class PBDSegment {
 
     /**
      * Parse the segment and truncate the file if necessary.
-     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
-     * @return The number of objects that was truncated. This number will be subtracted from the total number
-     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     *
+     * @param truncator A caller-supplied truncator that decides where in the segment to truncate
+     * @return The number of objects that was truncated. This number will be subtracted from the total number of
+     *         available objects in the PBD. {@link Integer#MAX_VALUE} means that this whole segment should be removed.
+     *         A negative value means that the entries were truncated because of corruption and not {@code truncator}
      * @throws IOException
      */
     int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
@@ -193,7 +195,7 @@ public abstract class PBDSegment {
         if (initialEntryCount == 0) {
             reader.close();
             close();
-            return -1;
+            return Integer.MAX_VALUE;
         }
         int sizeInBytes = 0;
 
@@ -260,7 +262,7 @@ public abstract class PBDSegment {
             if (!isFinal() && entriesNotScanned == 0) {
                 finalize(true);
             }
-            return entriesNotScanned;
+            return -entriesNotScanned;
         }
 
         close();

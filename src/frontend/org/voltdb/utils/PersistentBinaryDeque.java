@@ -649,15 +649,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             final int truncatedEntries = segment.parseAndTruncate(truncator);
 
-            if (truncatedEntries == -1) {
+            if (truncatedEntries == Integer.MAX_VALUE) {
                 // This whole segment will be truncated in the truncation loop below
                 lastSegmentIndex = segmentIndex - 1;
                 break;
-            } else if (truncatedEntries > 0) {
-                m_numObjects -= truncatedEntries;
-                //Set last segment and break the loop over this segment
-                lastSegmentIndex = segmentIndex;
-                break;
+            } else if (truncatedEntries != 0) {
+                m_numObjects -= Math.abs(truncatedEntries);
+                if (truncatedEntries > 0) {
+                    // Set last segment and break the loop over this segment
+                    lastSegmentIndex = segmentIndex;
+                    break;
+                }
             }
             // truncatedEntries == 0 means nothing is truncated in this segment,
             // should move on to the next segment.
