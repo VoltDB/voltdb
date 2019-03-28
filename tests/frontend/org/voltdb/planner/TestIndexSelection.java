@@ -240,7 +240,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
     // This tests recognition of prefix parameters and constants to prefer an index that
     // would use a greater number of key components AND would give the desired ordering.
-    public void testEng2541Plan() throws JSONException {
+    public void testEng2541Plan() {
         AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
         // System.out.println("DEBUG: " + pn.toExplainPlanString());
@@ -251,8 +251,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
     // This tests recognition of a prefix parameter and upper bound to prefer an index that would
     // use a greater number of key components even though another index would give the desired ordering.
-    public void testEng4792PlanWithCompoundEQLTEOrderedByPK()
-            throws JSONException {
+    public void testEng4792PlanWithCompoundEQLTEOrderedByPK() {
         AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
         // System.out.println("DEBUG: " + pn.toExplainPlanString());
         pn = pn.getChild(0);
@@ -418,6 +417,12 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select * from c where f > 0 and (e > 0 or d < 5);");
         checkScanUsesIndex(pn, "PARTIAL_IDX_OR_EXPR");
         checkIndexPredicateIsNull(pn);
+
+        // ENG-15719
+        // CREATE INDEX partial_idx_8 ON c (b) WHERE abs(a) > 0;
+        pn = compile("SELECT COUNT(b) FROM c WHERE abs(a) > 0;");
+        checkScanUsesIndex(pn, "PARTIAL_IDX_8");
+        checkIndexPredicateContains(pn, "A");
     }
 
     public void testPartialIndexComparisonPredicateExactMatch() {

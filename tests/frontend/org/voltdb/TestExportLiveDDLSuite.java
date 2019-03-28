@@ -185,8 +185,14 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             response = client.callProcedure("@AdHoc", "drop stream " + tab);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
-        //After drop there should be no stats rows for export.
-        waitForStreamedTargetDeallocated(client);
+        if (MiscUtils.isPro()) {
+            // In the Pro path of the test the NEX streams don't get dropped
+            waitForStreamedTargetAllocatedMemoryZero(client);
+        }
+        else {
+            //After drop there should be no stats rows for export.
+            waitForStreamedTargetDeallocated(client);
+        }
 
         //recreate tables and export again
         for (int i = 0; i < numOfStreams; i++) {

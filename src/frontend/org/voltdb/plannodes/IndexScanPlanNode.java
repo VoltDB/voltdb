@@ -101,6 +101,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     // (see setSkipNullPredicate() beblow).
     private AbstractExpression m_skip_null_predicate;
 
+    private AbstractExpression m_partialIndexPredicate = null;
+
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
 
@@ -119,6 +121,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
     private static final int FOR_DETERMINISM = 3;
+    private static final int FOR_PARTIAL_INDEX = 4;
 
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
@@ -265,6 +268,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         return skipNullPredicate;
     }
 
+    public void setPartialIndexPredicate(AbstractExpression e) {
+        m_partialIndexPredicate = e;
+    }
+
+    public AbstractExpression getPartialIndexPredicate() {
+        return m_partialIndexPredicate;
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.INDEXSCAN;
@@ -272,12 +283,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     @Override
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
+            Collection<String> indexes) {
         super.getTablesAndIndexes(tablesRead, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
-            assert(m_targetIndexName.length() > 0);
             indexes.add(m_targetIndexName);
         }
     }
@@ -325,8 +334,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         return false;
     }
 
-    private void setCatalogIndex(Index index)
-    {
+    private void setCatalogIndex(Index index) {
         m_catalogIndex = index;
         m_targetIndexName = index.getTypeName();
     }
@@ -456,10 +464,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     /**
      * @param endExpression the end expression to set
      */
-    public void setEndExpression(AbstractExpression endExpression)
-    {
-        if (endExpression != null)
-        {
+    public void setEndExpression(AbstractExpression endExpression) {
+        if (endExpression != null) {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
@@ -467,10 +473,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
     }
 
-    public void addEndExpression(AbstractExpression newExpr)
-    {
-        if (newExpr != null)
-        {
+    public void addEndExpression(AbstractExpression newExpr) {
+        if (newExpr != null) {
             List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add(newExpr.clone());
             m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
@@ -482,10 +486,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_searchkeyExpressions.clear();
     }
 
-    public void addSearchKeyExpression(AbstractExpression expr)
-    {
-        if (expr != null)
-        {
+    public void addSearchKeyExpression(AbstractExpression expr) {
+        if (expr != null) {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
@@ -497,8 +499,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_compareNotDistinct.add(flag);
     }
 
-    public void removeLastSearchKey()
-    {
+    public void removeLastSearchKey() {
         int size = m_searchkeyExpressions.size();
         if (size <= 1) {
             clearSearchKeyExpression();
@@ -584,8 +585,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             m_lookupType != IndexLookupType.EQ &&
             m_lookupType != IndexLookupType.GEO_CONTAINS) {
             keyWidth -= 0.5;
-        }
-        else if (keyWidth == 0.0 && m_endExpression != null) {
+        } else if (keyWidth == 0.0 && m_endExpression != null) {
             // When there is no start key, count an end-key as a single-column range scan key.
 
             // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
@@ -636,12 +636,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // Assign minor priorities for different index types (tiebreakers).
         if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
             tuplesToRead = 2;
-        }
-        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
+        } else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
                  (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
             tuplesToRead = 3;
-        }
-        else if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+        } else if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             // "Covering cell" indexes get further special treatment below that tries to
             // properly credit their benefit even when they do not actually eliminate
             // the expensive exact contains post-filter.
@@ -652,8 +650,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // special case a unique match for the output count
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
-        }
-        else {
+        } else {
             // If not a unique, covering index, favor (discount)
             // the choice with the most columns pre-filtered by the index.
             // Cost starts at 90% of a comparable seqscan AND
@@ -793,6 +790,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
+    public boolean isForSortOrderOnly() {
+        return m_searchkeyExpressions.isEmpty() &&
+                (m_purpose != FOR_DETERMINISM && m_purpose != FOR_GROUPING && ! m_hasOffsetRankOptimization);
+    }
+
+    public void setForPartialIndexOnly() {
+        m_purpose = FOR_PARTIAL_INDEX;
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
@@ -810,23 +816,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // The plan is easy to explain if it isn't using indexed expressions.
             // Just explain why an index scan was chosen
             // -- either for determinism or for an explicit ORDER BY requirement.
-            if (m_purpose == FOR_DETERMINISM) {
-                usageInfo = " (for deterministic order only)";
-            }
-            else if (m_purpose == FOR_GROUPING) {
-                usageInfo = " (for optimized grouping only)";
-            }
-            else if (m_hasOffsetRankOptimization) {
-                usageInfo = " (for offset rank lookup and for sort order)";
-            }
-            else {
-                usageInfo = " (for sort order only)";
+            switch (m_purpose) {
+                case FOR_DETERMINISM :
+                    usageInfo = " (for deterministic order only)";
+                    break;
+                case FOR_GROUPING :
+                    usageInfo = " (for optimized grouping only)";
+                    break;
+                case FOR_PARTIAL_INDEX :
+                    usageInfo = " (for partial index only)";
+                    break;
+                default:
+                    usageInfo = m_hasOffsetRankOptimization ?
+                            " (for offset rank lookup and for sort order)" : " (for sort order only)";
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.
             // e.g. " filter by OTHER_COL = 1"
             predicatePrefix = "\n" + indent + " filter by ";
-        }
-        else {
+        } else {
             int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
             String[] asIndexed = new String[indexSize];
             // Not really expecting to need these fall-back labels,
@@ -843,8 +850,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                     Column col = cref.getColumn();
                     asIndexed[cref.getIndex()] = col.getName();
                 }
-            }
-            else {
+            } else {
                 try {
                     List<AbstractExpression> indexExpressions =
                         AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
@@ -867,15 +873,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 // " scan matches for (event_type = 1) AND (event_location = x.region)"
                 if (m_catalogIndex.getUnique()) {
                     usageInfo = "\n" + indent + " uniquely match " + start;
-                }
-                else {
+                } else {
                     usageInfo = "\n" + indent + " scan matches for " + start;
                 }
-            }
-            else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+            } else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
                 usageInfo = "\n" + indent + " scan for " + start;
-            }
-            else {
+            } else {
                 usageInfo = "\n" + indent;
                 if (isReverseScan()) {
                     usageInfo += "reverse ";
@@ -885,8 +888,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
                     usageInfo += "range-scan covering from " + start;
-                }
-                else {
+                } else {
                     usageInfo += String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
                 // Explain the criteria for continuinuing the scan such as
@@ -925,8 +927,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     /// Explain that this index scan begins at the "start" of the index
     /// or at a particular key, possibly compound.
-    private String explainSearchKeys(String[] asIndexed, int nCovered)
-    {
+    private String explainSearchKeys(String[] asIndexed, int nCovered) {
         // By default, indexing starts at the start of the index.
         if (m_searchkeyExpressions.isEmpty()) {
             return "start";
@@ -943,8 +944,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         result += conjunction + asIndexed[prefixSize] + " ";
         if (m_lookupType == IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize)) {
             result += "NOT DISTINCT";
-        }
-        else {
+        } else {
             result += m_lookupType.getSymbol();
         }
         result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain());
@@ -957,8 +957,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     /// Explain that this index scans "to end" of the index
     /// or only "while" an end expression involving indexed key values remains true.
-    private String explainEndKeys()
-    {
+    private String explainEndKeys() {
         // By default, indexing starts at the start of the index.
         if (m_endExpression == null) {
             return " to end";
