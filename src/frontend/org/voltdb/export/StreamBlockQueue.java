@@ -406,6 +406,7 @@ public class StreamBlockQueue {
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
+                final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
                 final int tupleCount = b.getInt();
                 b.order(endianness);
                 tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
