@@ -738,7 +738,7 @@ private:
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
     void setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
-            TableTuple& sourceTupleWithNewValues);
+            TableTuple& sourceTupleWithNewValues, bool updateMigrate);
 
     void computeSmallestUniqueIndex();
 

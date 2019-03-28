@@ -741,7 +741,7 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
 }
 
 void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
-        TableTuple& sourceTupleWithNewValues) {
+        TableTuple& sourceTupleWithNewValues, bool updateMigrate) {
     assert(targetTupleToUpdate.getSchema()->isTableWithStream());
     uint16_t migrateColumnIndex = getMigrateColumnIndex();
     NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
@@ -749,10 +749,12 @@ void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& t
     // If the migrate hidden column has transaction id, reset it to null and remove the tuple
     // from migrating index (update path).Otherwise set the transaction id to the migrate hidden column (migrate path)
     if (txnId.isNull()) {
-        int64_t spHandle = ec->currentSpHandle();
-        VOLT_DEBUG("Add migrating index for txnId: %ld", (long)spHandle);
-        sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
-    } else {
+        if (updateMigrate) {
+            int64_t spHandle = ec->currentSpHandle();
+            VOLT_DEBUG("Add migrating index for txnId: %ld", (long)spHandle);
+            sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
+        }
+     } else {
         sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
         VOLT_DEBUG("Remove migrating index for txnId: %ld", (long)(ValuePeeker::peekBigInt(txnId)));
         migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
@@ -1026,7 +1028,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     // Set or reset txnId on migrate hidden column
     if (m_shadowStream != nullptr) {
-        setMigrateTxnIdForTuple(ec, targetTupleToUpdate, sourceTupleWithNewValues);
+        setMigrateTxnIdForTuple(ec, targetTupleToUpdate, sourceTupleWithNewValues, updateMigrate);
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
