@@ -967,7 +967,13 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     }
 
     // Add tuple back to migrating index if needed
-    migratingUndo(target);
+    if (m_shadowStream != nullptr) {
+       NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+       if (!txnId.isNull()) {
+          migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+          VOLT_TRACE("Delete undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
+       }
+    }
 }
 
 /*
@@ -1135,7 +1141,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
          */
        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
-              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated);
+              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, updateMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
     }
     else {
@@ -1189,7 +1195,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
  */
 void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
                                          char* sourceTupleDataWithNewValues,
-                                         bool revertIndexes) {
+                                         bool revertIndexes,
+                                         bool updateMigrate) {
     TableTuple matchable(m_schema);
     // Get the address of the tuple in the table from one of the copies on hand.
     // Any TableScan OR a primary key lookup on an already updated index will find the tuple
@@ -1233,17 +1240,42 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     if (revertIndexes) {
         TableTuple conflict(m_schema);
         BOOST_FOREACH (auto index, m_indexes) {
-            index->addEntry(&targetTupleToUpdate, &conflict);
+            if (m_shadowStream != nullptr && index->isMigratingIndex()) {
+                 NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
+                 // Partial not_migrating index
+                 if (txnId.isNull()) {
+                     index->addEntry(&targetTupleToUpdate, &conflict);
+                 }
+            } else {
+                index->addEntry(&targetTupleToUpdate, &conflict);
+            }
             if (!conflict.isNullTuple()) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
                                     m_name.c_str(), index->getName().c_str());
             }
         }
     }
-    migratingUndo(targetTupleToUpdate);
+
+    // Revert migrating indexes
+    if (m_shadowStream != nullptr) {
+        NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
+
+        // This is update path, add migrating index back
+        if (!txnId.isNull() && !updateMigrate) {
+            migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
+            VOLT_TRACE("Undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
+        }
+
+        // This is migrate path, Remove migrating index
+        if (txnId.isNull() && updateMigrate){
+            ExecutorContext* ec = ExecutorContext::getExecutorContext();
+            migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
+            VOLT_TRACE("Undo remove migrating index for TxnId %ld", (long)ec->currentSpHandle());
+        }
+    }
 }
 
-void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
+void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool removeMigratingIndex) {
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
     bool createUndoAction = fallible && (uq != NULL);
 
@@ -1271,7 +1303,13 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
-
+    if (m_shadowStream != nullptr && removeMigratingIndex) {
+        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+        // This is update path, add migrating index back
+        if (!txnId.isNull()) {
+            migratingRemove(ValuePeeker::peekBigInt(txnId), target);
+        }
+    }
     if (createUndoAction) {
         target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
@@ -2455,22 +2493,6 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     return found == 1;
 }
 
-void PersistentTable::migratingUndo(TableTuple& tuple) {
-    if (m_shadowStream != nullptr) {
-        NValue txnId = tuple.getHiddenNValue(getMigrateColumnIndex());
-        if (!txnId.isNull()) {
-            // Add the index back
-            migratingAdd(ValuePeeker::peekBigInt(txnId), tuple);
-            VOLT_DEBUG("Undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
-        } else {
-            // Remove the index
-            ExecutorContext* ec = ExecutorContext::getExecutorContext();
-            migratingRemove(ec->currentSpHandle(), tuple);
-            VOLT_DEBUG("Undo remove migrating index for TxnId %ld", (long)ec->currentSpHandle());
-        }
-    }
-}
-
 uint16_t PersistentTable::getMigrateColumnIndex() {
     return (m_schema->hiddenColumnCount() -1);
 }
@@ -2487,7 +2509,7 @@ int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxR
                 deletedRows += batch.size();
                 BOOST_FOREACH (auto toDelete, batch) {
                     targetTuple.move(toDelete);
-                    deleteTuple(targetTuple);
+                    deleteTuple(targetTuple, true, false);
                 }
                 currIt = m_migratingRows.erase(currIt);
                 if (currIt == m_migratingRows.end()) {
@@ -2504,7 +2526,7 @@ int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxR
                     break;
                 }
             }
-            VOLT_DEBUG("Migrated rows to be deleted: %d, deleted: %d", remainingRows, deletedRows);
+            VOLT_TRACE("Migrated rows to be deleted: %d, deleted: %d", remainingRows, deletedRows);
             return remainingRows;
         }
     }

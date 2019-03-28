@@ -107,14 +107,15 @@ public:
     void insertTupleForUndo(char* tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
-                            bool revertIndexes);
+                            bool revertIndexes,
+                            bool updateMigrate);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
     // The initial use case is a live catalog update that changes table schema and migrates tuples
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
-    void deleteTuple(TableTuple& tuple, bool fallible = true);
+    void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple& tuple, TBPtr block = TBPtr(NULL));
@@ -281,7 +282,7 @@ public:
     // The initial use case is a live catalog update that changes table schema
     // and migrates tuples and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
-    void deleteTuple(TableTuple& tuple, bool fallible = true);
+    void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool insertTuple(TableTuple& tuple);
     // Optimized version of update that only updates specific indexes.
@@ -596,7 +597,6 @@ public:
 
     void migratingAdd(int64_t txnId, TableTuple& tuple);
     bool migratingRemove(int64_t txnId, TableTuple& tuple);
-    void migratingUndo(TableTuple& tuple);
     uint16_t getMigrateColumnIndex();
     /**
      * Delete the rows that have completed the migration process
@@ -692,7 +692,8 @@ private:
 
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
-                            bool revertIndexes);
+                            bool revertIndexes,
+                            bool updateMigrate);
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
@@ -906,12 +907,13 @@ inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
 
 inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
                                                        char* sourceTupleWithNewValues,
-                                                       bool revertIndexes) {
-    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
+                                                       bool revertIndexes,
+                                                       bool updateMigrate) {
+    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes, updateMigrate);
 }
 
-inline void PersistentTableSurgeon::deleteTuple(TableTuple& tuple, bool fallible) {
-    m_table.deleteTuple(tuple, fallible);
+inline void PersistentTableSurgeon::deleteTuple(TableTuple& tuple, bool fallible,  bool removeMigratingIndex) {
+    m_table.deleteTuple(tuple, fallible, removeMigratingIndex);
 }
 
 inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {

@@ -130,15 +130,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
                     // Delete from target table
                     targetTable->deleteTuple(targetTuple, true);
-
-                    // delete migrating index if needed
-                    if (targetTable->getStreamedTable() != nullptr) {
-                        NValue txnId = targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex());
-                        if (!txnId.isNull()) {
-                            VOLT_DEBUG("Delete migrating index for txnId: %ld", (long)(ValuePeeker::peekBigInt(txnId)));
-                            targetTable->migratingRemove(ValuePeeker::peekBigInt(txnId), targetTuple);
-                        }
-                    }
                 }
                 modified_tuples = m_inputTable->tempTableTupleCount();
                 VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
