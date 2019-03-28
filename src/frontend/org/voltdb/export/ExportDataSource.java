@@ -66,6 +66,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
@@ -87,6 +88,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
     private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
@@ -181,7 +183,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
     private MigrateRowsDeleter m_migrateRowsDeleter;
 
-    private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
+    private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 
     private static final String VOLT_TRANSACTION_ID = "VOLT_TRANSACTION_ID";
     private static final String VOLT_EXPORT_TIMESTAMP = "VOLT_EXPORT_TIMESTAMP";
@@ -1804,13 +1806,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
-                                if (DISABLE_AUTO_GAP_RELEASE) {
-                                    // Show warning only in full cluster.
-                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin export release' command to skip the missing data.");
-                                } else {
+                                if (ENABLE_AUTO_GAP_RELEASE) {
                                     processStreamControl(OperationMode.RELEASE);
+                                } else {
+                                    // Show warning only in full cluster.
+                                    String warnMsg = "Export is blocked, missing [" +
+                                            gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                            ExportDataSource.this.toString() +
+                                            ". Please rejoin a node with the missing export queue data or " +
+                                            "use 'voltadmin export release' command to skip the missing data.";
+                                    exportLog.warn(warnMsg);
+                                    consoleLog.warn(warnMsg);
+                                    SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
+                                    if (snmp != null) {
+                                        try {
+                                            snmp.streamBlocked(warnMsg);
+                                        } catch (Throwable t) {
+                                            VoltLogger log = new VoltLogger("HOST");
+                                            log.warn("failed to issue a streamBlocked SNMP trap", t);
+                                        }
+                                    }
                                 }
                             }
                         } else {
