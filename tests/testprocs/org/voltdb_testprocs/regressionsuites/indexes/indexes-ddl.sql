@@ -119,6 +119,7 @@ CREATE TABLE tableY (
 PARTITION TABLE tableY ON COLUMN keyA;
 
 CREATE INDEX idx_y_keyI ON tableY(keyH,keyI);
+CREATE INDEX idx_partial_y_keyI ON tableY(keyI) WHERE abs(keyA) > 0;
 
 -- tree index on varbinary type
 CREATE TABLE varbinaryTableTree (

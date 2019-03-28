@@ -36,7 +36,6 @@ public class AccessPath {
     Index index = null;
     IndexUseType use = IndexUseType.COVERING_UNIQUE_EQUALITY;
     boolean nestLoopIndexJoin = false;
-    boolean requiresSendReceive = false;
     boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
