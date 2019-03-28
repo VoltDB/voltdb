@@ -1237,11 +1237,9 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // Revert migrating indexes
     if (fromMigrate) {
         assert(m_shadowStream != nullptr);
-        NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
-        if (txnId.isNull()) {
-            ExecutorContext* ec = ExecutorContext::getExecutorContext();
-            migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
-        }
+        assert(targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex()).isNull());
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
     } else {
         if (m_shadowStream != nullptr) {
             NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
