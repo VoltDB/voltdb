@@ -38,4 +38,5 @@ public interface SnmpTrapSender {
     public void resourceClear(ThresholdType criteria, FaultFacility facility, long threshold, long actual, String msg);
     public void pause(String msg);
     public void resume(String msg);
+    public void streamBlocked(String msg);
 }
