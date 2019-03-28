@@ -740,24 +740,6 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
     }
 }
 
-void PersistentTable::setMigrateTxnIdForTuple(ExecutorContext* ec, TableTuple& targetTupleToUpdate,
-        TableTuple& sourceTupleWithNewValues, bool updateMigrate) {
-    uint16_t migrateColumnIndex = getMigrateColumnIndex();
-    NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
-
-    // If the migrate hidden column has transaction id, reset it to null and remove the tuple
-    // from migrating index (update path).Otherwise set the transaction id to the migrate hidden column (migrate path)
-    if (txnId.isNull()) {
-        if (updateMigrate) {
-            int64_t spHandle = ec->currentSpHandle();
-            sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
-        }
-     } else {
-        sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
-        migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
-    }
-}
-
 void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallible) {
     // If the current table does not have a delta table, return.
     // If the current table has a delta table, but it is used by
@@ -968,7 +950,6 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
        if (!txnId.isNull()) {
           migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-          VOLT_TRACE("Delete undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
        }
     }
 }
@@ -983,7 +964,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
                                                      std::vector<TableIndex*> const& indexesToUpdate,
                                                      bool fallible,
                                                      bool updateDRTimestamp,
-                                                     bool updateMigrate) {
+                                                     bool fromMigrate) {
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
     int tupleLength = targetTupleToUpdate.tupleLength();
@@ -1025,18 +1006,26 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
-    if (hasDRTimestampColumn() && updateDRTimestamp && !updateMigrate) {
+    if (hasDRTimestampColumn() && updateDRTimestamp) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    // Set or reset txnId on migrate hidden column
     if (m_shadowStream != nullptr) {
-        setMigrateTxnIdForTuple(ec, targetTupleToUpdate, sourceTupleWithNewValues, updateMigrate);
+       uint16_t migrateColumnIndex = getMigrateColumnIndex();
+       NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
+       if (txnId.isNull()) {
+           if (fromMigrate) {
+               int64_t spHandle = ec->currentSpHandle();
+               sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(spHandle));
+           }
+       } else {
+           sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(VALUE_TYPE_BIGINT));
+           migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
+       }
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (!updateMigrate && doDRActions(drStream)) {
-        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+    if (!fromMigrate && doDRActions(drStream)) {
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
         size_t drMark = drStream->appendUpdateRecord(m_signature, m_partitionColumn, currentSpHandle,
@@ -1125,7 +1114,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
-    if (updateMigrate && m_shadowStream != nullptr) {
+    if (fromMigrate) {
+        assert(m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
         m_shadowStream->insertTuple(sourceTupleWithNewValues);
     }
@@ -1137,7 +1127,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
          */
        char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
-              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, updateMigrate);
+              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
     }
     else {
@@ -1159,7 +1149,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         }
 
         // For migrate, the hidden index should not be added back
-        if (updateMigrate && index->isMigratingIndex()) {
+        if (fromMigrate && index->isMigratingIndex()) {
             continue;
         }
         index->addEntry(&targetTupleToUpdate, &conflict);
@@ -1192,7 +1182,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
                                          char* sourceTupleDataWithNewValues,
                                          bool revertIndexes,
-                                         bool updateMigrate) {
+                                         bool fromMigrate) {
     TableTuple matchable(m_schema);
     // Get the address of the tuple in the table from one of the copies on hand.
     // Any TableScan OR a primary key lookup on an already updated index will find the tuple
@@ -1236,15 +1226,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     if (revertIndexes) {
         TableTuple conflict(m_schema);
         BOOST_FOREACH (auto index, m_indexes) {
-            if (m_shadowStream != nullptr && index->isMigratingIndex()) {
-                 NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
-                 // Partial not_migrating index
-                 if (txnId.isNull()) {
-                     index->addEntry(&targetTupleToUpdate, &conflict);
-                 }
-            } else {
-                index->addEntry(&targetTupleToUpdate, &conflict);
-            }
+            index->addEntry(&targetTupleToUpdate, &conflict);
             if (!conflict.isNullTuple()) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
                                     m_name.c_str(), index->getName().c_str());
@@ -1255,18 +1237,14 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     // Revert migrating indexes
     if (m_shadowStream != nullptr) {
         NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
-
         // This is update path, add migrating index back
-        if (!txnId.isNull() && !updateMigrate) {
+        if (!txnId.isNull() && !fromMigrate) {
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
-            VOLT_TRACE("Undo add migrating index for TxnId %ld", (long)ValuePeeker::peekBigInt(txnId));
         }
-
         // This is migrate path, Remove migrating index
-        if (txnId.isNull() && updateMigrate){
+        if (txnId.isNull() && fromMigrate){
             ExecutorContext* ec = ExecutorContext::getExecutorContext();
             migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
-            VOLT_TRACE("Undo remove migrating index for TxnId %ld", (long)ec->currentSpHandle());
         }
     }
 }
