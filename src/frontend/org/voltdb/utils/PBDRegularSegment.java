@@ -786,8 +786,8 @@ class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
-        public boolean allReadAndDiscarded() {
-            return m_discardCount == m_numOfEntries;
+        public boolean anyReadAndDiscarded() {
+            return m_discardCount > 0;
         }
 
         @Override

@@ -86,8 +86,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //that were deleted at the time this cursor was created
         private final int m_numObjectsDeleted;
         private int m_numRead;
+        // If a rewind occurred this is set to the segment id where this cursor was before the rewind
+        private long m_rewoundFromId = -1;
 
-        public ReadCursor(String cursorId, int numObjectsDeleted) throws IOException {
+        public ReadCursor(String cursorId, int numObjectsDeleted) {
             m_cursorId = cursorId;
             m_numObjectsDeleted = numObjectsDeleted;
         }
@@ -127,7 +129,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 m_numRead++;
                 assertions();
                 assert (retcont.b() != null);
-                return wrapRetCont(m_segment, retcont);
+                return wrapRetCont(m_segment, segmentReader.readIndex(), retcont);
             }
         }
 
@@ -160,6 +162,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 // need to restore the read offset
                 return segmentReader.getExtraHeader();
             }
+        }
+
+        void rewindTo(PBDSegment segment) {
+            if (m_rewoundFromId == -1 && m_segment != null) {
+                m_rewoundFromId = m_segment.segmentId();
+            }
+            m_segment = segment;
         }
 
         private void moveToValidSegment() {
@@ -237,7 +246,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
         }
 
-        private BBContainer wrapRetCont(PBDSegment segment, final BBContainer retcont) {
+        private BBContainer wrapRetCont(PBDSegment segment, int entryNumber, final BBContainer retcont) {
             return new BBContainer(retcont.b()) {
                 @Override
                 public void discard() {
@@ -246,35 +255,28 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         retcont.discard();
                         assert(m_closed || m_segments.containsKey(segment.segmentIndex()));
 
-                        //Don't do anything else if we are closed
-                        if (m_closed) {
+                        // Only continue if open there is another segment and this is the first entry of a segment
+                        if (m_closed || m_segments.size() == 1
+                                || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
+                                || !canDeleteSegmentsBefore(segment)) {
                             return;
                         }
 
-                        //Segment is potentially ready for deletion
+                        if (m_rewoundFromId == segment.m_id) {
+                            m_rewoundFromId = -1;
+                        }
+
                         try {
-                            PBDSegmentReader segmentReader = segment.getReader(m_cursorId);
-                            // Don't delete if this is the last segment.
-                            // Cannot be deleted if this reader hasn't finished discarding this.
-                            if (segment == peekLastSegment() || (segmentReader != null && !segmentReader.allReadAndDiscarded())) {
-                                return;
-                            }
-                            if (canDeleteSegment(segment)) {
-                                m_segments.remove(segment.segmentIndex());
+                            Iterator<PBDSegment> iter = m_segments.headMap(segment.segmentIndex(), false).values()
+                                    .iterator();
+                            while (iter.hasNext()) {
+                                PBDSegment earlierSegment = iter.next();
+                                iter.remove();
                                 if (m_usageSpecificLog.isDebugEnabled()) {
-                                    m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
+                                    m_usageSpecificLog.debug("Segment " + earlierSegment.file()
+                                            + " has been closed and deleted after discarding last buffer");
                                 }
-                                // If the segment that cursor currently points to is going to be deleted,
-                                // looks for next segment.
-                                long lastSegmentId = peekLastSegment().segmentIndex();
-                                if (m_segment.segmentIndex() == segment.segmentIndex()) {
-                                    // Tail segment should always exists
-                                    if (m_segment.segmentIndex() == lastSegmentId) {
-                                        throw new IOException("Tail segment file " + m_segment.file().getName() + " shouldn't be deleted! ");
-                                    }
-                                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-                                }
-                                closeAndDeleteSegment(segment);
+                                closeAndDeleteSegment(earlierSegment);
                             }
                         } catch (IOException e) {
                             m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
@@ -756,28 +758,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return (entry==null) ? null : entry.getValue();
     }
 
-    private PBDSegment pollLastSegment() {
-        Map.Entry<Long, PBDSegment> entry = m_segments.pollLastEntry();
-        return (entry!=null) ? entry.getValue() : null;
-    }
-
-    private void closeAndDeleteSegmentsBefore(long segmentId, String reason) throws IOException {
-        // Remove this segment and segments with a smaller sequence number if there are any
-        Iterator<Map.Entry<Long, PBDSegment>> iter = m_segments.entrySet().iterator();
-        while (iter.hasNext()) {
-            Map.Entry<Long, PBDSegment> entry = iter.next();
-            if (entry.getKey() > segmentId) {
-                break;
-            }
-            PBDSegment segmentToDelete = entry.getValue();
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Segment " + segmentToDelete.file() + " has been closed and deleted " + reason);
-            }
-            closeAndDeleteSegment(segmentToDelete);
-            iter.remove();
-        }
-    }
-
     @Override
     public void updateExtraHeader(DeferredSerialization extraHeaderSerializer) throws IOException {
         m_extraHeader = extraHeaderSerializer;
@@ -825,19 +805,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private PBDSegment addSegment(PBDSegment tail) throws IOException {
-        boolean previousTailIsDeleted = false;
         //Check to see if the tail is completely consumed so we can close and delete it
-        if (tail.hasAllFinishedReading() && canDeleteSegment(tail)) {
-            pollLastSegment();
-            closeAndDeleteSegment(tail);
-            previousTailIsDeleted = true;
-        } else {
-            tail.finalize(!tail.isBeingPolled());
+        tail.finalize(!tail.isBeingPolled());
 
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug(
-                        "Segment " + tail.file() + " (final: " + tail.isFinal() + "), has been closed by offer to PBD");
-            }
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug(
+                    "Segment " + tail.file() + " (final: " + tail.isFinal() + "), has been closed by offer to PBD");
         }
         Long nextIndex = tail.segmentIndex() + 1;
         long lastId = tail.segmentId();
@@ -846,9 +819,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         String fname = getSegmentFileName(curId, lastId);
         PBDSegment newSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "an offer");
         m_segments.put(newSegment.segmentIndex(), newSegment);
-        if (previousTailIsDeleted) {
-            advanceCursorTo(tail, newSegment);
-        }
+
         return newSegment;
     }
 
@@ -944,7 +915,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private void rewindCursors() {
         PBDSegment firstSegment = peekFirstSegment();
         for (ReadCursor cursor : m_readCursors.values()) {
-            cursor.m_segment = firstSegment;
+            cursor.rewindTo(firstSegment);
         }
     }
 
@@ -979,58 +950,49 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 // TODO ignore this for now, it is just the segment file failed to be closed
             }
         }
-        // check all segments from latest to oldest (excluding the last write segment) to see if they can be deleted
-        // in a separate try catch block because these two are independent
+        // check all segments from latest to oldest to see if segments before that segment can be deleted
         // We need this only in closeCursor() now, which is currently only used when removing snapshot placeholder
         // cursor in one-to-many DR, this extra check is needed because other normal cursors may have read past some
         // segments, leaving them hold only by the placeholder cursor, since we won't have triggers to check deletion
         // eligibility for these segments anymore, the check needs to take place here to prevent leaking of segments
         // file
         try {
-            boolean isLastSegment = true;
-            for (PBDSegment segment : m_segments.descendingMap().values()) {
-                // skip the last segment
-                if (isLastSegment) {
-                    isLastSegment = false;
-                    continue;
-                }
-                if (canDeleteSegment(segment)) {
-                    closeAndDeleteSegmentsBefore(segment.segmentIndex(), "because of close of cursor");
-                    break;
+            boolean deleteSegment = false;
+            Iterator<PBDSegment> iter = m_segments.descendingMap().values().iterator();
+            while (iter.hasNext()) {
+                PBDSegment segment = iter.next();
+                if (deleteSegment) {
+                    closeAndDeleteSegment(segment);
+                    iter.remove();
+                } else {
+                    deleteSegment = canDeleteSegmentsBefore(segment);
                 }
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             m_usageSpecificLog.error("Exception closing and deleting PBD segment", e);
         }
     }
 
-    private boolean canDeleteSegment(PBDSegment segment) throws IOException {
+    private boolean canDeleteSegmentsBefore(PBDSegment segment) {
         for (ReadCursor cursor : m_readCursors.values()) {
-            if (cursor.m_segment != null && (cursor.m_segment.segmentIndex() >= segment.segmentIndex())) {
-                PBDSegmentReader segmentReader = segment.getReader(cursor.m_cursorId);
-                if (segmentReader == null) {
-                    assert(cursor.m_segment.segmentIndex() == segment.segmentIndex());
-                    segmentReader = segment.openForRead(cursor.m_cursorId);
-                }
+            if (cursor.m_segment == null) {
+                return false;
+            }
 
-                if (!segmentReader.allReadAndDiscarded()) {
-                    return false;
-                }
-            } else { // this cursor hasn't reached this segment yet
+            long segmentIndex = segment.segmentIndex();
+            long cursorSegmentIndex = cursor.m_segment.segmentIndex();
+            if (cursorSegmentIndex < segmentIndex) {
+                return false;
+            }
+
+            PBDSegmentReader segmentReader = segment.getReader(cursor.m_cursorId);
+            if (segmentReader == null) {
+                return false;
+            } else if (!segmentReader.anyReadAndDiscarded()) {
                 return false;
             }
         }
-
         return true;
-    }
-
-    private void advanceCursorTo(PBDSegment deletedSegment, PBDSegment newSegment) {
-        for (ReadCursor cursor : m_readCursors.values()) {
-            if (cursor.m_segment != null && cursor.m_segment.segmentIndex() == deletedSegment.segmentIndex()) {
-                cursor.m_segment = newSegment;
-            }
-        }
     }
 
     @Override
@@ -1194,6 +1156,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 Throwables.propagate(e);
             }
         }
+    }
+
+    int numberOfSegments() {
+        return m_segments.size();
     }
 
     // Used by test only

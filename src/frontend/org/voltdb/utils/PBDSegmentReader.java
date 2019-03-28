@@ -35,13 +35,9 @@ interface PBDSegmentReader {
     public boolean hasMoreEntries() throws IOException;
 
     /**
-     * Have all the entries in this segment been read by this reader and
-     * acknowledged as ready for discarding.
-     *
-     * @return true if all entries have been read and discarded by this reader. False otherwise.
-     * @throws IOException if the reader was closed
+     * @return {@code true} if any entries have been read and discarded from this segment
      */
-    public boolean allReadAndDiscarded() throws IOException;
+    public boolean anyReadAndDiscarded();
 
     /**
      * Read the next entry from the segment for this reader.
