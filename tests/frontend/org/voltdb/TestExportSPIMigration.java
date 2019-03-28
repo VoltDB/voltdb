@@ -61,7 +61,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
     private ServerListener m_serverSocket;
     private final List<ClientConnectionHandler> clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
     private final ConcurrentMap<Long, AtomicLong> seenIds = new ConcurrentHashMap<Long, AtomicLong>();
-    private static final String SCHEMA = "CREATE STREAM t partition on column a (a integer not null, b integer not null);";
+    private static final String SCHEMA = "CREATE STREAM t partition on column a export to target utopia (a integer not null, b integer not null);";
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
 
@@ -97,7 +97,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             Properties props = new Properties();
             //props.put("replicated", "true");
             props.put("skipinternals", "true");
-            builder.addExport(true, "custom", props);
+            builder.addExport(true, "custom", props, "utopia");
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");
