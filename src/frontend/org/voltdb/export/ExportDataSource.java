@@ -1149,7 +1149,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
-                    //We are closing source dont discard next processor will pick it up.
+                    // The GuestProcessor instance wasn't able to handle the future (e.g. being
+                    // shut down by a catalog update). Discard container without acking it.
+                    if (ackingContainer != null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Discarding rejected " + ackingContainer.toString());
+                        }
+                        ackingContainer.internalDiscard();
+                    }
                 }
                 m_pollTask = null;
             }
