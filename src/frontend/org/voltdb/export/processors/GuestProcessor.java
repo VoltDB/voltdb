@@ -325,8 +325,9 @@ public class GuestProcessor implements ExportDataProcessor {
         fut.addListener(new Runnable() {
             @Override
             public void run() {
+                AckingContainer cont = null;
                 try {
-                    AckingContainer cont = fut.get();
+                    cont = fut.get();
                     if (cont == null) {
                         return;
                     }
@@ -471,6 +472,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     } finally {
                         if (cont != null) {
                             cont.discard();
+                            cont = null;
                         }
                     }
                 } catch (Exception e) {
@@ -480,6 +482,11 @@ public class GuestProcessor implements ExportDataProcessor {
 
                     } else {
                         m_logger.error("Error processing export block, continuing processing: ", e);
+                    }
+                } finally {
+                    if (cont != null) {
+                        cont.discard();
+                        cont = null;
                     }
                 }
                 if (!m_shutdown) {
