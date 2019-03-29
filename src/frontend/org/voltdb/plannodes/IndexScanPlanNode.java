@@ -601,11 +601,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                                      ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
-        // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered
-        // otherwise, count non-equality scans as -0.5 coverage
-        // prefer hash index to tree, all else being equal
-        // prefer partial index, all else being equal
+        // 1. unique, covering index always wins
+        // 2. otherwise, pick the index with the most columns covered
+        // 3. otherwise, count non-equality scans as -0.5 coverage
+        // 4. prefer hash index to tree, all else being equal
+        // 5. prefer partial index, all else being equal
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
@@ -625,11 +625,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         // -- as if all rows found in the index passed any additional post-filter conditions.
         // This ignoring of post-filter effects is at least consistent with the SeqScanPlanNode.
         // In effect, it gives index scans an "unfair" advantage
-        // -- follow-on sorts (etc.) are costed lower as if they are operating on fewer rows
+        // -- follow-on sorts (etc.) are cost lower as if they are operating on fewer rows
         // than would have come out of the seqscan, though that's nonsense.
         // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but
         // IndexScanPlanNode costing only ignores post-filters.
-        // In any case, it's important to keep this code roughly in synch with any changes to
+        // In any case, it's important to keep this code roughly in sync with any changes to
         // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         int tuplesToRead = 0;
 
@@ -654,9 +654,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             m_estimatedOutputTupleCount = 1;
         }
         else {
-            // If not a unique, covering index, favor (discount)
-            // the choice with the most columns pre-filtered by the index.
-            // Cost starts at 90% of a comparable seqscan AND
+            // If not a unique, covering index, favor (discount) the choice with the most columns
+            // pre-filtered by the index. Cost starts at 90% of a comparable seqscan AND
             // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
             // One intentional benchmark is for a single range-covered
             // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
@@ -671,9 +670,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             // "Covering cell" indexes get a special adjustment to make them look more favorable
             // than non-unique range filters in particular.
             // I can't quite justify that rationally, but it "seems reasonable". --paul
+            // Please note this discount only applies when query is checking "geometry contains point"
+            // otherwise geo index can't be used and thus will be given a penalty, worse than seq scan
             if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
-                final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
-                tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
+                if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+                    final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
+                    tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
+                } else {
+                    final double GEO_INDEX_ARTIFICIAL_TUPLE_PENALTY_FACTOR = 10.0;
+                    tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_PENALTY_FACTOR;
+                }
             }
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more
