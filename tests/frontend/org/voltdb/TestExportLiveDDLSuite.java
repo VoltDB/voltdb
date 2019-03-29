@@ -83,7 +83,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
         }
-        int limit = 3;
+        int limit = 2;
         try {
             for (int i = 0; i <= limit; i++) {
                 client.callProcedure("@AdHoc", "create stream t" + i + " (a INT);");
