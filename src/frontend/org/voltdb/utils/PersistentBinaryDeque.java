@@ -788,7 +788,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private PBDSegment newSegment(long segmentIndex, long segmentId, File file) {
-        return new PBDRegularSegment(segmentIndex, segmentId, file);
+        return new PBDRegularSegment(segmentIndex, segmentId, file, m_usageSpecificLog);
     }
 
     private PBDSegment initializeNewSegment(long segmentIndex, long segmentId, File file, String reason)
