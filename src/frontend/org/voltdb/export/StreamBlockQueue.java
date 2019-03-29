@@ -45,8 +45,7 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    -- Segment Header ---
- *    version(4) + crc(4) + numberOfEntries(4) + totalBytes(4) + segmentRandomId(4) +
- *    extraHeaderSize(4) + extraHeaderCrc(4)
+ *    (defined in PBDSegment.java, see comments for segment header layout)
  *
  *    -- Export Extra Segment Header ---
  *    exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length) +
@@ -54,7 +53,7 @@ import org.voltdb.utils.VoltFile;
  *    colType(1) + colLength(4) + ...
  *
  *    --- Common Entry Header   ---
- *    crc(4) + length(4) + entryId(4) + flags(2)
+ *   (defined in PBDSegment.java, see comments for entry header layout)
  *
  *    --- Export Entry Header   ---
  *    seqNo(8) + committedSeqNo(8) + tupleCount(4) + uniqueId(8)

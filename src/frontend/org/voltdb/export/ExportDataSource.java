@@ -214,17 +214,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         ReentrantPollException(String s) { super(s); }
     }
 
-    public static class PollTask {
+    private static class PollTask {
         private SettableFuture<AckingContainer> m_pollFuture;
         private boolean m_forcePollSchema;
 
         public PollTask(SettableFuture<AckingContainer> fut, Boolean forcePollSchema) {
             m_pollFuture = fut;
             m_forcePollSchema = forcePollSchema;
-        }
-
-        public SettableFuture<AckingContainer> getPollFuture() {
-            return m_pollFuture;
         }
 
         public boolean forcePollSchema() {
@@ -241,7 +237,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public void clear() {
             m_pollFuture.set(null);
-            m_pollFuture = null;
             m_forcePollSchema = false;
         }
     }
@@ -1007,8 +1002,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
                             AckingContainer cont = m_pendingContainer.getAndSet(null);
-                            boolean hasSchema = cont.schema() != null;
-                            if (!hasSchema) {
+                            if (cont.schema() == null) {
                                 // Ensure this first block has a schema
                                 BBContainer schemaContainer = m_committedBuffers.pollSchema();
                                 if (schemaContainer == null) {
@@ -1275,7 +1269,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                   exportLog.info("Acking export data task rejected, this should be harmless");
                   m_backingCont.discard();
                   synchronized(this) {
-                      m_schemaCont.discard();
+                      if (m_schemaCont != null) {
+                          m_schemaCont.discard();
+                      }
                   }
             }
         }
