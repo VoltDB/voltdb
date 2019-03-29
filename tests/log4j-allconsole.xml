@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd" [
+        <!ENTITY calcite_logger SYSTEM "calcite-logger.xml">
+        ]>
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
     <!-- file appender captures all loggers messages. -->
     <!-- console is a special appender for the logger CONSOLE
@@ -79,6 +81,9 @@
 <!--     <logger name="org.voltdb.sysprocs.SnapshotRestore">
         <level value="TRACE"/>
     </logger> -->
+
+    <!--logger config for calcite-->
+    &calcite_logger;
 
     <root>
         <priority value="info" />

@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+
+# Use this script to turn off debug output in Calcite
+
+import os
+import shutil
+
+APPENDER_PATH = "../../voltdb/calcite-appender.xml"
+
+LOGGER_PATH = "../../voltdb/calcite-logger.xml"
+
+TEST_LOGGER_PATH = "../../tests/calcite-logger.xml"
+
+JAR_PATH = "../../lib/slf4j-log4j12-1.6.2.jar"
+
+if __name__ == "__main__":
+    # update the log4j.xml for tests running in ide
+    with open(os.path.join(os.path.dirname(__file__), APPENDER_PATH), 'w'):
+        pass
+
+    with open(os.path.join(os.path.dirname(__file__), LOGGER_PATH), 'w'):
+        pass
+
+    # update the log4j.xml for tests running in terminal
+    with open(os.path.join(os.path.dirname(__file__), TEST_LOGGER_PATH), 'w'):
+        pass
+
+    # update the jar file
+    shutil.move(os.path.join(os.path.dirname(__file__), JAR_PATH),
+                os.path.join(os.path.dirname(__file__), "slf4j-log4j12-1.6.2.jar"))
+
+    # update .classpath
+    with open(os.path.join(os.path.dirname(__file__), '../../.classpath'), 'r') as f:
+        classPathData = f.read()
+
+    classPathData = classPathData.replace('slf4j-log4j12-1.6.2.jar', 'slf4j-nop-1.6.2.jar')
+
+    with open(os.path.join(os.path.dirname(__file__), '../../.classpath'), 'w') as f:
+        f.write(classPathData)
+
+    print("Calcite debug output is off!")
