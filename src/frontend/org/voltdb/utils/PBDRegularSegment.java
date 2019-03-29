@@ -53,11 +53,11 @@ class PBDRegularSegment extends PBDSegment {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
     private static final int VERSION = 2;
-    private static final VoltLogger LOG = new VoltLogger("HOST");
     private static final Random RANDOM = new Random();
 
     private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
     private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
+    private final VoltLogger m_usageSpecificLog;
 
     private boolean m_closed = true;
     private FileChannelWrapper m_fc;
@@ -82,10 +82,11 @@ class PBDRegularSegment extends PBDSegment {
     private DBBPool.BBContainer m_entryHeaderBuf = null;
     Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    PBDRegularSegment(long index, long id, File file) {
+    PBDRegularSegment(long index, long id, File file, VoltLogger usageSpecificLog) {
         super(file, index, id);
         m_crc = new CRC32();
         m_isFinal = PBDSegment.isFinal(m_file);
+        m_usageSpecificLog = usageSpecificLog;
         reset();
     }
 
@@ -220,7 +221,7 @@ class PBDRegularSegment extends PBDSegment {
                 if (version != VERSION) {
                     String message = "File version incorrect. Detected version " + version + " requires version "
                             + VERSION + " in file " + m_file.getName();
-                    LOG.warn(message);
+                    m_usageSpecificLog.warn(message);
                     throw new IOException(message);
                 }
 
@@ -233,7 +234,8 @@ class PBDRegularSegment extends PBDSegment {
                 if (crcCheck) {
                     if (crc != calculateSegmentHeaderCrc(numOfEntries, size, segmentRandomId, extraHeaderSize,
                             extraHeaderCrc)) {
-                        LOG.warn("File corruption detected in " + m_file.getName() + ": invalid file header. ");
+                        m_usageSpecificLog
+                                .warn("File corruption detected in " + m_file.getName() + ": invalid file header. ");
                         throw new IOException(
                                 "File corruption detected in " + m_file.getName() + ": invalid file header.");
                     }
@@ -244,7 +246,7 @@ class PBDRegularSegment extends PBDSegment {
                             if (extraHeaderCrc != calculateExtraHeaderCrc(extraHeader.b())) {
                                 String message = "File corruption deteced in " + m_file.getName()
                                         + ": invalid extended file header";
-                                LOG.warn(message);
+                                m_usageSpecificLog.warn(message);
                                 throw new IOException(message);
                             }
                         } finally {
@@ -557,8 +559,8 @@ class PBDRegularSegment extends PBDSegment {
 
     @Override
     void close() throws IOException {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Close PBD Segment " + m_file.getName());
+        if (m_usageSpecificLog.isDebugEnabled()) {
+            m_usageSpecificLog.debug("Close PBD Segment " + m_file.getName());
         }
         m_closedCursors.clear();
         closeReadersAndFile();
@@ -879,7 +881,7 @@ class PBDRegularSegment extends PBDSegment {
                     public void discard() {
                         checkDoubleFree();
                         if (m_discarded) {
-                            LOG.error("PBD Container discarded more than once");
+                            m_usageSpecificLog.error("PBD Container discarded more than once");
                             return;
                         }
 
@@ -890,7 +892,8 @@ class PBDRegularSegment extends PBDSegment {
                 };
             } catch (IOException e) {
                 if (canTruncate) {
-                    LOG.warn("Error reading segment " + m_file.getName() + ". Truncate the file to last safe point.",
+                    m_usageSpecificLog.warn(
+                            "Error reading segment " + m_file.getName() + ". Truncate the file to last safe point.",
                             e);
                     truncateToCurrentReadIndex();
                     return null;
@@ -906,7 +909,7 @@ class PBDRegularSegment extends PBDSegment {
             if (canTruncate) {
                 message += " Truncate the file to last safe point.";
             }
-            LOG.warn(message);
+            m_usageSpecificLog.warn(message);
             if (canTruncate) {
                 truncateToCurrentReadIndex();
             } else {
@@ -926,7 +929,7 @@ class PBDRegularSegment extends PBDSegment {
             if (checkCrc) {
                 if (crc != PBDUtils.calculateEntryCrc(m_crcReader, entry, entryId, flags)
                         || INJECT_PBD_CHECKSUM_ERROR) {
-                    LOG.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
+                    m_usageSpecificLog.warn("File corruption detected in " + m_file.getName() + ": checksum error. "
                             + "Truncate the file to last safe point.");
                     truncateToCurrentReadIndex();
                     return false;
@@ -985,7 +988,7 @@ class PBDRegularSegment extends PBDSegment {
                 if (schemaBuf != null) {
                     schemaBuf.discard();
                 }
-                LOG.error("Error reading extra header of file: " + m_file.getName(), e);
+                m_usageSpecificLog.error("Error reading extra header of file: " + m_file.getName(), e);
                 return null;
             }
         }
