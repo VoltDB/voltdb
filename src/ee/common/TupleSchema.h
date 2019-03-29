@@ -346,12 +346,12 @@ inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnInde
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    assert(columnIndex < m_columnCount);
+    assert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    assert(columnIndex < m_columnCount);
+    assert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 

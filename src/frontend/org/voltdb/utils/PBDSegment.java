@@ -19,7 +19,6 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
@@ -30,7 +29,6 @@ import java.util.zip.CRC32;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
 
@@ -42,42 +40,57 @@ public abstract class PBDSegment {
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
 
     // Segment Header layout:
+    // - version of segment headers (4 bytes)
     //  - crc of segment header (4 bytes),
     //  - total number of entries (4 bytes),
     //  - total bytes of data (4 bytes, uncompressed size),
-    public static final int HEADER_CRC_OFFSET = 0;
-    public static final int HEADER_NUM_OF_ENTRY_OFFSET = 4;
-    public static final int HEADER_TOTAL_BYTES_OFFSET = 8;
-    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = 12;
-    static final int SEGMENT_HEADER_BYTES = 16;
+    //  - random id assigned to segment ( 4 bytes )
+    //  - size in bytes of extra header ( 4 bytes )
+    //  - crc for the extra header ( 4 bytes )
+    public static final int HEADER_START_OFFSET = 0;
+    public static final int HEADER_VERSION_OFFSET = HEADER_START_OFFSET;
+    public static final int HEADER_CRC_OFFSET = HEADER_VERSION_OFFSET + 4;
+    public static final int HEADER_NUM_OF_ENTRY_OFFSET = HEADER_CRC_OFFSET + 4;
+    public static final int HEADER_TOTAL_BYTES_OFFSET = HEADER_NUM_OF_ENTRY_OFFSET + 4;
+    public static final int HEADER_RANDOM_ID_OFFSET = HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int HEADER_EXTRA_HEADER_SIZE_OFFSET = HEADER_RANDOM_ID_OFFSET + 4;
+    public static final int HEADER_EXTRA_HEADER_CRC_OFFSET = HEADER_EXTRA_HEADER_SIZE_OFFSET + 4;
+    static final int SEGMENT_HEADER_BYTES = HEADER_EXTRA_HEADER_CRC_OFFSET + 4;
+    static final int HEADER_EXTRA_HEADER_OFFSET = SEGMENT_HEADER_BYTES;
 
-    static final int NO_FLAGS = 0;
-    static final int FLAG_COMPRESSED = 1;
+    static final char NO_FLAGS = 0;
+    static final char FLAG_COMPRESSED = 1;
 
     // Export Segment Entry Header layout (each segment has multiple entries):
     //  - crc of segment entry (4 bytes),
     //  - total bytes of the entry (4 bytes, compressed size if compression is enable),
-    //  - entry flag (4 bytes)
-    public static final int ENTRY_HEADER_CRC_OFFSET = 0;
-    public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = 4;
-    public static final int ENTRY_HEADER_FLAG_OFFSET = 8;
-    public static final int ENTRY_HEADER_BYTES = 12;
+    //  - entry id (random segment id + entry number) (4 bytes),
+    //  - entry flag (2 bytes)
+    public static final int ENTRY_HEADER_START_OFFSET = 0;
+    public static final int ENTRY_HEADER_CRC_OFFSET = ENTRY_HEADER_START_OFFSET;
+    public static final int ENTRY_HEADER_TOTAL_BYTES_OFFSET = ENTRY_HEADER_CRC_OFFSET + 4;
+    public static final int ENTRY_HEADER_ENTRY_ID_OFFSET = ENTRY_HEADER_TOTAL_BYTES_OFFSET + 4;
+    public static final int ENTRY_HEADER_FLAG_OFFSET = ENTRY_HEADER_ENTRY_ID_OFFSET + 4;
+    public static final int ENTRY_HEADER_BYTES = ENTRY_HEADER_FLAG_OFFSET + 2;
 
     protected final File m_file;
 
     protected boolean m_closed = true;
-    protected RandomAccessFile m_ras;
     protected FileChannel m_fc;
     //Avoid unnecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
-    protected CRC32 m_segmentHeaderCRC;
-    protected CRC32 m_entryCRC;
+    // Reusable crc calculator. Must be reset before each use
+    protected CRC32 m_crc;
+    // Mirror of the isFinal metadata on the filesystem
+    private boolean m_isFinal;
+    // Whether or not this is the current active segment being written to
+    boolean m_isActive = false;
 
     public PBDSegment(File file)
     {
         m_file = file;
-        m_segmentHeaderCRC = new CRC32();
-        m_entryCRC = new CRC32();
+        m_crc = new CRC32();
+        m_isFinal = isFinal(m_file);
     }
 
     abstract long segmentIndex();
@@ -86,7 +99,7 @@ public abstract class PBDSegment {
 
     abstract void reset();
 
-    abstract int getNumEntries(boolean crcCheck) throws IOException;
+    abstract int getNumEntries() throws IOException;
 
     abstract boolean isBeingPolled();
 
@@ -101,11 +114,19 @@ public abstract class PBDSegment {
     abstract PBDSegmentReader getReader(String cursorId);
 
     /**
-     * @param forWrite    Open the file in read/write mode
-     * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
+     * Open and initialize this segment as a new segment
+     *
+     * @param compress whether or not entries should be compressed by default
      * @throws IOException
      */
-    abstract protected void openForWrite(boolean emptyFile) throws IOException;
+    abstract void openNewSegment(boolean compress) throws IOException;
+
+    /**
+     * Open the segment for read and possible truncation
+     *
+     * @throws IOException
+     */
+    abstract void openForTruncate() throws IOException;
 
     abstract void initNumEntries(int count, int size) throws IOException;
 
@@ -119,16 +140,35 @@ public abstract class PBDSegment {
 
     abstract boolean hasAllFinishedReading() throws IOException;
 
-    abstract boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException;
+    abstract boolean offer(DBBPool.BBContainer cont) throws IOException;
 
     abstract int offer(DeferredSerialization ds) throws IOException;
 
     // TODO: javadoc
     abstract int size();
 
-    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException;
+    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int entryNumber) throws IOException;
 
     abstract void writeExtraHeader(DeferredSerialization ds) throws IOException;
+
+    /**
+     * Force a read and validation of the header and any extra header metadata which might exist
+     *
+     * @throws IOException If there was an error reading or validating the header
+     */
+    abstract void validateHeader() throws IOException;
+
+    /**
+     * @return {@code true} if this segment is eligible for finalization
+     */
+    abstract boolean canBeFinalized();
+
+    /**
+     * Update the segment to be read only
+     *
+     * @throws IOException If there was an error updating the segment to read only
+     */
+    abstract void setReadOnly() throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -141,11 +181,12 @@ public abstract class PBDSegment {
         if (!m_closed) {
             close();
         }
-        openForWrite(false);
+        openForTruncate();
         PBDSegmentReader reader = openForRead(TRUNCATOR_CURSOR);
 
         // Do stuff
-        final int initialEntryCount = getNumEntries(true);
+        validateHeader();
+        final int initialEntryCount = getNumEntries();
         int entriesTruncated = 0;
         // Zero entry count means the segment is empty or corrupted, in both cases
         // the segment can be deleted.
@@ -198,7 +239,7 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        final int written = writeTruncatedEntry(retval);
+                        final int written = writeTruncatedEntry(retval, reader.readIndex());
                         sizeInBytes += written;
                         initNumEntries(reader.readIndex(), sizeInBytes);
                         m_fc.truncate(partialEntryBeginOffset + written + ENTRY_HEADER_BYTES);
@@ -212,69 +253,61 @@ public abstract class PBDSegment {
         }
         int entriesScanned = reader.readIndex();
         reader.close();
-        close();
-        // If we checksum the file and it looks good, mark as final
-        if (!isFinal() && entriesScanned == initialEntryCount) {
-            setFinal(true);
+
+        if (entriesTruncated == 0) {
+            int entriesNotScanned = initialEntryCount - entriesScanned;
+            // If we checksum the file and it looks good, mark as final
+            if (!isFinal() && entriesNotScanned == 0) {
+                finalize(true);
+            }
+            return entriesNotScanned;
         }
+
+        close();
 
         return entriesTruncated;
     }
 
     /**
-     * Parse the segment and truncate the file if necessary.
-     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
-     * @return The number of objects that was truncated. This number will be subtracted from the total number
-     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     * Scan over all entries in a segment possibly truncating the segment if corruption is detected
+     *
+     * @param truncator A caller-supplied {@link BinaryDeque.BinaryDequeScanner} to scan the individual entries
+     * @return The number of objects that was truncated. This number will be subtracted from the total number of
+     *         available objects in the PBD.
      * @throws IOException
      */
-    ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
-        if (!m_closed) {
-            throw new IOException(("Segment should not be open before truncation"));
-        }
-
+    int scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
         PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
-        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
-
-        DBBPool.BBContainer cont = null;
-        DBBPool.BBContainer schemaCont = null;
-        int initialEntryCount = getNumEntries(true);
-        if (initialEntryCount == 0) {
-            reader.close();
-            return tracker;
-        }
-        while (true) {
-            // Start to read a new segment
-            if (reader.readIndex() == 0) {
-                schemaCont = reader.getExtraHeader();
+        try {
+            validateHeader();
+            DBBPool.BBContainer cont = null;
+            int initialEntryCount = getNumEntries();
+            if (initialEntryCount == 0) {
+                return 0;
             }
-            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
-            if (cont == null) {
-                break;
-            }
-            try {
-                //Handoff the object to the truncator and await a decision
-                ExportSequenceNumberTracker retval = scanner.scan(cont);
-                tracker.mergeTracker(retval);
-
-            } finally {
-                cont.discard();
-                if (schemaCont != null) {
-                    schemaCont.discard();
-                    schemaCont = null;
+            while (true) {
+                cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                if (cont == null) {
+                    break;
+                }
+                try {
+                    scanner.scan(cont);
+                } finally {
+                    cont.discard();
                 }
             }
-        }
-        int entriesScanned = reader.readIndex();
-        reader.close();
-        // Forcefully close the file
-        close();
-        // Scan through entire file, everything looks good
-        if (!isFinal() && entriesScanned == initialEntryCount) {
-            setFinal(true);
-        }
+            int entriesScanned = reader.readIndex();
 
-        return tracker;
+            // Scan through entire file, everything looks good
+            int entriesTruncated = initialEntryCount - entriesScanned;
+            if (!m_isActive && !isFinal() && entriesTruncated == 0) {
+                finalize(false);
+            }
+
+            return entriesTruncated;
+        } finally {
+            reader.purge();
+        }
     }
 
     /**
@@ -282,35 +315,84 @@ public abstract class PBDSegment {
      *
      * NOTES:
      *
-     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the
-     * operation is a no-op: this will be the case on filesystems that do no support extended file
-     * attributes. Also note that the {@code FileStore.supportsFileAttributeView} method does not provide
-     * a reliable way to test for the availability of the extended file attributes.
+     * This is a best-effort feature: On any kind of I/O failure, the exception is swallowed and the operation is a
+     * no-op: this will be the case on filesystems that do no support extended file attributes. Also note that the
+     * {@code FileStore.supportsFileAttributeView} method does not provide a reliable way to test for the availability
+     * of the extended file attributes.
      *
-     * Must be called with 'true' by segment owner when it has filled the segment, written all segment
-     * metadata, and after it has either closed or sync'd the segment file.
+     * Must be called with 'true' by segment owner when it has filled the segment, written all segment metadata, and
+     * after it has either closed or sync'd the segment file.
      *
      * Must be called with 'false' whenever opening segment for writing new data.
      *
-     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment
-     * itself generally lacks context to decide whether it's final or not.
+     * Note that all calls to 'setFinal' are done by the class owning the segment because the segment itself generally
+     * lacks context to decide whether it's final or not.
      *
-     * @param isFinal   true if segment is set to final, false otherwise
+     * @param isFinal true if segment is set to final, false otherwise
+     * @throws IOException
      */
-    public void setFinal(boolean isFinal) {
-        setFinal(m_file, isFinal);
+    void setFinal(boolean isFinal) throws IOException {
+        if (isFinal != m_isFinal) {
+            if (setFinal(m_file, isFinal)) {
+                if (!isFinal) {
+                    // It is dangerous to leave final on a segment so make sure the metadata is flushed
+                    m_fc.force(true);
+                }
+                m_isFinal = isFinal;
+            }
+        }
     }
 
-    public static void setFinal(File file, boolean isFinal) {
+    /**
+     * If this segment is in a good condition the data will be flushed to disk and the segment will either be closed or
+     * converted to read only depending on the argument {@code close}
+     *
+     * @param close If {@code true} this segment will be closed otherwise it will be made read only
+     * @throws IOException
+     */
+    void finalize(boolean close) throws IOException {
+        m_isActive = false;
+        IOException exception = null;
+        try {
+            if (canBeFinalized()) {
+                sync();
+                setFinal(true);
+            }
+        } catch (IOException e) {
+            exception = e;
+        } finally {
+            try {
+                if (close) {
+                    close();
+                } else {
+                    setReadOnly();
+                }
+            } catch (IOException e) {
+                if (exception == null) {
+                    exception = e;
+                } else {
+                    exception.addSuppressed(e);
+                }
+            }
+
+            if (exception != null) {
+                throw exception;
+            }
+        }
+    }
+
+    public static boolean setFinal(File file, boolean isFinal) {
 
         try {
             UserDefinedFileAttributeView view = getFileAttributeView(file);
             if (view != null) {
-                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(new Boolean(isFinal).toString()));
+                view.write(IS_FINAL_ATTRIBUTE, Charset.defaultCharset().encode(Boolean.toString(isFinal)));
             }
+            return true;
         } catch (IOException e) {
             // No-op
         }
+        return false;
     }
 
     /**
@@ -320,7 +402,7 @@ public abstract class PBDSegment {
      * @return true if file is final, false otherwise
      */
     public boolean isFinal() {
-        return isFinal(m_file);
+        return m_isFinal;
     }
 
     public static boolean isFinal(File file) {

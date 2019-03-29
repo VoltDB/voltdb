@@ -104,29 +104,30 @@ template<typename OuterExtractor, typename InnerExtractor>
 inline AbstractExpression* subqueryComparisonFactory(ExpressionType const c,
       AbstractExpression* outer, AbstractExpression* inner, QuantifierType quantifier) {
    switch(c) {
-      case (EXPRESSION_TYPE_COMPARE_EQUAL):
+      case EXPRESSION_TYPE_COMPARE_EQUAL:
          return new VectorComparisonExpression<CmpEq, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+      case EXPRESSION_TYPE_COMPARE_NOTEQUAL:
          return new VectorComparisonExpression<CmpNe, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+      case EXPRESSION_TYPE_COMPARE_LESSTHAN:
          return new VectorComparisonExpression<CmpLt, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+      case EXPRESSION_TYPE_COMPARE_GREATERTHAN:
          return new VectorComparisonExpression<CmpGt, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+      case EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO:
          return new VectorComparisonExpression<CmpLte, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+      case EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO:
          return new VectorComparisonExpression<CmpGte, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+      case EXPRESSION_TYPE_COMPARE_NOTDISTINCT:
          return new VectorComparisonExpression<CmpNotDistinct, OuterExtractor, InnerExtractor>(
                c, outer, inner, quantifier);
-      case (EXPRESSION_TYPE_COMPARE_LIKE):
+      case EXPRESSION_TYPE_COMPARE_LIKE:
          // LIKE operator only works when inner relation is not a tuple
+      case EXPRESSION_TYPE_COMPARE_STARTSWITH:  // likewise for startswith
       default:
          char message[256];
          snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -146,20 +147,31 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
    }
    SubqueryExpression const *l_subquery = dynamic_cast<SubqueryExpression*>(l);
    SubqueryExpression const *r_subquery = dynamic_cast<SubqueryExpression*>(r);
-
-   // OK, here we go
    if (l_subquery != NULL && r_subquery != NULL) {
       return subqueryComparisonFactory<TupleExtractor, TupleExtractor>(c, l, r, quantifier);
    } else if (l_subquery != NULL) {
-      if (c == EXPRESSION_TYPE_COMPARE_LIKE) {
-         return new VectorComparisonExpression<CmpLike, TupleExtractor, NValueExtractor>(
-               c, l, r, quantifier);
-      } else {
-         return subqueryComparisonFactory<TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+      switch (c) {
+         case EXPRESSION_TYPE_COMPARE_LIKE:
+            return new VectorComparisonExpression<CmpLike, TupleExtractor, NValueExtractor>(
+                  c, l, r, quantifier);
+         case EXPRESSION_TYPE_COMPARE_STARTSWITH:
+            return new VectorComparisonExpression<CmpStartsWith, TupleExtractor, NValueExtractor>(
+                  c, l, r, quantifier);
+         default:
+            return subqueryComparisonFactory<TupleExtractor, NValueExtractor>(c, l, r, quantifier);
       }
    } else {
       assert(r_subquery != NULL);
-      return subqueryComparisonFactory<NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+      switch (c) {
+         case EXPRESSION_TYPE_COMPARE_LIKE:
+            return new VectorComparisonExpression<CmpLike, NValueExtractor, TupleExtractor>(
+                  c, l, r, quantifier);
+         case EXPRESSION_TYPE_COMPARE_STARTSWITH:
+            return new VectorComparisonExpression<CmpStartsWith, NValueExtractor, TupleExtractor>(
+                  c, l, r, quantifier);
+         default:
+            return subqueryComparisonFactory<NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+      }
    }
 }
 

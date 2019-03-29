@@ -30,11 +30,10 @@ public interface BinaryDequeReader {
      * Read and return the object at the current read position of this reader.
      * The entry will be removed once all active readers have read the entry.
      * @param ocf
-     * @param checkCRC
      * @return BBContainer with the bytes read. Null if there is nothing left to read.
      * @throws IOException
      */
-    public BBContainer poll(OutputContainerFactory ocf, boolean checkCRC) throws IOException;
+    public BBContainer poll(OutputContainerFactory ocf) throws IOException;
 
     /**
      * @param segmentIndex index of the segment to get schema from, -1 means get schema from current segment

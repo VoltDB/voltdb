@@ -96,16 +96,14 @@ public class ExportSequenceNumberTracker {
         Range<Long> newRange = range(start, end);
         long nonOverlapSize = end - start + 1;
         if (m_map.intersects(newRange)) {
-            final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-            while (iter.hasNext()) {
-                final Range<Long> next = iter.next();
-                Range<Long> intersection = next.intersection(newRange);
-                if (intersection != null) {
-                    nonOverlapSize -= end(intersection) - start(intersection) + 1;
-                }
-            }
+             for (Range<Long> next : m_map.asRanges()) {
+                 if (next.isConnected(newRange)) {
+                     Range<Long> intersection = next.intersection(newRange);
+                     nonOverlapSize -= end(intersection) - start(intersection) + 1;
+                 }
+             }
         }
-        m_map.add(range(start, end));
+        m_map.add(newRange);
         return nonOverlapSize;
     }
 
@@ -227,7 +225,6 @@ public class ExportSequenceNumberTracker {
      *         otherwise return null
      */
     public Pair<Long, Long> getRangeContaining(long seq) {
-        assert (!m_map.isEmpty());
         Range<Long> range = m_map.rangeContaining(seq);
         if (range != null) {
             return new Pair<Long, Long>(start(range), end(range));
