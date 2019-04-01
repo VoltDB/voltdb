@@ -641,35 +641,43 @@ class PBDRegularSegment extends PBDSegment {
                     return null;
                 }
 
-                final DBBPool.BBContainer retcont;
-                if (compressed) {
-                    final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
-                    try {
-                        if (!fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCRC)) {
+                DBBPool.BBContainer retcont = null;
+                try {
+                    if (compressed) {
+                        final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
+                        try {
+                            if (!fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCRC)) {
+                                return null;
+                            }
+
+                            uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
+                            retcont = factory.getContainer(uncompressedLen);
+                            retcont.b().limit(uncompressedLen);
+                            CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
+                        } finally {
+                            compressedBuf.discard();
+                        }
+                    } else {
+                        uncompressedLen = length;
+                        retcont = factory.getContainer(length);
+                        retcont.b().limit(length);
+
+                        if (!fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCRC)) {
+                            retcont.discard();
                             return null;
                         }
-
-                        uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
-                        retcont = factory.getContainer(uncompressedLen);
-                        retcont.b().limit(uncompressedLen);
-                        CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
-                    } finally {
-                        compressedBuf.discard();
                     }
-                } else {
-                    uncompressedLen = length;
-                    retcont = factory.getContainer(length);
-                    retcont.b().limit(length);
-                    if (!fillBuffer(retcont.b(), entryId, flags, entryCRC, checkCRC)) {
+                } catch (Throwable t) {
+                    if (retcont != null) {
                         retcont.discard();
-                        return null;
                     }
+                    throw t;
                 }
 
                 m_bytesRead += uncompressedLen;
                 m_objectReadIndex++;
 
-                return new DBBPool.BBContainer(retcont.b()) {
+                return new DBBPool.DBBDelegateContainer(retcont) {
                     private boolean m_discarded = false;
 
                     @Override
@@ -681,7 +689,7 @@ class PBDRegularSegment extends PBDSegment {
                         }
 
                         m_discarded = true;
-                        retcont.discard();
+                        super.discard();
                         m_discardCount++;
                     }
                 };
