@@ -87,3 +87,5 @@ CREATE UNIQUE INDEX compoundunique ON polypoints ( component1, component2unique 
 CREATE INDEX compoundnon ON polypoints ( component1, component2non );
 -- index 7
 CREATE UNIQUE INDEX HASHUNIQUEHASH ON polypoints ( uniquehashable );
+
+CREATE INDEX IDX ON polypoints (polypoints.poly) WHERE NOT component1 IS NULL;
