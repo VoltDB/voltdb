@@ -173,25 +173,11 @@ public class TestPersistentBinaryDeque {
                 System.out.println("Ignoring empty file " + fname);
                 continue;
             }
-            String rootname = fname.substring(0, fname.lastIndexOf("."));
-            String[] parts = rootname.split("_");
-            if (parts.length < 3) {
-                System.out.println("Ignoring file " + fname);
-                continue;
-            }
+            PbdSegmentName segmentName = PbdSegmentName.parseFile(logger, f);
+            assertEquals(PbdSegmentName.Result.OK, segmentName.m_result);
 
-            // Parse the counters
-            long prevCnt = 0L;
-            long curCnt = 0L;
-            try {
-                prevCnt = Long.parseLong(parts[parts.length - 1]);
-                curCnt = Long.parseLong(parts[parts.length - 2]);
-            } catch (NumberFormatException ex) {
-                throw new IOException("Failed to parse counters in " + fname + ":" + ex);
-            }
-
-            filesById.put(curCnt, f);
-            sequencer.add(new Pair<Long, Long>(prevCnt, curCnt));
+            filesById.put(segmentName.m_id, f);
+            sequencer.add(new Pair<Long, Long>(segmentName.m_prevId, segmentName.m_id));
         }
 
         // Deduce the sequence from the extracted segment ids
@@ -625,7 +611,7 @@ public class TestPersistentBinaryDeque {
         m_pbd.offer(defaultContainer());
         File files[] = TEST_DIR.listFiles();
         assertEquals( 1, files.length);
-        assertTrue("pbd_nonce_0000000001_0000000002.pbd".equals(files[0].getName()));
+        assertTrue(createSegmentName(1, 2).equals(files[0].getName()));
 
         //Now make sure the current write file is stolen and a new write file created
         pollOnce(reader);
@@ -651,9 +637,9 @@ public class TestPersistentBinaryDeque {
             actualFiles.add(f.getName());
         }
         Set<String> expectedFiles = Sets.newHashSet();
-        expectedFiles.add("pbd_nonce_0000000001_0000000002.pbd");
-        expectedFiles.add("pbd_nonce_0000000003_0000000001.pbd");
-        expectedFiles.add("pbd_nonce_0000000004_0000000003.pbd");
+        expectedFiles.add(createSegmentName(1, 2));
+        expectedFiles.add(createSegmentName(3, 1));
+        expectedFiles.add(createSegmentName(4, 3));
         assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
@@ -692,9 +678,9 @@ public class TestPersistentBinaryDeque {
             actualFiles.add(f.getName());
         }
         Set<String> expectedFiles = Sets.newHashSet();
-        expectedFiles.add("pbd_nonce_0000000001_0000000002.pbd");
-        expectedFiles.add("pbd_nonce_0000000003_0000000001.pbd");
-        expectedFiles.add("pbd_nonce_0000000004_0000000003.pbd");
+        expectedFiles.add(createSegmentName(1, 2));
+        expectedFiles.add(createSegmentName(3, 1));
+        expectedFiles.add(createSegmentName(4, 3));
         assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
@@ -733,13 +719,13 @@ public class TestPersistentBinaryDeque {
 
         // Check the expected ordering of the PBDs
         File f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000002_0000000005.pbd", f0.getName());
+        assertEquals(createSegmentName(2, 5), f0.getName());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000001_0000000002.pbd", f0.getName());
+        assertEquals(createSegmentName(1, 2), f0.getName());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000003_0000000001.pbd", f0.getName());
+        assertEquals(createSegmentName(3, 1), f0.getName());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000004_0000000003.pbd", f0.getName());
+        assertEquals(createSegmentName(4, 3), f0.getName());
 
         //Poll the two at the front and check that the contents are what is expected
         buffer1.clear();
@@ -756,11 +742,11 @@ public class TestPersistentBinaryDeque {
         assertEquals(3, listing.size());
 
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000001_0000000002.pbd", f0.getName());
+        assertEquals(createSegmentName(1, 2), f0.getName());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000003_0000000001.pbd", f0.getName());
+        assertEquals(createSegmentName(3, 1), f0.getName());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000004_0000000003.pbd", f0.getName());
+        assertEquals(createSegmentName(4, 3), f0.getName());
 
         //Now poll the rest and make sure the data is correct
         for (int ii = 0; ii < 95; ii++) {
@@ -774,7 +760,7 @@ public class TestPersistentBinaryDeque {
         listing = getSortedDirectoryListing();
         assertEquals( 1, listing.size());
         f0 = listing.remove(0);
-        assertEquals("pbd_nonce_0000000004_0000000003.pbd", f0.getName());
+        assertEquals(createSegmentName(4, 3), f0.getName());
     }
 
     @Test
@@ -1294,5 +1280,9 @@ public class TestPersistentBinaryDeque {
                 retval.discard();
             }
         }
+    }
+
+    private String createSegmentName(long id, long prevId) {
+        return PbdSegmentName.createName(TEST_NONCE, id, prevId, false);
     }
 }
