@@ -178,7 +178,7 @@ class PBDRegularSegment extends PBDSegment {
             m_syncedSinceLastEdit = false;
         }
         assert (m_fc == null);
-        m_fc = new FileChannelWrapper(m_file, forWrite);
+        m_fc = openFile(m_file, forWrite);
         m_segmentHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
         m_entryHeaderBuf = DBBPool.allocateDirect(ENTRY_HEADER_BYTES);
 
@@ -197,6 +197,10 @@ class PBDRegularSegment extends PBDSegment {
         }
 
         m_closed = false;
+    }
+
+    FileChannelWrapper openFile(File file, boolean forWrite) throws IOException {
+        return new FileChannelWrapper(file, forWrite);
     }
 
     private void initializeFromHeader() throws IOException {
@@ -1060,7 +1064,7 @@ class PBDRegularSegment extends PBDSegment {
      * A simple delegation wrapper around a {@link FileChannel} which tracks whether or not any exceptions were thrown
      * by the delegate
      */
-    private static final class FileChannelWrapper extends FileChannel {
+    static class FileChannelWrapper extends FileChannel {
         private final Path m_path;
         private FileChannel m_delegate;
         boolean m_writable;
