@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Collectors;
@@ -49,13 +50,11 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
-import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.exportclient.ExportClientBase;
@@ -63,6 +62,8 @@ import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.PbdSegmentName;
+import org.voltdb.utils.PbdSegmentName.Result;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
@@ -158,16 +159,10 @@ public class ExportGeneration implements Generation {
             long genId) {
 
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
+        NavigableSet<Table> streams = CatalogUtil.getExportTablesExcludeViewOnly(connectors);
         Set<String> exportedTables = new HashSet<>();
-        for (Connector conn : connectors) {
-            for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                Table table = ti.getTable();
-                if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
-                    // Skip view-only streams
-                    continue;
-                }
-                exportedTables.add(table.getTypeName());
-            }
+        for (Table stream : streams) {
+            exportedTables.add(stream.getTypeName());
         }
         /*
          * Find all the data files. Once one is found, extract the nonce
@@ -177,25 +172,28 @@ public class ExportGeneration implements Generation {
         Map<String, File> dataFiles = new HashMap<>();
         for (File data: files) {
             if (data.getName().endsWith(".pbd")) {
-                // Naming convention for pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb,
-                // so cut out 2 last segments starting with '_'.
-                String nonce = data.getName().substring(0, data.getName().lastIndexOf('_'));
-                nonce = nonce.substring(0, nonce.lastIndexOf('_'));
-                String streamName = nonce.substring(0, nonce.indexOf('_'));
-                if (exportedTables.contains(streamName)) {
-                    dataFiles.put(nonce, data);
-                } else {
-                    // ENG-15740, stream can be dropped while node is offline, delete .pbd files
-                    // if stream is no longer in catalog
-                    data.delete();
+                PbdSegmentName pbdName = PbdSegmentName.parseFile(exportLog, data);
+                if (pbdName.m_nonce != null) {
+                    String nonce = pbdName.m_nonce;
+                    String streamName = getStreamNameFromNonce(nonce);
+                    if (exportedTables.contains(streamName)) {
+                        dataFiles.put(nonce, data);
+                    } else {
+                        // ENG-15740, stream can be dropped while node is offline, delete .pbd files
+                        // if stream is no longer in catalog
+                        data.delete();
+                    }
+                } else if (pbdName.m_result == Result.NOT_PBD) {
+                    exportLog.warn(data.getAbsolutePath() + " is not a PBD file.");
+                } else if (pbdName.m_result == Result.INVALID_NAME) {
+                    exportLog.warn(data.getAbsolutePath() + " doesn't have valid PBD name.");
                 }
 
             }
         }
         for (File ad: files) {
             if (ad.getName().endsWith(".ad")) {
-                // Naming convention for ad file, [table name]_[partition].ad
-                String nonce = ad.getName().substring(0, ad.getName().lastIndexOf('.'));
+                String nonce = getNonceFromAdFile(ad);
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
@@ -268,19 +266,13 @@ public class ExportGeneration implements Generation {
                 localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toSet());
 
         boolean createdSources = false;
-        List<String> exportedTables = new ArrayList<>();
-        for (Connector conn : connectors) {
-            for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                Table table = ti.getTable();
-                if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
-                    // Skip view-only streams
-                    continue;
-                }
-                addDataSources(table, hostId, localPartitionsToSites, partitionsInUse,
-                        processor, catalogContext.m_genId);
-                createdSources = true;
-                exportedTables.add(table.getTypeName());
-            }
+        NavigableSet<Table> streams = CatalogUtil.getExportTablesExcludeViewOnly(connectors);
+        Set<String> exportedTables = new HashSet<>();
+        for (Table stream : streams) {
+            addDataSources(stream, hostId, localPartitionsToSites, partitionsInUse,
+                    processor, catalogContext.m_genId);
+            exportedTables.add(stream.getTypeName());
+            createdSources = true;
         }
 
         updateStreamStatus(exportedTables);
@@ -298,7 +290,7 @@ public class ExportGeneration implements Generation {
     }
 
     // Mark a DataSource as dropped if its not present in the connectors.
-    private void updateStreamStatus( List<String> exportedTables) {
+    private void updateStreamStatus( Set<String> exportedTables) {
         synchronized(m_dataSourcesByPartition) {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
                 Map<String, ExportDataSource> sources = it.next();
@@ -1105,6 +1097,16 @@ public class ExportGeneration implements Generation {
                 }
             }
         }
+    }
+
+    // Naming convention for export pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb,
+    private static String getStreamNameFromNonce(String nonce) {
+        return nonce.substring(0, nonce.indexOf('_'));
+    }
+
+    // Naming convention for ad file, [table name]_[partition].ad
+    private static String getNonceFromAdFile(File ad) {
+        return ad.getName().substring(0, ad.getName().lastIndexOf('.'));
     }
 
     @Override

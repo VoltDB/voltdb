@@ -99,7 +99,7 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
         return client;
     }
 
-    static void resetDir() throws IOException {
+    public static void resetDir() throws IOException {
         File f = new File("/tmp/" + System.getProperty("user.name"));
          VoltFile.recursivelyDelete(f);
          f.mkdirs();

@@ -47,13 +47,12 @@ import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
-import org.voltdb.catalog.Database;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -270,49 +269,6 @@ public class ExportManager
                 em.getExportStats());
     }
 
-    private CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        return db.getConnectors();
-    }
-
-    private boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
-        for (Connector conn : connectors) {
-            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean hasExportedTables(CatalogMap<Connector> connectors) {
-        for (Connector conn : connectors) {
-            if (!conn.getTableinfo().isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void dumpConnectors(CatalogMap<Connector> connectors) {
-
-        if (!exportLog.isDebugEnabled()) return;
-        StringBuilder sb = new StringBuilder("Connectors:\n");
-        for (Connector conn : connectors) {
-            sb.append("\tname:    " + conn.getTypeName() + "\n");
-            sb.append("\tenabled: " + conn.getEnabled() + "\n");
-            if (conn.getTableinfo().isEmpty()) {
-                sb.append("\tno tables ...\n");
-            }
-            else {
-                sb.append("\ttables:\n");
-                for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
-                }
-            }
-        }
-        exportLog.debug(sb.toString());
-    }
     /**
      * Indicate to associated {@link ExportGeneration}s to become
      * masters for the given partition id
@@ -396,8 +352,8 @@ public class ExportManager
         exportLog.info("Export has compression "
                 + (compress ? "enabled" : "disabled") + " in " + VoltDB.instance().getExportOverflowPath());
 
-        CatalogMap<Connector> connectors = getConnectors(catalogContext);
-        if (!hasEnabledConnectors(connectors)) {
+        CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
+        if (!CatalogUtil.hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
             return;
         }
@@ -430,8 +386,8 @@ public class ExportManager
     public synchronized void startPolling(CatalogContext catalogContext) {
         m_startPolling = true;
 
-        CatalogMap<Connector> connectors = getConnectors(catalogContext);
-        if(!hasEnabledConnectors(connectors)) {
+        CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
+        if(!CatalogUtil.hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
             return;
         }
@@ -502,12 +458,12 @@ public class ExportManager
     private void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin) {
         try {
-            CatalogMap<Connector> connectors = getConnectors(catalogContext);
+            CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("initialize for " + connectors.size() + " connectors.");
-                dumpConnectors(connectors);
+                CatalogUtil.dumpConnectors(exportLog, connectors);
             }
-            if (!hasExportedTables(connectors)) {
+            if (!CatalogUtil.hasExportedTables(connectors)) {
                 return;
             }
 
@@ -539,12 +495,12 @@ public class ExportManager
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
-        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
+        final CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
 
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("UpdateCatalog: requiresNewGeneration: " + requiresNewExportGeneration
                     + ", for " + connectors.size() + " connectors.");
-            dumpConnectors(connectors);
+            CatalogUtil.dumpConnectors(exportLog, connectors);
         }
 
         // Update processor config: note that we want to run a generation update even if the

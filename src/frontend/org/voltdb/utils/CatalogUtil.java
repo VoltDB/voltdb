@@ -83,6 +83,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -624,6 +625,65 @@ public abstract class CatalogUtil {
             }
         }
         return exportTables.build();
+    }
+
+    public static NavigableSet<Table> getExportTablesExcludeViewOnly(CatalogMap<Connector> connectors) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : connectors) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                Table t = tinfo.getTable();
+                if (t.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
+                exportTables.add(t);
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
+
+        if (!logger.isDebugEnabled()) return;
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        logger.debug(sb.toString());
     }
 
     public static NavigableSet<String> getExportTableNames(Database db) {
