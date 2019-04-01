@@ -586,7 +586,7 @@ public class TestIndexSelection extends PlannerTestCase {
         checkIndexSkipNullPredicateIsNull(pn, true);
     }
 
-    public void testSkipGeoIndex() {
+    public void testENG15616PenalizeGeoIndex() {
         AbstractPlanNode pn;
 
         pn = compile("select component1 from polypoints where component1 != component1;");
