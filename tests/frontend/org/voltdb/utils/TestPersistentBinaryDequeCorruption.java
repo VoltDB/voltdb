@@ -36,6 +36,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NavigableMap;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -76,6 +78,7 @@ public class TestPersistentBinaryDequeCorruption {
     @Rule
     public final RandomTestRule random = new RandomTestRule();
 
+    private final Map<String, Long> m_corruptionPoints;
     private final CorruptionChecker m_checker;
     private PersistentBinaryDeque m_pbd;
     private DeferredSerialization m_ds;
@@ -84,11 +87,19 @@ public class TestPersistentBinaryDequeCorruption {
     public static Collection<Object[]> parameters() {
         CorruptionChecker scanEntries = pbd -> pbd.scanEntries(b -> {});
         CorruptionChecker parseAndTruncate = pbd -> pbd.parseAndTruncate(b -> null);
-        return ImmutableList.of(new Object[] { scanEntries }, new Object[] { parseAndTruncate });
+
+        ImmutableList.Builder<Object[]> args = ImmutableList.builder();
+        for (CorruptionChecker cc : new CorruptionChecker[] {scanEntries, parseAndTruncate}) {
+            for (Boolean throwIoException : new Boolean[] {false, true}) {
+                args.add(new Object[] { cc, throwIoException });
+            }
+        }
+        return args.build();
     }
 
-    public TestPersistentBinaryDequeCorruption(CorruptionChecker checker) {
+    public TestPersistentBinaryDequeCorruption(CorruptionChecker checker, boolean throwIoException) {
         m_checker = checker;
+        m_corruptionPoints = throwIoException ? new HashMap<>() : null;
     }
 
     @Before
@@ -417,10 +428,14 @@ public class TestPersistentBinaryDequeCorruption {
         corruptSegment(getSegmentMap().lastEntry().getValue(), corruptData, position);
     }
 
-    private static void corruptSegment(PBDSegment segment, ByteBuffer corruptData, int position) throws IOException {
+    private void corruptSegment(PBDSegment segment, ByteBuffer corruptData, int position) throws IOException {
         File file = segment.file();
+        if (m_corruptionPoints == null) {
         try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
             channel.write(corruptData, position);
+            }
+        } else {
+            m_corruptionPoints.put(file.getName(), Long.valueOf(position));
         }
     }
 
@@ -431,7 +446,54 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     private PersistentBinaryDeque newPbd() throws IOException {
-        return new PersistentBinaryDeque(TEST_NONCE, m_ds, testDir.getRoot(), LOG);
+        if (m_corruptionPoints == null) {
+            return new PersistentBinaryDeque(TEST_NONCE, m_ds, testDir.getRoot(), LOG);
+        }
+        return new PersistentBinaryDeque(TEST_NONCE, m_ds, testDir.getRoot(), LOG) {
+            @Override
+            PBDSegment newSegment(long segmentIndex, long segmentId, File file) {
+                return new PBDRegularSegment(segmentIndex, segmentId, file, LOG) {
+                    @Override
+                    FileChannelWrapper openFile(File file, boolean forWrite) throws IOException {
+                        return new PBDRegularSegment.FileChannelWrapper(file, forWrite) {
+                            // Only need to track position changes from read since position is set before any read
+                            private long m_position = 0;
+
+                            @Override
+                            public int read(ByteBuffer dst) throws IOException {
+                                throwIfCorrupt(m_position, dst.remaining());
+                                int read = super.read(dst);
+                                if (read > 0) {
+                                    m_position += read;
+                                }
+                                return read;
+                            }
+
+                            @Override
+                            public int read(ByteBuffer dst, long position) throws IOException {
+                                throwIfCorrupt(position, dst.remaining());
+                                return super.read(dst, position);
+                            }
+
+                            @Override
+                            public FileChannel position(long newPosition) throws IOException {
+                                super.position(newPosition);
+                                m_position = newPosition;
+                                return this;
+                            }
+
+                            private void throwIfCorrupt(long position, int length) throws IOException {
+                                Long corruptionPoint = m_corruptionPoints.get(file.getName());
+                                if (corruptionPoint != null && corruptionPoint >= position
+                                        && corruptionPoint < position + length) {
+                                    throw new IOException("Imaginary corruption");
+                                }
+                            }
+                        };
+                    }
+                };
+            }
+        };
     }
 
     private interface CorruptionChecker {
