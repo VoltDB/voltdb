@@ -332,6 +332,17 @@ public class TestPersistentBinaryDequeCorruption {
         verifySegmentCount(1, 0);
     }
 
+    @Test
+    public void testFileShorterThanExpectedFirst() throws Exception {
+        m_pbd.offer(defaultContainer());
+        File segment = getSegmentMap().lastEntry().getValue().file();
+        m_pbd.close();
+        try (FileChannel channel = FileChannel.open(segment.toPath(), StandardOpenOption.WRITE)) {
+            channel.truncate(channel.size() - 45);
+        }
+        runCheckerNewPbd(ENTRY_FIRST);
+    }
+
     private int putInitialEntries() throws IOException {
         int entryLength = -1;
         for (int i = 0; i < ENTRY_COUNT; ++i) {
