@@ -23,6 +23,7 @@
 
 package org.voltdb.export;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.VoltFile;
 
 /**
  * A convenient base class to write export end-to-end test case by using local cluster. Comparing
@@ -95,5 +97,28 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
             throw new IOException("Failed to Initialize Hashinator.");
         }
         return client;
+    }
+
+    static void resetDir() throws IOException {
+        File f = new File("/tmp/" + System.getProperty("user.name"));
+         VoltFile.recursivelyDelete(f);
+         f.mkdirs();
+    }
+
+    protected void insertToStream(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+        for (int i = startPkey; i < startPkey + numberOfRows; i++) {
+            params[1] = i; // Pkey column
+            m_verifier.addRow(client, streamName, i, params);
+            client.callProcedure("@AdHoc", "insert into "+ streamName + " values(" + i + ", 1)");
+        }
+    }
+
+    protected void insertToStreamWithNewColumn(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+        for (int i = startPkey; i < startPkey + numberOfRows; i++) {
+            params[1] = i; // Pkey column
+            params[2] = i; // new column
+            m_verifier.addRow(client, streamName, i, params);
+            client.callProcedure("@AdHoc", "insert into " + streamName + " values(" + i + "," + i + ",1)");
+        }
     }
 }

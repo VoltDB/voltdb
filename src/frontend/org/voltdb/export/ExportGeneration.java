@@ -134,7 +134,7 @@ public class ExportGeneration implements Generation {
     {
         File files[] = exportOverflowDirectory.listFiles();
         if (files != null) {
-            initializeGenerationFromDisk(messenger, processor, files, localPartitionsToSites, catalogContext.m_genId);
+            initializeGenerationFromDisk(connectors, messenger, processor, files, localPartitionsToSites, catalogContext.m_genId);
         }
         initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, messenger, localPartitionsToSites);
 
@@ -145,18 +145,30 @@ public class ExportGeneration implements Generation {
      *
      * Called immediately before calling {@code initializeGenerationFromCatalog}.
      *
+     * @param connectors
      * @param messenger
      * @param processor new {@code ExportDataProcessor}, with decoders not started yet
      * @param files the contents of the export overflow directory
      * @param localPartitionsToSites
      */
-    private void initializeGenerationFromDisk(HostMessenger messenger,
+    private void initializeGenerationFromDisk(final CatalogMap<Connector> connectors,
+            HostMessenger messenger,
             final ExportDataProcessor processor,
             File[] files, List<Pair<Integer, Integer>> localPartitionsToSites,
             long genId) {
 
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
-
+        Set<String> exportedTables = new HashSet<>();
+        for (Connector conn : connectors) {
+            for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                Table table = ti.getTable();
+                if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
+                exportedTables.add(table.getTypeName());
+            }
+        }
         /*
          * Find all the data files. Once one is found, extract the nonce
          * and check for any advertisements related to the data files. If
@@ -169,7 +181,15 @@ public class ExportGeneration implements Generation {
                 // so cut out 2 last segments starting with '_'.
                 String nonce = data.getName().substring(0, data.getName().lastIndexOf('_'));
                 nonce = nonce.substring(0, nonce.lastIndexOf('_'));
-                dataFiles.put(nonce, data);
+                String streamName = nonce.substring(0, nonce.indexOf('_'));
+                if (exportedTables.contains(streamName)) {
+                    dataFiles.put(nonce, data);
+                } else {
+                    // ENG-15740, stream can be dropped while node is offline, delete .pbd files
+                    // if stream is no longer in catalog
+                    data.delete();
+                }
+
             }
         }
         for (File ad: files) {
@@ -250,7 +270,6 @@ public class ExportGeneration implements Generation {
         boolean createdSources = false;
         List<String> exportedTables = new ArrayList<>();
         for (Connector conn : connectors) {
-
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 Table table = ti.getTable();
                 if (table.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
