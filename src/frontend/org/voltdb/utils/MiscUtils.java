@@ -383,18 +383,10 @@ public class MiscUtils {
 
         // check node count
         if (licenseApi.maxHostcount() < numberOfNodes) {
-            // Enterprise gets a pass on this one for now
-            if (licenseApi.isEnterprise()) {
-                hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
-                        " nodes, starting cluster with " + numberOfNodes + " nodes.");
-                valid = false;
-            }
-            // Trial, Pro & AWS licenses have a hard enforced limit
-            else {
-                hostLog.fatal("Warning, VoltDB license for a " + licenseApi.maxHostcount() + " node " +
-                        "attempted for use with a " + numberOfNodes + " node cluster.");
-                return false;
-            }
+            hostLog.fatal("Attempting to start with too many nodes (" + numberOfNodes + "). " +
+                          "Current license only supports " + licenseApi.maxHostcount() +
+                          ". Please contact VoltDB at info@voltdb.com.");
+            return false;
         }
 
         // If this is a commercial license, and there is less than or equal to 30 days until expiration,
