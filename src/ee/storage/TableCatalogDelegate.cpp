@@ -749,8 +749,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
                     wrapper->getCurrBlock() == NULL ||
                     wrapper->getCurrBlock()->getRowCount() == 0);
             existingStreamedTable->setWrapper(NULL);
-            newStreamedTable->setWrapper(wrapper);
             newStreamedTable->setExportStreamPositions(seqNo, streamBytesUsed);
+            newStreamedTable->setWrapper(wrapper);
             migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
         }
     }
