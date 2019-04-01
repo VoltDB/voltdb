@@ -589,7 +589,7 @@ public class TestIndexSelection extends PlannerTestCase {
     public void testENG15616PenalizeGeoIndex() {
         AbstractPlanNode pn;
 
-        pn = compile("select component1 from polypoints where component1 != component1;");
+        pn = compile("SELECT R.VCHAR_INLINE_MAX FROM R WHERE NOT R.TINY = R.TINY;\n");
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
