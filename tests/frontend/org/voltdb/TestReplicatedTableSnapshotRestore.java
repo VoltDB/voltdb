@@ -98,7 +98,7 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
         System.out.println("Recover the cluster.");
         cluster.startUp(false);
         client = cluster.createClient(new ClientConfig());
-
+        Thread.sleep(1000);
         assertEquals(30, client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM T;").getResults()[0].asScalarLong());
     }
 }
