@@ -943,7 +943,8 @@ class PBDRegularSegment extends PBDSegment {
         @Override
         public FileChannel position(long newPosition) throws IOException {
             try {
-                return m_delegate.position(newPosition);
+                m_delegate.position(newPosition);
+                return this;
             } catch (Throwable e) {
                 m_stable = false;
                 throw e;
