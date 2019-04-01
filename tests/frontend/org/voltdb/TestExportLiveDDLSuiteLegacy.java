@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,12 +31,12 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -58,9 +57,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();

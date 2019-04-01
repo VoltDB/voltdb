@@ -26,7 +26,6 @@ package org.voltdb.export;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -37,9 +36,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
@@ -114,12 +113,6 @@ public class TestMigrateExport extends ExportLocalClusterBase {
                     "PARTITION PROCEDURE TestMigrateExport$UpdateConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;" +
                     "CREATE PROCEDURE FROM CLASS org.voltdb.export.TestMigrateExport$DeleteConstraintProc;" +
                     "PARTITION PROCEDURE TestMigrateExport$DeleteConstraintProc ON TABLE NIBBLE_EXPORT COLUMN PKEY;";
-
-    static void resetDir() throws IOException {
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        VoltFile.recursivelyDelete(f);
-        f.mkdirs();
-    }
 
     private static final int k_factor = 1;
 

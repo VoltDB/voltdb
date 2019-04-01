@@ -26,8 +26,6 @@ package org.voltdb.export;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,12 +54,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
             + "     a integer not null, "
             + "     b integer not null"
             + ");";
-
-    static void resetDir() throws IOException {
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-         VoltFile.recursivelyDelete(f);
-         f.mkdirs();
-    }
 
     @Before
     public void setUp() throws Exception
@@ -115,23 +107,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         m_cluster.shutDown();
     }
 
-    private void insertToStream(int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
-        for (int i = startPkey; i < startPkey + numberOfRows; i++) {
-            params[1] = i; // Pkey column
-            m_verifier.addRow(client, "t", i, params);
-            client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
-        }
-    }
-
-    private void insertToStreamWithNewColumn(int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
-        for (int i = startPkey; i < startPkey + numberOfRows; i++) {
-            params[1] = i; // Pkey column
-            params[2] = i; // new column
-            m_verifier.addRow(client, "t", i, params);
-            client.callProcedure("@AdHoc", "insert into t values(" + i + "," + i + ",1)");
-        }
-    }
-
     @Test
     public void testAlterStreamAddDropColumn() throws Exception {
         Client client = getClient(m_cluster);
@@ -139,7 +114,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         //add data to stream table
         Object[] data = new Object[3];
         Arrays.fill(data, 1);
-        insertToStream(0, 100, client, data);
+        insertToStream("t", 0, 100, client, data);
 
         // alter stream to add column
         ClientResponse response = client.callProcedure("@AdHoc", "ALTER STREAM t ADD COLUMN new_column int BEFORE b");
@@ -147,12 +122,12 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
 
         Object[] data2 = new Object[4];
         Arrays.fill(data2, 1);
-        insertToStreamWithNewColumn(100, 100, client, data2);
+        insertToStreamWithNewColumn("t", 100, 100, client, data2);
 
         // drop column
         response = client.callProcedure("@AdHoc", "ALTER STREAM t DROP COLUMN new_column");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        insertToStream(200, 100, client, data);
+        insertToStream("t", 200, 100, client, data);
 
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
@@ -166,7 +141,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         //add data to stream table
         Object[] data = new Object[3];
         Arrays.fill(data, 1);
-        insertToStream(0, 100, client, data);
+        insertToStream("t", 0, 100, client, data);
 
         // alter stream to alter column
         ClientResponse response = client.callProcedure("@AdHoc", "ALTER STREAM t ALTER COLUMN b varchar(32)");
@@ -190,7 +165,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         //add data to stream table
         Object[] data = new Object[3];
         Arrays.fill(data, 1);
-        insertToStream(0, 100, client, data);
+        insertToStream("t", 0, 100, client, data);
 
         // alter stream to make column b nullable
         ClientResponse response = client.callProcedure("@AdHoc", "ALTER STREAM t ALTER COLUMN b SET NULL");

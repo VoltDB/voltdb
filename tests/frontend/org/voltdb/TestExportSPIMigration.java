@@ -27,7 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
@@ -50,6 +49,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
@@ -65,15 +65,9 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
 
-    static void resetDir() throws IOException {
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-         VoltFile.recursivelyDelete(f);
-         f.mkdirs();
-    }
-
     @Test
     public void testFlushEEBufferWhenRejoin() throws Exception {
-        resetDir();
+        ExportLocalClusterBase.resetDir();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
         VoltFile.resetSubrootForThisProcess();

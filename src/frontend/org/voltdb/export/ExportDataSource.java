@@ -2123,13 +2123,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int size = 0;
             // column name length, name, type, length
             Table streamTable = m_catalogContext.database.getTables().get(m_streamName);
-            ////////////////////// debug code ////////////////////////
-            StringBuilder sb = new StringBuilder();
-            for (Table table : m_catalogContext.database.getTables()) {
-                sb.append(table.getTypeName()).append(" ");
-            }
-            ///////////////////////////////////////////////////////////
-            assert streamTable != null : "Failed to find stream " + m_streamName + " in the catalog {" + sb.toString() + "}";
+            assert streamTable != null : "Failed to find stream " + m_streamName + " in catalog";
             for (Column c : CatalogUtil.getSortedCatalogItems(streamTable.getColumns(), "index")) {
                 size += 4 + c.getName().length() + 1 + 4;
             }
