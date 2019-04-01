@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.zip.CRC32;
@@ -471,6 +473,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         HashMap<Long, PbdSegmentName> filesById = new HashMap<>();
         PairSequencer<Long> sequencer = new PairSequencer<>();
+        List<String> invalidPbds = new ArrayList<>();
         try {
             for (File file : m_path.listFiles()) {
                 if (file.isDirectory() || !file.isFile() || file.isHidden()) {
@@ -481,7 +484,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 switch (segmentName.m_result) {
                 case INVALID_NAME:
-                    deleteStalePbdFile(file);
+                case INVALID_VERSION:
+                    invalidPbds.add(file.getName());
                     //$FALL-THROUGH$
                 case NOT_PBD:
                     continue;
@@ -506,6 +510,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
                 filesById.put(segmentName.m_id, segmentName);
                 sequencer.add(new Pair<Long, Long>(segmentName.m_prevId, segmentName.m_id));
+            }
+
+            if (!invalidPbds.isEmpty()) {
+                if (m_usageSpecificLog.isDebugEnabled()) {
+                    m_usageSpecificLog.debug("Found invalid PBDs in " + m_path + ": " + invalidPbds);
+                } else {
+                    m_usageSpecificLog.warn("Found " + invalidPbds.size() + " invalid PBD"
+                            + (invalidPbds.size() > 1 ? "s" : "") + " in " + m_path);
+                }
             }
 
             // Handle common cases: no PBD files or just one
