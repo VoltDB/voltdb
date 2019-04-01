@@ -90,7 +90,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
             }
         } catch (ProcCallException e) {
             assertTrue(! MiscUtils.isPro()
-                    && e.getLocalizedMessage().startsWith("Too many streams."));
+                    && e.getLocalizedMessage().startsWith("ERROR - Too many streams."));
         }
     }
 

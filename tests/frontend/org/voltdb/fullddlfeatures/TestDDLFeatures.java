@@ -445,8 +445,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testExportTable() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25"));
-        assertEquals(getTableType("T25"), "EXPORT");
+        assertTrue(findTableInSystemCatalogResults("T25N"));
+        assertEquals(getTableType("T25N"), "EXPORT");
         //Export table created with STREAM syntax
         assertTrue(findTableInSystemCatalogResults("T25S"));
         assertEquals(getTableType("T25S"), "EXPORT");
