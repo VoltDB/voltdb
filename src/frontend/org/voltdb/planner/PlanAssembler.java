@@ -2587,16 +2587,36 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Check if the index for the scan node is a partial index, and if so, make sure that the
+     * scan contains index predicate, and update index reason as needed for @Explain.
+     * @param scan index scan plan node
+     */
+    private static void updatePartialIndex(IndexScanPlanNode scan) {
+        if (scan.getPredicate() == null && scan.getPartialIndexPredicate() != null) {
+            if (scan.isForSortOrderOnly()) {
+                scan.setPredicate(Collections.singletonList(scan.getPartialIndexPredicate()));
+            }
+            scan.setForPartialIndexOnly();
+        }
+    }
+
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
-
-        if (root instanceof IndexScanPlanNode) {   // ENG-15719: with partial index scan, add top node
-            final IndexScanPlanNode scan = (IndexScanPlanNode) root;
-            if (scan.getPredicate() == null && scan.getPartialIndexPredicate() != null) {
-                if (scan.isForSortOrderOnly()) {
-                    scan.setPredicate(Collections.singletonList(scan.getPartialIndexPredicate()));
+        // ENG-15719: with partial index scan, add top node
+        if (root instanceof IndexScanPlanNode) {
+            updatePartialIndex((IndexScanPlanNode) root);
+        } else if (root instanceof ReceivePlanNode) {
+            assert root.getChildCount() > 0;
+            for(int c1 = 0; c1 < root.getChildCount(); ++c1) {
+                assert root.getChild(c1) instanceof SendPlanNode;
+                final SendPlanNode child1 = (SendPlanNode) root.getChild(c1);
+                for (int c2 = 0; c2 < child1.getChildCount(); ++c2) {
+                    final AbstractPlanNode child2 = child1.getChild(c2);
+                    if (child2 instanceof IndexScanPlanNode) {
+                        updatePartialIndex((IndexScanPlanNode) child2);
+                    }
                 }
-                scan.setForPartialIndexOnly();
             }
         }
 
