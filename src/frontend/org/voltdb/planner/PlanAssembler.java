@@ -2587,6 +2587,11 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Check if the index for the scan node is a partial index, and if so, make sure that the
+     * scan contains index predicate, and update index reason as needed for @Explain.
+     * @param scan index scan plan node
+     */
     private static void updatePartialIndex(IndexScanPlanNode scan) {
         if (scan.getPredicate() == null && scan.getPartialIndexPredicate() != null) {
             if (scan.isForSortOrderOnly()) {
