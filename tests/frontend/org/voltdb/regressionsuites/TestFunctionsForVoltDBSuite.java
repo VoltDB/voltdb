@@ -931,9 +931,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
                 "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
 
-        for (int i=0; i< procedures.length; i++) {
-            String proc = procedures[i];
-
+        for (String proc : procedures) {
             cr = client.callProcedure(proc, 0);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
@@ -1102,9 +1100,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         String[] procedures = {"FROM_UNIXTIME", "TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
                 "TO_TIMESTAMP_MILLISECOND", "TO_TIMESTAMP_MICROS", "TO_TIMESTAMP_MICROSECOND"};
 
-        for (int i=0; i< procedures.length; i++) {
-            String proc = procedures[i];
-
+        for (String proc : procedures) {
             cr = client.callProcedure(proc, 0L , 0);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
@@ -2489,7 +2485,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Exception ex = null;
         try {
             String sql = String.format("select inet%s_aton(pres) from %s;", ipVersion, tableName);
-            client.callProcedure("@AdHoc", sql);
+            cr = client.callProcedure("@AdHoc", sql);
             fail(String.format("Expected inet address %s to fail.", presentation));
         }
         catch (Exception e) {

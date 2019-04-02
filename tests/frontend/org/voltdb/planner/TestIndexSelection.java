@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -585,6 +584,17 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select b from c where b > 0 and d > 0;");
         checkScanUsesIndex(pn, "PARTIAL_IDX_3");
         checkIndexSkipNullPredicateIsNull(pn, true);
+    }
+
+    public void testENG15616PenalizeGeoIndex() {
+        AbstractPlanNode pn;
+
+        pn = compile("SELECT R.VCHAR_INLINE_MAX FROM R WHERE NOT R.TINY = R.TINY;");
+        assertEquals(1, pn.getChildCount());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode) pn;
+        assertFalse(ispn.getTargetIndexName().equalsIgnoreCase("IDX"));
     }
 
     private void checkDualIndexedJoin(AbstractPlanNode pn,

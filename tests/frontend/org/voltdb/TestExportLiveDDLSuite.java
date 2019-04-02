@@ -76,14 +76,18 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         System.out.println("testExportTableCommunityLimit");
         Client client = getClient();
-        int limit = 3;
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+        int limit = 2;
         try {
             for (int i = 0; i <= limit; i++) {
                 client.callProcedure("@AdHoc", "create stream t" + i + " (a INT);");
             }
         } catch (ProcCallException e) {
             assertTrue(! MiscUtils.isPro()
-                    && e.getLocalizedMessage().startsWith("Too many streams."));
+                    && e.getLocalizedMessage().startsWith("ERROR - Too many streams."));
         }
     }
 
