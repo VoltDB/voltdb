@@ -17,18 +17,18 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
+
 import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
-import java.util.Objects;
+import com.google.common.base.Preconditions;
 
 public interface VoltPhysicalRel extends RelNode {
-    Convention CONVENTION = new Convention.Impl("CONVENTION", VoltPhysicalRel.class) {
+    Convention CONVENTION = new Convention.Impl("VoltPhysical", VoltPhysicalRel.class) {
     };
 
     /**

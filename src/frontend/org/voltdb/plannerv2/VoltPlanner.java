@@ -168,7 +168,7 @@ public class VoltPlanner implements Planner {
         m_validator = new VoltSqlValidator(m_config);
         m_validator.setIdentifierExpansion(true);
         m_rexBuilder = new RexBuilder(m_config.getTypeFactory());
-        m_relPlanner = new VolcanoPlanner();
+        m_relPlanner = new VolcanoPlanner(VoltRelOptCost.FACTORY, null);
         for (@SuppressWarnings("rawtypes") RelTraitDef def : m_config.getTraitDefs()) {
             m_relPlanner.addRelTraitDef(def);
         }

@@ -84,7 +84,15 @@ public class NonDdlBatchPlanner {
                 }
                 plannedStmts.add(result);
             } catch (PlanningErrorException e) {
-                errorMsgs.add(e.getMessage());
+                Throwable cause = e.getCause();
+                String errorMsg = null;
+                if (cause != null) {
+                    errorMsg = cause.getMessage();
+                }
+                if (errorMsg == null) {
+                    errorMsg = e.getMessage();
+                }
+                errorMsgs.add(errorMsg);
             }
         }
 
@@ -131,7 +139,11 @@ public class NonDdlBatchPlanner {
             // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
         } catch (Exception ex) {
-            throw new PlanningErrorException(ex.getMessage());
+            Throwable cause = ex.getCause();
+            while(cause != null && cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            throw new PlanningErrorException(ex.getMessage(), cause);
         } catch (StackOverflowError error) {
             // TODO: This is from AdHocNTBase.compileAdHocSQL()
             // Maybe it is not needed any more in Calcite.
