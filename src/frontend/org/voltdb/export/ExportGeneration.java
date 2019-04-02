@@ -1101,8 +1101,7 @@ public class ExportGeneration implements Generation {
 
     // Naming convention for export pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb,
     private static String getStreamNameFromNonce(String nonce) {
-        // it's possible the stream name contains underscore
-        return nonce.substring(0, nonce.lastIndexOf('_'));
+        return nonce.substring(0, nonce.indexOf('_'));
     }
 
     // Naming convention for ad file, [table name]_[partition].ad
