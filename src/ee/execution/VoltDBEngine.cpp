@@ -1495,17 +1495,21 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
     m_exportingTables[streamName] = streamedTable;
     ExportTupleStream* wrapper = streamedTable->getWrapper();
     if (wrapper == NULL) {
-        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                        m_executorContext->m_siteId,
-                                        timestamp,
-                                        streamName);
+        wrapper = purgedStreams[streamName];
+        if (wrapper == NULL) {
+            wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                            m_executorContext->m_siteId,
+                                            timestamp,
+                                            streamName);
+        } else {
+            purgedStreams[streamName] = NULL;
+        }
         streamedTable->setWrapper(wrapper);
-        assert(purgedStreams[streamName] == NULL);
         VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
     } else {
         // If stream was dropped in UAC and the added back we should not purge the wrapper.
         // A case when exact same stream is dropped and added.
-        purgedStreams[streamName] = NULL;
+        assert(purgedStreams[streamName] == NULL);
     }
     streamedTable->setGeneration(timestamp);
 }
