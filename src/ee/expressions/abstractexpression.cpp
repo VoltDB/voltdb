@@ -82,18 +82,12 @@ AbstractExpression::~AbstractExpression()
     delete m_right;
 }
 
-bool
-AbstractExpression::hasParameter() const
-{
-    if (m_left && m_left->hasParameter())
-        return true;
-    return (m_right && m_right->hasParameter());
+bool AbstractExpression::hasParameter() const {
+   return (m_left && m_left->hasParameter()) || (m_right && m_right->hasParameter());
 }
 
-bool
-AbstractExpression::initParamShortCircuits()
-{
-    return (m_hasParameter = hasParameter());
+bool AbstractExpression::initParamShortCircuits() {
+    return m_hasParameter = hasParameter();
 }
 
 std::string
@@ -144,9 +138,7 @@ AbstractExpression::buildExpressionTree(PlannerDomValue obj)
     return exp;
 }
 
-AbstractExpression*
-AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
-{
+AbstractExpression* AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj) {
     // build a tree recursively from the bottom upwards.
     // when the expression node is instantiated, its type,
     // value and child types will have been discovered.
@@ -156,7 +148,6 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     bool inBytes = false;
     AbstractExpression *left_child = NULL;
     AbstractExpression *right_child = NULL;
-    std::vector<AbstractExpression*>* argsVector = NULL;
 
     // read the expression type
     peek_type = static_cast<ExpressionType>(obj.valueForKey("TYPE").asInt());
@@ -195,13 +186,13 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         // NULL argsVector corresponds to a missing ARGS value
         // vs. an empty argsVector which corresponds to an empty array ARGS value.
         // Different expression types could assert either a NULL or non-NULL argsVector initializer.
+        std::vector<AbstractExpression*> argsVector;
         if (obj.hasNonNullKey("ARGS")) {
             PlannerDomValue argsArray = obj.valueForKey("ARGS");
-            argsVector = new std::vector<AbstractExpression*>();
             for (int i = 0; i < argsArray.arrayLen(); i++) {
                 PlannerDomValue argValue = argsArray.valueAtIndex(i);
                 AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue);
-                argsVector->push_back(argExpr);
+                argsVector.push_back(argExpr);
             }
         }
 
@@ -219,7 +210,6 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     catch (const SerializableEEException &ex) {
         delete left_child;
         delete right_child;
-        delete argsVector;
         throw;
     }
 }

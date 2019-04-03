@@ -39,7 +39,7 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.DELETE;
-    };
+    }
 
     public boolean isTruncate() {
         return m_truncate;

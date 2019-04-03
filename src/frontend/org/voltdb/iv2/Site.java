@@ -1113,13 +1113,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo, false);
     }
 
     @Override
     public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
             VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo)
+            boolean undo, boolean elastic)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
@@ -1128,7 +1128,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 uniqueId,
                 returnUniqueViolations,
                 shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
+                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                elastic);
     }
 
     @Override

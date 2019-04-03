@@ -41,6 +41,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -134,10 +135,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
             VoltTable schemaTable;
+            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(table.getTabletype());
             if (XDCR && table.getIsdred()) {
-                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
-            }
-            else {
+                if (preserveMigrateHiddenColumn) {
+                    schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+                } else {
+                    schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+                }
+            } else if (preserveMigrateHiddenColumn) {
+                schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+            } else {
                 schemaTable = CatalogUtil.getVoltTable(table);
             }
             schemas.put(table.getRelativeIndex(),

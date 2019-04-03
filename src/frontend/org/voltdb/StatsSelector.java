@@ -22,6 +22,7 @@ public enum StatsSelector {
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
     QUEUE,
+    IDLETIME,         // synonym for STARVATION
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
     LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY

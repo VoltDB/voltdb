@@ -51,6 +51,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
+    private static final long INITIAL_DATA_TIMEOUT_MS = Long.getLong("REJOIN_INITIAL_DATA_TIMEOUT_MS",
+            TimeUnit.HOURS.toMillis(1));
 
     private final AtomicBoolean m_currentlyRejoining;
     private static ScheduledFuture<?> m_timeFuture;
@@ -59,8 +61,8 @@ public class RejoinProducer extends JoinProducerBase {
     // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
     private String m_commaSeparatedNameOfViewsToPause = null;
 
-    // True if we're handling a table-less rejoin.
-    boolean m_schemaHasNoTables = false;
+    // True if there are any persistent tables in the schema.
+    boolean m_hasPersistentTables = true;
 
     // Barrier that prevents the finish task for firing until all sites have finished the stream snapshot
     private static AtomicInteger s_streamingSiteCount;
@@ -132,12 +134,30 @@ public class RejoinProducer extends JoinProducerBase {
     // Run if the watchdog isn't cancelled within the timeout period
     private static class TimerCallback implements Runnable
     {
+        final long m_timeout;
+        private final String m_reason;
+
+        static TimerCallback initialTimer() {
+            return new TimerCallback(INITIAL_DATA_TIMEOUT_MS, "initial data not being sent from active nodes");
+        }
+
+        static TimerCallback dataTimer() {
+            return new TimerCallback(StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
+                    "no data sent from active nodes");
+        }
+
+        private TimerCallback(long timeout, String reason) {
+            super();
+            m_timeout = timeout;
+            m_reason = reason;
+        }
+
         @Override
         public void run()
         {
             VoltDB.crashLocalVoltDB(String.format(
-                    "Rejoin process timed out due to no data sent from active nodes for %d seconds  Terminating rejoin.",
-                    StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS / 1000),
+                    "Rejoin process timed out due to " + m_reason + " for %d seconds  Terminating rejoin.",
+                    m_timeout / 1000),
                     false,
                     null);
         }
@@ -191,19 +211,19 @@ public class RejoinProducer extends JoinProducerBase {
 
     // cancel and maybe rearm the node-global snapshot data-segment watchdog.
     @Override
-    protected void kickWatchdog(boolean rearm)
+    protected void kickWatchdog(boolean rearm) {
+        kickWatchdog(rearm ? TimerCallback.dataTimer() : null);
+    }
+
+    private static void kickWatchdog(TimerCallback callback)
     {
         synchronized (RejoinProducer.class) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
             }
-            if (rearm) {
-                m_timeFuture = VoltDB.instance().scheduleWork(
-                        new TimerCallback(),
-                        StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
-                        0,
-                        TimeUnit.MILLISECONDS);
+            if (callback != null) {
+                m_timeFuture = VoltDB.instance().scheduleWork(callback, callback.m_timeout, 0, TimeUnit.MILLISECONDS);
             }
         }
     }
@@ -215,12 +235,13 @@ public class RejoinProducer extends JoinProducerBase {
     void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        m_schemaHasNoTables = message.schemaHasNoTables();
-        if (!m_schemaHasNoTables) {
+        m_hasPersistentTables = message.schemaHasPersistentTables();
+        if (m_hasPersistentTables) {
             m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
             m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
-        }
-        else {
+            // Start the watchdog so if we never get data it will notice
+            kickWatchdog(TimerCallback.initialTimer());
+        } else {
             m_streamSnapshotMb = null;
             m_rejoinSiteProcessor = null;
         }
@@ -304,7 +325,7 @@ public class RejoinProducer extends JoinProducerBase {
             // Set enabled to false for the views we found.
             siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
         }
-        if (!m_schemaHasNoTables) {
+        if (m_hasPersistentTables) {
             boolean sourcesReady = false;
             RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
             if (rejoinWork != null) {
@@ -379,7 +400,7 @@ public class RejoinProducer extends JoinProducerBase {
                 long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
-                    if (!m_schemaHasNoTables) {
+                    if (m_hasPersistentTables) {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
@@ -414,7 +435,7 @@ public class RejoinProducer extends JoinProducerBase {
                         exportSequenceNumbers,
                         drSequenceNumbers,
                         allConsumerSiteTrackers,
-                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */,
+                        m_hasPersistentTables /* requireExistingSequenceNumbers */,
                         clusterCreateTime);
             }
         };

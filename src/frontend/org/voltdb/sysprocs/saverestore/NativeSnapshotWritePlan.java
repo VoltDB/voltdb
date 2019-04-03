@@ -37,6 +37,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -281,6 +282,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 hostId);
 
         if (isActiveActiveDRed && table.getIsdred()) {
+            VoltTable tbl;
+            if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+            } else {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
@@ -289,11 +296,18 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     partitionCount,
                     table.getIsreplicated(),
                     tracker.getPartitionsForHost(hostId),
-                    CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    tbl,
                     txnId,
                     timestamp);
         }
         else if (CatalogUtil.needsViewHiddenColumn(table)) {
+            VoltTable tbl;
+            if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+            } else {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO);
+            }
+
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
@@ -302,11 +316,22 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     partitionCount,
                     table.getIsreplicated(),
                     tracker.getPartitionsForHost(hostId),
-                    CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO),
+                    tbl,
                     txnId,
                     timestamp);
-        }
-        else {
+        } else if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        } else {
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,

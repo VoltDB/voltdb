@@ -35,9 +35,11 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -120,7 +122,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasNoTables)
+    private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasPersistentTables)
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
@@ -138,7 +140,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               nonce,
                                               m_snapshotDataBufPool,
                                               m_snapshotCompressedDataBufPool,
-                                              schemaHasNoTables);
+                                              schemaHasPersistentTables);
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -190,7 +192,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
-        boolean schemaHasNoTables = catalog.getTables().isEmpty();
+        boolean schemaHasPersistentTables = false;
+        for (Table t : catalog.getTables()) {
+            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.STREAM_VIEW_ONLY.get()) {
+                schemaHasPersistentTables = true;
+                break;
+            }
+        }
         m_startTime = System.currentTimeMillis();
         List<Long> firstSites = new ArrayList<Long>();
         synchronized (m_lock) {
@@ -199,7 +207,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             m_pendingSites.clear();
         }
         REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
-        initiateRejoinOnSites(firstSites, schemaHasNoTables);
+        initiateRejoinOnSites(firstSites, schemaHasPersistentTables);
 
         return true;
     }
@@ -246,7 +254,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     }
 
     private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId,
-                                   boolean schemaHasNoTables)
+                                   boolean schemaHasPersistentTables)
     {
         String nonce = null;
         String data = null;
@@ -273,7 +281,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
                     CoreUtils.hsIdToString(HSId));
         }
-        if (data != null && !schemaHasNoTables) {
+        if (data != null && schemaHasPersistentTables) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotPathType.SNAP_NO_PATH, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
@@ -298,7 +306,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),
-                              rm.schemaHasNoTables());
+                              rm.schemaHasPersistentTables());
         } else {
             VoltDB.crashLocalVoltDB("Wrong rejoin message of type " + type +
                                     " sent to the rejoin coordinator", false, null);

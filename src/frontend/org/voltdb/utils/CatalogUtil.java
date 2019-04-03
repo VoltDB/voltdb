@@ -83,6 +83,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -189,6 +190,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
+    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -198,6 +201,8 @@ public abstract class CatalogUtil {
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
     public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo MIGRATE_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -639,19 +644,25 @@ public abstract class CatalogUtil {
      * @return true if a table is export or false otherwise
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
-                                            org.voltdb.catalog.Table table)
-    {
-        for (Connector connector : database.getConnectors()) {
-            // iterate the connector tableinfo list looking for tableIndex
-            // tableInfo has a reference to a table - can compare the reference
-            // to the desired table by looking at the relative index. ick.
-            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                    return true;
+                                            org.voltdb.catalog.Table table) {
+        if (TableType.isInvalidType(table.getTabletype())) {
+            // This implementation uses connectors instead of just looking at the tableType
+            // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
+            for (Connector connector : database.getConnectors()) {
+                // iterate the connector tableinfo list looking for tableIndex
+                // tableInfo has a reference to a table - can compare the reference
+                // to the desired table by looking at the relative index. ick.
+                for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                    if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                        return true;
+                    }
                 }
             }
+            // Found no connectors
+            return false;
+        } else {
+            return TableType.isStream(table.getTabletype());
         }
-        return false;
     }
 
     public static boolean isExportEnabled() {

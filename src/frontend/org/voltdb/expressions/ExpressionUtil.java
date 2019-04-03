@@ -27,15 +27,299 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.compiler.VoltXMLElementHelper;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.QuantifierType;
 
 /**
  *
  */
-public abstract class ExpressionUtil {
+public final class ExpressionUtil {
+
+    private static Map<String, ExpressionType> mapOfVoltXMLOpType = new HashMap<String, ExpressionType>() {{
+       put("or", ExpressionType.CONJUNCTION_OR);
+       put("and", ExpressionType.CONJUNCTION_AND);
+       put("greaterthan", ExpressionType.COMPARE_GREATERTHAN);
+       put("lessthan", ExpressionType.COMPARE_LESSTHAN);
+       put("greaterthanorequalto", ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+       put("lessthanorequalto", ExpressionType.COMPARE_LESSTHANOREQUALTO);
+       put("equal", ExpressionType.COMPARE_EQUAL);
+       put("in", ExpressionType.COMPARE_IN);
+       put("not", ExpressionType.OPERATOR_NOT);
+       put("exists", ExpressionType.OPERATOR_EXISTS);
+       put("add", ExpressionType.OPERATOR_PLUS);
+       put("subtract", ExpressionType.OPERATOR_MINUS);
+       put("multiply", ExpressionType.OPERATOR_MULTIPLY);
+       put("divide", ExpressionType.OPERATOR_DIVIDE);
+    }};
+
+    private ExpressionUtil() {}
+
+    /**
+     * Helper to check if a VoltXMLElement contains parameter.
+     * @param elm element under inspection
+     * @return if elm contains parameter
+     */
+    private static boolean isParameterized(VoltXMLElement elm) {
+        final String name = elm.name;
+        if (name.equals("value")) {
+            return elm.getBoolAttribute("isparam", false);
+        } else if (name.equals("vector") || name.equals("row")) {
+            return elm.children.stream().anyMatch(ExpressionUtil::isParameterized);
+        } else if (name.equals("columnref") || name.equals("function") ||
+                name.equals("tablesubquery")) {
+            return false;
+        } else {
+            assert name.equals("operation") : "unknown VoltXMLElement type: " + name;
+            final ExpressionType op = mapOfVoltXMLOpType.get(elm.attributes.get("optype"));
+            assert op != null;
+            switch (op) {
+                case CONJUNCTION_OR:                    // two operators
+                case CONJUNCTION_AND:
+                case COMPARE_GREATERTHAN:
+                case COMPARE_LESSTHAN:
+                case COMPARE_EQUAL:
+                case COMPARE_NOTEQUAL:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHANOREQUALTO:
+                case OPERATOR_PLUS:
+                case OPERATOR_MINUS:
+                case OPERATOR_MULTIPLY:
+                case OPERATOR_DIVIDE:
+                case OPERATOR_CONCAT:
+                case OPERATOR_MOD:
+                case COMPARE_IN:
+                    return isParameterized(elm.children.get(0)) || isParameterized(elm.children.get(1));
+                case OPERATOR_IS_NULL:      // one operator
+                case OPERATOR_EXISTS:
+                case OPERATOR_NOT:
+                case OPERATOR_UNARY_MINUS:
+                    return isParameterized(elm.children.get(0));
+                default:
+                    assert false;
+                    return false;
+            }
+        }
+    }
+
+    /**
+     * Get the underlying type of the VoltXMLElement node. Need reference to the catalog for PVE
+     * @param db catalog
+     * @param elm element under inspection
+     * @return string representation of the element node
+     */
+    private static String getType(Database db, VoltXMLElement elm) {
+        final String type = elm.getStringAttribute("valuetype", "");
+        if (! type.isEmpty()) {
+            return type;
+        } else if (elm.name.equals("columnref")) {
+            final String tblName = elm.getStringAttribute("table", "");
+            final int colIndex = elm.getIntAttribute("index", 0);
+            return StreamSupport.stream(db.getTables().spliterator(), false)
+                    .filter(tbl -> tbl.getTypeName().equals(tblName))
+                    .findAny()
+                    .flatMap(tbl ->
+                            StreamSupport.stream(tbl.getColumns().spliterator(), false)
+                                    .filter(col -> col.getIndex() == colIndex)
+                                    .findAny())
+                    .map(Column::getType)
+                    .map(typ -> VoltType.get((byte) ((int)typ)).getName())
+                    .orElse("");
+        } else {
+            return "";
+        }
+    }
+
+    /**
+     * Guess from a parent node what are the parameter type of its child node, should one of its child node
+     * contain parameter.
+     * @param db catalog
+     * @param elm node under inspection
+     * @return string representation of the type of its child node.
+     */
+    private static String guessParameterType(Database db, VoltXMLElement elm) {
+        if (! isParameterized(elm) || ! elm.name.equals("operation")) {
+            return "";
+        } else {
+            final ExpressionType op = mapOfVoltXMLOpType.get(elm.attributes.get("optype"));
+            assert op != null;
+            switch (op) {
+                case CONJUNCTION_OR:
+                case CONJUNCTION_AND:
+                case OPERATOR_NOT:
+                    return "boolean";
+                case COMPARE_GREATERTHAN: // For these 2 operator-ops, the type is what the non-parameterized part gets set to.
+                case COMPARE_LESSTHAN:
+                case COMPARE_EQUAL:
+                case COMPARE_NOTEQUAL:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHANOREQUALTO:
+                case OPERATOR_PLUS:
+                case OPERATOR_MINUS:
+                case OPERATOR_MULTIPLY:
+                case OPERATOR_DIVIDE:
+                case OPERATOR_CONCAT:
+                case OPERATOR_MOD:
+                case COMPARE_IN:
+                    final VoltXMLElement left = elm.children.get(0), right = elm.children.get(1);
+                    return isParameterized(left) ? getType(db, right) : getType(db, left);
+                case OPERATOR_UNARY_MINUS:
+                    return "integer";
+                case OPERATOR_IS_NULL:
+                case OPERATOR_EXISTS:
+                    return "";
+                default:
+                    assert false;
+                    return "";
+            }
+        }
+    }
+
+    /**
+     * Conversion from a VoltXMLElement node to abstract expression, done outside HSQL.
+     * We need this overhaul, because
+     * 1. We need to inspect the predicate of "MIGRATE FROM tbl WHERE ..." query for certain properties
+     * 2. We are stuck with HSQL.
+     *
+     * @param db catalog
+     * @param elm element node under inspection
+     * @return converted expression
+     */
+    public static AbstractExpression from(Database db, VoltXMLElement elm) {
+        return from(db, elm, "");
+    }
+
+    private static AbstractExpression from(Database db, VoltXMLElement elm, String typeHint) {
+        if (elm == null) {
+            return null;
+        } else if (elm.name.equals("columnref")) {
+            final String tblName = elm.getStringAttribute("table", ""),
+                    colName = elm.getStringAttribute("column", "");
+            final int colIndex = elm.getIntAttribute("index", 0);
+            assert !tblName.isEmpty();
+            assert !colName.isEmpty();
+            return new TupleValueExpression(tblName, colName, colIndex);
+        } else if (elm.name.equals("value")) {
+            final ConstantValueExpression expr = new ConstantValueExpression();
+            expr.setValue(elm.getStringAttribute("value", ""));
+            expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", typeHint)));
+            return expr;
+        } else if (elm.name.equals("vector")) {
+            final VectorValueExpression expr = new VectorValueExpression();
+            expr.setArgs(elm.children.stream().map(elem -> from(db, elem, typeHint)).collect(Collectors.toList()));
+            return expr;
+        } else if (elm.name.equals("row")) {
+            return from(db, VoltXMLElementHelper.getFirstChild(elm, "columnref"), typeHint);
+        } else if (elm.name.equals("function")) {
+            final FunctionExpression expr = new FunctionExpression();
+            expr.setAttributes(elm.getStringAttribute("name", ""),
+                    elm.getStringAttribute("argument", null),
+                    elm.getIntAttribute("id", 0));
+            expr.setArgs(elm.children.stream().map(elem -> from(db, elem, typeHint)).collect(Collectors.toList()));
+            expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", "")));
+            return expr;
+        } else if (elm.name.equals("tablesubquery")) {  // e.g. where X in (SELECT ...)
+            // TODO: do not support parsing more complex queries
+            throw new PlanningErrorException("Expression is too complicated");
+        } else {
+            assert elm.name.equals("operation");
+            final ExpressionType op = mapOfVoltXMLOpType.get(elm.attributes.get("optype"));
+            assert op != null;
+            final String hint = guessParameterType(db, elm);
+            switch (op) {
+                case CONJUNCTION_OR:
+                case CONJUNCTION_AND:
+                    return new ConjunctionExpression(op, from(db, elm.children.get(0), hint), from(db, elm.children.get(1), hint));
+                case COMPARE_GREATERTHAN:
+                case COMPARE_LESSTHAN:
+                case COMPARE_EQUAL:
+                case COMPARE_NOTEQUAL:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHANOREQUALTO: {
+                    final ComparisonExpression expr = new ComparisonExpression(op,
+                            from(db, elm.children.get(0), hint),
+                            from(db, elm.children.get(1), hint));
+                    expr.setQuantifier(QuantifierType.get(elm.getStringAttribute("opsubtype", "none")));
+                    return expr;
+                }
+                case OPERATOR_PLUS:
+                case OPERATOR_MINUS:
+                case OPERATOR_MULTIPLY:
+                case OPERATOR_DIVIDE:
+                case OPERATOR_CONCAT:
+                case OPERATOR_MOD:
+                    return new OperatorExpression(op,
+                            from(db, elm.children.get(0), hint), from(db, elm.children.get(1), hint));
+                case OPERATOR_IS_NULL:
+                case OPERATOR_EXISTS:
+                case OPERATOR_NOT:
+                case OPERATOR_UNARY_MINUS:
+                    return new OperatorExpression(op, from(db, elm.children.get(0), hint), null);
+                case COMPARE_IN: {
+                    final InComparisonExpression expr = new InComparisonExpression();
+                    expr.setLeft(from(db, elm.children.get(0), hint));
+                    expr.setRight(from(db, elm.children.get(1), hint));
+                    return expr;
+                }
+                default:
+                    assert false;
+                    return null;
+            }
+        }
+    }
+
+    // A terminal node of an expression is the one that does not have left/right child, nor any parameters;
+    private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
+        if (expr != null) {
+            collectTerminals(expr.getLeft(), accum);
+            collectTerminals(expr.getRight(), accum);
+            if (expr.getArgs() != null) {
+                expr.getArgs().forEach(e -> collectTerminals(e, accum));
+            } else if (expr.getLeft() == null && expr.getRight() == null) {
+                accum.add(expr);
+            }
+        }
+    }
+
+    /**
+     * Collect/dedup all terminal/leaf nodes of an expression tree
+     * @param expr source expression tree
+     * @return dedup-ed terminal expressions
+     */
+    public static Set<AbstractExpression> collectTerminals(AbstractExpression expr) {
+        final Set<AbstractExpression> result = new HashSet<>();
+        collectTerminals(expr, result);
+        return result;
+    }
+
+    /**
+     * Check if any node of given expression tree satisfies given predicate
+     * @param expr source expression tree
+     * @param pred predicate to check against any expression node to find if any node satisfies.
+     *             Note that it should be able to handle null.
+     * @return true if there exists a node that satisfies the predicate
+     */
+    public static boolean reduce(AbstractExpression expr, Predicate<AbstractExpression> pred) {
+        final boolean current = pred.test(expr);
+        if (current) {
+            return true;
+        } else if (expr == null) {
+            return pred.test(null);
+        } else {
+            return pred.test(expr.getLeft()) || pred.test(expr.getRight()) ||
+                    expr.getArgs() != null && expr.getArgs().stream().anyMatch(pred);
+        }
+
+    }
 
     public static void finalizeValueTypes(AbstractExpression exp)
     {

@@ -356,12 +356,10 @@ public abstract class CatalogSchemaTools {
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
                     sb.append("CREATE ASSUMEUNIQUE INDEX ");
-                }
-                else {
+                } else {
                     sb.append("CREATE UNIQUE INDEX ");
                 }
-            }
-            else {
+            } else {    // MITGRATE flag does not imply any changes on the "CREATE INDEX" syntax
                 sb.append("CREATE INDEX ");
             }
 

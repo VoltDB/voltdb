@@ -23,4 +23,14 @@ public class PlanningErrorException extends RuntimeException {
     public PlanningErrorException(String msg) {
         super(msg);
     }
+    /**
+     * Create an exception with stacktrace erased. Used for reporting
+     * parsing/validation errors without the long backtrace list, to mimick
+     * user-observable error message from VoltCompiler.VoltCompilerException.
+     * @param msg exception message
+     * @param ignored not used
+     */
+    public PlanningErrorException(String msg, int ignored) {
+        super(msg, null, true, false);
+    }
 }

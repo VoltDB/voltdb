@@ -33,7 +33,8 @@ public enum QueryType {
     INSERT      (3),
     UPDATE      (4),
     DELETE      (5),
-    UPSERT      (6);
+    UPSERT      (6),
+    MIGRATE     (7);    // MIGRATE FROM tbl WHERE ...
 
     QueryType(int val) {
         assert (this.ordinal() == val) :
@@ -117,6 +118,9 @@ public enum QueryType {
             // motivating diving right in to the full parser/planner without this pre-check.
             // We don't want to be re-implementing the parser here -- this has already gone far enough.
             return QueryType.SELECT;
+        } else if (stmt.startsWith("migrat")) {
+            // Note that we are only comparing the first 6 characters as a hack.
+            return QueryType.MIGRATE;
         }
         // else:
         // All the known statements are handled above, so default to cataloging an invalid read-only statement

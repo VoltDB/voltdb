@@ -197,6 +197,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
     PLAN_NODE_TYPE_SWAPTABLES       = 34,
+    PLAN_NODE_TYPE_MIGRATE          = 35,
 
     //
     // Communication Nodes
@@ -603,6 +604,42 @@ enum DRConflictOnPK {
     NOT_CONFLICT_ON_PK,
     CONFLICT_ON_PK,
 };
+
+enum TableType {
+     // This will be unset and hence 0 for pre-9.0 catalogs
+     INVALID = 0,
+
+      // Regular PersistentTable
+     PERSISTENT = 1,
+
+      // StreamTable without ExportTupleStream (Views only)
+     STREAM_VIEW_ONLY = 2,
+
+     // StreamTable with ExportTupleStream
+     STREAM = 3,
+
+     // PersistentTable with associated Stream for migrating DELETES
+     PERSISTENT_MIGRATE  = 4,
+
+     // PersistentTable with associated Stream for linking INSERTS
+     PERSISTENT_EXPORT = 5,
+};
+
+inline bool isStream(TableType tableType) {
+    return tableType == STREAM_VIEW_ONLY || tableType == STREAM;
+}
+
+inline bool isTableWithExport(TableType tableType) {
+    return tableType == PERSISTENT_EXPORT;
+}
+
+inline bool isTableWithMigrate(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE;
+}
+
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+}
 
 // ------------------------------------------------------------------
 // Utility functions.

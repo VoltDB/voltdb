@@ -143,26 +143,26 @@ public:
                                              voltdb::BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, false, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         voltdb::TableIndexScheme indexScheme1("BinaryTreeMultimapIndex",
                                               voltdb::BALANCED_TREE_INDEX,
                                               m_primaryKeyIndexColumns,
                                               TableIndex::simplyIndexColumns(),
-                                              false, true, m_tableSchema);
+                                              false, true, false, m_tableSchema);
         indexes.push_back(indexScheme1);
         voltdb::TableIndexScheme indexScheme2("HashUniqueIndex",
                                               voltdb::HASH_TABLE_INDEX,
                                               m_primaryKeyIndexColumns,
                                               TableIndex::simplyIndexColumns(),
-                                              true, false, m_tableSchema);
+                                              true, false, false, m_tableSchema);
         indexes.push_back(indexScheme2);
         voltdb::TableIndexScheme indexScheme3("HashMultimapIndex",
                                               voltdb::HASH_TABLE_INDEX,
                                               m_primaryKeyIndexColumns,
                                               TableIndex::simplyIndexColumns(),
-                                              false, false, m_tableSchema);
+                                              false, false, false, m_tableSchema);
         indexes.push_back(indexScheme3);
 
 

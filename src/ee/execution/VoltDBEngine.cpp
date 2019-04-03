@@ -1496,8 +1496,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
         return false;
     }
 
-    markAllExportingStreamsNew();
-
     std::map<std::string, ExportTupleStream*> purgedStreams;
     processCatalogDeletes(timestamp, false, purgedStreams);
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
@@ -1557,16 +1555,6 @@ VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & pu
     }
 }
 
-void
-VoltDBEngine::markAllExportingStreamsNew() {
-    //Mark all streams new so that schema is sent on next tuple.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        if (entry.second != NULL) {
-            entry.second->setNew();
-        }
-    }
-}
-
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
@@ -1574,7 +1562,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                         int64_t uniqueId,
                         bool returnConflictRows,
                         bool shouldDRStream,
-                        int64_t undoToken) {
+                        int64_t undoToken,
+                        bool elastic) {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
@@ -1635,7 +1624,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                                           NULL,
                                           returnConflictRows ? &m_resultOutput : NULL,
                                           shouldDRStream,
-                                          ExecutorContext::currentUndoQuantum() == NULL);
+                                          ExecutorContext::currentUndoQuantum() == NULL,
+                                          elastic);
         }
         catch (const ConstraintFailureException &cfe) {
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;

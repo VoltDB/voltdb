@@ -17,7 +17,9 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -47,7 +49,8 @@ public class OperatorExpression extends AbstractExpression {
 
     public OperatorExpression() {
         //
-        // This is needed for serialization
+        // This is needed for the "reflective" way to construct an abstract expression.
+        // See AbstractParsedStmt#parseOperationExpression()
         //
         super();
     }

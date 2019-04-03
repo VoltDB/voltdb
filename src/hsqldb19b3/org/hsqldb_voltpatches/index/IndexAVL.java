@@ -132,6 +132,7 @@ public class IndexAVL implements Index {
     private final int[]     pkCols;
     private final Type[]    pkTypes;
     private final boolean   isUnique;    // DDL uniqueness
+    private final boolean   isMigrating; // DDL migrating index
     private final boolean   useRowId;
     private final boolean   isConstraint;
     private final boolean   isForward;
@@ -247,7 +248,7 @@ public class IndexAVL implements Index {
      */
     public IndexAVL(HsqlName name, long id, TableBase table, int[] columns,
                     boolean[] descending, boolean[] nullsLast,
-                    Type[] colTypes, boolean pk, boolean unique,
+                    Type[] colTypes, boolean pk, boolean unique, boolean migrating,
                     boolean constraint, boolean forward) {
 
         persistenceId  = id;
@@ -259,6 +260,7 @@ public class IndexAVL implements Index {
         this.nullsLast = nullsLast == null ? new boolean[columns.length]
                                            : nullsLast;
         isUnique       = unique;
+        isMigrating    = migrating;
         isConstraint   = constraint;
         isForward      = forward;
         this.table     = table;
@@ -382,6 +384,14 @@ public class IndexAVL implements Index {
     @Override
     public boolean isUnique() {
         return isUnique;
+    }
+
+    /**
+     * @return Is this a MIGRATING index?
+     */
+    @Override
+    public boolean isMigrating() {
+        return isMigrating;
     }
 
     /**
@@ -1787,6 +1797,9 @@ public class IndexAVL implements Index {
 
         index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
         index.attributes.put("unique", isUnique() ? "true" : "false");
+        index.attributes.put("migrating", isMigrating() ? "true" : "false");
+        assert ! (isMigrating() && (isUnique() || isAssumeUnique())) :
+                "Cannot create a MIGRATING index that is also UNIQUE or ASSUMEUNIQUE";
 
         Object[] columnList = getColumnNameList().toArray();
         index.attributes.put("columns", StringUtils.join(columnList, ","));

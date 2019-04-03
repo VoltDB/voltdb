@@ -442,6 +442,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
+                    long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             partitionId,
@@ -449,6 +450,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             startSequenceNumber,
                             tupleCount,
                             uniqueId,
+                            genId,
                             0,
                             length == 0 ? null : getBytes(length),
                             sync);
@@ -1190,7 +1192,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
             final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
-            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken, boolean elastic)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -1208,6 +1210,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(undoToken);
             m_data.putInt(returnUniqueViolations ? 1 : 0);
             m_data.putInt(shouldDRStream ? 1 : 0);
+            m_data.putInt(elastic ? 1 : 0);
             verifyDataCapacity(m_data.position() + tableBytes.remaining());
         } while (m_data.position() == 0);
 

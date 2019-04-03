@@ -106,7 +106,6 @@ StreamedTable::~StreamedTable() {
 // Stream writes were done so commit all the writes
 void StreamedTable::notifyQuantumRelease() {
     if (m_wrapper) {
-        assert(!m_wrapper->isNew());
         m_wrapper->commit(m_executorContext->getContextEngine(),
                 m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
     }
@@ -208,12 +207,12 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (shouldStreamToExport()) {
+        assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
         m_sequenceNo--;
-        assert(seqNo == m_sequenceNo);
     }
 }
 

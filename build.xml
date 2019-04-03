@@ -80,12 +80,15 @@
 <property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.prod.mac.dir'          location='${build.prod.dir}/org/voltdb/native/Mac/x86_64'/>
+<property name='build.prod.linux.dir'        location='${build.prod.dir}/org/voltdb/native/Linux/x86_64'/>
 <property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='build.testproc.dir'          location='${build.dir}/testprocs' />
 <property name='build.testfunc.dir'          location='${build.dir}/testfuncs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
+
 <property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
@@ -120,20 +123,15 @@
 <property name='cmake.verbose.config'        value='no' />
 <property name='cmake.build.maxcores'        value='-1' />
 
+
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
     <os family="mac"/>
 </condition>
 
 <condition property="jar.nativelib.dir"
-    value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
-    else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
-    <isset property="os.mac"/>
-</condition>
-
-<condition property="library.ext"
-    value=".jnilib"
-    else=".so">
+    value="${build.prod.mac.dir}"
+    else="${build.prod.linux.dir}">
     <isset property="os.mac"/>
 </condition>
 
@@ -672,7 +670,6 @@ DISTRIBUTION
             <include name="kafka/**"/>
             <include name="lib/**" />
             <include name="draingen" />
-            <include name="kubernetes/**" />
         </fileset>
     </copy>
 
@@ -843,7 +840,7 @@ DISTRIBUTION
     <antcall target="call_strip_lib" />
 
     <!-- copy to dir where jar picks it up as well -->
-    <!-- libcatalog is copied to ${jar.nativelib.dir} in the ee target (earlier than this) -->
+    <!-- libcatalog for both OS copied in the "catalog" target (earlier than this) -->
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb-${dist.version}.*"/>
@@ -854,7 +851,7 @@ DISTRIBUTION
     <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
-        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
+        <arg value='${build.prod.mac.dir}' />
         <arg value='${dist.version}'/>
         <arg value='${kitbuild}'/>
     </exec>
@@ -1442,13 +1439,13 @@ NATIVE EE STUFF
     <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
         <arg line="install.py"/>
     </exec>
-    <mkdir dir="${jar.nativelib.dir}"/>
-    <!-- GenerateEETests and plannertester needs the catalog API library. -->
-    <copy todir="${jar.nativelib.dir}">
-        <fileset dir="${base.dir}/lib">
-            <include name="libcatalog-${dist.version}.*"/>
-        </fileset>
-    </copy>
+
+    <!--both libcatalogs are checked out, so copy to right place-->
+    <mkdir dir="${build.prod.mac.dir}"/>
+    <copy file="${base.dir}/lib/libcatalog-${dist.version}.jnilib" todir="${build.prod.mac.dir}"/>
+    <mkdir dir="${build.prod.linux.dir}"/>
+    <copy file="${base.dir}/lib/libcatalog-${dist.version}.so" todir="${build.prod.linux.dir}"/>
+
 </target>
 
 <!-- Build the jni library. -->

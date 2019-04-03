@@ -30,6 +30,7 @@ import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -207,7 +208,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
+    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState);
 
     @Override
     abstract public void deliver(VoltMessage message);

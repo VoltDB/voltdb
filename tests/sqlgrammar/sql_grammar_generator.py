@@ -635,7 +635,8 @@ def print_summary(error_message=''):
                          + get_last_n_sql_statements(last_n_sql_statements, False, False)
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
-                         + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
+                         + ' ({0:.3f} seconds)'.format(seconds) + ', at ' + formatted_time(time()) \
+                         + ', SQL statements by type:'
 
         total_count = -1
         if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
@@ -935,7 +936,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print "\nDEBUG: Found 'ERROR' before SQL echoed (rare condition), with:\n" + \
                               get_last_n_sql_statements(last_n_sql_statements)
 
-                # Invalid 'exec', 'explainproc' & 'explainview' commands sometimes
+                # Invalid 'exec', 'explainproc' & 'explainview' commands (etc.) sometimes
                 # respond with various messages that do not include 'ERROR'
                 elif any( all(err_msg in output for err_msg in kem) for kem in known_error_messages):
                     if sql_was_echoed_as_output:
@@ -949,6 +950,15 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print "\nDEBUG: Found invalid 'exec', 'explainproc', or 'explainview'", \
                               "error message before SQL echoed (rare condition), with:\n" + \
                               get_last_n_sql_statements(last_n_sql_statements)
+
+                # CREATE VIEW statements will occasionally simply return 'null' in sqlcmd;
+                # see ENG-15587: this is a known bug, so we don't want to exit or fail
+                elif (output == 'null' and sql.startswith('CREATE VIEW')):
+                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                  sql_contains_echo_substring)
+                    if debug > 1:
+                        print "\nWARNING: 'null' returned by CREATE VIEW statement (ENG-15587):\n    ", sql
+                    break
 
                 # Valid 'show' commands just return a list, with one of several valid headers;
                 # also, for some reason, these commands don't get echoed back by sqlcmd, so we
@@ -1344,8 +1354,15 @@ if __name__ == "__main__":
                             ['Materialized view only supports INNER JOIN'],
                             ['windowed function call and GROUP BY in a single query is not supported'],
                             ['materialized view does not support self-join'],
-                            ['Windowed RANK function call expressions require an ORDER BY specification'],
+                            ['Windowed', 'function call expressions require an ORDER BY specification'],
+                            ['Windowed function call expressions', 'ORDER BY expression of their window'],
                             ['Invalid catalog update', 'another one is in progress'],
+                            ['The requested catalog change', 'not supported'],
+                            ['failed to create the transaction internally'],
+                            ['ParameterValueExpression', 'cannot be cast', 'TupleValueExpression'],
+                            ['SQL Aggregate function calls with subquery expression arguments are not allowed'],
+                            ['Column', 'not found', 'Please update your query'],
+                            ['Index: 0, Size: 0'],    # See ENG-15736
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of

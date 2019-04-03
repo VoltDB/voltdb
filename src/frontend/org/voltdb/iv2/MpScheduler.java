@@ -129,7 +129,8 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long mpTxnId)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState)
     {
         return updateReplicas(replicas, partitionMasters, false);
     }

@@ -71,6 +71,7 @@ import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -1270,7 +1271,7 @@ public class SnapshotUtil {
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables) {
             // Export tables are not included in the snapshot.
-            if (CatalogUtil.isTableExportOnly(database, table)) {
+            if (TableType.isStream(table.getTabletype())) {
                 continue;
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.

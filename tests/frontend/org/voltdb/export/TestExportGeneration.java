@@ -48,12 +48,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
@@ -157,6 +159,9 @@ public class TestExportGeneration {
 
         m_mockVoltDB = new MockVoltDB();
         m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite(m_host, m_site), m_part);
+        m_mockVoltDB.addTable("e1", false);
+        m_mockVoltDB.addColumnToTable("e1", "id", VoltType.INTEGER, true, "AA", VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("e1", "f1", VoltType.STRING, true, "AA", VoltType.STRING);
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
@@ -169,6 +174,15 @@ public class TestExportGeneration {
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                if (message instanceof BinaryPayloadMessage) {
+                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final byte msgType = buf.get();
+                    // Skip non-related messages
+                    if (msgType != ExportManager.RELEASE_BUFFER) {
+                        return;
+                    }
+                }
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -224,10 +238,11 @@ public class TestExportGeneration {
                     seqNo,
                     1,
                     0L,
+                    System.currentTimeMillis(),
                     foo.duplicate(),
                     false
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));
@@ -254,6 +269,7 @@ public class TestExportGeneration {
                 /*seqNo*/1L,
                 1,
                 0L,
+                System.currentTimeMillis(),
                 foo.duplicate(),
                 false
                 );
