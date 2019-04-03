@@ -1015,13 +1015,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             env.tearDown();
         }
     }
-
     @Test
     public void testENG15719PartialIndex() throws Exception {
+        testENG15719PartialIndex(false);
+        testENG15719PartialIndex(true);
+    }
+
+    private void testENG15719PartialIndex(boolean partitioned) throws Exception {
         final TestEnv env = new TestEnv("CREATE TABLE foo(i int not null, j int);\n" +
-                // TODO: COUNT(*) on partitioned table still transforms into table count despite partial index;
-                // but this cannot be reproduced in sqlcmd.
-                // "partition table foo on column i;\n" +
+                (partitioned ? "partition table foo on column i;\n" : "") +
                 "create index partial_index on foo(i) where abs(i) > 0;\n",
                 m_catalogJar, m_pathToDeployment, 2, 1, 0);
         try {

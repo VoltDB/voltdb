@@ -606,20 +606,23 @@ enum DRConflictOnPK {
 };
 
 enum TableType {
+     // This will be unset and hence 0 for pre-9.0 catalogs
+     INVALID = 0,
+
       // Regular PersistentTable
-     PERSISTENT = 0,
+     PERSISTENT = 1,
 
       // StreamTable without ExportTupleStream (Views only)
-     STREAM_VIEW_ONLY =1,
+     STREAM_VIEW_ONLY = 2,
 
      // StreamTable with ExportTupleStream
-     STREAM = 2,
+     STREAM = 3,
 
      // PersistentTable with associated Stream for migrating DELETES
-     PERSISTENT_MIGRATE  = 3,
+     PERSISTENT_MIGRATE  = 4,
 
      // PersistentTable with associated Stream for linking INSERTS
-     PERSISTENT_EXPORT = 4,
+     PERSISTENT_EXPORT = 5,
 };
 
 inline bool tableTypeIsExportStream(TableType tableType) {
