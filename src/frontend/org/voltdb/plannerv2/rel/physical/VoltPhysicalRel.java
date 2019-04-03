@@ -28,7 +28,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import com.google.common.base.Preconditions;
 
 public interface VoltPhysicalRel extends RelNode {
-    Convention CONVENTION = new Convention.Impl("VoltPhysical", VoltPhysicalRel.class) {
+    Convention CONVENTION = new Convention.Impl("CONVENTION", VoltPhysicalRel.class) {
     };
 
     /**

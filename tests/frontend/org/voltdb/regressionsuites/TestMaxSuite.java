@@ -41,9 +41,7 @@ public class TestMaxSuite extends RegressionSuite {
     private static String LONG_STRING_TEMPLATE = "This is a long string to test. It will make the client easier "
             + "to generate very long long string.";
     private static int APPEND_TIMES = SQL_TEXT_MAX_LENGTH / LONG_STRING_TEMPLATE.length();
-
-    // ENG-15262
-//    private static int PARAMETERS_MAX_JOIN = 100;
+    
     private static int PARAMETERS_MAX_JOIN = 50;
     private static int PARAMETERS_MAX_JOIN_FAIL = PARAMETERS_MAX_JOIN + 2;
     private static int PARAMETERS_MAX_COLUMN = 1024;
