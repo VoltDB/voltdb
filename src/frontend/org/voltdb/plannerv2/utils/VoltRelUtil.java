@@ -18,15 +18,24 @@
 package org.voltdb.plannerv2.utils;
 
 import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.*;
+import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rex.*;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.validate.SqlMonotonicity;
+import org.apache.calcite.util.mapping.Mappings;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+
+import java.util.List;
 
 public class VoltRelUtil {
 
@@ -48,9 +57,50 @@ public class VoltRelUtil {
                 ((VoltPhysicalRel) rel).getSplitCount() : 1;
     }
 
+    /**
+     * Transform sort's collation pushing it through a Calc.
+     * If the collationsort relies on non-trivial expressions we can't transform and
+     * and return an empty collation
+     *
+     * @param sortRel
+     * @param calcRel
+     * @return
+     */
+    public static RelCollation sortCollationCalcTranspose(RelCollation collation, Calc calc) {
+        final RexProgram program = calc.getProgram();
+        final RelOptCluster cluster = calc.getCluster();
+
+        List<RexLocalRef> projectRefList = program.getProjectList();
+        List<RexNode> projectList = RexConverter.expandLocalRef(projectRefList, program);
+        final Mappings.TargetMapping map =
+                RelOptUtil.permutationIgnoreCast(
+                        projectList, calc.getInput().getRowType());
+        for (RelFieldCollation fc : collation.getFieldCollations()) {
+            if (map.getTargetOpt(fc.getFieldIndex()) < 0) {
+                return RelCollations.EMPTY;
+            }
+            final RexNode node = projectList.get(fc.getFieldIndex());
+            if (node.isA(SqlKind.CAST)) {
+                // Check whether it is a monotonic preserving cast, otherwise we cannot push
+                final RexCall cast = (RexCall) node;
+                final RexCallBinding binding =
+                        RexCallBinding.create(cluster.getTypeFactory(), cast,
+                                ImmutableList.of(RelCollations.of(RexUtil.apply(map, fc))));
+                if (cast.getOperator().getMonotonicity(binding) == SqlMonotonicity.NOT_MONOTONIC) {
+                    return RelCollations.EMPTY;
+                }
+            }
+        }
+
+        final RelCollation newCollation =
+                cluster.traitSet().canonize(
+                        RexUtil.apply(map, collation));
+        return newCollation;
+    }
+
     public static CompiledPlan calciteToVoltDBPlan(VoltPhysicalRel rel, CompiledPlan compiledPlan) {
 
-        RexConverter.resetParameterIndex();
+        RexConverter.PARAM_COUNTER.reset();
 
         AbstractPlanNode root = new SendPlanNode();
         root.addAndLinkChild(rel.toPlanNode());

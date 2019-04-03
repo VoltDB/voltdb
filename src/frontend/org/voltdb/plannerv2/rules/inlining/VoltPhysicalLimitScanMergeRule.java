@@ -39,7 +39,7 @@ public class VoltPhysicalLimitScanMergeRule extends RelOptRule {
 
     // TODO: This one seems redundant, we first apply the VoltPhysicalCalcScanMergeRule
     // to Transform VoltDBPLimit / Calc / AbstractVoltDBPTableScan to VoltDBPLimit / AbstractVoltDBPTableScan,
-    // than it goes to the #INSTANCE_1 pattern
+    // than it goes to the #INSTANCE_SORT_SCAN pattern
     public static final VoltPhysicalLimitScanMergeRule INSTANCE_2 =
             new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalCalc.class,

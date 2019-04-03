@@ -42,14 +42,7 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.plannerv2.rules.logical.*;
-import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
-import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
-import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
-import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
-import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
+import org.voltdb.plannerv2.rules.physical.*;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -173,6 +166,11 @@ public class PlannerRules {
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
             VoltPJoinRule.INSTANCE,
+            VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
+            VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SEQSCAN,
+            VoltPCalcScanToIndexRule.INSTANCE,
+            VoltPSortIndexScanRemoveRule.INSTANCE_SORT_INDEXSCAN,
+            VoltPSortIndexScanRemoveRule.INSTANCE_SORT_CALC_INDEXSCAN,
             VoltPSetOpsRule.INSTANCE_UNION,
             VoltPSetOpsRule.INSTANCE_INTERSECT,
             VoltPSetOpsRule.INSTANCE_EXCEPT,
