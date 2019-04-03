@@ -101,7 +101,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
         Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltPhysicalAggregate);
-        Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0);
+        Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0, "Column count can not be 0.");
         m_program = program;
         m_offset = offset;
         m_limit = limit;

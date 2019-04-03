@@ -364,4 +364,10 @@ public class TestInlineRules extends Plannerv2TestCase {
                         "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], I=[$t0], V=[$t5], $condition=[$t8])\n")
                 .pass();
     }
+
+//    public void testENG15802() {
+//        m_tester.sql("select count(i) from (select max(i) from r1 ) as subquery, r1")
+//                .transform("")
+//                .pass();
+//    }
 }

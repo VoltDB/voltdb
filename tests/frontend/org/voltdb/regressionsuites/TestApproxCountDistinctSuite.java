@@ -262,10 +262,8 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                         "approx_count_distinct(", col, tbl);
                 String exactStmt = String.format(queryFormat,
                         "count( distinct ", col, tbl);
-
                 VoltTable estimateTable = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 VoltTable exactTable = client.callProcedure("@AdHoc", exactStmt).getResults()[0];
-
                 assertEstimatesAreWithin(col, exactTable, estimateTable, ALLOWED_PERCENT_ERROR);
             }
         }

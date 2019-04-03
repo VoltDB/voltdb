@@ -37,4 +37,21 @@ public class VoltSqlConformance extends SqlAbstractConformance {
     @Override public boolean isBangEqualAllowed() {
         return true;
     }
+
+    /**
+     * Whether to allow parentheses to be specified in calls to niladic functions
+     * and procedures (that is, functions and procedures with no parameters).
+     *
+     * <p>For example, {@code CURRENT_DATE} is a niladic system function. In
+     * standard SQL it must be invoked without parentheses:
+     *
+     * <blockquote><code>VALUES CURRENT_DATE</code></blockquote>
+     *
+     * <p>If {@code allowNiladicParentheses}, the following syntax is also valid:
+     *
+     * <blockquote><code>VALUES CURRENT_DATE()</code></blockquote>
+     */
+    @Override public boolean allowNiladicParentheses() {
+        return true;
+    }
 }
