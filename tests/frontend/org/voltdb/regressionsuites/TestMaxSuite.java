@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,10 +41,8 @@ public class TestMaxSuite extends RegressionSuite {
     private static String LONG_STRING_TEMPLATE = "This is a long string to test. It will make the client easier "
             + "to generate very long long string.";
     private static int APPEND_TIMES = SQL_TEXT_MAX_LENGTH / LONG_STRING_TEMPLATE.length();
-
-    // ENG-15262
-//    private static int PARAMETERS_MAX_JOIN = 100;
     private static int PARAMETERS_MAX_JOIN = 50;
+    private static int PARAMETERS_MAX_JOIN_FAIL = PARAMETERS_MAX_JOIN + 2;
     private static int PARAMETERS_MAX_COLUMN = 1024;
     private static int PARAMETERS_MAX_IN = 6000;
 
@@ -155,27 +154,39 @@ public class TestMaxSuite extends RegressionSuite {
         assertEquals(0, results.fetchRow(0).getLong(0));
     }
 
-    public void testMaxJoin() throws Exception {
+    private Pair<ClientResponse, String> testMaxJoin(int maxJoins) throws Exception {
         final Client client = this.getClient();
 
         ClientResponse resp = null;
+        String errMessage = null;
 
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+        for (int i = 0; i < maxJoins; i++) {
             resp = client.callProcedure("MAX_JOIN_TABLE" + i + ".insert", 1, 1);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
 
         sb = new StringBuilder("select * from ");
-        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+        for (int i = 0; i < maxJoins; i++) {
             sb.append("max_join_table");
             sb.append(i);
-            if (i != PARAMETERS_MAX_JOIN - 1) {
+            if (i != maxJoins - 1) {
                 sb.append(",");
             }
         }
 
+        try {
         resp = client.callProcedure("@AdHoc", sb.toString());
+        } catch (Exception ex) {
+            errMessage = ex.getMessage();
+        }
+        return Pair.of(resp, errMessage);
+    }
+
+    public void testMaxJoinSuccess() throws Exception {
+        Pair<ClientResponse, String> result = testMaxJoin(PARAMETERS_MAX_JOIN);
+        ClientResponse resp = result.getFirst();
+        assertNotNull(resp);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
         assertEquals(1, resp.getResults().length);
@@ -184,6 +195,12 @@ public class TestMaxSuite extends RegressionSuite {
         assertEquals(1, results.getRowCount());
         assertEquals(PARAMETERS_MAX_JOIN * 2, results.getColumnCount());
         assertEquals(1, results.fetchRow(0).getLong(0));
+    }
+
+    public void testMaxJoinFailure() throws Exception {
+        Pair<ClientResponse, String> result = testMaxJoin(PARAMETERS_MAX_JOIN_FAIL);
+        String errorMessage = result.getSecond();
+        assertEquals("VoltRelOptCost rowCount is infinite", errorMessage);
     }
 
     static public junit.framework.Test suite() {
@@ -225,7 +242,7 @@ public class TestMaxSuite extends RegressionSuite {
 
             /** for max join */
             sb = new StringBuilder();
-            for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+            for (int i = 0; i < PARAMETERS_MAX_JOIN_FAIL; i++) {
                 sb.append("create table max_join_table");
                 sb.append(i);
                 sb.append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");

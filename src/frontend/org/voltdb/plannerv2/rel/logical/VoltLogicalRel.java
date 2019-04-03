@@ -36,5 +36,5 @@ public interface VoltLogicalRel extends RelNode  {
      * will be made infinite cost. The planner will fail to come up
      * with a plan with best cost.
      */
-    Convention CONVENTION = new Convention.Impl("VoltLogical", VoltLogicalRel.class);
+    Convention CONVENTION = new Convention.Impl("CONVENTION", VoltLogicalRel.class);
 }
