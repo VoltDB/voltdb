@@ -1600,6 +1600,10 @@ bool PersistentTable::equals(PersistentTable* other) {
 std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
     buffer << Table::debug(spacer);
+    if (m_shadowStream) {
+        std::string infoSpacer = spacer + "  |";
+        buffer << infoSpacer << "\tSHADOW STREAM: " << m_shadowStream->debug() << "\n";
+    }
 #ifdef VOLT_TRACE_ENABLED
     std::string infoSpacer = spacer + "  |";
     buffer << infoSpacer << "\tINDEXES: " << m_indexes.size() << "\n";

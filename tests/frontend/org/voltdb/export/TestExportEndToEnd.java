@@ -48,13 +48,13 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
 
     private static int KFACTOR = 1;
     private static final String SCHEMA =
-            "CREATE STREAM t1 "
+            "CREATE STREAM t_1 "
             + "PARTITION ON COLUMN a "
             + "EXPORT TO TARGET export_target_a ("
             + "     a integer not null, "
             + "     b integer not null"
             + ");"
-            + "CREATE STREAM t2 "
+            + "CREATE STREAM t_2 "
             + "EXPORT TO TARGET export_target_b ("
             + "     a integer not null, "
             + "     b integer not null"
@@ -75,11 +75,11 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         // Each stream needs an exporter configuration
         builder.addExport(true /* enabled */,
                          "custom", /* custom exporter:  org.voltdb.exportclient.SocketExporter*/
-                         createSocketExportProperties("t1", false /* is replicated stream? */),
+                         createSocketExportProperties("t_1", false /* is replicated stream? */),
                          "export_target_a");
         builder.addExport(true /* enabled */,
                 "custom", /* custom exporter:  org.voltdb.exportclient.SocketExporter*/
-                createSocketExportProperties("t2", false /* is replicated stream? */),
+                createSocketExportProperties("t_2", false /* is replicated stream? */),
                 "export_target_b");
         // Start socket exporter client
         startListener();
@@ -122,13 +122,14 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         // Generate PBD files
         Object[] data = new Object[3];
         Arrays.fill(data, 1);
-        insertToStream("t1", 0, 100, client, data);
+        insertToStream("t_1", 0, 100, client, data);
+        insertToStream("t_2", 0, 100, client, data);
 
         // kill one node
         m_cluster.killSingleHost(1);
 
         // drop stream
-        ClientResponse response = client.callProcedure("@AdHoc", "DROP STREAM t1");
+        ClientResponse response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         // rejoin node back
