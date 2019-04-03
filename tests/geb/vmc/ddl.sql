@@ -9,8 +9,9 @@ DROP PROCEDURE CountReplicatedTable         IF EXISTS;
 DROP PROCEDURE CountReplicatedTableByGroup  IF EXISTS;
 DROP PROCEDURE InsertReplicatedTableZeroes  IF EXISTS;
 
-DROP TABLE partitioned_table IF EXISTS CASCADE;
-DROP TABLE replicated_table  IF EXISTS CASCADE;
+DROP TABLE partitioned_table  IF EXISTS CASCADE;
+DROP TABLE replicated_table   IF EXISTS CASCADE;
+DROP TABLE kafka_import_table IF EXISTS CASCADE;
 
 DROP STREAM export_partitioned_table        IF EXISTS;
 DROP STREAM export_mirror_partitioned_table IF EXISTS;
@@ -223,13 +224,6 @@ AS
 --, rowid                     BIGINT          NOT NULL
 --);
 
--- Simple Table used for Kafka Import
-CREATE TABLE kafka_import_table
-(
-  message                   VARCHAR
-, PRIMARY KEY (message)
-);
-
 -- Simple User-Defined Stored Procedures, to test CREATE PROCEDURE AS ...
 -- and the display of User-Defined Stored Procedures in the VMC
 CREATE PROCEDURE CountPartitionedTable AS
@@ -253,3 +247,10 @@ CREATE PROCEDURE InsertReplicatedTableZeroes AS
 -- Load the classes used by FullDdlSqlTest, to test CREATE PROCEDURE FROM CLASS
 -- (as run in the VMC)
 load classes fullddlfeatures.jar;
+
+-- Simple Table used for Kafka Import
+CREATE TABLE kafka_import_table
+(
+  message                   VARCHAR         NOT NULL
+, PRIMARY KEY (message)
+);

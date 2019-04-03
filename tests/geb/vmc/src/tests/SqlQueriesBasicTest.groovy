@@ -655,10 +655,11 @@ class SqlQueriesBasicTest extends SqlQueriesTestBase {
      * Check that the list of Streams displayed on the page matches the expected
      * list (for the default test app).
      */
-    def checkStreams() {
-        expect: 'List of displayed Streams should match expected list'
-        printAndCompare('Streams', streamsFileName, true, streamLines, getStreams(page))
-    }
+     // TODO: reinstate this if/when there are Streams to check
+//    def checkStreams() {
+//        expect: 'List of displayed Streams should match expected list'
+//        printAndCompare('Streams', streamsFileName, true, streamLines, getStreams(page))
+//    }
 
     /**
      * Check that the list of Views displayed on the page matches the expected
