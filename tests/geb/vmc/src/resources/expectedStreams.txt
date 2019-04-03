@@ -1,7 +1,9 @@
-# Expected Streams: (when running the default GEB VMC
-# test server; see ../../run.sh)
-EXPORT_DONE_TABLE
-EXPORT_MIRROR_PARTITIONED_TABLE
-EXPORT_PARTITIONED_TABLE
-EXPORT_REPLICATED_TABLE
-EXPORT_SKINNY_PARTITIONED_TABLE
+# Expected Streams: (when running the default GEB VMC test server; see ../../run.sh)
+#
+# Note: all Streams are now commented out, because there are too many for
+# 'community' tests, especially when combined with fullDDL.sql tests
+#EXPORT_DONE_TABLE
+#EXPORT_MIRROR_PARTITIONED_TABLE
+#EXPORT_PARTITIONED_TABLE
+#EXPORT_REPLICATED_TABLE
+#EXPORT_SKINNY_PARTITIONED_TABLE

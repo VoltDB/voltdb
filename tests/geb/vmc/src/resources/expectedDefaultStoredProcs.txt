@@ -1,10 +1,12 @@
-# Expected Default Stored Procedures: (when running the default GEB VMC
-# test server; see ../../run.sh)
-EXPORT_DONE_TABLE.insert
-EXPORT_MIRROR_PARTITIONED_TABLE.insert
-EXPORT_PARTITIONED_TABLE.insert
-EXPORT_REPLICATED_TABLE.insert
-EXPORT_SKINNY_PARTITIONED_TABLE.insert
+# Expected Default Stored Procedures: (when running the default GEB VMC test server; see ../../run.sh)
+#
+# Note: all Streams are now commented out, because there are too many for
+# 'community' tests, especially when combined with fullDDL.sql tests
+#EXPORT_DONE_TABLE.insert
+#EXPORT_MIRROR_PARTITIONED_TABLE.insert
+#EXPORT_PARTITIONED_TABLE.insert
+#EXPORT_REPLICATED_TABLE.insert
+#EXPORT_SKINNY_PARTITIONED_TABLE.insert
 KAFKA_IMPORT_TABLE.delete
 KAFKA_IMPORT_TABLE.insert
 KAFKA_IMPORT_TABLE.update

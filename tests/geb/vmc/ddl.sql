@@ -67,73 +67,75 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
+-- Commenting out Streams because there are too many for 'community' tests,
+-- especially when combined with fullDDL.sql tests:
 -- Stream Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid
-(
-  txnid                     BIGINT          NOT NULL
-, rowid                     BIGINT          NOT NULL
-, rowid_group               TINYINT         NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT         NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT        NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER         NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT          NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP       NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL         NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT           NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)     NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)    NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
---, type_null_point           GEOGRAPHY_POINT
---, type_not_null_point       GEOGRAPHY_POINT NOT NULL
---, type_null_polygon         GEOGRAPHY
---, type_not_null_polygon     GEOGRAPHY       NOT NULL
-);
+--CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid
+--(
+--  txnid                     BIGINT          NOT NULL
+--, rowid                     BIGINT          NOT NULL
+--, rowid_group               TINYINT         NOT NULL
+--, type_null_tinyint         TINYINT
+--, type_not_null_tinyint     TINYINT         NOT NULL
+--, type_null_smallint        SMALLINT
+--, type_not_null_smallint    SMALLINT        NOT NULL
+--, type_null_integer         INTEGER
+--, type_not_null_integer     INTEGER         NOT NULL
+--, type_null_bigint          BIGINT
+--, type_not_null_bigint      BIGINT          NOT NULL
+--, type_null_timestamp       TIMESTAMP
+--, type_not_null_timestamp   TIMESTAMP       NOT NULL
+--, type_null_decimal         DECIMAL
+--, type_not_null_decimal     DECIMAL         NOT NULL
+--, type_null_float           FLOAT
+--, type_not_null_float       FLOAT           NOT NULL
+--, type_null_varchar25       VARCHAR(32)
+--, type_not_null_varchar25   VARCHAR(32)     NOT NULL
+--, type_null_varchar128      VARCHAR(128)
+--, type_not_null_varchar128  VARCHAR(128)    NOT NULL
+--, type_null_varchar1024     VARCHAR(1024)
+--, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
+----, type_null_point           GEOGRAPHY_POINT
+----, type_not_null_point       GEOGRAPHY_POINT NOT NULL
+----, type_null_polygon         GEOGRAPHY
+----, type_not_null_polygon     GEOGRAPHY       NOT NULL
+--);
 
 CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
-(
-  txnid                     BIGINT          NOT NULL
-, rowid                     BIGINT          NOT NULL
-, rowid_group               TINYINT         NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT         NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT        NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER         NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT          NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP       NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL         NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT           NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)     NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)    NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
---, type_null_point           GEOGRAPHY_POINT
---, type_not_null_point       GEOGRAPHY_POINT NOT NULL
---, type_null_polygon         GEOGRAPHY
---, type_not_null_polygon     GEOGRAPHY       NOT NULL
-);
+--(
+--  txnid                     BIGINT          NOT NULL
+--, rowid                     BIGINT          NOT NULL
+--, rowid_group               TINYINT         NOT NULL
+--, type_null_tinyint         TINYINT
+--, type_not_null_tinyint     TINYINT         NOT NULL
+--, type_null_smallint        SMALLINT
+--, type_not_null_smallint    SMALLINT        NOT NULL
+--, type_null_integer         INTEGER
+--, type_not_null_integer     INTEGER         NOT NULL
+--, type_null_bigint          BIGINT
+--, type_not_null_bigint      BIGINT          NOT NULL
+--, type_null_timestamp       TIMESTAMP
+--, type_not_null_timestamp   TIMESTAMP       NOT NULL
+--, type_null_decimal         DECIMAL
+--, type_not_null_decimal     DECIMAL         NOT NULL
+--, type_null_float           FLOAT
+--, type_not_null_float       FLOAT           NOT NULL
+--, type_null_varchar25       VARCHAR(32)
+--, type_not_null_varchar25   VARCHAR(32)     NOT NULL
+--, type_null_varchar128      VARCHAR(128)
+--, type_not_null_varchar128  VARCHAR(128)    NOT NULL
+--, type_null_varchar1024     VARCHAR(1024)
+--, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
+----, type_null_point           GEOGRAPHY_POINT
+----, type_not_null_point       GEOGRAPHY_POINT NOT NULL
+----, type_null_polygon         GEOGRAPHY
+----, type_not_null_polygon     GEOGRAPHY       NOT NULL
+--);
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid
-(
-  txnid                     BIGINT          NOT NULL
-);
+--CREATE STREAM export_done_table PARTITION ON COLUMN txnid
+--(
+--  txnid                     BIGINT          NOT NULL
+--);
 
 -- Replicated Table
 CREATE TABLE replicated_table
@@ -184,42 +186,42 @@ AS
  GROUP BY rowid_group;
 
 -- Stream Table for Replicated Data Table deletions
-CREATE STREAM export_replicated_table
-(
-  txnid                     BIGINT          NOT NULL
-, rowid                     BIGINT          NOT NULL
-, rowid_group               TINYINT         NOT NULL
-, type_null_tinyint         TINYINT
-, type_not_null_tinyint     TINYINT         NOT NULL
-, type_null_smallint        SMALLINT
-, type_not_null_smallint    SMALLINT        NOT NULL
-, type_null_integer         INTEGER
-, type_not_null_integer     INTEGER         NOT NULL
-, type_null_bigint          BIGINT
-, type_not_null_bigint      BIGINT          NOT NULL
-, type_null_timestamp       TIMESTAMP
-, type_not_null_timestamp   TIMESTAMP       NOT NULL
-, type_null_float           FLOAT
-, type_not_null_float       FLOAT           NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL         NOT NULL
-, type_null_varchar25       VARCHAR(32)
-, type_not_null_varchar25   VARCHAR(32)     NOT NULL
-, type_null_varchar128      VARCHAR(128)
-, type_not_null_varchar128  VARCHAR(128)    NOT NULL
-, type_null_varchar1024     VARCHAR(1024)
-, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
---, type_null_point           GEOGRAPHY_POINT
---, type_not_null_point       GEOGRAPHY_POINT NOT NULL
---, type_null_polygon         GEOGRAPHY
---, type_not_null_polygon     GEOGRAPHY       NOT NULL
-);
+--CREATE STREAM export_replicated_table
+--(
+--  txnid                     BIGINT          NOT NULL
+--, rowid                     BIGINT          NOT NULL
+--, rowid_group               TINYINT         NOT NULL
+--, type_null_tinyint         TINYINT
+--, type_not_null_tinyint     TINYINT         NOT NULL
+--, type_null_smallint        SMALLINT
+--, type_not_null_smallint    SMALLINT        NOT NULL
+--, type_null_integer         INTEGER
+--, type_not_null_integer     INTEGER         NOT NULL
+--, type_null_bigint          BIGINT
+--, type_not_null_bigint      BIGINT          NOT NULL
+--, type_null_timestamp       TIMESTAMP
+--, type_not_null_timestamp   TIMESTAMP       NOT NULL
+--, type_null_float           FLOAT
+--, type_not_null_float       FLOAT           NOT NULL
+--, type_null_decimal         DECIMAL
+--, type_not_null_decimal     DECIMAL         NOT NULL
+--, type_null_varchar25       VARCHAR(32)
+--, type_not_null_varchar25   VARCHAR(32)     NOT NULL
+--, type_null_varchar128      VARCHAR(128)
+--, type_not_null_varchar128  VARCHAR(128)    NOT NULL
+--, type_null_varchar1024     VARCHAR(1024)
+--, type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
+----, type_null_point           GEOGRAPHY_POINT
+----, type_not_null_point       GEOGRAPHY_POINT NOT NULL
+----, type_null_polygon         GEOGRAPHY
+----, type_not_null_polygon     GEOGRAPHY       NOT NULL
+--);
 
-CREATE STREAM export_skinny_partitioned_table PARTITION ON COLUMN rowid
-(
-  txnid                     BIGINT          NOT NULL
-, rowid                     BIGINT          NOT NULL
-);
+--CREATE STREAM export_skinny_partitioned_table PARTITION ON COLUMN rowid
+--(
+--  txnid                     BIGINT          NOT NULL
+--, rowid                     BIGINT          NOT NULL
+--);
 
 -- Simple Table used for Kafka Import
 CREATE TABLE kafka_import_table
