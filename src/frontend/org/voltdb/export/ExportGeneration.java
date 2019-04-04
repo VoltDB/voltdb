@@ -842,9 +842,6 @@ public class ExportGeneration implements Generation {
      */
     @Override
     public void onSourceDrained(int partitionId, String tableName) {
-
-        assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(tableName));
         ExportDataSource source;
         synchronized(m_dataSourcesByPartition) {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
