@@ -138,6 +138,9 @@ public class StreamBlockQueue {
         }
 
         if (cont == null) {
+            if (schemaCont != null) {
+                schemaCont.discard();
+            }
             return null;
         } else {
             long segmentIndex = m_reader.getSegmentIndex();

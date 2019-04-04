@@ -481,10 +481,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private synchronized void releaseExportBytes(long releaseSeqNo) throws IOException {
+
         // Released offset is in an already-released past
-        if (releaseSeqNo < m_lastReleasedSeqNo) {
+        if (releaseSeqNo <= m_lastReleasedSeqNo) {
             return;
         }
+
+        // Check whether a pending container was completely acked
+        AckingContainer pend = m_pendingContainer.get();
+        if (pend != null) {
+            if (releaseSeqNo > pend.m_lastSeqNo) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Discarding via ack a pending " + pend);
+                }
+                m_pendingContainer.set(null);
+                pend.internalDiscard();
+            }
+        }
+
+        // Release buffers
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
@@ -500,6 +515,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
+
+        // If blocked and we released past the first gap, revert to ACTIVE
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
@@ -507,6 +524,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
+
         m_lastReleasedSeqNo = releaseSeqNo;
         int tuplesDeleted = m_gapTracker.truncate(releaseSeqNo);
         m_tuplesPending.addAndGet(-tuplesDeleted);
@@ -920,7 +938,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollTask.setFuture(null);
             }
         } catch (RejectedExecutionException reex) {
-            //We are closing source.
+            // Ignore, {@code GuestProcessor} was closed
         }
         m_pollTask = null;
 
@@ -977,7 +995,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<AckingContainer> poll(boolean forcePollSchema) {
-        final SettableFuture<AckingContainer> fut = SettableFuture.create();
+        //ENG-15763, create SettableFuture that lets us handle executor exceptions
+        final SettableFuture<AckingContainer> fut = SettableFuture.create(false);
         PollTask pollTask = new PollTask(fut, forcePollSchema);
         try {
             m_es.execute(new Runnable() {
@@ -993,32 +1012,50 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
-                        pollTask.clear();
+                        try {
+                            pollTask.clear();
+                        } catch (RejectedExecutionException rej) {
+                            // Ignore: the {@code GuestProcessor} was shut down
+                        }
                         m_pollTask = null;
                         return;
                     }
 
+                    AckingContainer cont = null;
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            AckingContainer cont = m_pendingContainer.getAndSet(null);
+                            cont = m_pendingContainer.getAndSet(null);
                             if (cont.schema() == null) {
                                 // Ensure this first block has a schema
                                 BBContainer schemaContainer = m_committedBuffers.pollSchema();
                                 if (schemaContainer == null) {
-                                    pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo));
+                                    try {
+                                        pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
+                                                + ", discarding buffer (rows may be lost)."));
+                                    } catch (RejectedExecutionException reex) { /* Ignore */ }
+                                    cont.internalDiscard();
                                     return;
                                 } else {
                                     cont.setSchema(schemaContainer);
                                 }
                             }
-                            pollTask.setFuture(cont);
-                            if (m_pollTask != null) {
+
+                            try {
+                                pollTask.setFuture(cont);
                                 if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Pick up work from pending container, set poll future to null");
+                                    exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
                                 }
-                                m_pollTask = null;
+                            } catch (RejectedExecutionException reex) {
+                                // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+                                // shut down by a catalog update): place the polled container in pending
+                                // so it is picked up by the new GuestProcessor.
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Pending a rejected " + cont);
+                                }
+                                setPendingContainer(cont);
                             }
+                            m_pollTask = null;
                             return;
                         }
                         /*
@@ -1035,15 +1072,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             pollImpl(pollTask);
                         }
                     } catch (Exception e) {
-                        exportLog.error("Exception polling export buffer", e);
+                        if (cont != null) {
+                            exportLog.error("Exception polling export buffer, discarding buffer with for committedSeqNo" + cont.m_commitSeqNo
+                                    + ", rows may be lost", e);
+                            cont.internalDiscard();
+                        } else  {
+                            exportLog.error("Exception polling export buffer", e);
+                        }
                     } catch (Error e) {
                         VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
                 }
             });
         } catch (RejectedExecutionException rej) {
-            //Don't expect this to happen outside of test, but in test it's harmless
-            exportLog.info("Polling from export data source rejected, this should be harmless");
+            exportLog.info("Polling from export data source rejected.");
         }
         return fut;
     }
@@ -1149,19 +1191,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
-                    // The GuestProcessor instance wasn't able to handle the future (e.g. being
-                    // shut down by a catalog update). Discard container without acking it.
-                    if (ackingContainer != null) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Discarding rejected " + ackingContainer.toString());
-                        }
-                        ackingContainer.internalDiscard();
+                    // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+                    // shut down by a catalog update): place the polled container in pending
+                    // so it is picked up by the new GuestProcessor.
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Pending a rejected " + ackingContainer);
                     }
+                    setPendingContainer(ackingContainer);
                 }
                 m_pollTask = null;
             }
         } catch (Throwable t) {
-            pollTask.setException(t);
+            try {
+                pollTask.setException(t);
+            } catch (RejectedExecutionException reex) { /* Ignore */ }
         }
     }
 
@@ -1446,7 +1489,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                      m_pollTask.setFuture(null);
                  }
              } catch (RejectedExecutionException reex) {
-                 //We are closing source.
+                 // Ignore, {@code GuestProcessor} was closed
              }
              m_pollTask = null;
              m_generation.onSourceDrained(m_partitionId, m_tableName);
