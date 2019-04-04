@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -149,7 +148,8 @@ public class TestLikeQueries extends TestCase {
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
-            new LikeTest("â_x一xxéyyԱ", 1),
+            // ENG-15264
+            // new LikeTest("â_x一xxéyyԱ", 1),
     };
 
     public static class LikeSuite {
@@ -253,7 +253,7 @@ public class TestLikeQueries extends TestCase {
             } catch (ProcCallException e) {
                 System.out.printf("LIKE clause \"%s\" failed\n", clause);
                 System.out.println(e.toString());
-                assertTrue("This failure was unexpected", test.crashes);
+                assertTrue("This failure was unexpected on " + query, test.crashes);
                 System.out.println("(This failure was expected)");
             }
         }
