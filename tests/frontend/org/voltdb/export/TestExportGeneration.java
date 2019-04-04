@@ -164,10 +164,10 @@ public class TestExportGeneration {
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(m_dataDirectory);
+        m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
-                m_connectors, getProcessor(), m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
+                m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
                 ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
@@ -212,7 +212,7 @@ public class TestExportGeneration {
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.close(null);
+        m_exportGeneration.close();
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
