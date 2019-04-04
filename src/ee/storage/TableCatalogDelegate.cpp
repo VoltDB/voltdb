@@ -728,6 +728,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     m_table->incrementRefcount();
     PersistentTable* newPersistentTable = dynamic_cast<PersistentTable*>(m_table);
     PersistentTable* existingPersistentTable = dynamic_cast<PersistentTable*>(existingTable);
+    StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
+    StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
 
     ///////////////////////////////////////////////
     // Move tuples from one table to the other
@@ -735,24 +737,18 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     if (existingPersistentTable && newPersistentTable) {
         migrateChangedTuples(catalogTable, existingPersistentTable, newPersistentTable);
         migrateViews(catalogTable.views(), existingPersistentTable, newPersistentTable, delegatesByName);
+        existingStreamedTable = existingPersistentTable->getStreamedTable();
+        newStreamedTable = newPersistentTable->getStreamedTable();
     }
-    else {
-        StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
-        StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
-        if (existingStreamedTable && newStreamedTable) {
-            int64_t seqNo;
-            size_t streamBytesUsed;
-            existingStreamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
-            ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
-            // There should be no pending buffer at the time of UAC
-            assert(wrapper == NULL ||
-                    wrapper->getCurrBlock() == NULL ||
-                    wrapper->getCurrBlock()->getRowCount() == 0);
-            existingStreamedTable->setWrapper(NULL);
-            newStreamedTable->setExportStreamPositions(seqNo, streamBytesUsed);
-            newStreamedTable->setWrapper(wrapper);
-            migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
-        }
+    if (existingStreamedTable && newStreamedTable) {
+        ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
+        // There should be no pending buffer at the time of UAC
+        assert(wrapper != NULL &&
+                (wrapper->getCurrBlock() == NULL ||
+                 wrapper->getCurrBlock()->getRowCount() == 0));
+        existingStreamedTable->setWrapper(NULL);
+        newStreamedTable->setWrapper(wrapper);
+        migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
     }
 
     ///////////////////////////////////////////////

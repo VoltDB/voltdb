@@ -127,6 +127,9 @@ public:
 
     void setWrapper(ExportTupleStream *wrapper) {
         m_wrapper = wrapper;
+        if (m_wrapper) {
+            m_sequenceNo = m_wrapper->getSequenceNumber() - 1;
+        }
     }
 
     ExportTupleStream* getWrapper() {
