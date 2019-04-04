@@ -22,10 +22,10 @@
  */
 
 /*
-CREATE TABLE a (
-    last_update timestamp default now not null
-) USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 1
-    MIGRATE TO TARGET archive;
+    CREATE TABLE a (
+        last_update timestamp default now not null
+    ) USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 2
+        MIGRATE TO TARGET archive;
 */
 const char *catalogPayloadBasic =
     "add / clusters cluster\n"
@@ -46,7 +46,7 @@ const char *catalogPayloadBasic =
     "set $PREV drFlushInterval 0\n"
     "set $PREV preferredSource 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"lQJUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDYxMjAyODIwEQJ8NkM2MTczNzQ1Rjc1NzA2NDYxNzQ2NTIwNzQ2OTZENjUBHBg2MTZENzAyAR5INTY2NjE3NTZDNzQyMDZFNkY3Nw0IBRABGkQ2QzIwMjkyMDU1NTM0OTRFNDcBgiw1NDRDMjAzMTIwNEQBFgQ1NQGcTDUzMjA0RjRFMjA0MzRGNEM1NTREAQ5elgARtgVECDc1Mh3iAEYBZiA0MTUyNDc0NTUBjjwxNzI2MzY4Njk3NjY1M0IK\"\n"
+    "set /clusters#cluster/databases#database schema \"xwJUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDYxMjAyODIwPgIAfDZDNjE3Mzc0NUY3NTcwNjQ2MTc0NjUyMDc0Njk2RDY1ARwYNjE2RDcwMgEeSDU2NjYxNzU2Qzc0MjA2RTZGNzcNCAUQARoENkMdZDA5MjA1NTUzNDk0RTQ3AZJkNTQ0QzIwMzEyMDUzNDU0MzRGNEU0NDUzMjABCgQyMAUSIEM1NTRENEUyMF6eAAQ0MgXkKDM0ODVGNTM0OTVBAeQEMzIdeg3qGDRENDk0NzUJMCkUBEYyJRoYNTI0NzQ1NQG4PDE3MjYzNjg2OTc2NjUzQgo=\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"hash\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -86,9 +86,9 @@ const char *catalogPayloadBasic =
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#A timeToLive ttl\n"
     "set /clusters#cluster/databases#database/tables#A/timeToLive#ttl ttlValue 1\n"
-    "set $PREV ttlUnit \"MINUTES\"\n"
+    "set $PREV ttlUnit \"SECONDS\"\n"
     "set $PREV ttlColumn /clusters#cluster/databases#database/tables#A/columns#LAST_UPDATE\n"
-    "set $PREV batchSize 1\n"
+    "set $PREV batchSize 2\n"
     "set $PREV maxFrequency 1\n"
     "set $PREV migrationTarget \"ARCHIVE\"\n"
     "add /clusters#cluster/databases#database connectors ARCHIVE\n"
@@ -120,7 +120,7 @@ const char *catalogPayloadBasic =
 
 // ALTER TABLE a ADD COLUMN a INT NOT NULL;
 const char *catalogPayloadAddColumn =
-    "set /clusters#cluster/databases#database schema \"vANUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNkQ0QzIwMjkyMDU1NTM0OTRFNDcBnAQ1NAEYFDMxMjA0RAEWDDU1NTQBRhQyMDRGNEUBaBw0RjRDNTU0RAUOWrIABDQyBbwoMzQ4NUY1MzQ5NUEB7gwzMTMwAQIFXBgxNTg1RjQ2AbIANQHGHDU0RTQzNTkyBXwFIgw5NDc1CUgpNgxGMjA1IRQQMjQ3NDUFyAgxNTIBZAw0OTU2ASQQM0IKNDEhDww0NTUyCS0xaQA2AdEQMTQ0NDQ+wwAFGgg5NEUFUTohAQgzQgo=\"\n"
+    "set /clusters#cluster/databases#database schema \"tgNUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNkQ0QzIwMjkyMDU1NTM0OTRFNDcBnAQ1NAEYTDMxMjA1MzQ1NDM0RjRFNDQ1MzIwAQoBaCA0RjRDNTU0RDQBDlqyAAQ0MgW8KDM0ODVGNTM0OTVBAe40MzIyMDRENDE1ODVGNDYBrAA1AcAcNTRFNDM1OTIFdgUiDDk0NzUJQikwDEYyMDUhDhAyNDc0NQXCCDE1MgFeDDQ5NTYBJBAzQgo0MSEJDDQ1NTIJLTFjJDYxMjA0MTQ0NDQ+vQAFGgg5NEUFUTobAQgzQgo=\"\n"
     "set /clusters#cluster/databases#database/tables#A signature \"A|pi\"\n"
     "add /clusters#cluster/databases#database/tables#A columns A\n"
     "set /clusters#cluster/databases#database/tables#A/columns#A index 1\n"
@@ -135,18 +135,164 @@ const char *catalogPayloadAddColumn =
     "set $PREV matview null\n"
     "set $PREV inbytes false\n";
 
-// CREATE UNIQUE INDEX idx_a ON a (last_update);
+// CREATE INDEX idx_a ON a (last_update) WHERE NOT MIGRATING;
 const char *catalogPayloadCreateIndex =
-    "set /clusters#cluster/databases#database schema \"9ANUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNgw0QzJDCXgAMgWIPDY5NkU3NDY1Njc2NTcyMjBCLgA4MDI5MjA1NTUzNDk0RTQ3AcosNTQ0QzIwMzEyMDREARYMNTU1NAF0FDIwNEY0RQGWHDRGNEM1NTREBQ5a4AAENDIF6igzNDg1RjUzNDk1QSEcDDMxMzABAgVcGDE1ODVGNDYB4AA1AfQYNTRFNDM1OQl8BSIMOTQ3NQlIKWQMRjIwNSFCEDI0NzQ1BfYIMTUyAWQMNDk1NgEkCDNCCjqZAQFVADkJXwgyMDQB5QHNBDgyIRsUNDc4NUY2AekF2QEKcDI4NkM2MTczNzQ1Rjc1NzA2NDYxNzQ2NTI5M0IK\"\n"
+    "set /clusters#cluster/databases#database schema \"iARUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNgw0QzJDCXgAMgWIPDY5NkU3NDY1Njc2NTcyMjBCLgA4MDI5MjA1NTUzNDk0RTQ3AcpkNTQ0QzIwMzEyMDUzNDU0MzRGNEU0NDUzMjABCgGWIDRGNEM1NTRENAEOWuAABDQyBeoQMzQ4NUYBXgQ1QSEcADMBhCBENDE1ODVGNDYB2gA1Ae4YNTRFNDM1OQl2IDIwNEQ0OTQ3NQlCKV4ERjIlZBQ1MjQ3NDUF8AEMGDM0ODQ5NTYBJAgzQgo2kwEF0RQ0NDU1ODIhBxw0Nzg1RjYxMg3FAQpMMjg2QzYxNzM3NDVGNzU3MDY0NjEhLSUTEDc0ODQ1AaE9NS6XABw5NEU0NzNCCg==\"\n"
     "add /clusters#cluster/databases#database/tables#A indexes IDX_A\n"
-    "set /clusters#cluster/databases#database/tables#A/indexes#IDX_A unique true\n"
+    "set /clusters#cluster/databases#database/tables#A/indexes#IDX_A unique false\n"
     "set $PREV assumeUnique false\n"
-    "set $PREV migrating false\n"
+    "set $PREV migrating true\n"
     "set $PREV countable true\n"
     "set $PREV type 1\n"
     "set $PREV expressionsjson \"\"\n"
-    "set $PREV predicatejson \"\"\n"
-    "set $PREV isSafeWithNonemptySources true\n"
+    "set $PREV predicatejson \"{\"TYPE\":8,\"VALUE_TYPE\":1,\"VALUE_SIZE\":0,\"LEFT\":{\"TYPE\":100,\"VALUE_TYPE\":23,\"ARGS\":[],\"NAME\":\"migrating\",\"FUNCTION_ID\":21026}}\"\n"
+    "set $PREV isSafeWithNonemptySources false\n"
     "add /clusters#cluster/databases#database/tables#A/indexes#IDX_A columns LAST_UPDATE\n"
     "set /clusters#cluster/databases#database/tables#A/indexes#IDX_A/columns#LAST_UPDATE index 0\n"
     "set $PREV column /clusters#cluster/databases#database/tables#A/columns#LAST_UPDATE\n";
+
+// ALTER TABLE a USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 1 MIGRATE TO TARGET archive;
+const char *catalogPayloadChangeBatchSize1 =
+    "set /clusters#cluster/databases#database schema \"zwVUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNgw0QzJDCXgAMgWIPDY5NkU3NDY1Njc2NTcyMjBCLgA4MDI5MjA1NTUzNDk0RTQ3AcpkNTQ0QzIwMzEyMDUzNDU0MzRGNEU0NDUzMjABCgGWIDRGNEM1NTRENAEOWuAABDQyBeoQMzQ4NUYBXgQ1QSEcADMBhCBENDE1ODVGNDYB2gA1Ae4YNTRFNDM1OQl2IDIwNEQ0OTQ3NQlCKV4ERjIlZBQ1MjQ3NDUF8AEMGDM0ODQ5NTYBJAgzQgo2kwEF0RQ0NDU1ODIBDAA0BXMEMTIRxSWlWr0AIRMQNzQ4NDUBoQwyMDI4MTckNkQ2OTY3NzI2MSW/IEU2NzI4MjkyOQF9ADEhtAEzCapRDgQ2MfZgATw2QzYxNzM3NDVGNzU3MDY0BXsENTJeYAEB4Yo+AUA2MTcyNjM2ODY5NzY2NTNCCg==\"\n"
+    "set /clusters#cluster/databases#database/tables#A/timeToLive#ttl batchSize 1\n";
+
+// ALTER TABLE a USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 2 MIGRATE TO TARGET archive;
+const char *catalogPayloadChangeBatchSize2 =
+    "set /clusters#cluster/databases#database schema \"zwVUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMHDQxMjAyODIwCQI8NEM0MTUzNTQ1RjU1NTA0NBEySDc0Njk2RDY1NzM3NDYxNkQ3MDIBHkg1NDY0MTU1NEM1NDIwNDM1NTUyBWgARQVCGDQ0OTRENDUBUBA0MTRENQE0CEU0RgUsAEUBNgw0QzJDCXgAMgWIPDY5NkU3NDY1Njc2NTcyMjBCLgA4MDI5MjA1NTUzNDk0RTQ3AcpkNTQ0QzIwMzEyMDUzNDU0MzRGNEU0NDUzMjABCgGWIDRGNEM1NTRENAEOWuAABDQyBeoQMzQ4NUYBXgQ1QSEcAVYkNEQ0MTU4NUY0NgHaADUB7hg1NEU0MzU5CXYAMgEiDDk0NzUJQileBEYyJWQUNTI0NzQ1BfABDBgzNDg0OTU2ASQIM0IKNpMBBdEUNDQ1NTgyAQwANAVzBDEyEcUlpVq9ACETEDc0ODQ1AaEMMjAyODE3JDZENjk2NzcyNjElvyBFNjcyODI5MjkBfQAxIbQBMwmqUQ4ENjH2YAE8NkM2MTczNzQ1Rjc1NzA2NAV7BDUyXmABIeQARIY+AUA2MTcyNjM2ODY5NzY2NTNCCg==\"\n"
+    "set /clusters#cluster/databases#database/tables#A/timeToLive#ttl batchSize 2;\n";
+
+// INSERT INTO a VALUES (1, NOW());
+std::string isertPlan =
+    "{\n"
+    "    \"EXECUTE_LIST\": [\n"
+    "        6,\n"
+    "        5,\n"
+    "        4\n"
+    "    ],\n"
+    "    \"IS_LARGE_QUERY\": false,\n"
+    "    \"PLAN_NODES\": [\n"
+    "        {\n"
+    "            \"CHILDREN_IDS\": [5],\n"
+    "            \"ID\": 4,\n"
+    "            \"PLAN_NODE_TYPE\": \"SEND\"\n"
+    "        },\n"
+    "        {\n"
+    "            \"CHILDREN_IDS\": [6],\n"
+    "            \"FIELD_MAP\": [\n"
+    "                0,\n"
+    "                1\n"
+    "            ],\n"
+    "            \"ID\": 5,\n"
+    "            \"MULTI_PARTITION\": true,\n"
+    "            \"PLAN_NODE_TYPE\": \"INSERT\",\n"
+    "            \"TARGET_TABLE_NAME\": \"A\"\n"
+    "        },\n"
+    "        {\n"
+    "            \"BATCHED\": false,\n"
+    "            \"ID\": 6,\n"
+    "            \"OUTPUT_SCHEMA\": [\n"
+    "                {\n"
+    "                    \"COLUMN_NAME\": \"LAST_UPDATE\",\n"
+    "                    \"EXPRESSION\": {\n"
+    "                        \"ARGS\": [],\n"
+    "                        \"FUNCTION_ID\": 43,\n"
+    "                        \"NAME\": \"current_timestamp\",\n"
+    "                        \"TYPE\": 100,\n"
+    "                        \"VALUE_TYPE\": 11\n"
+    "                    }\n"
+    "                },\n"
+    "                {\n"
+    "                    \"COLUMN_NAME\": \"A\",\n"
+    "                    \"EXPRESSION\": {\n"
+    "                        \"ISNULL\": false,\n"
+    "                        \"TYPE\": 30,\n"
+    "                        \"VALUE\": 1,\n"
+    "                        \"VALUE_TYPE\": 5\n"
+    "                    }\n"
+    "                }\n"
+    "            ],\n"
+    "            \"PLAN_NODE_TYPE\": \"MATERIALIZE\"\n"
+    "        }\n"
+    "    ]\n"
+    "}\n";
+
+// MIGRATE FROM A WHERE not migrating AND LAST_UPDATE <= NOW;
+std::string migratePlan =
+    "{\n"
+    "    \"EXECUTE_LIST\": [\n"
+    "        6,\n"
+    "        5,\n"
+    "        4\n"
+    "    ],\n"
+    "    \"IS_LARGE_QUERY\": false,\n"
+    "    \"PLAN_NODES\": [\n"
+    "        {\n"
+    "            \"CHILDREN_IDS\": [5],\n"
+    "            \"ID\": 4,\n"
+    "            \"PLAN_NODE_TYPE\": \"SEND\"\n"
+    "        },\n"
+    "        {\n"
+    "            \"CHILDREN_IDS\": [6],\n"
+    "            \"ID\": 5,\n"
+    "            \"PLAN_NODE_TYPE\": \"MIGRATE\",\n"
+    "            \"TARGET_TABLE_NAME\": \"A\"\n"
+    "        },\n"
+    "        {\n"
+    "            \"COMPARE_NOTDISTINCT\": [false],\n"
+    "            \"ID\": 6,\n"
+    "            \"INITIAL_EXPRESSION\": {\n"
+    "                \"LEFT\": {\n"
+    "                    \"COLUMN_IDX\": 0,\n"
+    "                    \"TYPE\": 32,\n"
+    "                    \"VALUE_TYPE\": 11\n"
+    "                },\n"
+    "                \"RIGHT\": {\n"
+    "                    \"ARGS\": [],\n"
+    "                    \"FUNCTION_ID\": 43,\n"
+    "                    \"NAME\": \"current_timestamp\",\n"
+    "                    \"TYPE\": 100,\n"
+    "                    \"VALUE_TYPE\": 11\n"
+    "                },\n"
+    "                \"TYPE\": 14,\n"
+    "                \"VALUE_TYPE\": 23\n"
+    "            },\n"
+    "            \"INLINE_NODES\": [{\n"
+    "                \"ID\": 7,\n"
+    "                \"OUTPUT_SCHEMA\": [{\n"
+    "                    \"COLUMN_NAME\": \"tuple_address\",\n"
+    "                    \"EXPRESSION\": {\n"
+    "                        \"TYPE\": 33,\n"
+    "                        \"VALUE_TYPE\": 6\n"
+    "                    }\n"
+    "                }],\n"
+    "                \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
+    "            }],\n"
+    "            \"LOOKUP_TYPE\": \"LTE\",\n"
+    "            \"PLAN_NODE_TYPE\": \"INDEXSCAN\",\n"
+    "            \"PREDICATE\": {\n"
+    "                \"LEFT\": {\n"
+    "                    \"LEFT\": {\n"
+    "                        \"COLUMN_IDX\": 0,\n"
+    "                        \"TYPE\": 32,\n"
+    "                        \"VALUE_TYPE\": 11\n"
+    "                    },\n"
+    "                    \"TYPE\": 9,\n"
+    "                    \"VALUE_TYPE\": 23\n"
+    "                },\n"
+    "                \"TYPE\": 8,\n"
+    "                \"VALUE_TYPE\": 23\n"
+    "            },\n"
+    "            \"SEARCHKEY_EXPRESSIONS\": [{\n"
+    "                \"ARGS\": [],\n"
+    "                \"FUNCTION_ID\": 43,\n"
+    "                \"NAME\": \"current_timestamp\",\n"
+    "                \"TYPE\": 100,\n"
+    "                \"VALUE_TYPE\": 11\n"
+    "            }],\n"
+    "            \"SORT_DIRECTION\": \"INVALID\",\n"
+    "            \"TARGET_INDEX_NAME\": \"IDX_A\",\n"
+    "            \"TARGET_TABLE_ALIAS\": \"A\",\n"
+    "            \"TARGET_TABLE_NAME\": \"A\"\n"
+    "        }\n"
+    "    ]\n"
+    "}\n";
