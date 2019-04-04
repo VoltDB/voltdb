@@ -366,14 +366,7 @@ public class ExportGeneration implements Generation {
                                             " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                             " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                                 }
-                                if (catalogVersion < eds.getCatalogVersionCreated()) {
-                                    exportLog.warn("Received stale export RELEASE_BUFFER sent in version " +
-                                            catalogVersion + ", for partition " +
-                                            partition + " source " + tableName +
-                                            ", created in version " + + eds.getCatalogVersionCreated());
-                                } else {
-                                    eds.remoteAck(seqNo);
-                                }
+                                eds.remoteAck(seqNo);
                             } catch (RejectedExecutionException ignoreIt) {
                                 // ignore it: as it is already shutdown
                             }
