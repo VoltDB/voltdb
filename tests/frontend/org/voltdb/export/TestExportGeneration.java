@@ -43,6 +43,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -138,15 +139,24 @@ public class TestExportGeneration {
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(m_dataDirectory);
+        m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
-                m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
+                m_connectors, m_mockVoltDB.m_hostId,
                 ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                if (message instanceof BinaryPayloadMessage) {
+                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final byte msgType = buf.get();
+                    // Skip non-related messages
+                    if (msgType != ExportManager.RELEASE_BUFFER) {
+                        return;
+                    }
+                }
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -177,7 +187,7 @@ public class TestExportGeneration {
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.close(null);
+        m_exportGeneration.close();
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }

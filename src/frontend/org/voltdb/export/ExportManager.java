@@ -374,10 +374,6 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
 
-    public HostMessenger getHostMessenger() {
-        return m_messenger;
-    }
-
     private void clearOverflowData() throws ExportManager.SetupException {
         String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
@@ -481,8 +477,8 @@ public class ExportManager
             m_processor.set(newProcessor);
 
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-            ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-            generation.initialize(m_messenger, m_hostId, catalogContext,
+            ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, m_messenger);
+            generation.initialize(m_hostId, catalogContext,
                     connectors, localPartitionsToSites, exportOverflowDirectory);
 
             m_generation.set(generation);
@@ -527,7 +523,7 @@ public class ExportManager
         if (m_generation.get() == null) {
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
             try {
-                ExportGeneration gen = new ExportGeneration(exportOverflowDirectory);
+                ExportGeneration gen = new ExportGeneration(exportOverflowDirectory, m_messenger);
                 m_generation.set(gen);
             } catch (IOException crash) {
                 //This means durig UAC we had a bad disk on a node or bad directory.
@@ -546,8 +542,7 @@ public class ExportManager
                 exportLog.debug("First stream created processor will be initialized: " + m_loaderClass);
             }
             try {
-                generation.initializeGenerationFromCatalog(catalogContext,
-                        connectors, m_hostId, m_messenger, localPartitionsToSites);
+                generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, localPartitionsToSites);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -608,7 +603,7 @@ public class ExportManager
             exportLog.debug("Existing export datasources unassigned.");
         }
         //Load any missing tables.
-        generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
+        generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, partitions);
         for (Pair<Integer, Integer> partition : partitions) {
             generation.updateAckMailboxes(partition.getFirst(), null);
         }
@@ -642,7 +637,7 @@ public class ExportManager
     public void shutdown() {
         ExportGeneration generation = m_generation.getAndSet(null);
         if (generation != null) {
-            generation.close(m_messenger);
+            generation.close();
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
