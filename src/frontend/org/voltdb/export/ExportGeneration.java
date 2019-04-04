@@ -329,9 +329,11 @@ public class ExportGeneration implements Generation {
                         byte stringBytes[] = new byte[length];
                         buf.get(stringBytes);
                         String tableName = new String(stringBytes, Constants.UTF8ENCODING);
-                        if (partitionSources == null && !m_removingPartitions.contains(partition)) {
-                            exportLog.error("Received an export message " + msgType + " for partition " + partition +
-                                    " which does not exist on this node");
+                        if (partitionSources == null) {
+                            if (!m_removingPartitions.contains(partition)) {
+                                exportLog.error("Received an export message " + msgType + " for partition " + partition +
+                                        " which does not exist on this node");
+                            }
                             return;
                         }
                         final ExportDataSource eds = partitionSources.get(tableName);
@@ -847,8 +849,10 @@ public class ExportGeneration implements Generation {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
             if (sources == null) {
-                exportLog.warn("Could not find export data sources for partition "
-                        + partitionId + ". The export cleanup stream is being discarded.");
+                if (!m_removingPartitions.contains(partitionId)) {
+                     exportLog.error("Could not find export data sources for partition "
+                            + partitionId + ". The export cleanup stream is being discarded.");
+                }
                 return;
             }
 
