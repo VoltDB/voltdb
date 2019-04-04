@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
@@ -37,7 +38,8 @@ import java.util.List;
  */
 public class VoltLogicalValues extends Values implements VoltLogicalRel {
     public VoltLogicalValues(RelOptCluster cluster, RelTraitSet traitSet, RelDataType rowType, ImmutableList<ImmutableList<RexLiteral>> tuples) {
-        super(cluster, rowType, tuples, traitSet);
+        // VoltLogicalValues is always SP
+        super(cluster, rowType, tuples, traitSet.replace(RelDistributions.SINGLETON.with(null, true)));
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 

@@ -370,8 +370,4 @@ public class TestInlineRules extends Plannerv2TestCase {
 //                .transform("")
 //                .pass();
 //    }
-
-    public void test1() {
-        m_tester.sql("select I from R1 limit 0").transform("").pass();
-    }
 }

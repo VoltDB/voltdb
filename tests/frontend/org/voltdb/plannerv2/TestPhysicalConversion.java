@@ -455,4 +455,10 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                         "  VoltSeqTableScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n")
                 .pass();
     }
+
+    public void testLimit0() {
+        m_tester.sql("select I from R1 limit 0")
+                .transform("VoltPhysicalValues(tuples=[[]], split=[1])\n")
+                .pass();
+    }
 }
