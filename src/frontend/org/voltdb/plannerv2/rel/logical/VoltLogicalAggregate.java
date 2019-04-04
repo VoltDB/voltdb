@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -54,7 +55,9 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
-        super(cluster, traitSet, child, false /*indicator*/, groupSet, groupSets, aggCalls);
+        super(cluster,
+                traitSet.replace(RelDistributions.SINGLETON),   // The result of aggregation always has SINGLETON distribution
+                child, false /*indicator*/, groupSet, groupSets, aggCalls);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
