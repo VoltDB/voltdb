@@ -22,6 +22,7 @@ public final class Constants {
     }
 
     static final int JOIN_SPLIT_COUNT = 1;
+    static final int VALUES_SPLIT_COUNT = 1;
     // TODO: why 30?
     static public final int DISTRIBUTED_SPLIT_COUNT = 30;
 
