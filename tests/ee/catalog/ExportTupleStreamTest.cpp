@@ -71,7 +71,7 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
 
     // ALTER TABLE a ADD COLUMN a INT NOT NULL;
     // Alter table add column, this is a stream update, and can only be done on empty streams.
-    m_engine->updateCatalog(time(NULL), true, catalogPayloadAddColumn);
+    m_engine->updateCatalog(time(NULL), true, catalogPayloadAddColumnA);
     checkExportTupleStream(&wrapper, 2);
 
     // CREATE INDEX idx_a ON a (last_update) WHERE NOT MIGRATING;
@@ -95,9 +95,11 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
     }
     // Insert 4 rows.
     ASSERT_EQ(0, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1000, 1000, 1000, 1000, 1, false));
+    m_engine->releaseUndoToken(1, false);
     // Execute MIGRATE FROM A WHERE not migrating AND LAST_UPDATE <= NOW;
     planfragmentIds[0] = migratePlanId;
     ASSERT_EQ(0, m_engine->executePlanFragments(1, planfragmentIds, NULL, params, 2000, 2000, 2000, 2000, 2, false));
+    m_engine->releaseUndoToken(2, false);
     checkExportTupleStream(&wrapper, 2);
     // Delete migrate rows
     m_engine->deleteMigratedRows(3000, 2000, 2000, "A", 2000, 10, 3);
@@ -106,16 +108,18 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
 
     // ALTER TABLE a USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 1 MIGRATE TO TARGET archive;
     // Alter table change TTL, this is NOT a stream update.
-    m_engine->updateCatalog(time(NULL), false, catalogPayloadChangeBatchSize1);
+    m_engine->updateCatalog(time(NULL), false, catalogPayloadChangeBatchSize);
     checkExportTupleStream(&wrapper, 2);
 
     // What we just did was updating catalog when the table was empty.
     // Do one more (last) catalog update when the table is not empty.
     planfragmentIds[0] = insertPlanId;
-    ASSERT_EQ(0, m_engine->executePlanFragments(1, planfragmentIds, NULL, params, 1000, 1000, 1000, 1000, 4, false));
-    // ALTER TABLE a USING TTL 1 SECONDS ON COLUMN last_update BATCH_SIZE 2 MIGRATE TO TARGET archive;
-    m_engine->updateCatalog(time(NULL), false, catalogPayloadChangeBatchSize2);
-    checkExportTupleStream(&wrapper, 2);
+    ASSERT_EQ(0, m_engine->executePlanFragments(1, planfragmentIds, NULL, params, 4000, 4000, 4000, 4000, 4, false));
+    m_engine->releaseUndoToken(4, false);
+    m_engine->quiesce(4000);
+    // ALTER TABLE a ADD COLUMN b INT;
+    m_engine->updateCatalog(time(NULL), true, catalogPayloadAddColumnB);
+    checkExportTupleStream(&wrapper, 3);
 }
 
 int main() {

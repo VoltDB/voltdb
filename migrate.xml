@@ -1,0 +1,9 @@
+<deployment>
+<cluster hostcount="1" sitesperhost="1" kfactor="0" />
+<export>
+   <configuration enabled="true" type="file" target="archive">
+     <property name="type">csv</property>
+     <property name="nonce">MyExport</property>
+   </configuration>
+</export>
+</deployment>
