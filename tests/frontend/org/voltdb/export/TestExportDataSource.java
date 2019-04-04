@@ -23,8 +23,8 @@
 
 package org.voltdb.export;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -52,7 +52,6 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -107,7 +106,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void close(HostMessenger messenger) {
+        public void close() {
         }
 
         @Override

@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 
@@ -31,7 +30,7 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 public interface Generation {
 
     public void acceptMastership(int partitionId);
-    public void close(final HostMessenger messenger);
+    public void close();
 
     public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDrained(int partitionId, String tableName);
