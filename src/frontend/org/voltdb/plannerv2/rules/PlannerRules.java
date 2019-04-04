@@ -50,6 +50,7 @@ import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
@@ -57,6 +58,7 @@ import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSetOpsRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+import org.voltdb.plannerv2.rules.physical.VoltPValuesRule;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -136,7 +138,8 @@ public class PlannerRules {
             VoltLJoinRule.INSTANCE,
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
-            VoltLSetOpsRule.INSTANCE_EXCEPT
+            VoltLSetOpsRule.INSTANCE_EXCEPT,
+            VoltLValuesRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -181,7 +184,8 @@ public class PlannerRules {
             VoltPJoinRule.INSTANCE,
             VoltPSetOpsRule.INSTANCE_UNION,
             VoltPSetOpsRule.INSTANCE_INTERSECT,
-            VoltPSetOpsRule.INSTANCE_EXCEPT
+            VoltPSetOpsRule.INSTANCE_EXCEPT,
+            VoltPValuesRule.INSTANCE
     );
 
     private static final RuleSet INLINE = RuleSets.ofList(

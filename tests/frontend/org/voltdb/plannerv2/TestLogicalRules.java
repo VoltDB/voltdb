@@ -548,4 +548,10 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "      VoltLogicalTableScan(table=[[public, R2]])\n")
                 .pass();
     }
+
+    public void testLimit0() {
+        m_tester.sql("select I from R1 limit 0")
+                .transform("VoltLogicalValues(tuples=[[]])\n")
+                .pass();
+    }
 }
