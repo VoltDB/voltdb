@@ -88,6 +88,15 @@ public:
     */
     bool next(TableTuple &out);
 
+    /**
+     * Updates the given tuple so that it points to the next
+     * off-th tuple in the table.
+     * @param out the tuple will advance at most off positions
+     * @param off offset to advance
+     * @return actual advanced position
+     */
+    size_t advance(TableTuple& out, size_t const off);
+
     bool hasNext() const;
 
     uint32_t getFoundTuples() const {
@@ -442,6 +451,12 @@ inline bool TableIterator::next(TableTuple &out) {
         assert(m_iteratorType == LARGE_TEMP);
         return largeTempNext(out);
     }
+}
+
+inline size_t TableIterator::advance(TableTuple& out, size_t const off) {
+   size_t advanced = 0;
+   while(next(out) && ++advanced < off);
+   return advanced;
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {

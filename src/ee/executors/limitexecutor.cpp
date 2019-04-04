@@ -100,18 +100,16 @@ LimitExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
-    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-    {
-        // TODO: need a way to skip / iterate N items.
-        if (tuples_skipped < offset)
-        {
-            tuples_skipped++;
-            continue;
+    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
+        if (tuples_skipped < offset) {
+           tuples_skipped += iterator.advance(tuple, offset - tuples_skipped);
+           if (tuples_skipped < offset) { // offset > table count
+              break;
+           }
         }
         tuple_ctr++;
 
-        if (!output_table->insertTuple(tuple))
-        {
+        if (!output_table->insertTuple(tuple)) {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                        " output table '%s'",
                        input_table->name().c_str(),
