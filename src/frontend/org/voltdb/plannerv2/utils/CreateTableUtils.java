@@ -18,18 +18,7 @@
 package org.voltdb.plannerv2.utils;
 
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.calcite.sql.SqlCharStringLiteral;
-import org.apache.calcite.sql.SqlDataTypeSpec;
-import org.apache.calcite.sql.SqlDelete;
-import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.ddl.SqlColumnDeclaration;
 import org.apache.calcite.sql.ddl.SqlColumnDeclarationWithExpression;
 import org.apache.calcite.sql.ddl.SqlCreateTable;
@@ -128,6 +117,17 @@ public class CreateTableUtils {
     }
 
     /**
+     * Manually extract VARBINARY default value in form of "x'03'" into "03"
+     * @param src raw default string
+     * @return extracted string
+     */
+    private static String extractVarBinaryValue(String src) {
+        final int indexQuote1 = src.indexOf('\''), indexQuote2 = src.lastIndexOf('\'');
+        assert indexQuote1 > 0 && indexQuote2 > indexQuote1;
+        return src.substring(indexQuote1 + 1, indexQuote2 - indexQuote1 + 1);
+    }
+
+    /**
      * Add a column to the table under construction
      * @param col column declaration
      * @param t Table containing the column
@@ -176,6 +176,12 @@ public class CreateTableUtils {
                     defaultValue = null;
                 } else if (expr instanceof SqlNumericLiteral) {
                     defaultValue = ((SqlNumericLiteral) expr).getValue().toString();
+                } else if (expr instanceof SqlBinaryStringLiteral) {
+                    // NOTE: cannot call toValue() method, which Calcite will happily change into binary representation,
+                    // e.g. x'00' -> '0'; x'06' -> '110', etc.
+                    // But, HSQL will be unhappy because Scanner#convertToBinary expects the raw form (which it converts).
+                    // TODO: use toValue() when we deprecate HSQL.
+                    defaultValue = extractVarBinaryValue(expr.toString());
                 } else {
                     assert expr instanceof SqlCharStringLiteral;
                     defaultValue = ((SqlCharStringLiteral) expr).toValue();
