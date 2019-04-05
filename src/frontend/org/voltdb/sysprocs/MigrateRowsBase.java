@@ -207,6 +207,12 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         VoltTable result = null;
         result = executePrecompiledSQL(countStmt, params, replicated);
         long rowCount = result.asScalarLong();
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Migrate on table " + tableName +
+                    (replicated ? "" : " on partition " + ctx.getPartitionId()) +
+                    " reported " + rowCount + " matching rows");
+        }
+
         // If number of rows meet the criteria is more than chunk size, pick the column value
         // which offset equals to chunk size as new predicate.
         // Please be noted that it means rows be deleted can be more than chunk size, normally
@@ -216,6 +222,12 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             if (rowCount > chunksize) {
                 result = executePrecompiledSQL(valueAtStmt, new Object[] { chunksize }, replicated);
                 cutoffValue = result.fetchRow(0).get(0, actualType);
+
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Migrate on table " + tableName +
+                            (replicated ? "" : " on partition " + ctx.getPartitionId()) +
+                            " reported " + cutoffValue + " target ttl");
+                }
             }
         }
         result = executePrecompiledSQL(migrateStmt,
