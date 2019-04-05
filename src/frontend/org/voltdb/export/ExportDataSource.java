@@ -482,8 +482,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private synchronized void releaseExportBytes(long releaseSeqNo) throws IOException {
 
-        // Released offset is in an already-released past
-        if (releaseSeqNo <= m_lastReleasedSeqNo) {
+        // Return if released offset is in an already-released past.
+        // Note: on recover the first RELEASE_BUFFER message received by a
+        // replica will come with releaseSeqNo == m_lastReleasedSeqNo;
+        // We must go over the release logic to properly truncate the gap
+        // tracker and update the tuples pending.
+        if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
 
