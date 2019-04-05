@@ -18,8 +18,10 @@
 package org.voltdb.plannerv2.rules.logical;
 
 import com.google_voltpatches.common.collect.Sets;
+import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
@@ -27,7 +29,7 @@ import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
 import org.voltdb.exceptions.PlanningErrorException;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+import org.voltdb.plannerv2.rel.logical.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -492,7 +494,7 @@ final class RelDistributionUtils {
      * @param setOpNodes SetOp children
      * @return true if the result is SP.
      */
-    public static JoinState isSetOpSP(List<RelNode> setOpNodes) {
+    static JoinState isSetOpSP(List<RelNode> setOpNodes) {
         JoinState initSetOpState = new JoinState(true, null, Sets.newHashSet());
         JoinState finalSetOpState = setOpNodes.stream().reduce(
                 initSetOpState,
@@ -531,6 +533,51 @@ final class RelDistributionUtils {
     }
 
     /**
+     * Check if a node is "eventually" an aggregation node. It can have arbitrary/combinations of
+     * Calc/Sort/Limit on top of the aggregation node.
+     * @param node source node under inspection
+     * @return whether the given node contains an aggregation node somewhere.
+     */
+    private static boolean isAggregateNode(RelNode node) {
+        if (node instanceof VoltLogicalAggregate) {
+            return true;
+        } else if (node instanceof VoltLogicalCalc ||
+                node instanceof VoltLogicalLimit ||
+                node instanceof VoltLogicalSort) {
+            return isAggregateNode(((HepRelVertex) node.getInput(0)).getCurrentRel());
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Special handling of distribution trait when either node is (eventually) an aggregation node.
+     * When only one join node is (eventually) an aggregation, set it to SINGLETON (as if from replicated table), because
+     * there will never be a true MP case that VoltDB cannot handle: we must aggregate first, regardless of whether the
+     * aggregation itself is MP or not, before joining; at join time, there is no need to retrieve from multiple partitions
+     * from aggregation's perspective.
+     *
+     * @param outer Join's outer relation
+     * @param inner Join's inner relation
+     * @return outer/inner relation with their distribution possibly updated.
+     */
+    private static Pair<RelDistribution, RelDistribution> checkedAggDistributions(RelNode outer, RelNode inner) {
+        final boolean isOuterAgg = isAggregateNode(outer), isInnerAgg = isAggregateNode(inner);
+        final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
+        if (isOuterAgg == isInnerAgg) {
+            // When neither relation is aggregation, no need to change anything;
+            // when both relations are aggregations, the aggregation node's distribution is identical to
+            // its child's distribution, and we can still let join's logic handle, same way as if handling
+            // child nodes of aggregations being joined together.
+            return Pair.of(getDistribution(outer), getDistribution(inner));
+        } else if (isOuterAgg) {
+            return Pair.of(RelDistributions.SINGLETON, innerDist);
+        } else {
+            return Pair.of(outerDist, RelDistributions.SINGLETON);
+        }
+    }
+
+    /**
      * Check whether the given join relation is SP.
      * If it is SP, and contains partitioned tables, (which implies that there is a
      * "WHERE partitionColumn = LITERAL_VALUE"), then also set the literal value in the distribution trait.
@@ -540,7 +587,8 @@ final class RelDistributionUtils {
      * @return true if the result of the join is SP, and sets the distribution trait for all partitioned relations.
      */
     static JoinState isJoinSP(VoltLogicalJoin join, RelNode outer, RelNode inner) {
-        final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
+        final Pair<RelDistribution, RelDistribution> dists = checkedAggDistributions(outer, inner);
+        final RelDistribution outerDist = dists.getFirst(), innerDist = dists.getSecond();
         final int outerTableColumns = outer.getRowType().getFieldCount();
         final Set<Integer> outerPartColumns = getPartitionColumns(outer),
                 innerPartColumns = getPartitionColumns(inner),

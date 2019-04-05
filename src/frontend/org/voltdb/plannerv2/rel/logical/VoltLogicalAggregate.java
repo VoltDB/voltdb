@@ -17,17 +17,10 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -57,38 +50,8 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
     public VoltLogicalAggregate(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode child, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        super(cluster,
-                updateTraitSet(aggCalls, traitSet, child),
-                child, false /*indicator*/, groupSet, groupSets, aggCalls);
+        super(cluster, traitSet, child, false /*indicator*/, groupSet, groupSets, aggCalls);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
-    }
-
-    /**
-     * Update trait set, by inspecting all the aggregation function arguments when the child is HASH_DISTRIBUTED:
-     * change it to SINGLETON distribution only when all aggregation function arguments are partition columns.
-     * @param aggs aggregation functions
-     * @param traitSet source trait set
-     * @param child child node whose distribution we inspect, and act upon
-     * @return converted distribution.
-     */
-    private static RelTraitSet updateTraitSet(List<AggregateCall> aggs, RelTraitSet traitSet, RelNode child) {
-        if (! aggs.isEmpty()) {       // not a "true" aggregate
-            final RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-            if (childDist != null) {
-                final Set<Integer> partCols = new HashSet<>(childDist.getKeys());
-                if (aggs.stream().flatMap(call -> {
-                    assert call.getArgList().size() <= 1;
-                    if (call.getArgList().isEmpty()) {  // COUNT removes argument
-                        return Stream.empty();
-                    } else {
-                        return Stream.of(call.getArgList().get(0));
-                    }
-                }).allMatch(partCols::contains)) {
-                    return traitSet.replace(RelDistributions.SINGLETON.with(null, true));
-                }
-            }
-        }
-        return traitSet;
     }
 
     @Override public VoltLogicalAggregate copy(
