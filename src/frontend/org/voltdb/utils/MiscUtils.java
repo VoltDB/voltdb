@@ -47,6 +47,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -326,8 +327,8 @@ public class MiscUtils {
      * Validate the signature and business logic enforcement for a license.
      * @return true if the licensing constraints are met
      */
-    public static boolean validateLicense(LicenseApi licenseApi,
-                                          int numberOfNodes, DrRoleType replicationRole)
+    public static boolean validateLicense(LicenseApi licenseApi, int numberOfNodes, DrRoleType replicationRole,
+            StartAction startAction)
     {
         // Delay the handling of an invalid license file until here so
         // that the leader can terminate the full cluster.
@@ -383,9 +384,9 @@ public class MiscUtils {
 
         // check node count
         if (licenseApi.maxHostcount() < numberOfNodes) {
-            hostLog.fatal("Attempting to start with too many nodes (" + numberOfNodes + "). " +
-                          "Current license only supports " + licenseApi.maxHostcount() +
-                          ". Please contact VoltDB at info@voltdb.com.");
+            hostLog.fatal("Attempting to " + (startAction.doesJoin() ? "join" : "start") + " with too many nodes ("
+                    + numberOfNodes + "). " + "Current license only supports " + licenseApi.maxHostcount()
+                    + ". Please contact VoltDB at info@voltdb.com.");
             return false;
         }
 
