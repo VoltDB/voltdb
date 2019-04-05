@@ -63,6 +63,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -578,7 +579,91 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
-//    /**
+    // Test that gap release operates even when no further export rows are inserted
+    public void testGapRelease() throws Exception{
+        System.out.println("Running testGapRelease");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            final CountDownLatch cdl = new CountDownLatch(1);
+            Runnable cdlWaiter = new Runnable() {
+
+                @Override
+                public void run() {
+                    cdl.countDown();
+                }
+            };
+            s.setOnMastership(cdlWaiter);
+            s.acceptMastership();
+            cdl.await();
+
+            // Push 2 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, 0, foo, false);
+
+            // Push 2 more creating a gap
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(10, 10, 1, 0, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(11, 11, 1, 0, 0, foo, false);
+
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll once more, should hit the gap (wait for the state to be changed)
+            ListenableFuture<AckingContainer> fut1 = s.poll(false);
+
+            Thread.sleep(1000);
+            assertFalse(fut1.isDone());
+            assertEquals(ExportDataSource.StreamStatus.BLOCKED, s.getStatus());
+
+            // Do a release
+            assertTrue(s.processStreamControl(OperationMode.RELEASE));
+
+            // Verify we can poll the 2 buffers past the gap
+            try {
+                cont = fut1.get(100,TimeUnit.MILLISECONDS);
+            }
+            catch( TimeoutException to) {
+                fail("did not expect timeout");
+            }
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(10, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals(11, cont.m_lastSeqNo);
+            cont.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    //    /**
 //     * Test that releasing everything in steps and then polling results in
 //     * the right StreamBlock
 //     */

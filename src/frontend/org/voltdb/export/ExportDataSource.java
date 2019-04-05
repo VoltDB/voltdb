@@ -2027,6 +2027,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
                 m_queueGap = 0;
+
+                // Satisfy a pending poll request
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!m_mastershipAccepted.get() || m_pollTask == null) {
+                            return;
+                        }
+                        try {
+                            pollImpl(m_pollTask);
+                        } catch (Exception e) {
+                            exportLog.error("Exception polling export buffer after RELEASE", e);
+                        } catch (Error e) {
+                            VoltDB.crashLocalVoltDB("Error polling export bufferafter RELEASE", true, e);
+                        }
+                    }
+                });
                 return true;
             }
             break;
