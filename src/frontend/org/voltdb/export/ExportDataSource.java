@@ -521,8 +521,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
             exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
-            setStatus(StreamStatus.ACTIVE);
-            m_queueGap = 0;
+            clearGap(true);
         }
 
         m_lastReleasedSeqNo = releaseSeqNo;
@@ -1170,8 +1169,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
-                    setStatus(StreamStatus.ACTIVE);
-                    m_queueGap = 0;
+                    clearGap(true);
                 }
                 BBContainer schemaContainer = null;
                 if (pollTask.forcePollSchema()) {
@@ -1722,7 +1720,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info(toString() + " skipped stream gap because it's a replicated stream, " +
                         "setting next poll sequence number to " + m_firstUnpolledSeqNo);
             }
-            m_queueGap = 0;
+            clearGap(false);
             return;
         }
 
@@ -2025,8 +2023,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
                         "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
-                setStatus(StreamStatus.ACTIVE);
-                m_queueGap = 0;
+                clearGap(true);
 
                 // Satisfy a pending poll request
                 m_es.execute(new Runnable() {
@@ -2051,6 +2048,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // should not happen since the operation is verified prior to this call
         }
         return false;
+    }
+
+    private void clearGap(boolean setActive) {
+        m_queueGap = 0;
+        m_seqNoToDrain = Long.MAX_VALUE;
+        if (setActive) {
+            setStatus(StreamStatus.ACTIVE);
+        }
     }
 
     private void setCommittedSeqNo(long committedSeqNo) {
