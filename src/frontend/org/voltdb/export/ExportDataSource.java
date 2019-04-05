@@ -2007,8 +2007,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
         }
-        // Rejoin or recovery should be on a transaction boundary (except maybe in a gap situation)
-        m_committedSeqNo = m_lastReleasedSeqNo;
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }
