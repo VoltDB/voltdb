@@ -2451,7 +2451,11 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
         it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
     }
     void* addr = tuple.address();
-    it->second.insert(addr);
+#ifndef NDEBUG
+    bool success =
+#endif
+    it->second.insert(addr).second;
+    assert(success);
 };
 
 bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
