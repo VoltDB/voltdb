@@ -2263,16 +2263,6 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     for (auto const &streamTable : m_exportingTables) {
-#ifndef NDEBUG
-        if (streamTable.second == NULL) {
-            Table* table = getTableByName(streamTable.first);
-            TableCatalogDelegate* tcd = getTableDelegate(streamTable.first);
-            throw std::runtime_error("Failed to quiesce stream due to null pointer (Name="
-                    + streamTable.first + ", tableType="
-                    + (tcd != NULL ? std::to_string(tcd->getTableType()) : "NULL") + ", tableInfo="
-                    + (table != NULL ? table->debug() : "NULL") + ")");
-        }
-#endif
         if (streamTable.second->getWrapper()) {
 #ifndef NDEBUG
             // A quiesce should be transactional so periodicFlush should always succeed

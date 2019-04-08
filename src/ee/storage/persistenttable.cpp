@@ -1600,7 +1600,7 @@ bool PersistentTable::equals(PersistentTable* other) {
 std::string PersistentTable::debug(const std::string& spacer) const {
     std::ostringstream buffer;
     buffer << Table::debug(spacer);
-    if (m_shadowStream) {
+    if (m_shadowStream != nullptr) {
         std::string infoSpacer = spacer + "  |";
         buffer << infoSpacer << "\tSHADOW STREAM: " << m_shadowStream->debug() << "\n";
     }
@@ -2452,10 +2452,10 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
     }
     void* addr = tuple.address();
 #ifndef NDEBUG
-    bool success =
+    std::pair<MigratingBatch::iterator,bool> success =
 #endif
-    it->second.insert(addr).second;
-    assert(success);
+    it->second.insert(addr);
+    assert(success.second);
 };
 
 bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
