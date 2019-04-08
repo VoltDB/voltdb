@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -49,23 +48,15 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
      * @param aggCalls  Array of aggregates to compute, not null
      */
     public VoltLogicalAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls) {
-        super(cluster,
-                traitSet.replace(RelDistributions.SINGLETON),   // The result of aggregation always has SINGLETON distribution
-                child, false /*indicator*/, groupSet, groupSets, aggCalls);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode child, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
+        super(cluster, traitSet, child, false /*indicator*/, groupSet, groupSets, aggCalls);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override public VoltLogicalAggregate copy(RelTraitSet traitSet, RelNode input,
-                                 boolean indicator, ImmutableBitSet groupSet,
-                                 List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return new VoltLogicalAggregate(
-                getCluster(), traitSet, input,
-                groupSet, groupSets, aggCalls);
+    @Override public VoltLogicalAggregate copy(
+            RelTraitSet traitSet, RelNode input, boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
+        return new VoltLogicalAggregate(getCluster(), traitSet, input, groupSet, groupSets, aggCalls);
     }
 }

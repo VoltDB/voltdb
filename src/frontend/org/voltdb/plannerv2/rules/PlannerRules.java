@@ -41,16 +41,7 @@ import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMerge
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
-import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.MPSetOpsQueryFallBackRule;
-import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
-import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
-import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSetOpsRule;
-import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
-import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
-import org.voltdb.plannerv2.rules.logical.VoltLValuesRule;
+import org.voltdb.plannerv2.rules.logical.*;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
