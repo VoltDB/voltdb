@@ -90,7 +90,8 @@ public:
 
     /**
      * Updates the given tuple so that it points to the next
-     * off-th tuple in the table.
+     * off-th tuple, relative to the current position, in the table.
+     * The semantics is similar to read(2) of <unistd.h>, minus error code.
      * @param out the tuple will advance at most off positions
      * @param off offset to advance
      * @return actual advanced position
@@ -455,7 +456,7 @@ inline bool TableIterator::next(TableTuple &out) {
 
 inline size_t TableIterator::advance(TableTuple& out, size_t const off) {
    size_t advanced = 0;
-   while(next(out) && ++advanced < off);
+   while(++advanced < off && next(out));
    return advanced;
 }
 

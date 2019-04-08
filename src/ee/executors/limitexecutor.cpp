@@ -77,38 +77,37 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool
-LimitExecutor::p_execute(const NValueArray &params)
-{
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    Table* input_table = node->getInputTable();
-    assert(input_table);
+bool LimitExecutor::p_execute(const NValueArray &params) {
+   LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+   assert(node);
+   Table* output_table = node->getOutputTable();
+   assert(output_table);
+   Table* input_table = node->getInputTable();
+   assert(input_table);
 
-    //
-    // Grab the iterator for our input table, and loop through until
-    // we have copy enough tuples for the limit specified by the node
-    //
-    TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+   //
+   // Grab the iterator for our input table, and loop through until
+   // we have copy enough tuples for the limit specified by the node
+   //
+   TableTuple tuple(input_table->schema());
+   TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
-    int tuple_ctr = 0;
-    int limit = -1;
-    int offset = -1;
-    node->getLimitAndOffsetByReference(params, limit, offset);
+   int tuple_ctr = 0;
+   int limit = -1;
+   int offset = -1;
+   node->getLimitAndOffsetByReference(params, limit, offset);
 
-    if (iterator.advance(tuple, offset) < offset) {
-       return true;     // offset beyond table count: empty table
-    }
-    do {
-       if (!output_table->insertTuple(tuple)) {
-          VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
-                input_table->name().c_str(), output_table->name().c_str());
-          return false;
-       }
-    } while(iterator.next(tuple) && ++tuple_ctr < limit);
-    return true;
+   if (limit < 0 || iterator.advance(tuple, offset) < offset) {
+      return true;     // offset beyond table count: empty table
+   } else if (limit >= 0) {
+      while(tuple_ctr++ < limit && iterator.next(tuple)) {
+         if (!output_table->insertTuple(tuple)) {
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
+                  input_table->name().c_str(), output_table->name().c_str());
+            return false;
+         }
+      }
+   }
+   return true;
 }
 
