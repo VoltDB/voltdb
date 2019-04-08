@@ -47,6 +47,7 @@ import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -308,6 +309,7 @@ public class TestExportGeneration {
     }
 
     @Test
+    @Ignore
     public void testStaleAckDelivery() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
 
