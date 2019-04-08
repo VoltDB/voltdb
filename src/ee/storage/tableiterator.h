@@ -456,7 +456,7 @@ inline bool TableIterator::next(TableTuple &out) {
 
 inline size_t TableIterator::advance(TableTuple& out, size_t const off) {
    size_t advanced = 0;
-   while(++advanced < off && next(out));
+   while(next(out) && ++advanced < off);
    return advanced;
 }
 

@@ -97,17 +97,19 @@ bool LimitExecutor::p_execute(const NValueArray &params) {
    int offset = -1;
    node->getLimitAndOffsetByReference(params, limit, offset);
 
-   if (limit < 0 || iterator.advance(tuple, offset) < offset) {
+   if (iterator.advance(tuple, offset) < offset) {
       return true;     // offset beyond table count: empty table
-   } else if (limit >= 0) {
-      while(tuple_ctr++ < limit && iterator.next(tuple)) {
+   } else {
+      while(limit < 0 || tuple_ctr++ < limit) {
          if (!output_table->insertTuple(tuple)) {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
                   input_table->name().c_str(), output_table->name().c_str());
             return false;
+         } else if (!iterator.next(tuple)) {
+            break;
          }
       }
+      return true;
    }
-   return true;
 }
 
