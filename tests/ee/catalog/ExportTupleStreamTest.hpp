@@ -71,7 +71,7 @@ const char *catalogPayloadBasic =
     "set $PREV signature \"A|p\"\n"
     "set $PREV tuplelimit 2147483647\n"
     "set $PREV isDRed false\n"
-    "set $PREV tableType 3\n"
+    "set $PREV tableType 4\n"
     "add /clusters#cluster/databases#database/tables#A columns LAST_UPDATE\n"
     "set /clusters#cluster/databases#database/tables#A/columns#LAST_UPDATE index 0\n"
     "set $PREV type 11\n"

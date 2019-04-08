@@ -1930,8 +1930,8 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
         }
     }
     if (m_shadowStream != nullptr) {
-        int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
-        if (migrateTxnId) {
+        int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
+        if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
             assert(it != m_migratingRows.end());
             MigratingBatch& batch = it->second;
@@ -2451,21 +2451,26 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
         it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
     }
     void* addr = tuple.address();
-    it->second.insert(addr);
+#ifndef NDEBUG
+    bool success =
+#endif
+    it->second.insert(addr).second;
+    assert(success);
 };
 
 bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     assert(m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.find(txnId);
     if (it == m_migratingRows.end()) {
+        assert(false);
         return false;
     }
-    it->second.erase(tuple.address());
+
     size_t found = it->second.erase(tuple.address());
     if (it->second.empty()) {
         m_migratingRows.erase(it);
     }
-    assert(found <= 1);
+    assert(found == 1);
     return found == 1;
 }
 

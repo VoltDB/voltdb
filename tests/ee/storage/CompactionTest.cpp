@@ -146,7 +146,7 @@ public:
 
 
         m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes, m_tableSchemaColumnSizes, m_tableSchemaAllowNull, columnInBytes,
-                                                       hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+                                                       hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes, true);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -440,7 +440,6 @@ TEST_F(CompactionTest, CompactionWithMigratingRows) {
         ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
         TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         //FIXME: deleteTuple should clean up the index for us
-        m_table->migratingRemove(*ii, tuple);
         m_table->deleteTuple(tuple, true);
     }
 
@@ -457,7 +456,7 @@ TEST_F(CompactionTest, CompactionWithMigratingRows) {
             ASSERT_EQ(indexTuple.address(), tuple.address());
         }
         int64_t migratingTxn = ValuePeeker::peekAsBigInt(tuple.getHiddenNValue(0));
-        if (migratingTxn) {
+        if (migratingTxn != INT64_NULL) {
             ASSERT_TRUE(m_table->migratingRemove(migratingTxn, tuple));
         }
     }
