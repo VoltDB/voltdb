@@ -404,8 +404,17 @@ final class RelDistributionUtils {
         return Pair.of(outer, inner);
     }
 
+    /**
+     * Get the distribution trait from RelNode, except when the node is "eventually" an aggregation node, in which case
+     * we treat it as a replicated table, and return SINGLETON.
+     * The "eventually" means that either the node itself is an aggregation; or when there are some CALC/SORT/LIMIT
+     * nodes above an aggregation node, see `isAggregateNode`.
+     * @param node
+     * @return
+     */
     static RelDistribution getDistribution(RelNode node) {
-        return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        return isAggregateNode(node) ? RelDistributions.SINGLETON :
+                node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
     }
 
     private static Pair<Map<Integer, RexNode>, Map<Integer, RexNode>> fillColumnLiteralEqualPredicates(
@@ -551,33 +560,6 @@ final class RelDistributionUtils {
     }
 
     /**
-     * Special handling of distribution trait when either node is (eventually) an aggregation node.
-     * When only one join node is (eventually) an aggregation, set it to SINGLETON (as if from replicated table), because
-     * there will never be a true MP case that VoltDB cannot handle: we must aggregate first, regardless of whether the
-     * aggregation itself is MP or not, before joining; at join time, there is no need to retrieve from multiple partitions
-     * from aggregation's perspective.
-     *
-     * @param outer Join's outer relation
-     * @param inner Join's inner relation
-     * @return outer/inner relation with their distribution possibly updated.
-     */
-    private static Pair<RelDistribution, RelDistribution> checkedAggDistributions(RelNode outer, RelNode inner) {
-        final boolean isOuterAgg = isAggregateNode(outer), isInnerAgg = isAggregateNode(inner);
-        final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
-        if (isOuterAgg == isInnerAgg) {
-            // When neither relation is aggregation, no need to change anything;
-            // when both relations are aggregations, the aggregation node's distribution is identical to
-            // its child's distribution, and we can still let join's logic handle, same way as if handling
-            // child nodes of aggregations being joined together.
-            return Pair.of(getDistribution(outer), getDistribution(inner));
-        } else if (isOuterAgg) {
-            return Pair.of(RelDistributions.SINGLETON, innerDist);
-        } else {
-            return Pair.of(outerDist, RelDistributions.SINGLETON);
-        }
-    }
-
-    /**
      * Check whether the given join relation is SP.
      * If it is SP, and contains partitioned tables, (which implies that there is a
      * "WHERE partitionColumn = LITERAL_VALUE"), then also set the literal value in the distribution trait.
@@ -587,8 +569,7 @@ final class RelDistributionUtils {
      * @return true if the result of the join is SP, and sets the distribution trait for all partitioned relations.
      */
     static JoinState isJoinSP(VoltLogicalJoin join, RelNode outer, RelNode inner) {
-        final Pair<RelDistribution, RelDistribution> dists = checkedAggDistributions(outer, inner);
-        final RelDistribution outerDist = dists.getFirst(), innerDist = dists.getSecond();
+        final RelDistribution outerDist = getDistribution(outer), innerDist = getDistribution(inner);
         final int outerTableColumns = outer.getRowType().getFieldCount();
         final Set<Integer> outerPartColumns = getPartitionColumns(outer),
                 innerPartColumns = getPartitionColumns(inner),
