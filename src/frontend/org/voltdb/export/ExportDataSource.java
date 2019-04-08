@@ -1669,7 +1669,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
-                            m_onMastership.run();
+                            // If we have an outstanding poll request, try satisfying it,
+                            // otherwise start a polling runnable.
+                            if (m_pollTask != null) {
+                                pollImpl(m_pollTask);
+                            } else {
+                                m_onMastership.run();
+                            }
                         }
                     }
                 } catch (Exception e) {
