@@ -1930,8 +1930,8 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
         }
     }
     if (m_shadowStream != nullptr) {
-        int64_t migrateTxnId = ValuePeeker::peekAsBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
-        if (migrateTxnId) {
+        int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
+        if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
             assert(it != m_migratingRows.end());
             MigratingBatch& batch = it->second;
