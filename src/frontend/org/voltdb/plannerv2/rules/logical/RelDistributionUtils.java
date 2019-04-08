@@ -18,8 +18,10 @@
 package org.voltdb.plannerv2.rules.logical;
 
 import com.google_voltpatches.common.collect.Sets;
+import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;
@@ -27,7 +29,7 @@ import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.voltcore.utils.Pair;
 import org.voltdb.exceptions.PlanningErrorException;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+import org.voltdb.plannerv2.rel.logical.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -402,8 +404,17 @@ final class RelDistributionUtils {
         return Pair.of(outer, inner);
     }
 
+    /**
+     * Get the distribution trait from RelNode, except when the node is "eventually" an aggregation node, in which case
+     * we treat it as a replicated table, and return SINGLETON.
+     * The "eventually" means that either the node itself is an aggregation; or when there are some CALC/SORT/LIMIT
+     * nodes above an aggregation node, see `isAggregateNode`.
+     * @param node
+     * @return
+     */
     static RelDistribution getDistribution(RelNode node) {
-        return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        return isAggregateNode(node) ? RelDistributions.SINGLETON :
+                node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
     }
 
     private static Pair<Map<Integer, RexNode>, Map<Integer, RexNode>> fillColumnLiteralEqualPredicates(
@@ -492,7 +503,7 @@ final class RelDistributionUtils {
      * @param setOpNodes SetOp children
      * @return true if the result is SP.
      */
-    public static JoinState isSetOpSP(List<RelNode> setOpNodes) {
+    static JoinState isSetOpSP(List<RelNode> setOpNodes) {
         JoinState initSetOpState = new JoinState(true, null, Sets.newHashSet());
         JoinState finalSetOpState = setOpNodes.stream().reduce(
                 initSetOpState,
@@ -528,6 +539,24 @@ final class RelDistributionUtils {
                 },
                 (currentState, nextState) -> nextState);
         return finalSetOpState;
+    }
+
+    /**
+     * Check if a node is "eventually" an aggregation node. It can have arbitrary/combinations of
+     * Calc/Sort/Limit on top of the aggregation node.
+     * @param node source node under inspection
+     * @return whether the given node contains an aggregation node somewhere.
+     */
+    private static boolean isAggregateNode(RelNode node) {
+        if (node instanceof VoltLogicalAggregate) {
+            return true;
+        } else if (node instanceof VoltLogicalCalc ||
+                node instanceof VoltLogicalLimit ||
+                node instanceof VoltLogicalSort) {
+            return isAggregateNode(((HepRelVertex) node.getInput(0)).getCurrentRel());
+        } else {
+            return false;
+        }
     }
 
     /**
