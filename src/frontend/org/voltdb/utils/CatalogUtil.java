@@ -2488,10 +2488,6 @@ public abstract class CatalogUtil {
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        // create the previous catalog bytes zk node
-        zk.create(VoltZK.catalogbytesPrevious,
-                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     /**
