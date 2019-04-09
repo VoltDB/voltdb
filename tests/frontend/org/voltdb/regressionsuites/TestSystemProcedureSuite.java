@@ -24,6 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 import org.voltdb.BackendTarget;
@@ -1061,10 +1063,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         MultiConfigSuiteBuilder builder =
                 new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
-        LocalCluster config;
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        System.setProperty("TIME_TO_LIVE_DELAY", "60000");
+        additionalEnv.put("TIME_TO_LIVE_DELAY", "60000");
 
-        config = new LocalCluster("sysproc-cluster.jar", SITES, HOSTS, KFACTOR,
-               BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("sysproc-cluster.jar", SITES, HOSTS, KFACTOR,
+               BackendTarget.NATIVE_EE_JNI, additionalEnv);
         if ( ! hasLocalServer ) {
             config.setHasLocalServer(false);
         }
