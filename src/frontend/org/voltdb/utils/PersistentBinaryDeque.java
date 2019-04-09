@@ -255,7 +255,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     synchronized(PersistentBinaryDeque.this) {
                         checkDoubleFree();
                         retcont.discard();
-                        assert(m_closed || m_segments.containsKey(segment.segmentIndex()));
+                        assert(m_closed || m_segments.containsKey(segment.segmentIndex())) :
+                            "m_closed=" + m_closed + " m_segments={" + m_segments.keySet() + "}" +
+                            " segmentIndex=" + segment.segmentIndex();
 
                         // Only continue if open there is another segment and this is the first entry of a segment
                         if (m_closed || m_segments.size() == 1
