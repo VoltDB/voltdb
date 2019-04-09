@@ -29,7 +29,14 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
+import org.voltdb.utils.MiscUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static junit.framework.Assert.assertTrue;
 
 public class AdhocDDLTestBase extends JUnit4LocalClusterTest {
 
@@ -282,5 +289,26 @@ public class AdhocDDLTestBase extends JUnit4LocalClusterTest {
             stats = m_client.callProcedure("@Statistics", selector, 0).getResults()[0];
         } while (stats.getRowCount() != expected);
         return stats;
+    }
+
+    protected static List<Object> getColumn(VoltTable tbl, int columnIndex, VoltType vt) {
+        final List<Object> result = new ArrayList<>();
+        while (tbl.advanceRow()) {
+            result.add(tbl.get(columnIndex, vt));
+        }
+        return result;
+    }
+
+    protected void createSchema(
+            VoltDB.Configuration config, String ddl, final int sitesPerHost, final int hostCount,
+            final int replication) throws Exception {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+        builder.setUseDDLSchema(true);
+        config.m_pathToCatalog = VoltDB.Configuration.getPathToCatalogForTest("adhocddl.jar");
+        boolean success = builder.compile(config.m_pathToCatalog, sitesPerHost, hostCount, replication);
+        assertTrue("Schema compilation failed", success);
+        config.m_pathToDeployment = VoltDB.Configuration.getPathToCatalogForTest("adhocddl.xml");
+        MiscUtils.copyFile(builder.getPathToDeployment(), config.m_pathToDeployment);
     }
 }
