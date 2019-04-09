@@ -310,7 +310,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
         m_tester.sql("select count(*) from R1")
                 .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT()], split=[1], coordinator=[false], type=[serial])\n" +
-                        "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], DUMMY=[$t6], split=[1])\n" +
+                        "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], $f0=[$t6], split=[1])\n" +
                         "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
 
