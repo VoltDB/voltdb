@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -336,5 +337,28 @@ public class RepairLog
     void registerTransactionCommitInterest(TransactionCommitInterest interest)
     {
         m_txnCommitInterests.add(interest);
+    }
+
+    private void logSummary(StringBuilder sb, Deque<Item> log, String indentStr) {
+        final int txnIdsPerLine = 15;
+        Iterator<Item> itemator = log.iterator();
+        for (int lineCnt = 0; lineCnt <= (log.size() / txnIdsPerLine); lineCnt++) {
+            sb.append(indentStr);
+            for(int i = 0; i < txnIdsPerLine; i++) {
+                if (itemator.hasNext()) {
+                    sb.append(" ").append(TxnEgo.txnIdSeqToString(itemator.next().getTxnId()));
+                }
+            }
+        }
+    }
+
+    public void indentedString(StringBuilder sb, int indentCnt) {
+        char[] array = new char[indentCnt-1];
+        Arrays.fill(array, ' ');
+        String indentStr = new String("\n" + new String(array));
+        sb.append(indentStr).append("MP RepairLog:");
+        logSummary(sb, m_logMP, indentStr);
+        sb.append(indentStr).append("SP RepairLog:");
+        logSummary(sb, m_logSP, indentStr);
     }
 }
