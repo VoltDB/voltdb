@@ -2259,7 +2259,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         boolean transactionStarted = false;
-        long targetHSId = m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId);
+        Long targetHSId = m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId);
+        if (targetHSId == null) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(String.format("Partition %d is no longer on host %d", partitionId, targetHostId));
+            }
+            return;
+        }
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@MigratePartitionLeader";
@@ -2357,9 +2363,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             if (!migrationComplete) {
-                notifyPartitionMigrationStatus(partitionId,
-                        m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
-                        true);
+                notifyPartitionMigrationStatus(partitionId, targetHSId, true);
             }
         }
     }
