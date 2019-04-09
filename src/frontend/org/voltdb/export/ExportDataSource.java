@@ -784,11 +784,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         if (poll) {
-            try {
-                pollImpl(m_pollTask);
-            } catch (RejectedExecutionException ex) {
-                //Its ok.
-            }
+            // Note: this should only be executed in a runnable
+            assert(!m_es.isShutdown());
+            pollImpl(m_pollTask);
         }
     }
 
@@ -908,21 +906,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Export mastership should have been released: force it.
         m_mastershipAccepted.set(false);
 
-        // FIXME: necessary? Old processor should have been shut down.
-        // Returning null indicates end of stream
-        try {
-            if (m_pollTask != null) {
-                m_pollTask.setFuture(null);
-            }
-        } catch (RejectedExecutionException reex) {
-            // Ignore, {@code GuestProcessor} was closed
-        }
-        m_pollTask = null;
 
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
+
                 try {
+                    // Returning null indicates end of stream
+                    try {
+                        if (m_pollTask != null) {
+                            m_pollTask.setFuture(null);
+                        }
+                    } catch (RejectedExecutionException reex) {
+                        // Ignore, {@code GuestProcessor} was closed
+                    }
+                    m_pollTask = null;
+
                     // Discard the pending container, shortcutting the standard discard logic
                     AckingContainer ack = m_pendingContainer.getAndSet(null);
                     if (ack != null) {
@@ -979,6 +978,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
+                    /*
+                     * The poll is blocking through the cached future, shouldn't
+                     * call poll a second time until a response has been given
+                     * which satisfies the cached future.
+                     */
+                    if (m_pollTask != null) {
+                        try {
+                            pollTask.setException(new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
+                                    " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
+                        } catch (RejectedExecutionException reex) {
+                            // Ignore: the {@code GuestProcessor} was shut down...
+                        }
+                        return;
+                    }
+
                     // ENG-14488, it's possible to have the export master gives up mastership
                     // but still try to poll immediately after that, e.g. from Pico Network
                     // thread the master gives up mastership, from decoder thread it tries to
@@ -994,7 +1008,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         } catch (RejectedExecutionException rej) {
                             // Ignore: the {@code GuestProcessor} was shut down
                         }
-                        m_pollTask = null;
                         return;
                     }
 
@@ -1033,16 +1046,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 setPendingContainer(cont);
                             }
                             m_pollTask = null;
-                            return;
-                        }
-                        /*
-                         * The poll is blocking through the cached future, shouldn't
-                         * call poll a second time until a response has been given
-                         * which satisfies the cached future.
-                         */
-                        if (m_pollTask != null) {
-                            fut.setException(new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
-                                    " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -1534,7 +1537,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         }
-        unacceptMastership();
+        unacceptMastershipInternal();
     }
 
     private void sendTakeMastershipMessage() {
@@ -1604,37 +1607,56 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public synchronized void unacceptMastership() {
+    private void unacceptMastershipInternal() {
+
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " is no longer the export stream master.");
         }
         m_mastershipAccepted.set(false);
+        try {
+        if (m_pollTask != null) {
+            m_pollTask.setFuture(null);
+        }
+        } catch (RejectedExecutionException reex) {
+            // Ignore, {@code GuestProcessor} was closed
+        }
         m_pollTask = null;
+
         m_readyForPolling = false;
         m_seqNoToDrain = Long.MAX_VALUE;
         m_newLeaderHostId = null;
+    }
+
+    public ListenableFuture<?> unacceptMastership() {
+        return m_es.submit(new Runnable() {
+
+            @Override
+            public void run() {
+                unacceptMastershipInternal();
+            }
+        });
     }
 
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public synchronized void acceptMastership() {
-        if (m_onMastership == null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
-            }
-            return;
-        }
-        if (m_mastershipAccepted.get()) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
-            }
-            return;
-        }
+    public void acceptMastership() {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
+                if (m_onMastership == null) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
+                    }
+                    return;
+                }
+                if (m_mastershipAccepted.get()) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+                    }
+                    return;
+                }
                 try {
                     if (!m_es.isShutdown() || !m_closed) {
                         if (exportLog.isDebugEnabled()) {
@@ -1643,7 +1665,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
-                            m_onMastership.run();
+                            // ENG-15811 - not sure that the {@code GuestProcessor} is not already
+                            // running when we get there.
+                            if (m_pollTask != null) {
+                                pollImpl(m_pollTask);
+                            } else {
+                                m_onMastership.run();
+                            }
                         }
                     }
                 } catch (Exception e) {
