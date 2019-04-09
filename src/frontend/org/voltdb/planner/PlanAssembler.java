@@ -163,9 +163,8 @@ public class PlanAssembler {
      * Return true if tableList includes at least one matview.
      */
     private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
+            if (table.getMaterializer() != null && !TableType.isStream(table.getMaterializer().getTabletype())) {
                 return true;
             }
         }

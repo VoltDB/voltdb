@@ -443,21 +443,93 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     }
 
     @Test
-    public void testExportTable() throws Exception
+    public void testDropStream() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25N"));
-        assertEquals(getTableType("T25N"), "EXPORT");
-        //Export table created with STREAM syntax
-        assertTrue(findTableInSystemCatalogResults("T25S"));
-        assertEquals(getTableType("T25S"), "EXPORT");
+        assertFalse("Stream T25D1 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D1"));
+        assertFalse("Stream T25D2 should NOT exist: it was DROP-ed", findTableInSystemCatalogResults("T25D2"));
+    }
+
+    @Test
+    public void testCreateStream() throws Exception
+    {
+        assertTrue  ("Stream T25S should exist",   findTableInSystemCatalogResults("T25S"));
+        assertEquals("Stream T25S has wrong type", "EXPORT", getTableType("T25S"));
     }
 
     @Test
     public void testStreamView() throws Exception
     {
-        assertTrue(findTableInSystemCatalogResults("T25N"));
-        assertEquals(getTableType("T25N"), "EXPORT");
-        assertEquals(getTableType("VT25N"), "VIEW");
+        assertTrue  ("Stream T25N should exist",         findTableInSystemCatalogResults("T25N"));
+        assertEquals("Stream T25N has wrong type",       "EXPORT", getTableType("T25N"));
+        assertTrue  ("Stream View VT25N should exist",   findTableInSystemCatalogResults("VT25N"));
+        assertEquals("Stream View VT25N has wrong type", "VIEW", getTableType("VT25N"));
+    }
+
+    @Test
+    public void testCreateTableWithTTL() throws Exception
+    {
+        assertTrue  ("Table T63 should exist",    findTableInSystemCatalogResults("T63"));
+        assertEquals("Stream T63 has wrong type", "TABLE", getTableType("T63"));
+
+        // TODO: add more tests, once TTL info (e.g. TTL value, time-unit,
+        // batch size # rows, max frequency value) is available from
+        // '@SystemCatalog "COLUMNS"' (or in some other way): ENG-15701
+
+        // Table T64 also specifies BATCH_SIZE and MAX_FREQUENCY
+        assertTrue  ("Table T64 should exist",    findTableInSystemCatalogResults("T64"));
+        assertEquals("Stream T64 has wrong type", "TABLE", getTableType("T64"));
+    }
+
+    @Test
+    public void testAlterTableWithTTLDropColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnDoesNotExist("T63", "C1");
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnDoesNotExist("T64", "C2");
+    }
+
+    @Test
+    public void testAlterTableWithTTLAddColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnExists    ("T63", "A1");
+        assertColumnTypeEquals("T63", "A1", "VARCHAR");
+        assertColumnSizeEquals("T63", "A1", 15);
+        assertColumnIsNullable("T63", "A1");
+        assertColumnDefaultValueEquals   ("T63", "A1", "'abc'");
+        assertColumnOrdinalPositionEquals("T63", "A1", 3);
+        assertColumnOrdinalPositionEquals("T63", "C2", 1);
+        assertColumnOrdinalPositionEquals("T63", "C3", 2);
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnExists    ("T64", "A1");
+        assertColumnTypeEquals("T64", "A1", "VARCHAR");
+        assertColumnSizeEquals("T64", "A1", 2048);
+        assertColumnIsNotNullable("T64", "A1");
+        assertColumnDefaultValueEquals   ("T64", "A1", "'ghi'");
+        assertColumnOrdinalPositionEquals("T64", "A1", 1);
+        assertColumnOrdinalPositionEquals("T64", "C1", 2);
+        assertColumnOrdinalPositionEquals("T64", "C3", 3);
+    }
+
+    @Test
+    public void testAlterTableWithTTLAlterColumn() throws Exception
+    {
+        assertTrue("Stream T63 should exist", findTableInSystemCatalogResults("T63"));
+        assertColumnExists    ("T63", "C2");
+        assertColumnTypeEquals("T63", "C2", "VARCHAR");
+        assertColumnSizeEquals("T63", "C2", 16);
+        assertColumnIsNotNullable("T63", "C2");
+        assertColumnDefaultValueEquals("T63", "C2", "'def'");
+
+        assertTrue("Stream T64 should exist", findTableInSystemCatalogResults("T64"));
+        assertColumnExists    ("T64", "C1");
+        assertColumnTypeEquals("T64", "C1", "VARCHAR");
+        assertColumnSizeEquals("T64", "C1", 15);
+        assertColumnIsNullable("T64", "C1");
+        assertColumnDefaultValueEquals("T64", "C1", "'jkl'");
     }
 
 //    @Test

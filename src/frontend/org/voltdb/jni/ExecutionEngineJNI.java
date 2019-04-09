@@ -679,26 +679,35 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String tableSignature)
+            long uso, long seqNo, int partitionId, String streamName)
     {
         if (EXPORT_LOG.isDebugEnabled()) {
             EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
-                    uso + ", seqNo: " + seqNo + ", tableSignature: " + tableSignature);
+                    uso + ", seqNo: " + seqNo + ", streamName: " + streamName);
         }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, uso, seqNo, getStringBytes(tableSignature));
+                                         syncAction, uso, seqNo, getStringBytes(streamName));
         if (retval < 0) {
             LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
                     uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
-                    ", tableSignature: " + tableSignature);
+                    ", streamName: " + streamName);
         }
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+        m_nextDeserializer.clear();
+        int txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+                getStringBytes(tableName), deletableTxnId, maxRowCount, undoToken);
+        return txnFullyDeleted;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String streamName) {
+        return nativeGetUSOForExportTable(pointer, getStringBytes(streamName));
     }
 
     @Override

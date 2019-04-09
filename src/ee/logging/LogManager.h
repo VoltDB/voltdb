@@ -87,6 +87,9 @@ public:
         return getThreadLogManager()->getLogger(id);
     }
 
+    inline static const LogLevel getLogLevel(LoggerId id) {
+        return (LogLevel)getThreadLogManager()->getLogger(id)->m_level;
+    }
 private:
 
     static LogManager* getThreadLogManager();

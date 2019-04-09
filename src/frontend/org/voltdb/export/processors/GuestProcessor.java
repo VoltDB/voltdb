@@ -108,6 +108,7 @@ public class GuestProcessor implements ExportDataProcessor {
         }
     }
 
+    @Override
     public ExportClientBase getExportClient(final String tableName) {
         ExportClientBase client = null;
         synchronized (GuestProcessor.this) {
@@ -236,7 +237,6 @@ public class GuestProcessor implements ExportDataProcessor {
                 final AdvertisedDataSource ads =
                         new AdvertisedDataSource(
                                 m_source.getPartitionId(),
-                                m_source.getSignature(),
                                 m_source.getTableName(),
                                 m_source.getPartitionColumnName(),
                                 System.currentTimeMillis(),
@@ -325,8 +325,9 @@ public class GuestProcessor implements ExportDataProcessor {
         fut.addListener(new Runnable() {
             @Override
             public void run() {
+                AckingContainer cont = null;
                 try {
-                    AckingContainer cont = fut.get();
+                    cont = fut.get();
                     if (cont == null) {
                         return;
                     }
@@ -338,6 +339,9 @@ public class GuestProcessor implements ExportDataProcessor {
 
                         //Track the amount of backoff to use next time, will be updated on repeated failure
                         int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
+
+                        // Extract the sp handle of the last committed row in the block, if present
+                        long committedSpHandle = 0L;
 
                         /*
                          * If there is an error processing the block the decoder thinks is recoverable
@@ -351,10 +355,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                ByteBuffer schemaBuf = null;
-                                if (cont.schema() != null) {
-                                    schemaBuf = cont.schema();
-                                }
+                                ByteBuffer schemaBuf = cont.schema();
                                 if (schemaBuf != null) {
                                     schemaBuf.position(0);
                                     schemaBuf.order(ByteOrder.LITTLE_ENDIAN);
@@ -412,6 +413,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                             firstRowOfBlock = false;
                                         }
                                         edb.processRow(row);
+                                        if (committedSpHandle == 0) {
+                                            committedSpHandle = extractCommittedSpHandle(row,
+                                                    cont.getCommittedSeqNo());
+                                        }
                                     }
                                 }
                                 if (edb.isLegacy()) {
@@ -426,6 +431,11 @@ public class GuestProcessor implements ExportDataProcessor {
                                 // that container isn't fully consumed. Discard the buffer prematurely
                                 // would cause missing rows in export stream.
                                 if (!m_shutdown && cont != null) {
+                                    if (committedSpHandle != 0) {
+                                        // We came across the last committed row in the buffer,
+                                        // record its sp handle
+                                        cont.setCommittedSpHandle(committedSpHandle);
+                                    }
                                     cont.discard();
                                     cont = null;
                                 }
@@ -462,6 +472,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     } finally {
                         if (cont != null) {
                             cont.discard();
+                            cont = null;
                         }
                     }
                 } catch (Exception e) {
@@ -472,12 +483,41 @@ public class GuestProcessor implements ExportDataProcessor {
                     } else {
                         m_logger.error("Error processing export block, continuing processing: ", e);
                     }
+                } finally {
+                    if (cont != null) {
+                        cont.discard();
+                        cont = null;
+                    }
                 }
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(false), edb);
                 }
             }
         }, edb.getExecutor());
+    }
+
+    /**
+     * If the row is the last committed row, return the SpHandle, otherwise return 0
+     *
+     * @param row the export row
+     * @param committedSeqNo the sequence number of the last committed row
+     * @return
+     */
+    private long extractCommittedSpHandle(ExportRow row, long committedSeqNo) {
+        long ret = 0;
+        if (committedSeqNo == ExportDataSource.NULL_COMMITTED_SEQNO) {
+            return ret;
+        }
+
+        // Get the rows's sequence number (3rd column)
+        long seqNo = (long) row.values[2];
+        if (seqNo != committedSeqNo) {
+            return ret;
+        }
+
+        // Get the row's sp handle (1rst column)
+        ret = (long) row.values[0];
+        return ret;
     }
 
     @Override

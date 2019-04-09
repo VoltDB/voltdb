@@ -198,11 +198,17 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String mStreamName) {
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+        return 0;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String streamName) {
         return null;
     }
 

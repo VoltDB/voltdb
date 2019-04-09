@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 
@@ -31,12 +30,13 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 public interface Generation {
 
     public void acceptMastership(int partitionId);
-    public void close(final HostMessenger messenger);
+    public void close();
 
     public List<ExportStatsRow> getStats(boolean interval);
-    public void onSourceDone(int partitionId, String signature);
+    public void onSourceDrained(int partitionId, String tableName);
 
-    public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
+    public void pushExportBuffer(int partitionId, String signature,
+                                long seqNo, long committedSeqNo, int tupleCount,
                                  long uniqueId, long genId, ByteBuffer buffer, boolean sync);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, boolean isRejoin,
@@ -44,4 +44,5 @@ public interface Generation {
                                                 boolean isLowestSite);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
-}
+    public int getCatalogVersion();
+    }

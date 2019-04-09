@@ -33,21 +33,15 @@
 /**
  * A table is export only its catalog says so.
  */
+
 bool isTableExportOnly(catalog::Table const& catalogTable) {
-    return voltdb::isStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
-}
-
-bool isTableWithMigrate(catalog::Table const& catalogTable) {
-     return voltdb::isTableWithMigrate(static_cast<voltdb::TableType>(catalogTable.tableType()));
-}
-
-bool isTableWithExport(catalog::Table const& catalogTable) {
-     return voltdb::isTableWithExport(static_cast<voltdb::TableType>(catalogTable.tableType()));
+    return voltdb::tableTypeIsStream(static_cast<voltdb::TableType>(catalogTable.tableType()));
 }
 
 /**
  * a table is only enabled for export if explicitly listed in
- * a connector's table list and if export is enabled for the
+ * a connector's table list (regardless of the enabled state of
+ * the connector) if export is enabled for the
  * database as a whole
  */
 bool isExportEnabledForTable(catalog::Database const & database, catalog::Table const& catalogTable) {
@@ -68,11 +62,6 @@ bool isExportEnabledForTable(catalog::Database const & database, catalog::Table 
          connIter++)
     {
         catalog::Connector *connector = connIter->second;
-
-        // skip this connector if disabled
-        if (!connector->enabled()) {
-            continue;
-        }
 
         // iterate the connector tableinfo list looking for tableIndex matches
         std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;

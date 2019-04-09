@@ -19,12 +19,18 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Non-transactional procedure that turns around and creates a SQL statement
@@ -40,6 +46,16 @@ public class SwapTables extends AdHocNTBase {
         CatalogContext context = VoltDB.instance().getCatalogContext();
         List<String> sqlStatements = new ArrayList<>(1);
         sqlStatements.add(sql);
+
+        Map<String, Table> ttlTables = CatalogUtil.getTimeToLiveTables(context.database);
+        Table ttlTable = ttlTables.get(theTable.toUpperCase());
+        if (ttlTable != null) {
+            TimeToLive ttl = ttlTable.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (!StringUtil.isEmpty(ttl.getMigrationtarget())) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                        String.format("Table %s cannot be swapped since it uses TTL.",theTable));
+            }
+        }
 
         return runNonDDLAdHoc(context,
                 sqlStatements,

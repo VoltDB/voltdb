@@ -43,14 +43,12 @@ class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
-                      std::string signature, const std::string &tableName,
-                      const std::vector<std::string> &columnNames);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
     virtual ~ExportTupleStream() {
     }
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setGeneration(int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -65,8 +63,9 @@ public:
     void setBytesUsed(int64_t seqNo, size_t count) {
         assert(m_uso == 0);
         m_uso = count;
-        // this is for start sequence number of stream block
+        // set start and committed sequence numbers of stream block
         m_nextSequenceNumber = seqNo + 1;
+        m_committedSequenceNumber = seqNo;
         //Extend the buffer chain to replace any existing stream blocks with a new one
         //with the correct sequence number
         extendBufferChain(0);
@@ -78,7 +77,7 @@ public:
 
     int64_t testAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
-        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
+        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId);
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
@@ -149,10 +148,8 @@ private:
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    std::string m_signature;
     int64_t m_generation;
-    const std::string &m_tableName;
-    const std::vector<std::string> &m_columnNames;
+    const std::string m_tableName;
 
     int64_t m_nextSequenceNumber;
     int64_t m_committedSequenceNumber;

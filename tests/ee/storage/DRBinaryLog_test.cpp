@@ -119,9 +119,8 @@ static std::map<int, ClusterCtx> s_clusterMap;
 class MockExportTupleStream : public ExportTupleStream {
 public:
     MockExportTupleStream(VoltDBEngine* engine, CatalogId partitionId, int64_t siteId,
-                          int64_t generation, std::string signature, const std::string &tableName,
-                          const std::vector<std::string> &columnNames)
-        : ExportTupleStream(partitionId, siteId, generation, signature, tableName, columnNames),
+                          int64_t generation, const std::string &tableName)
+        : ExportTupleStream(partitionId, siteId, generation, tableName),
           m_engine(engine)
     { }
 
@@ -206,7 +205,7 @@ public:
 
         m_exportSchema = TupleSchema::createTupleSchemaForTest(m_exportColumnType, m_exportColumnLength, m_exportColumnAllowNull);
 
-        m_exportStream = new MockExportTupleStream((VoltDBEngine*)this, 1, 1, 0, "sign", tableName, m_exportColumnName);
+        m_exportStream = new MockExportTupleStream((VoltDBEngine*)this, 1, 1, 0, tableName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
                 tableName,
                 m_exportSchema,
@@ -360,8 +359,7 @@ public:
                                                                                                              columnNames,
                                                                                                              replicatedTableHandle,
                                                                                                              false, -1,
-                                                                                                             false,
-                                                                                                             false, 0,
+                                                                                                             PERSISTENT, 0,
                                                                                                              INT_MAX,
                                                                                                              95, true,
                                                                                                              true));
@@ -369,11 +367,24 @@ public:
 
         {
             ReplicaProcessContextSwitcher switcher;
-            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
+            m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                         "P_TABLE_REPLICA",
+                                                                                                         m_schemaReplica,
+                                                                                                         columnNames,
+                                                                                                         tableHandle,
+                                                                                                         false, 0));
             ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory useMpMemory;
-            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1,
-                false, false, 0, INT_MAX, 95, false, true));
+            m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                                   "R_TABLE_REPLICA",
+                                                                                                                   m_replicatedSchemaReplica,
+                                                                                                                   columnNames,
+                                                                                                                   replicatedTableHandle,
+                                                                                                                   false, -1,
+                                                                                                                   PERSISTENT, 0,
+                                                                                                                   INT_MAX,
+                                                                                                                   95, false,
+                                                                                                                   true));
         }
         m_table->setDR(true);
 

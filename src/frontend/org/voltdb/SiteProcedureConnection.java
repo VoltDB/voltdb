@@ -199,6 +199,10 @@ public interface SiteProcedureConnection {
                                                      Column column,
                                                      ComparisonOperation op);
 
+    public ProcedureRunner getMigrateProcRunner(String procName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op);
     /**
      * @return SystemProcedureExecutionContext
      */
@@ -217,7 +221,7 @@ public interface SiteProcedureConnection {
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
-    public long[] getUSOForExportTable(String signature);
+    public long[] getUSOForExportTable(String streamName);
 
     public TupleStreamStateInfo getDRTupleStreamStateInfo();
 
@@ -234,6 +238,9 @@ public interface SiteProcedureConnection {
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature);
+
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount);
 
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
