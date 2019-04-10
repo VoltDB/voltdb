@@ -222,11 +222,3 @@ void Pool::purge() throw() {
 }
 
 #endif
-
-// Global shared pool for heteregeous STL container with
-// customized allocator: 1024 of 16KB chunks, totaling 4MB
-// of high-watermark overhead.
-Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
-std::mutex VoltAllocResourceMng::s_allocMutex;
-volatile sig_atomic_t VoltAllocResourceMng::s_numInstances = 0;
-
