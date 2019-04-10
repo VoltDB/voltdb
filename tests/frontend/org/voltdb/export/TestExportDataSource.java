@@ -60,7 +60,6 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.sysprocs.ExportControl.OperationMode;

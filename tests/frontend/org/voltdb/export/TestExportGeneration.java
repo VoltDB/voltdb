@@ -62,7 +62,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportMatchers.AckPayloadMessage;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.messaging.LocalMailbox;

@@ -35,10 +35,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.export.AckingContainer;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.StreamBlockQueue;
@@ -187,7 +187,6 @@ public class GuestProcessor implements ExportDataProcessor {
         final ExportClientBase m_client;
         final ExportDataSource m_source;
         final ArrayList<VoltType> m_types = new ArrayList<VoltType>();
-        private volatile boolean running = false;
 
         ExportRunner(String groupName, ExportClientBase client, ExportDataSource source) {
             m_client = Preconditions.checkNotNull(m_clientsByTarget.get(groupName), "null client");
@@ -200,12 +199,6 @@ public class GuestProcessor implements ExportDataProcessor {
 
         @Override
         public void run() {
-            if (running) {
-                // FIXME: temporary
-                m_logger.info("Ignore reentrant run from " + m_source);
-                return;
-            }
-            running = true;
             runDataSource();
         }
 

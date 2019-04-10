@@ -523,7 +523,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
-            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
+            exportLog.info("Export queue gap resolved by releasing bytes, resuming export.");
             clearGap(true);
         }
 
@@ -1011,54 +1011,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         return;
                     }
 
-                    AckingContainer cont = null;
                     try {
-                        //If we have anything pending set that before moving to next block.
-                        if (m_pendingContainer.get() != null) {
-                            cont = m_pendingContainer.getAndSet(null);
-                            if (cont.schema() == null) {
-                                // Ensure this first block has a schema
-                                BBContainer schemaContainer = m_committedBuffers.pollSchema();
-                                if (schemaContainer == null) {
-                                    try {
-                                        pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
-                                                + ", discarding buffer (rows may be lost)."));
-                                    } catch (RejectedExecutionException reex) { /* Ignore */ }
-                                    cont.internalDiscard();
-                                    return;
-                                } else {
-                                    cont.setSchema(schemaContainer);
-                                }
-                            }
-
-                            try {
-                                pollTask.setFuture(cont);
-                                if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
-                                }
-                            } catch (RejectedExecutionException reex) {
-                                // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
-                                // shut down by a catalog update): place the polled container in pending
-                                // so it is picked up by the new GuestProcessor.
-                                if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Pending a rejected " + cont);
-                                }
-                                setPendingContainer(cont);
-                            }
-                            m_pollTask = null;
-                            return;
-                        }
                         if (!m_es.isShutdown()) {
                             pollImpl(pollTask);
                         }
                     } catch (Exception e) {
-                        if (cont != null) {
-                            exportLog.error("Exception polling export buffer, discarding buffer with for committedSeqNo" + cont.m_commitSeqNo
-                                    + ", rows may be lost", e);
-                            cont.internalDiscard();
-                        } else  {
-                            exportLog.error("Exception polling export buffer", e);
-                        }
+                        exportLog.error("Exception polling export buffer", e);
                     } catch (Error e) {
                         VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
@@ -1070,7 +1028,116 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
+    /**
+     * Poll a pending container before moving to m_commitedBuffers.
+     *
+     * Note: May put the into pending. May also put the pollTask into m_pollTask to wait
+     * for gap resolution. The same pending container may be polled repeatedly on pushBuffer
+     * until the gap resolution protocol resolves the mastership.
+     *
+     * @param pollTask the polling task
+     * @return true if the poll is completed, false if polling needs to proceed on m_committedBuffers
+     */
+    private boolean pollPendingContainer(PollTask pollTask) {
+
+        AckingContainer cont = m_pendingContainer.getAndSet(null);
+        if (cont.schema() == null && pollTask.forcePollSchema()) {
+            // Ensure this first block has a schema
+            BBContainer schemaContainer = m_committedBuffers.pollSchema();
+            if (schemaContainer == null) {
+                try {
+                    pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
+                            + ", discarding buffer (rows may be lost)."));
+                } catch (RejectedExecutionException reex) {
+                    /* Ignore */
+                }
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("poll task has a pendingContainer:" +
+                            m_pendingContainer.get().toString() + " but failed to get schema.");
+                }
+                cont.internalDiscard();
+                return true;
+            } else {
+                cont.setSchema(schemaContainer);
+            }
+        }
+
+        boolean polled = false;
+        long nextSeqNo = m_firstUnpolledSeqNo;
+        ContinuityCheckResult result = checkBufferContinuity(
+                cont.getStartSeqNo(), cont.getLastSeqNo(), nextSeqNo);
+
+        if (result == ContinuityCheckResult.OK) {
+            try {
+                // The pending container satisfies the poll
+                pollTask.setFuture(cont);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
+                }
+            } catch (RejectedExecutionException reex) {
+                // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+                // shut down by a catalog update): place the polled container in pending
+                // so it is picked up by the new GuestProcessor.
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Pending a rejected " + cont);
+                }
+                setPendingContainer(cont);
+                polled = true;
+            }
+        } else if (result == ContinuityCheckResult.ACKED) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Acked pending " + cont);
+            }
+            int tuplesDeleted = m_gapTracker.truncate(cont.getLastSeqNo());
+            m_tuplesPending.addAndGet(-tuplesDeleted);
+            cont.internalDiscard();
+        } else {
+            assert (result == ContinuityCheckResult.GAP);
+            // Put the poll aside until the gap is resolved
+            m_pollTask = pollTask;
+            startMastershipMigration(nextSeqNo, cont);
+            polled = true;
+        }
+        return polled;
+    }
+
+    private void startMastershipMigration(long nextSeqNo, AckingContainer ackingContainer) {
+        Preconditions.checkNotNull(ackingContainer, "Acking container must be not null.");
+        Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+        assert (gap != null && nextSeqNo >= gap.getFirst() && nextSeqNo <= gap.getSecond());
+        // Mark the recently polled buffer as pending then query other nodes.
+        setPendingContainer(ackingContainer);
+        // If an existing mastership migration is in progress and is before hitting gap,
+        // don't start new migration.
+        if (m_seqNoToDrain >= nextSeqNo) {
+            exportLog.info("Export data missing from current queue [" +
+                    gap.getFirst() + ", " + gap.getSecond() +
+                    "] from " + this.toString() + ". Searching other sites for missing data.");
+            m_seqNoToDrain = nextSeqNo - 1;
+            mastershipCheckpoint(nextSeqNo - 1);
+        }
+    }
+
+    private enum ContinuityCheckResult {
+        NONE, // Failed to check, stop the poll
+        OK,
+        ACKED,
+        GAP,
+    }
+
+    private ContinuityCheckResult checkBufferContinuity(long startSeqNo, long lastSeqNo, long nextSeqNo) {
+        if (nextSeqNo >= startSeqNo && nextSeqNo <= lastSeqNo) {
+            return ContinuityCheckResult.OK;
+        } else if (nextSeqNo > lastSeqNo) {
+            return ContinuityCheckResult.ACKED;
+        } else {
+            return ContinuityCheckResult.GAP;
+        }
+    }
+
     private synchronized void pollImpl(PollTask pollTask) {
+
+        m_pollTask = null;
         if (pollTask == null) {
             return;
         }
@@ -1078,28 +1145,38 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             handleDrainedSource();
 
+            // Poll pending container before polling m_committedBuffers
+            if (m_pendingContainer.get() != null) {
+                if (pollPendingContainer(pollTask)) {
+                    return;
+                }
+            }
+
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
+            long nextSeqNo = m_firstUnpolledSeqNo;
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("polling data from seqNo " + nextSeqNo);
+            }
+
             //Inside this critical section do the work to find out
             //what block should be returned by the next poll.
             //Copying and sending the data will take place outside the critical section
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-                long firstUnpolledSeq = m_firstUnpolledSeqNo;
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("polling data from seqNo " + firstUnpolledSeq);
-                }
                 while (iter.hasNext()) {
+                    // Find first unpolled data or gap
                     StreamBlock block = iter.next();
-                    // find the first block that has unpolled data
-                    if (firstUnpolledSeq >= block.startSequenceNumber() &&
-                            firstUnpolledSeq <= block.lastSequenceNumber()) {
+                    ContinuityCheckResult result = checkBufferContinuity(
+                            block.startSequenceNumber(), block.lastSequenceNumber(), nextSeqNo);
+
+                    if (result == ContinuityCheckResult.OK) {
                         first_unpolled_block = block;
                         m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                         break;
-                    } else if (firstUnpolledSeq > block.lastSequenceNumber()) {
+                    } else if (result == ContinuityCheckResult.ACKED) {
                         blocksToDelete.add(block);
                         iter.remove();
                         if (exportLog.isDebugEnabled()) {
@@ -1107,24 +1184,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     block.lastSequenceNumber() + "]");
                         }
                     } else {
-                        // Gap only exists in the middle of buffers, why is it never be in the head of
-                        // queue? Because only master checks the gap, mastership migration waits until
-                        // the last pushed buffer at the checkpoint time is acked, it won't leave gap
-                        // behind before migrates to another node.
-                        Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                        // Hit a gap! Prepare to relinquish master role and broadcast queries for
-                        // capable candidate.
-                        if (gap != null && firstUnpolledSeq >= gap.getFirst() && firstUnpolledSeq <= gap.getSecond()) {
-                            // If another mastership migration in progress and is before the gap,
-                            // don't bother to start new one.
-                            if (m_seqNoToDrain > firstUnpolledSeq - 1) {
-                                exportLog.info("Export data missing from current queue [" + gap.getFirst() + ", " + gap.getSecond() +
-                                        "] from " + this.toString() + ". Searching other sites for missing data.");
-                                m_seqNoToDrain = firstUnpolledSeq - 1;
-                                mastershipCheckpoint(firstUnpolledSeq - 1);
-                            }
-                            break;
+                        assert (result == ContinuityCheckResult.GAP);
+                        final AckingContainer ackingContainer = AckingContainer.create(
+                                this, block, m_committedBuffers, pollTask.forcePollSchema());
+                        try {
+                            pollTask.setFuture(null);
+                        } catch (RejectedExecutionException reex) {
                         }
+                        // Put the poll aside until the gap is resolved
+                        m_pollTask = pollTask;
+                        startMastershipMigration(nextSeqNo, ackingContainer);
+                        return;
                     }
                 }
             } catch (RuntimeException e) {
@@ -1158,12 +1228,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } else {
                     schemaContainer = first_unpolled_block.getSchemaContainer();
                 }
-                final AckingContainer ackingContainer =
-                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                schemaContainer,
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
-                                first_unpolled_block.committedSequenceNumber(),
-                                m_migrateRowsDeleter);
+                final AckingContainer ackingContainer = AckingContainer.create(
+                        this, first_unpolled_block, m_committedBuffers, pollTask.forcePollSchema());
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Posting Export data for " + ackingContainer.toString());
                 }
@@ -1178,7 +1244,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     setPendingContainer(ackingContainer);
                 }
-                m_pollTask = null;
             }
         } catch (Throwable t) {
             try {
@@ -1187,128 +1252,48 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public class AckingContainer extends BBContainer {
-        final long m_lastSeqNo;
-        final long m_commitSeqNo;
-        final BBContainer m_backingCont;
-        BBContainer m_schemaCont;
-        long m_startTime = 0;
-        long m_commitSpHandle = 0;
-        final MigrateRowsDeleter m_migrateRowsDeleter;
+    /**
+     * Calling this method will advance the export stream to {@code lastSeqNo}, release underlying
+     * PBD file if needed, and also forwarding the ACK message to replica(s) of the export stream.
+     *
+     * @param lastSeqNo the export sequence number advances to
+     * @param commitSeqNo the committed export sequence number
+     * @param commitSpHandle the committed SpHandle
+     * @param startTime the time of when the buffer is delivered to export client
+     * @throws RejectedExecutionException - if the stream's task executor cannot accept the task
+     */
+    public void advance(long lastSeqNo, long commitSeqNo, long commitSpHandle, long startTime) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (exportLog.isTraceEnabled()) {
+                    exportLog.trace("AckingContainer.discard with sequence number: " + lastSeqNo);
+                }
+                assert(startTime != 0);
+                long elapsedMS = System.currentTimeMillis() - startTime;
+                m_blocksSentSinceClear += 1;
+                m_totalLatencySinceClearInMS += elapsedMS;
+                m_averageLatency = m_totalLatencySinceClearInMS / m_blocksSentSinceClear;
+                if (m_averageLatency > m_maxLatency) {
+                    m_maxLatency = m_averageLatency;
+                }
 
-        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq,
-                MigrateRowsDeleter migrateRowsDeleter) {
-            super(cont.b());
-            m_lastSeqNo = seq;
-            m_commitSeqNo = commitSeq;
-            m_backingCont = cont;
-            m_schemaCont = schemaCont;
-            m_migrateRowsDeleter = migrateRowsDeleter;
-        }
-
-        public void updateStartTime(long startTime) {
-            m_startTime = startTime;
-        }
-
-        // Synchronized because schema is settable
-        public synchronized ByteBuffer schema() {
-            if (m_schemaCont == null) {
-                return null;
-            }
-            return m_schemaCont.b();
-        }
-
-        public synchronized void setSchema(BBContainer schemaCont) {
-            if (m_schemaCont != null) {
-                throw new IllegalStateException("Overwriting schema");
-            }
-            m_schemaCont = schemaCont;
-        }
-
-        public long getCommittedSeqNo() {
-            return m_commitSeqNo;
-        }
-
-        public void setCommittedSpHandle(long spHandle) {
-            m_commitSpHandle = spHandle;
-        }
-
-        // Package private
-        long getLastSeqNo() {
-            return m_lastSeqNo;
-        }
-
-        // Package private
-        void internalDiscard() {
-            checkDoubleFree();
-            m_backingCont.discard();
-            synchronized(this) {
-                if (m_schemaCont != null) {
-                    m_schemaCont.discard();
+                try {
+                    if (!m_es.isShutdown()) {
+                        setCommittedSeqNo(commitSeqNo);
+                        ackImpl(lastSeqNo);
+                    }
+                    forwardAckToOtherReplicas();
+                    if (m_migrateRowsDeleter != null && m_mastershipAccepted.get()) {
+                        m_migrateRowsDeleter.delete(commitSpHandle);
+                    }
+                } catch (Exception e) {
+                    exportLog.error("Error acking export buffer", e);
+                } catch (Error e) {
+                    VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
                 }
             }
-        }
-
-        @Override
-        public void discard() {
-            checkDoubleFree();
-            try {
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (exportLog.isTraceEnabled()) {
-                            exportLog.trace("AckingContainer.discard with sequence number: " + m_lastSeqNo);
-                        }
-                        assert(m_startTime != 0);
-                        long elapsedMS = System.currentTimeMillis() - m_startTime;
-                        m_blocksSentSinceClear += 1;
-                        m_totalLatencySinceClearInMS += elapsedMS;
-                        m_averageLatency = m_totalLatencySinceClearInMS / m_blocksSentSinceClear;
-                        if (m_averageLatency > m_maxLatency) {
-                            m_maxLatency = m_averageLatency;
-                        }
-
-                        try {
-                             m_backingCont.discard();
-                             synchronized(this) {
-                                 if (m_schemaCont != null) {
-                                     m_schemaCont.discard();
-                                 }
-                             }
-                            try {
-                                if (!m_es.isShutdown()) {
-                                    setCommittedSeqNo(m_commitSeqNo);
-                                    ackImpl(m_lastSeqNo);
-                                }
-                            } finally {
-                                forwardAckToOtherReplicas();
-                            }
-                            if (m_migrateRowsDeleter != null && m_mastershipAccepted.get()) {
-                                m_migrateRowsDeleter.delete(m_commitSpHandle);
-                            }
-                        } catch (Exception e) {
-                            exportLog.error("Error acking export buffer", e);
-                        } catch (Error e) {
-                            VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
-                        }
-                    }
-                });
-            } catch (RejectedExecutionException rej) {
-                  //Don't expect this to happen outside of test, but in test it's harmless
-                  exportLog.info("Acking export data task rejected, this should be harmless");
-                  m_backingCont.discard();
-                  synchronized(this) {
-                      if (m_schemaCont != null) {
-                          m_schemaCont.discard();
-                      }
-                  }
-            }
-        }
-
-        @Override
-        public String toString() {
-            return new String("Container: ending at " + m_lastSeqNo + " (Committed " + m_commitSeqNo + ")");
-        }
+        });
     }
 
     public void forwardAckToOtherReplicas() {
@@ -1609,9 +1594,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void unacceptMastershipInternal() {
 
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug(toString() + " is no longer the export stream master.");
-        }
+        exportLog.info("Releasing mastership for " + this);
         m_mastershipAccepted.set(false);
         try {
         if (m_pollTask != null) {
@@ -1659,9 +1642,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 try {
                     if (!m_es.isShutdown() || !m_closed) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
-                        }
+                        exportLog.info("Accepting mastership for " + this);
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
@@ -1669,10 +1650,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // running when we get there.
                             // FIXME: must remove info messages
                             if (m_pollTask != null) {
-                                exportLog.info("New master satisfies pending poll");
+                                exportLog.info("New master executes pending poll");
                                 pollImpl(m_pollTask);
                             } else {
-                                exportLog.info("New master satisfies runs decoder");
+                                exportLog.info("New master runs decoder");
                                 m_onMastership.run();
                             }
                         }
@@ -1789,13 +1770,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     void takeMastership() {
-        // Skip current master or in run everywhere mode
-        if (m_mastershipAccepted.get() || m_runEveryWhere) {
-            return;
-        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
+                // Skip current master or in run everywhere mode
                 if (m_mastershipAccepted.get() || m_runEveryWhere) {
                     return;
                 }
@@ -1884,7 +1862,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         } else {
                             // time to give up master and give it to the best candidate
                             m_newLeaderHostId = CoreUtils.getHostIdFromHSId(bestCandidate.getKey());
-                            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString() + " on host " + m_newLeaderHostId);
+                            exportLog.info("Host " + m_newLeaderHostId + " has the missing export data for " + ExportDataSource.this.toString());
                             // drainedTo sequence number should haven't been changed.
                             mastershipCheckpoint(m_lastReleasedSeqNo);
                         }
@@ -2070,7 +2048,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void setCommittedSeqNo(long committedSeqNo) {
-        if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
+        if (committedSeqNo == NULL_COMMITTED_SEQNO) {
+            return;
+        }
         if (committedSeqNo > m_committedSeqNo) {
             m_committedSeqNo  = committedSeqNo;
         }
