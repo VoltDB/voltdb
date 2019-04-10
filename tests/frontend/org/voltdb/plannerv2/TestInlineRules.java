@@ -365,9 +365,15 @@ public class TestInlineRules extends Plannerv2TestCase {
                 .pass();
     }
 
-//    public void testENG15802() {
-//        m_tester.sql("select count(i) from (select max(i) from r1 ) as subquery, r1")
-//                .transform("")
-//                .pass();
-//    }
+    public void testENG15802() {
+        m_tester.sql("select count(i) from (select max(i) from r1 ) as subquery, r1")
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], split=[1], coordinator=[false], type=[serial])\n" +
+                        "  VoltPhysicalCalc(expr#0..6=[{inputs}], I=[$t1], split=[1])\n" +
+                        "    VoltPhysicalJoin(condition=[true], joinType=[inner], split=[1])\n" +
+                        "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], " +
+                        "aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex,group={},EXPR$0=MAX($0)," +
+                        "split=1,coordinator=false,type=serial)_split_1_coordinator_false])\n" +
+                        "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                .pass();
+    }
 }

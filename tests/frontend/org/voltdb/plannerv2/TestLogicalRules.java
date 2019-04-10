@@ -337,7 +337,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
         m_tester.sql("select count(*) from R1")
                 .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[COUNT()])\n" +
-                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], DUMMY=[$t6])\n" +
+                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[0], $f0=[$t6])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 

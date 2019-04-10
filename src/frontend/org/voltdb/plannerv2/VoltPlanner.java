@@ -27,6 +27,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -262,11 +263,24 @@ public class VoltPlanner implements Planner {
 
         m_relRoot = m_relRoot.withRel(RelDecorrelator.decorrelateQuery(m_relRoot.rel, m_relBuilder));
 
-        // For each node, projects only the fields required by its consumer
-        m_relRoot = m_relRoot.withRel(m_sqlToRelConverter.trimUnusedFields(true, m_relRoot.rel));
+        // For each non-aggregate node (i.e. node with no (recursive) input being an aggregate node),
+        // projects only the fields required by its consumer
+        if (! hasAggregate(m_relRoot.rel)) {
+            m_relRoot = m_relRoot.withRel(m_sqlToRelConverter.trimUnusedFields(true, m_relRoot.rel));
+        }
 
         m_state = State.STATE_3_CONVERTED;
         return m_relRoot;
+    }
+
+    private static boolean hasAggregate(RelNode node) {
+        if (node instanceof Aggregate) {
+            return true;
+        } else if (node.getInputs().isEmpty()) {
+            return false;
+        } else {
+            return node.getInputs().stream().anyMatch(VoltPlanner::hasAggregate);
+        }
     }
 
     @Override public RelNode convert(SqlNode sql) throws RelConversionException {

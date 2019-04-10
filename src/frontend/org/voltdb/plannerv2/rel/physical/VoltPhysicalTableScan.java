@@ -130,10 +130,10 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             dg += "_program_" + m_program.toString();
         }
         if (m_limit != null) {
-            dg += "_limit_" + Integer.toString(getLimit());
+            dg += "_limit_" + getLimit();
         }
         if (m_offset != null) {
-            dg += "_offset_" + Integer.toString(getOffset());
+            dg += "_offset_" + getOffset();
         }
         if (m_aggregate != null) {
             dg += "_aggr_" + m_aggregate.getDigest();
