@@ -117,6 +117,13 @@ java_opts.append('-XX:+CMSClassUnloadingEnabled')
 if "1.7" in java_version:
     java_opts.append('-XX:PermSize=64m')
 
+# Suppress Illegal reflective access warning
+if "11." in java_version:
+    java_opts.extend(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.net=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.nio=ALL-UNNAMED'])
+
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
     Set the VOLTDB_LIB and VOLTDB_VOLTDB environment variables based on the
