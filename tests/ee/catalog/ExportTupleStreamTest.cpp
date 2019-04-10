@@ -88,7 +88,7 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
     initParamsBuffer();
     voltdb::ReferenceSerializeInputBE params(m_parameter_buffer.get(), m_smallBufferSize);
     // The insert statement does not have any query parameters.
-    boost::scoped_ptr<fragmentId_t> scopedPlanfragmentIds(new fragmentId_t[4]);
+    boost::scoped_array<fragmentId_t> scopedPlanfragmentIds(new fragmentId_t[4]);
     fragmentId_t* planfragmentIds = scopedPlanfragmentIds.get();
     for (int i = 0; i < 4; i++) {
         planfragmentIds[i] = insertPlanId;
