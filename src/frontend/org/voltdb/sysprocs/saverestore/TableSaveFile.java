@@ -74,10 +74,12 @@ public class TableSaveFile
         @Override
         public void discard() {
             checkDoubleFree();
-            if (m_hasMoreChunks.get() == false) {
-                m_origin.discard();
-            } else {
-                m_buffers.add(m_origin);
+            synchronized (TableSaveFile.this) {
+                if (m_hasMoreChunks.get() == false) {
+                    m_origin.discard();
+                } else {
+                    m_buffers.add(m_origin);
+                }
             }
         }
 
