@@ -1025,21 +1025,16 @@ public class ExportGeneration implements Generation {
         cleanup();
     }
 
+    /**
+     * Signal all EDS to drop mastership. This is done asynchronously.
+     */
     public void unacceptMastership() {
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : partitionDataSourceMap.values()) {
-                    tasks.add(source.unacceptMastership());
+                    source.unacceptMastership();
                 }
             }
-        }
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            //Logging of errors  is done inside the tasks so nothing to do here
-            //FIXME: intentionally not failing?
-            exportLog.error("Error removing mastership from export data sources", e);
         }
     }
 
