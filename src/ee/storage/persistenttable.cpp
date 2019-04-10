@@ -2491,6 +2491,7 @@ int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxR
                 deletedRows += batch.size();
                 BOOST_FOREACH (auto toDelete, batch) {
                     targetTuple.move(toDelete);
+                    assert(ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())) == currIt->first);
                     deleteTuple(targetTuple, true, false);
                 }
                 currIt = m_migratingRows.erase(currIt);
