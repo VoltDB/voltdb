@@ -906,7 +906,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Export mastership should have been released: force it.
         m_mastershipAccepted.set(false);
 
-
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -1083,6 +1082,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 setPendingContainer(cont);
             }
+            // Clear the pending poll, if any
+            m_pollTask = null;
             polled = true;
         } else if (result == ContinuityCheckResult.ACKED) {
             if (exportLog.isDebugEnabled()) {
@@ -1147,7 +1148,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // Poll pending container before polling m_committedBuffers
             if (m_pendingContainer.get() != null) {
                 if (pollPendingContainer(pollTask)) {
-                    m_pollTask = null;
                     return;
                 }
             }
