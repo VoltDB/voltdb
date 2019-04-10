@@ -1020,9 +1020,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     } catch (Error e) {
                         VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
-                    catch (Throwable t) {
-                        exportLog.error("Throwable polling export buffer", t);
-                    }
                 }
             });
         } catch (RejectedExecutionException rej) {
