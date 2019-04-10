@@ -82,9 +82,6 @@
         <level value="TRACE"/>
     </logger> -->
 
-    <!--logger config for calcite-->
-    &calcite_logger;
-
     <root>
         <priority value="info" />
         <appender-ref ref="file" />

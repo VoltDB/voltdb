@@ -30,35 +30,34 @@ import static org.voltdb.regressionsuites.RegressionSuite.assertContentOfTable;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
     private final static boolean m_debug = false;
-    public static final boolean retry_on_mismatch = true;
 
     @AfterClass
     public static void tearDownClass()
@@ -66,7 +65,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         try {
             VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         }
-        catch (IOException e) {};
+        catch (IOException e) {}
     }
 
     @Test
@@ -1011,6 +1010,48 @@ public class TestAdHocQueries extends AdHocQueryTester {
             env.tearDown();
         }
     }
+    @Test
+    public void testENG15719PartialIndex() throws Exception {
+        testENG15719PartialIndex(false);
+        testENG15719PartialIndex(true);
+    }
+
+    private void testENG15719PartialIndex(boolean partitioned) throws Exception {
+        final TestEnv env = new TestEnv("CREATE TABLE foo(i int not null, j int);\n" +
+                (partitioned ? "partition table foo on column i;\n" : "") +
+                "create index partial_index on foo(i) where abs(i) > 0;\n",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            final Batcher batcher = new Batcher(env);
+            final int nrep = 3; // how many repetitions each tuple gets inserted
+            IntStream.range(0, 5).forEach(n -> batcher.add(nrep,
+                    String.format("INSERT INTO foo VALUES(%d, %d);\n", n, n + 1), 1));
+            batcher.run();
+            Stream.of(Pair.of("true", IntStream.of(nrep * 5, 5, 0, 4, nrep * 10)),
+                    Pair.of("abs(i) > 0", IntStream.of(nrep * 4, 4, 1, 4, nrep * 10)),
+                    Pair.of("abs(i) > 0 AND j > 3", IntStream.of(nrep * 2, 2, 3, 4, nrep * 7)))
+                    .forEach(pair -> {
+                        final List<String> sqls = Stream.of("COUNT(*)", "COUNT (distinct i)", "MIN(i)", "MAX(i)", "SUM(i)")
+                                .map(aggregate -> String.format("SELECT %s FROM foo WHERE %s;", aggregate, pair.getFirst()))
+                                .collect(Collectors.toList());
+                        final List<Integer> expected = pair.getSecond().boxed().collect(Collectors.toList());
+                        assertEquals("Query number/result count mismatch", sqls.size(), expected.size());
+                        for(int index = 0; index < sqls.size(); ++index) {
+                            final String sql = sqls.get(index);
+                            final int expectedResult = expected.get(index);
+                            try {
+                                assertContentOfTable(new Object[][]{{expectedResult}},
+                                        env.m_client.callProcedure("@AdHoc", sql).getResults()[0]);
+                            } catch (Exception e) {
+                                fail(String.format("Query %s have worked fine", sql));
+                            }
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
 
     /**
      * Builds and validates query batch runs.
@@ -1028,6 +1069,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_queries.add(query);
             if (expectedCount != null) {
                 m_expectedCounts.add(expectedCount);
+            }
+        }
+
+        void add(int nrep, String query, Integer expectedCount) {
+            for(int index = 0; index < nrep; ++index) {
+                add(query, expectedCount);
             }
         }
 
@@ -1087,15 +1134,14 @@ public class TestAdHocQueries extends AdHocQueryTester {
     /**
      * Test environment with configured schema and server.
      */
-    public static class TestEnv {
-
-        final VoltProjectBuilder m_builder;
-        LocalCluster m_cluster;
-        Client m_client = null;
-
+    public static class TestEnv extends RegressionSuite.RegresssionEnv {
+        TestEnv(String ddl, String pathToCatalog, String pathToDeployment,
+                int siteCount, int hostCount, int kFactor) {
+            super(ddl, pathToCatalog, pathToDeployment, siteCount, hostCount,kFactor, m_debug);
+        }
         TestEnv(String pathToCatalog, String pathToDeployment,
                 int siteCount, int hostCount, int kFactor) {
-            this("create table BLAH (" +
+            super("create table BLAH (" +
                             "IVAL bigint default 0 not null, " +
                             "TVAL timestamp default null," +
                             "DVAL decimal default null," +
@@ -1172,93 +1218,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                             "  (TS TIMESTAMP UNIQUE NOT NULL,\n" +
                             "   COL1 VARCHAR(2048)); \n" +
                             "",
-                    pathToCatalog, pathToDeployment, siteCount, hostCount, kFactor);
-        }
-
-        TestEnv(String ddlText, String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
-
-            m_builder = new VoltProjectBuilder();
-            //Increase query tmeout as long literal queries taking long time.
-            m_builder.setQueryTimeout(60000);
-            try {
-                m_builder.addLiteralSchema(ddlText);
-
-                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
-                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                fail("Failed to set up schema");
-            }
-
-            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
-                                         BackendTarget.NATIVE_EE_JNI,
-                                         LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug);
-            m_cluster.setHasLocalServer(true);
-            boolean success = m_cluster.compile(m_builder);
-            assert(success);
-
-            try {
-                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
-            }
-            catch (Exception e) {
-                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
-            }
-        }
-
-        void setUp() {
-            m_cluster.startUp();
-
-            try {
-                // do the test
-                m_client = ClientFactory.createClient();
-                m_client.createConnection("localhost", m_cluster.port(0));
-            }
-            catch (UnknownHostException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-        }
-
-        void tearDown() {
-            if (m_client != null) {
-                try {
-                    m_client.close();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to close client");
-                }
-            }
-            m_client = null;
-
-            if (m_cluster != null) {
-                try {
-                    m_cluster.shutDown();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to shut down cluster");
-                }
-            }
-            m_cluster = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
-
-        boolean isValgrind() {
-            if (m_cluster != null)
-                return m_cluster.isValgrind();
-            return true;
-        }
-
-        boolean isMemcheckDefined() {
-            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
+                    pathToCatalog, pathToDeployment, siteCount, hostCount, kFactor, m_debug);
         }
     }
 

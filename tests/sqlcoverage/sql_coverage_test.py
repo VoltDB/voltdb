@@ -234,9 +234,10 @@ def get_max_mismatches(comparison_database, suite_name):
     # (or the PostGIS extension of PostgreSQL)
     if comparison_database.startswith('Post'):
         # Known failures in the joined-matview-* test suites ...
-        # Failures in joined-matview-default-full due to ENG-11086
+        # Failures in joined-matview-default-full due to ENG-11086 ("SUM in
+        # materialized view reported as zero for column with only nulls")
         if config_name == 'joined-matview-default-full':
-            max_mismatches = 3390
+            max_mismatches = 4390
         # Failures in joined-matview-int due to ENG-11086
         elif config_name == 'joined-matview-int':
             max_mismatches = 46440

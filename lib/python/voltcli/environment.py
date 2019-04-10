@@ -122,6 +122,13 @@ java_opts.append('-XX:+CMSClassUnloadingEnabled')
 if "1.7" in java_version:
     java_opts.append('-XX:PermSize=64m')
 
+# Suppress Illegal reflective access warning
+if "11." in java_version:
+    java_opts.extend(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.net=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/java.nio=ALL-UNNAMED'])
+
 def _is_tmpfs(path):
     '''
     Test if path is on a tmpfs filesystem

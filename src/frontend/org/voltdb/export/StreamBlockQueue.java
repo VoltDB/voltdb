@@ -45,19 +45,26 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    -- Segment Header ---
- *    crc(8) + numberOfEntries(4) + totalBytes(4)
- *    -- Export Segment Header ---
+ *    (defined in PBDSegment.java, see comments for segment header layout)
+ *
+ *    -- Export Extra Segment Header ---
  *    exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length) +
- *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) +
+ *    colType(1) + colLength(4) + ...
+ *
  *    --- Common Entry Header   ---
- *    crc(8) + length(4) + flags(4)
+ *   (defined in PBDSegment.java, see comments for entry header layout)
+ *
  *    --- Export Entry Header   ---
- *    seqNo(8) + tupleCount(4) + uniqueId(8)
+ *    seqNo(8) + committedSeqNo(8) + tupleCount(4) + uniqueId(8)
+ *
  *    --- Row Header      ---
  *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
  *    nullArrayLength(4) + nullArray(var length)
+ *
  *    --- Metadata        ---
  *    TxnId(8) + timestamp(8) + seqNo(8) + partitionId(8) + siteId(8) + exportOperation(1)
+ *
  *    --- Row Data        ---
  *    rowData(var length)
  *
@@ -92,7 +99,7 @@ public class StreamBlockQueue {
         m_streamName = streamName;
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 VoltDB.instance().getCatalogContext(), m_streamName);
-        m_persistentDeque = new PersistentBinaryDeque( nonce, ds, new VoltFile(path), exportLog);
+        m_persistentDeque = new PersistentBinaryDeque(nonce, ds, new VoltFile(path), exportLog, !DISABLE_COMPRESSION);
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
@@ -125,12 +132,15 @@ public class StreamBlockQueue {
             if (m_reader.isStartOfSegment()) {
                 schemaCont = m_reader.getExtraHeader(-1);
             }
-            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, false);
+            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error("Failed to poll from persistent binary deque:" + e);
         }
 
         if (cont == null) {
+            if (schemaCont != null) {
+                schemaCont.discard();
+            }
             return null;
         } else {
             long segmentIndex = m_reader.getSegmentIndex();
@@ -138,13 +148,16 @@ public class StreamBlockQueue {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long seqNo = cont.b().getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
+            long committedSeqNo = cont.b().getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
             int tupleCount = cont.b().getInt(StreamBlock.ROW_NUMBER_OFFSET);
             long uniqueId = cont.b().getLong(StreamBlock.UNIQUE_ID_OFFSET);
+
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 schemaCont,
                 seqNo,
+                committedSeqNo,
                 tupleCount,
                 uniqueId,
                 segmentIndex,
@@ -272,7 +285,7 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
+        m_persistentDeque.offer(streamBlock.asBBContainer());
         long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
@@ -337,6 +350,7 @@ public class StreamBlockQueue {
                     if (startSequenceNumber > truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
+                    final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
                     final int tupleCountPos = b.position();
                     final int tupleCount = b.getInt();
                     // There is nothing to do with this buffer
@@ -377,7 +391,8 @@ public class StreamBlockQueue {
         m_persistentDeque.close();
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 VoltDB.instance().getCatalogContext(), m_streamName);
-        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog);
+        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog,
+                !DISABLE_COMPRESSION);
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
@@ -385,22 +400,22 @@ public class StreamBlockQueue {
 
     public ExportSequenceNumberTracker scanForGap() throws IOException {
         assert(m_memoryDeque.isEmpty());
-        return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
-
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+        m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
-            public ExportSequenceNumberTracker scan(BBContainer bbc) {
+            public void scan(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
+                final long committedSequenceNumber = b.getLong();
                 final int tupleCount = b.getInt();
                 b.order(endianness);
-                ExportSequenceNumberTracker gapTracker = new ExportSequenceNumberTracker();
-                gapTracker.append(startSequenceNumber, startSequenceNumber + tupleCount - 1);
-                return gapTracker;
+                tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
             }
 
         });
+        return tracker;
     }
 
     @Override

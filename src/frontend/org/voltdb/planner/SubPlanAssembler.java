@@ -17,11 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import com.google_voltpatches.common.base.Preconditions;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
@@ -1645,6 +1641,14 @@ public abstract class SubPlanAssembler {
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        if (! path.index.getPredicatejson().isEmpty()) {
+            try {
+                scanNode.setPartialIndexPredicate(
+                        AbstractExpression.fromJSONString(path.index.getPredicatejson(), tableScan));
+            } catch (JSONException e) {
+                throw new PlanningErrorException(e.getMessage(), 0);
+            }
+        }
         scanNode.setPredicate(path.otherExprs);
         // Propagate the sorting information
         // into the scan node from the access path.
@@ -1653,7 +1657,7 @@ public abstract class SubPlanAssembler {
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
-        final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
+        final IndexUseForOrderBy indexUse = scanNode.indexUse();
         indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
         indexUse.setSortOrderFromIndexScan(path.sortDirection);
         indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);

@@ -242,7 +242,7 @@ public final class InvocationDispatcher {
         m_NTProcedureService.update(m_catalogContext.get());
     }
 
-    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+    public LightweightNTClientResponseAdapter getInternelAdapterNT () {
         return m_NTProcedureService.m_internalNTClientAdapter;
     }
 
@@ -485,7 +485,8 @@ public final class InvocationDispatcher {
             // admin port, otherwise return a failure
             if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
-                 || "@PrepareShutdown".equals(procName))
+                 || "@PrepareShutdown".equals(procName)
+                 || "@CancelShutdown".equals(procName))
             {
                 if (handler.isAdmin() == false) {
                     return unexpectedFailureResponse(

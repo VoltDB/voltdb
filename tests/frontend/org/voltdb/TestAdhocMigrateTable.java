@@ -34,6 +34,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.utils.MiscUtils;
 
 import java.io.IOException;

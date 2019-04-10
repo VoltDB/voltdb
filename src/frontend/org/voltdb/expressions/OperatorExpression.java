@@ -19,6 +19,7 @@ package org.voltdb.expressions;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 

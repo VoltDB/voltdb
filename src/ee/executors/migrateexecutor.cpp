@@ -43,41 +43,133 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cassert>
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
 #include "migrateexecutor.h"
 
 #include "common/ExecuteWithMpMemory.h"
-
+#include "plannodes/updatenode.h"
+#include "plannodes/projectionnode.h"
+#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
 #include "storage/tableutil.h"
+#include "storage/ConstraintFailureException.h"
+
 
 namespace voltdb {
+int64_t MigrateExecutor::s_modifiedTuples;
 
-bool MigrateExecutor::p_init(AbstractPlanNode *abstract_node, const ExecutorVector& executorVector) {
+bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
+                            const ExecutorVector& executorVector)
+{
     VOLT_TRACE("init Migrate Executor");
 
     m_node = dynamic_cast<MigratePlanNode*>(abstract_node);
     assert(m_node);
+    assert(m_node->getInputTableCount() == 1);
+    // input table should be temptable
+    m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable());
+    assert(m_inputTable);
+
+    // target table should be persistenttable
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
 
     setDMLCountOutputTable(executorVector.limits());
 
-    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
-    m_replicatedTableOperation = targetTable->isReplicatedTable();
+    AbstractPlanNode *child = m_node->getChildren()[0];
+    if (NULL == child) {
+        VOLT_ERROR("Attempted to initialize migrate executor with NULL child");
+        return false;
+    }
 
-    assert(m_node->getInputTableCount() == 1);
+    m_inputTuple = TableTuple(m_inputTable->schema());
+
+    // for target table related info.
+    m_partitionColumn = targetTable->partitionColumn();
+
+    // for shared replicated table special handling
+    m_replicatedTableOperation = targetTable->isReplicatedTable();
     return true;
 }
 
 bool MigrateExecutor::p_execute(const NValueArray &params) {
-   // target table should be persistenttable
-   // Note that the target table pointer in the node's tcd can change between p_init and p_execute
-#ifndef NDEBUG
-   PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-   assert(targetTable);
-#endif
-   //m_engine->addToTuplesModified(s_modifiedTuples);
-   return true;
+    assert(m_inputTable);
+
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
+
+    TableTuple targetTuple = TableTuple(targetTable->schema());
+
+    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
+    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
+
+    int64_t migrated_tuples = 0;
+
+    {
+        assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            std::vector<TableIndex*> indexesToUpdate;
+            const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
+
+            // Only care about the indexes associated with the hidden column for migrate
+            BOOST_FOREACH(TableIndex *index, allIndexes) {
+                if (index->isMigratingIndex()) {
+                    indexesToUpdate.push_back(index);
+                    VOLT_DEBUG("MigrateExecutor: updating migrating index.");
+                }
+            }
+
+            assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+            assert(targetTuple.columnCount() == targetTable->columnCount());
+            TableIterator input_iterator = m_inputTable->iterator();
+            while (input_iterator.next(m_inputTuple)) {
+                // The first column in the input table will be the address of a
+                // tuple to update in the target table.
+                void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+                targetTuple.move(target_address);
+
+                assert(targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull());
+                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                                                                indexesToUpdate, true, false, true);
+                migrated_tuples++;
+            }
+            if (m_replicatedTableOperation) {
+                s_modifiedTuples = migrated_tuples;
+            }
+        }
+        else {
+            if (s_modifiedTuples == -1) {
+                // An exception was thrown on the lowest site thread and we need to throw here as well so
+                // all threads are in the same state
+                char msg[1024];
+                snprintf(msg, 1024, "Replicated table update threw an unknown exception on other thread for table %s",
+                        targetTable->name().c_str());
+                VOLT_DEBUG("%s", msg);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+            }
+        }
+    }
+    if (m_replicatedTableOperation) {
+        // Use the static value assigned above to propagate the result to the other engines
+        // that skipped the replicated table work
+        migrated_tuples = s_modifiedTuples;
+    }
+    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(migrated_tuples));
+    // try to put the tuple into the output table
+    m_node->getOutputTable()->insertTuple(count_tuple);
+
+    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug("").c_str());
+    // add to the planfragments count of modified tuples
+    m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
+
+    return true;
 }
 
 } // end namespace voltdb
-

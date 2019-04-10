@@ -334,6 +334,7 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
 
                 if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
+                    assert(TableType.isPersistentMigrate(catalog_tbl.getTabletype()));
                     table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
                 }
             }
@@ -592,7 +593,7 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table),
+                        toSchema(sb, table, null, TableType.isStream(table.getTabletype()),
                                 (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL

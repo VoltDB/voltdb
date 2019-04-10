@@ -151,21 +151,25 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             std::vector<TableIndex*> indexesToUpdate;
             const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
             BOOST_FOREACH(TableIndex *index, allIndexes) {
-                bool indexKeyUpdated = false;
-                BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
-                    std::pair<int, int> updateColInfo; // needs to be here because of macro failure
-                    BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
-                        if (updateColInfo.second == colIndex) {
-                            indexKeyUpdated = true;
+                if (index->isMigratingIndex()) {
+                    indexesToUpdate.push_back(index);
+                } else {
+                    bool indexKeyUpdated = false;
+                    BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
+                        std::pair<int, int> updateColInfo; // needs to be here because of macro failure
+                        BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
+                           if (updateColInfo.second == colIndex) {
+                               indexKeyUpdated = true;
+                               break;
+                           }
+                        }
+                        if (indexKeyUpdated) {
                             break;
                         }
                     }
                     if (indexKeyUpdated) {
-                        break;
+                        indexesToUpdate.push_back(index);
                     }
-                }
-                if (indexKeyUpdated) {
-                    indexesToUpdate.push_back(index);
                 }
             }
 

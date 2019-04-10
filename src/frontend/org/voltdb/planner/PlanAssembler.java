@@ -17,16 +17,10 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableSet;
-import java.util.Set;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableType;
 import org.voltdb.VoltType;
@@ -170,9 +164,8 @@ public class PlanAssembler {
      * Return true if tableList includes at least one matview.
      */
     private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
+            if (table.getMaterializer() != null && !TableType.isStream(table.getMaterializer().getTabletype())) {
                 return true;
             }
         }
@@ -1142,8 +1135,7 @@ public class PlanAssembler {
                         root = handleMVBasedMultiPartQuery(reAggNode, root, mvFixInfoEdgeCaseOuterJoin);
                     }
                 }
-            }
-            else {
+            } else {
                 if (receivers.size() > 0) {
                     throw new PlanningErrorException(
                             "This special case join between an outer replicated table and " +
@@ -1175,8 +1167,7 @@ public class PlanAssembler {
                     mvFixNeedsProjection = true;
                 }
             }
-        }
-        else {
+        } else {
             /*
              * There is no receive node and root is a single partition plan.
              */
@@ -2583,15 +2574,45 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Check if the index for the scan node is a partial index, and if so, make sure that the
+     * scan contains index predicate, and update index reason as needed for @Explain.
+     * @param scan index scan plan node
+     */
+    private static void updatePartialIndex(IndexScanPlanNode scan) {
+        if (scan.getPredicate() == null && scan.getPartialIndexPredicate() != null) {
+            if (scan.isForSortOrderOnly()) {
+                scan.setPredicate(Collections.singletonList(scan.getPartialIndexPredicate()));
+            }
+            scan.setForPartialIndexOnly();
+        }
+    }
+
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
+        // ENG-15719: with partial index scan, add top node
+        if (root instanceof IndexScanPlanNode) {
+            updatePartialIndex((IndexScanPlanNode) root);
+        } else if (root instanceof ReceivePlanNode) {
+            assert root.getChildCount() > 0;
+            for(int c1 = 0; c1 < root.getChildCount(); ++c1) {
+                assert root.getChild(c1) instanceof SendPlanNode;
+                final SendPlanNode child1 = (SendPlanNode) root.getChild(c1);
+                for (int c2 = 0; c2 < child1.getChildCount(); ++c2) {
+                    final AbstractPlanNode child2 = child1.getChild(c2);
+                    if (child2 instanceof IndexScanPlanNode) {
+                        updatePartialIndex((IndexScanPlanNode) child2);
+                    }
+                }
+            }
+        }
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
-            AggregatePlanNode aggNode = null;
+            AggregatePlanNode aggNode;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
@@ -2604,8 +2625,7 @@ public class PlanAssembler {
                     gbInfo.m_multiPartition = true;
                     switchToIndexScanForGroupBy(candidate, gbInfo);
                 }
-            }
-            else if (switchToIndexScanForGroupBy(root, gbInfo)) {
+            } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
@@ -2615,34 +2635,26 @@ public class PlanAssembler {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
                     aggNode = new HashAggregatePlanNode();
-                }
-                else {
+                } else {
                     if (gbInfo.isChangedToSerialAggregate()) {
                         assert(root instanceof ReceivePlanNode);
                         aggNode = new AggregatePlanNode();
-                    }
-                    else if (gbInfo.isChangedToPartialAggregate()) {
+                    } else if (gbInfo.isChangedToPartialAggregate()) {
                         aggNode = new PartialAggregatePlanNode(gbInfo.m_coveredGroupByColumns);
-                    }
-                    else {
+                    } else {
                         aggNode = new HashAggregatePlanNode();
                     }
-
                     topAggNode = new HashAggregatePlanNode();
                 }
-            }
-            else {
+            } else {
                 aggNode = new AggregatePlanNode();
-
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                if (! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
 
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
-
-
             for ( int outputColumnIndex = 0;
                     outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                     outputColumnIndex += 1) {
@@ -2682,7 +2694,6 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.m_alias,
                             tve, outputColumnIndex);
-
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
                      * push them down to each partition. It will do the
@@ -2714,8 +2725,7 @@ public class PlanAssembler {
                                     ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
                                             canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
                                 topAggNode = null;
-                            }
-                            else {
+                            } else {
                                 // for aggregate distinct when group by
                                 // partition column, the top aggregate node
                                 // will be dropped later, thus there is no
@@ -2754,8 +2764,7 @@ public class PlanAssembler {
                                     topDistinctFalse, outputColumnIndex, tve);
                         }
                     }// end if we have a top agg node
-                }
-                else {
+                } else {
                     // All complex aggregations have been simplified,
                     // cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
                     // has already been broken down.
@@ -2775,8 +2784,7 @@ public class PlanAssembler {
                     AbstractExpression topExpr = null;
                     if (col.m_groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
-                    }
-                    else {
+                    } else {
                         topExpr = col.m_expression;
                     }
                     top_schema_col = new SchemaColumn(
@@ -2800,8 +2808,7 @@ public class PlanAssembler {
             if (topAggNode != null) {
                 if (m_parsedSelect.hasComplexGroupby()) {
                     topAggNode.setOutputSchema(top_agg_schema);
-                }
-                else {
+                } else {
                     topAggNode.setOutputSchema(agg_schema);
                 }
             }

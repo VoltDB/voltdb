@@ -69,7 +69,7 @@ public class TestStreamBlockQueue extends TestCase {
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
         g_seqNo += 100;
         return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)),
-                null, g_seqNo, 1, 0L, -1, false);
+                null, g_seqNo, g_seqNo, 1, 0L, -1, false);
     }
 
     @Override

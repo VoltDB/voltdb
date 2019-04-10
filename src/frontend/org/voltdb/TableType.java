@@ -23,11 +23,12 @@ package org.voltdb;
  *            Values are serialized through JNI and IPC as integers.
  */
 public enum TableType {
-    PERSISTENT(0),              // Regular PersistentTable
-    STREAM_VIEW_ONLY(1),        // StreamTable without ExportTupleStream (Views only)
-    STREAM(2),                  // StreamTable with ExportTupleStream
-    PERSISTENT_MIGRATE(3),      // PersistentTable with associated Stream for migrating DELETES
-    PERSISTENT_EXPORT(4);       // PersistentTable with associated Stream for linking INSERTS
+    INVALID_TYPE(0),
+    PERSISTENT(1),              // Regular PersistentTable
+    STREAM_VIEW_ONLY(2),        // StreamTable without ExportTupleStream (Views only)
+    STREAM(3),                  // StreamTable with ExportTupleStream
+    PERSISTENT_MIGRATE(4),      // PersistentTable with associated Stream for migrating DELETES
+    PERSISTENT_EXPORT(5);       // PersistentTable with associated Stream for linking INSERTS
 
     final int type;
     TableType(int type) {
@@ -37,8 +38,12 @@ public enum TableType {
         return type;
     }
 
+    public static boolean isStreamViewOnly(int e) {
+        return (e == STREAM_VIEW_ONLY.get());
+    }
+
     public static boolean isStream(int e) {
-        return (e ==STREAM.get() || e == STREAM_VIEW_ONLY.get());
+        return (e == STREAM.get() || e == STREAM_VIEW_ONLY.get());
     }
 
     public static boolean isPersistentMigrate(int e) {
@@ -47,6 +52,10 @@ public enum TableType {
 
     public static boolean needsMigrateHiddenColumn(int e) {
         return (e == PERSISTENT_MIGRATE.get() || e == PERSISTENT_EXPORT.get());
+    }
+
+    public static boolean isInvalidType(int e) {
+        return e == INVALID_TYPE.type;
     }
 }
 

@@ -188,35 +188,33 @@ public class DefaultProcedureManager {
         case "insert":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudInsert(table, partitionColumn);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedInsert(table);
             }
         case "update":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudUpdate(table, partitionColumn, pkey);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedUpdate(table, pkey);
             }
         case "delete":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudDelete(table, partitionColumn, pkey);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedDelete(table, pkey);
             }
+        case "migrate":
+            return generateCrudMigrate(table, defaultProc.getSinglepartition() ? partitionColumn : null, pkey);
         case "upsert":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudUpsert(table, partitionColumn);
-            }
-            else {
+            } else {
                 return generateCrudReplicatedUpsert(table, pkey);
             }
         case "nibbledelete":
             return generateNibbleDelete(defaultProc);
         default:
-            throw new RuntimeException("Invalid input to default proc SQL generator.");
+            throw new RuntimeException("Invalid input to default proc SQL generator (" + action + ")");
         }
     }
 
@@ -320,6 +318,20 @@ public class DefaultProcedureManager {
             sb.append("?");
         }
         sb.append(")");
+    }
+
+    /**
+     * Create a statement like:
+     * "MIGRATE FROM <table> where {...}"
+     * @param table target table
+     * @param partitioncolumn partition column of a partitioned table, or null if table is replicated
+     * @param pkey primary key
+     * @return statement string
+     */
+    private static String generateCrudMigrate(Table table, Column partitioncolumn, Constraint pkey) {
+        final StringBuilder sb = new StringBuilder("MIGRATE FROM ").append(table.getTypeName());
+        generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
+        return sb.append(';').toString();
     }
 
     /**

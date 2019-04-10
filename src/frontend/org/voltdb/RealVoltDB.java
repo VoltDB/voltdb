@@ -1189,15 +1189,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                    if(determination.startAction == StartAction.JOIN && kfactor > 0) {
-                        int kfactorPlusOne = kfactor + 1;
-                        String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class,
+                            int.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger,
+                            VoltDB.instance().getVoltDBRootPath(), kfactor);
+                    if (!MiscUtils.validateLicense(getLicenseApi(),
+                            m_clusterSettings.get().hostcount() + m_joinCoordinator.getHostsJoining(),
+                            DrRoleType.fromValue(getCatalogContext().getCluster().getDrrole()),
+                            m_config.m_startAction)) {
+                        VoltDB.crashLocalVoltDB("VoltDB license constraints are not met.");
+                    }
+                    if (determination.startAction == StartAction.JOIN && m_joinCoordinator.getHostsJoining() > 1) {
+                        String waitMessage = "The join process will begin after a total of "
+                                + m_joinCoordinator.getHostsJoining() + " nodes are added, waiting...";
                         consoleLog.info(waitMessage);
                     }
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.initialize(kfactor);
+                    m_joinCoordinator.initialize();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
@@ -1307,7 +1315,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             partsToHSIdsToRejoin.values(),
                             VoltDB.instance().getVoltDBRootPath(),
                             m_config.m_startAction == StartAction.LIVE_REJOIN);
-                    m_joinCoordinator.initialize(m_configuredReplicationFactor);
+                    m_joinCoordinator.initialize();
                     m_messenger.registerMailbox(m_joinCoordinator);
                     if (m_config.m_startAction == StartAction.LIVE_REJOIN) {
                         hostLog.info("Using live rejoin.");
@@ -4268,6 +4276,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // as at this juncture the initial truncation snapshot is already complete
         ExportManager.instance().startPolling(m_catalogContext);
 
+        // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
+        ExportManager.instance().clientInterfaceStarted(m_clientInterface);
+
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
 
@@ -4498,6 +4509,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
             ExportManager.instance().startPolling(m_catalogContext);
+
+            // Notify Export Subsystem of clientInterface so it can register an adaptor for NibbleExportDelete
+            ExportManager.instance().clientInterfaceStarted(m_clientInterface);
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData();

@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -34,11 +33,11 @@ import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.TestExportBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Listens for connections from socket export and then counts expected rows.
@@ -56,9 +55,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();

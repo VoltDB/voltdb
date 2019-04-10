@@ -19,10 +19,15 @@ package org.voltdb.plannerv2.guards;
 
 import org.voltdb.exceptions.PlanningErrorException;
 
+/**
+ * An exception that Calcite planner should throw.
+ */
 public class CalcitePlanningException extends PlanningErrorException {
-
     public CalcitePlanningException(String msg) {
         super(msg);
+    }
+    public CalcitePlanningException(String msg, int ignored) {
+        super(msg, ignored);
     }
 }
 
