@@ -1706,6 +1706,15 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         }
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            shouldDRStreamRows, ignoreTupleLimit);
+
+        // from stream snapshot/rejoin, add it to migrating index
+        if (!elastic && m_shadowStream != nullptr) {
+              uint16_t migrateColumnIndex = getMigrateColumnIndex();
+              NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+              if(!txnId.isNull()){
+                  migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+              }
+           }
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
