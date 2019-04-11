@@ -27,9 +27,9 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionCommitInterest;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Stub class that provides a gateway to the DRProducer when
@@ -117,7 +117,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
         try {
             pdrg.init(partitionId, producerGateway, startAction);
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         // Regarding apparent lack of thread safety: this is called serially
