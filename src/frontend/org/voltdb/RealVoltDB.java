@@ -4664,7 +4664,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                           isLowestSiteId(iv2init));
                 }
 
-                m_producerDRGateway.truncateDRLog();
+                m_producerDRGateway.completeInitialization();
             }
         } catch (Exception ex) {
             CoreUtils.printPortsInUse(hostLog);
