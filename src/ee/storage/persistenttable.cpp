@@ -871,8 +871,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
         // from stream snapshot/rejoin, add it to migrating index
         if (m_shadowStream != nullptr) {
-            uint16_t migrateColumnIndex = getMigrateColumnIndex();
-            NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+            NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
             if(!txnId.isNull()){
                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
             }
@@ -1430,8 +1429,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
 
     // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
     if (m_shadowStream != nullptr) {
-        uint16_t migrateColumnIndex = getMigrateColumnIndex();
-        NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
