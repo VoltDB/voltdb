@@ -695,6 +695,7 @@ public class ExportGeneration implements Generation {
         adFilePartitions.add(source.getPartitionId());
         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
         source.setupMigrateRowsDeleter(migrateBatchSize);
+        processor.setupDataSource(source);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -763,7 +764,7 @@ public class ExportGeneration implements Generation {
                                     + " partition " + partition + " site " + siteId);
                         }
                         dataSourcesForPartition.put(key, exportDataSource);
-
+                        processor.setupDataSource(exportDataSource);
                     } else {
                         // Associate any existing EDS to the export client in the new processor
                         ExportDataSource eds = dataSourcesForPartition.get(key);
@@ -778,7 +779,7 @@ public class ExportGeneration implements Generation {
                             eds.setClient(null);
                             eds.setRunEveryWhere(false);
                         }
-
+                        processor.setupDataSource(eds);
                         // Mark in catalog only if partition is in use
                         eds.markInCatalog(partitionsInUse.contains(partition));
                     }

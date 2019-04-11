@@ -45,8 +45,6 @@ public interface ExportDataProcessor  {
      */
     void addLogger(VoltLogger logger);
 
-    void setExportGeneration(ExportGeneration generation);
-
     /**
      * Get export client from processor, used by initializing export data source
      * @param tableName
@@ -55,9 +53,9 @@ public interface ExportDataProcessor  {
     public ExportClientBase getExportClient(String tableName);
 
     /**
-     * Inform the processor that initialization is complete; commence work.
+     * Inform the processor that initialization of given data source is complete; commence work.
      */
-    public void readyForData();
+    public void setupDataSource(ExportDataSource source);
 
     /**
      * Allows processor to initiate polling
