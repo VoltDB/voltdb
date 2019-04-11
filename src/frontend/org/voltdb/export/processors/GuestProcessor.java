@@ -501,7 +501,8 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(false), edb);
+                    ListenableFuture<AckingContainer> nextCont = source.poll(false);
+                    addBlockListener(source, nextCont, edb);
                 }
             }
         }, edb.getExecutor());
