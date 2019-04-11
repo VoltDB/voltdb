@@ -1147,13 +1147,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return ContinuityCheckResult.ACKED;
         }
 
-        // FIXME
-        // Theoretically the gap with m_firstUnpolledSeqNo should be 1
-        // Why is it 0 for buffers that have only 1 row (startSeqNo == lastSeqNo)?
-        long gap = m_firstUnpolledSeqNo - lastSeqNo;
+        if ((startSeqNo <= m_firstUnpolledSeqNo && m_firstUnpolledSeqNo <= lastSeqNo)
+                || (lastSeqNo + 1) == m_firstUnpolledSeqNo) {
+            return ContinuityCheckResult.OK;
+        }
 
-        // Pending buffer in sequence if 1 before first unpolled
-        return gap == 0 || gap == 1 ? ContinuityCheckResult.OK : ContinuityCheckResult.GAP;
+        return ContinuityCheckResult.GAP;
     }
 
     private synchronized void pollImpl(PollTask pollTask) {
