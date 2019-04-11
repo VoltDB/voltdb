@@ -40,7 +40,6 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
-import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -54,8 +53,6 @@ public class GuestProcessor implements ExportDataProcessor {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
-    // FIXME - replace with fixed list of ExportDataSource. That is all we need from m_generation.
-    private ExportGeneration m_generation;
     private volatile boolean m_shutdown = false;
     private VoltLogger m_logger;
 
@@ -106,6 +103,8 @@ public class GuestProcessor implements ExportDataProcessor {
             }
             configProcessed.put(targetName, new Properties(properties));
         }
+        //This will log any targets that are not there but draining datasources will keep them in list.
+        m_logger.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
     }
 
     @Override
@@ -130,34 +129,27 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
     @Override
-    public void readyForData() {
-        for (Map<String, ExportDataSource> sources : m_generation.getDataSourceByPartition().values()) {
-
-            for (final ExportDataSource source : sources.values()) {
-                synchronized(GuestProcessor.this) {
-                    if (m_shutdown) {
-                        if (m_logger.isDebugEnabled()) {
-                            m_logger.info("Skipping mastership notification for export because processor has been shut down.");
-                        }
-                        return;
-                    }
-                    String tableName = source.getTableName().toLowerCase();
-                    String groupName = m_targetsByTableName.get(tableName);
-                    if (source.getClient() == null) {
-                        m_logger.warn("Table " + tableName + " has no configured connector.");
-                        continue;
-                    }
-                    //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
-                    m_clientsByTarget.putIfAbsent(groupName, source.getClient());
-                    ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), source.getClient(), source);
-                    // DataSource should start polling only after command log replay on a recover
-                    source.setReadyForPolling(m_startPolling);
-                    source.setOnMastership(runner);
+    public void setupDataSource(ExportDataSource source) {
+        synchronized(GuestProcessor.this) {
+            if (m_shutdown) {
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.info("Skipping mastership notification for export because processor has been shut down.");
                 }
+                return;
             }
+            String tableName = source.getTableName().toLowerCase();
+            String groupName = m_targetsByTableName.get(tableName);
+            if (source.getClient() == null) {
+                m_logger.warn("Table " + tableName + " has no configured connector.");
+                return;
+            }
+            //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
+            m_clientsByTarget.putIfAbsent(groupName, source.getClient());
+            ExportRunner runner = new ExportRunner(m_targetsByTableName.get(tableName), source.getClient(), source);
+            // DataSource should start polling only after command log replay on a recover
+            source.setReadyForPolling(m_startPolling);
+            source.setOnMastership(runner);
         }
-        //This will log any targets that are not there but draining datasources will keep them in list.
-        m_logger.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
     }
 
     /**
@@ -175,12 +167,6 @@ public class GuestProcessor implements ExportDataProcessor {
         } catch(Throwable t) {
             throw new RuntimeException(t);
         }
-    }
-
-    @Override
-    public void setExportGeneration(ExportGeneration generation) {
-        assert generation != null;
-        m_generation = generation;
     }
 
     private class ExportRunner implements Runnable {
@@ -565,7 +551,6 @@ public class GuestProcessor implements ExportDataProcessor {
         }
         m_clientsByTarget.clear();
         m_targetsByTableName.clear();
-        m_generation = null;
     }
 
 }

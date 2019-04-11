@@ -471,12 +471,9 @@ public class ExportManager
 
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
             ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, m_messenger);
+            m_generation.set(generation);
             generation.initialize(m_hostId, catalogContext,
                     connectors, newProcessor, localPartitionsToSites, exportOverflowDirectory);
-
-            m_generation.set(generation);
-            newProcessor.setExportGeneration(generation);
-            newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -545,11 +542,9 @@ public class ExportManager
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
-                newProcessor.setExportGeneration(generation);
                 if (m_startPolling && !m_processorConfig.isEmpty()) {
                     newProcessor.startPolling();
                 }
-                newProcessor.readyForData();
 
                 /*
                  * When it isn't startup, it is necessary to kick things off with the mastership
@@ -600,6 +595,7 @@ public class ExportManager
             exportLog.debug("Existing export datasources unassigned.");
         }
         try {
+            //We create processor even if we dont have any streams.
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
@@ -607,13 +603,10 @@ public class ExportManager
             for (Pair<Integer, Integer> partition : partitions) {
                 generation.updateAckMailboxes(partition.getFirst(), null);
             }
-            //We create processor even if we dont have any streams.
-            newProcessor.setExportGeneration(generation);
             if (m_startPolling && !config.isEmpty()) {
                 newProcessor.startPolling();
             }
             m_processor.getAndSet(newProcessor);
-            newProcessor.readyForData();
         } catch (Exception crash) {
             VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
         }
