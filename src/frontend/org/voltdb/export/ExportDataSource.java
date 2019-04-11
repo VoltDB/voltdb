@@ -523,6 +523,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
+            //master stream cannot resolve a gap by receiving
+            // an ACK from itself, only replica stream can do.
+            assert (!m_mastershipAccepted.get());
             exportLog.info("Export queue gap resolved by releasing bytes, resuming export.");
             clearGap(true);
         }
@@ -1051,8 +1054,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     /* Ignore */
                 }
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("poll task has a pendingContainer:" +
-                            m_pendingContainer.get().toString() + " but failed to get schema.");
+                    exportLog.debug("Pending " + m_pendingContainer.get().toString()
+                            + " failed to get schema.");
                 }
                 cont.internalDiscard();
                 return true;
@@ -1061,10 +1064,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
 
+        // Check that the pending buffer precedes the unpolled ones
         boolean polled = false;
-        long nextSeqNo = m_firstUnpolledSeqNo;
-        ContinuityCheckResult result = checkBufferContinuity(
-                cont.getStartSeqNo(), cont.getLastSeqNo(), nextSeqNo);
+        ContinuityCheckResult result = checkPendingContinuity(
+                cont.getStartSeqNo(), cont.getLastSeqNo());
 
         if (result == ContinuityCheckResult.OK) {
             try {
@@ -1096,7 +1099,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             assert (result == ContinuityCheckResult.GAP);
             // Put the poll aside until the gap is resolved
             m_pollTask = pollTask;
-            startMastershipMigration(nextSeqNo, cont);
+            startMastershipMigration(cont.getLastSeqNo() + 1, cont);
             polled = true;
         }
         return polled;
@@ -1126,6 +1129,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         GAP,
     }
 
+    // Check the continuity of an unpolled buffer
     private ContinuityCheckResult checkBufferContinuity(long startSeqNo, long lastSeqNo, long nextSeqNo) {
         if (nextSeqNo >= startSeqNo && nextSeqNo <= lastSeqNo) {
             return ContinuityCheckResult.OK;
@@ -1134,6 +1138,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             return ContinuityCheckResult.GAP;
         }
+    }
+
+    // Check the continuity of a pending buffer, which stands BEFORE the unpolled ones
+    private ContinuityCheckResult checkPendingContinuity(long startSeqNo, long lastSeqNo) {
+
+        if (lastSeqNo <= m_lastReleasedSeqNo) {
+            return ContinuityCheckResult.ACKED;
+        }
+
+        // FIXME
+        // Theoretically the gap with m_firstUnpolledSeqNo should be 1
+        // Why is it 0 for buffers that have only 1 row (startSeqNo == lastSeqNo)?
+        long gap = m_firstUnpolledSeqNo - lastSeqNo;
+        assert(gap >= 0);
+
+        // Pending buffer in sequence if 1 before first unpolled
+        return gap <= 1 ? ContinuityCheckResult.OK : ContinuityCheckResult.GAP;
     }
 
     private synchronized void pollImpl(PollTask pollTask) {
@@ -1215,6 +1236,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
+                    assert (m_mastershipAccepted.get()); // only master stream can resolve the data gap
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     clearGap(true);
                 }
@@ -1258,7 +1280,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 if (exportLog.isTraceEnabled()) {
-                    exportLog.trace("AckingContainer.discard with sequence number: " + lastSeqNo);
+                    exportLog.trace("Advance sequence number to: " + lastSeqNo);
                 }
                 assert(startTime != 0);
                 long elapsedMS = System.currentTimeMillis() - startTime;

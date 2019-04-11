@@ -646,7 +646,8 @@ public class TestExportDataSource extends TestCase {
 
             // Verify we can poll the 2 buffers past the gap
             try {
-                cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                // cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                cont = fut1.get(100,TimeUnit.DAYS);
             }
             catch( TimeoutException to) {
                 fail("did not expect timeout");
@@ -658,6 +659,79 @@ public class TestExportDataSource extends TestCase {
             cont = s.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals(11, cont.m_lastSeqNo);
+            cont.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testPendingContainer() throws Exception{
+        System.out.println("Running testPendingContainer");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            final CountDownLatch cdl = new CountDownLatch(1);
+            Runnable cdlWaiter = new Runnable() {
+
+                @Override
+                public void run() {
+                    cdl.countDown();
+                }
+            };
+            s.setOnMastership(cdlWaiter);
+            s.acceptMastership();
+            cdl.await();
+
+            // Push 4 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 3, 1, 0, 0, foo, false);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(4, 4, 1, 0, 0, foo, false);
+
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll 3rd buffer but set it pending
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            s.setPendingContainer(cont);
+
+            // Poll 3rd buffer once more
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll last buffer
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 4, cont.m_lastSeqNo);
             cont.discard();
 
         } finally {
