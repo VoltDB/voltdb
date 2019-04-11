@@ -79,7 +79,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     private final Prepare.CatalogReader m_catalogReader;
 
     @Override public RelDataTypeSystem getTypeSystem() {
-        return RelDataTypeSystem.DEFAULT;
+        return VoltRelDataTypeSystem.VOLT_REL_DATATYPE_SYSTEM;
     }
 
     /**

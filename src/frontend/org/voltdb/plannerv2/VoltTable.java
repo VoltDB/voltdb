@@ -172,10 +172,6 @@ public class VoltTable implements TranslatableTable {
                 // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
                 rdt = typeFactory.createSqlType(sqlTypeName, prec);
                 break;
-            case DECIMAL:
-                rdt = typeFactory.createSqlType(sqlTypeName,
-                        VoltDecimalHelper.kDefaultPrecision, VoltDecimalHelper.kDefaultScale);
-                break;
             default:
                 rdt = typeFactory.createSqlType(sqlTypeName);
         }
