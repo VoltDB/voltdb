@@ -1099,7 +1099,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             assert (result == ContinuityCheckResult.GAP);
             // Put the poll aside until the gap is resolved
             m_pollTask = pollTask;
-            startMastershipMigration(cont.getLastSeqNo() + 1, cont);
+            startMastershipMigration(m_firstUnpolledSeqNo, cont);
             polled = true;
         }
         return polled;
