@@ -1301,7 +1301,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             try {
                                 if (!m_es.isShutdown()) {
                                     setCommittedSeqNo(m_commitSeqNo);
-                                    ackImpl(m_lastSeqNo);
+                                    ackImpl(m_commitSeqNo);
                                 }
                             } finally {
                                 forwardAckToOtherReplicas();
