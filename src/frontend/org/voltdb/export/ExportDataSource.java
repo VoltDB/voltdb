@@ -524,7 +524,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
-            exportLog.info("Export queue gap resolved. releaseExportBytes. Resuming export for " + ExportDataSource.this.toString());
+            assert (!m_mastershipAccepted.get()); //master stream cannot resolve a gap by receiving an ACK from itself, only replica stream can do.
+            exportLog.info("Received an ACK for the sequence number after export queue gap. "
+                    + "Set stream status to ACTIVE: " + ExportDataSource.this.toString());
             clearGap(true);
         }
 
@@ -1005,6 +1007,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
+                    /*
+                     * The poll is blocking through the cached future, shouldn't
+                     * call poll a second time until a response has been given
+                     * which satisfies the cached future.
+                     */
+                    if (m_pollTask != null) {
+                        try {
+                            pollTask.setException(
+                                    new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
+                                    " In " + ExportDataSource.this.toString()));
+                        } catch (RejectedExecutionException reex) {
+                            // Ignore: the {@code GuestProcessor} was shut down...
+                        }
+                        return;
+                    }
+
                     // ENG-14488, it's possible to have the export master gives up mastership
                     // but still try to poll immediately after that, e.g. from Pico Network
                     // thread the master gives up mastership, from decoder thread it tries to
@@ -1020,21 +1038,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         } catch (RejectedExecutionException rej) {
                             // Ignore: the {@code GuestProcessor} was shut down
                         }
-                        m_pollTask = null;
                         return;
                     }
 
                     try {
-                        /*
-                         * The poll is blocking through the cached future, shouldn't
-                         * call poll a second time until a response has been given
-                         * which satisfies the cached future.
-                         */
-                        if (m_pollTask != null) {
-                            fut.setException(new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
-                                    " In " + ExportDataSource.this.toString()));
-                            return;
-                        }
                         if (!m_es.isShutdown()) {
                             pollImpl(pollTask);
                         }
@@ -1064,10 +1071,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (RejectedExecutionException reex) {
                     /* Ignore */
                 }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("poll task has a pendingContainer:" +
-                            m_pendingContainer.get().toString() + " but failed to get schema.");
-                }
+                exportLog.error("poll task has a pendingContainer:" +
+                        m_pendingContainer.get().toString() + " but failed to get schema.");
                 cont.internalDiscard();
                 return ContinuityCheckResult.NONE;
             } else {
@@ -1187,7 +1192,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     } else {
                         assert (result == ContinuityCheckResult.HAS_GAP);
-                        final AckingContainer ackingContainer = AckingContainer.of(
+                        final AckingContainer ackingContainer = AckingContainer.create(
                                 this, block, m_committedBuffers, pollTask.forcePollSchema());
                         initiateMastershipMigration(nextSeqNo, ackingContainer);
                         return;
@@ -1215,10 +1220,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
+                    assert (m_mastershipAccepted.get()); // Should only master stream resolve the data gap
                     exportLog.info("Export queue gap is resolved. Resuming export for " + ExportDataSource.this.toString());
                     clearGap(true);
                 }
-                final AckingContainer ackingContainer = AckingContainer.of(
+                final AckingContainer ackingContainer = AckingContainer.create(
                         this, first_unpolled_block, m_committedBuffers, pollTask.forcePollSchema());
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Posting Export data for " + ackingContainer.toString());
@@ -1258,7 +1264,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 if (exportLog.isTraceEnabled()) {
-                    exportLog.trace("AckingContainer.discard with sequence number: " + lastSeqNo);
+                    exportLog.trace("Advance sequence number to: " + lastSeqNo);
                 }
                 assert(startTime != 0);
                 long elapsedMS = System.currentTimeMillis() - startTime;

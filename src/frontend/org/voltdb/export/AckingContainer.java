@@ -44,7 +44,7 @@ public class AckingContainer extends BBContainer {
         m_schemaCont = schemaCont;
     }
 
-    public static AckingContainer of(ExportDataSource source,
+    public static AckingContainer create(ExportDataSource source,
                                      StreamBlock sb,
                                      StreamBlockQueue sbq,
                                      boolean forcePollSchema) {
