@@ -868,6 +868,15 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     TableTuple conflict(m_schema);
     try {
         tryInsertOnAllIndexes(&target, &conflict);
+
+        // from stream snapshot/rejoin, add it to migrating index
+        if (m_shadowStream != nullptr) {
+            uint16_t migrateColumnIndex = getMigrateColumnIndex();
+            NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+            if(!txnId.isNull()){
+               migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+            }
+        }
     } catch (SQLException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
@@ -1418,6 +1427,15 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     // Make sure that they are not trying to delete the same tuple twice
     assert(target.isActive());
     deleteFromAllIndexes(&target);
+
+    // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
+    if (m_shadowStream != nullptr) {
+        uint16_t migrateColumnIndex = getMigrateColumnIndex();
+        NValue txnId = target.getHiddenNValue(migrateColumnIndex);
+        if(!txnId.isNull()){
+            migratingRemove(ValuePeeker::peekBigInt(txnId), target);
+        }
+    }
     deleteTupleFinalize(target); // also frees object columns
 }
 
@@ -1706,15 +1724,6 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
         }
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            shouldDRStreamRows, ignoreTupleLimit);
-
-        // from stream snapshot/rejoin, add it to migrating index
-        if (!elastic && m_shadowStream != nullptr) {
-              uint16_t migrateColumnIndex = getMigrateColumnIndex();
-              NValue txnId = target.getHiddenNValue(migrateColumnIndex);
-              if(!txnId.isNull()){
-                  migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-              }
-           }
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -2471,7 +2480,6 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     assert(m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.find(txnId);
     if (it == m_migratingRows.end()) {
-        assert(false);
         return false;
     }
 
@@ -2479,7 +2487,6 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     if (it->second.empty()) {
         m_migratingRows.erase(it);
     }
-    assert(found == 1);
     return found == 1;
 }
 
