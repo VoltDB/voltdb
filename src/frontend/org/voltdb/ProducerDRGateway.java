@@ -214,4 +214,11 @@ public interface ProducerDRGateway {
      * If DR producer is enabled and listening, this will log the current conversations.
      */
     public void logActiveConversations();
+
+    /**
+     * Enum to indicate which start mode the {@link ProducerDRGateway} instance is in
+     */
+    public enum Mode {
+        NEW, REJOIN, RECOVER, JOIN;
+    }
 }
