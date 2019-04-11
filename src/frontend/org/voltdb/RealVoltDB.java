@@ -1465,8 +1465,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_producerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.DRProducer", "DR Producer",
                         ProClass.HANDLER_CRASH,
                         new VoltFile(VoltDB.instance().getDROverflowPath()),
-                        new VoltFile(VoltDB.instance().getSnapshotPath()), willDoActualRecover(),
-                        m_config.m_startAction.doesRejoin(), m_config.m_startAction == StartAction.JOIN,
+                        new VoltFile(VoltDB.instance().getSnapshotPath()),
+                        willDoActualRecover() ? ProducerDRGateway.Mode.RECOVER
+                                : m_config.m_startAction.doesRejoin() ? ProducerDRGateway.Mode.REJOIN
+                                        : m_config.m_startAction == StartAction.JOIN ? ProducerDRGateway.Mode.JOIN
+                                                : ProducerDRGateway.Mode.NEW,
                         m_replicationActive.get(), m_configuredNumberOfPartitions,
                         (m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount));
             }
