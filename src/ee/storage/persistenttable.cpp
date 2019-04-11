@@ -2478,6 +2478,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     assert(m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.find(txnId);
     if (it == m_migratingRows.end()) {
+        assert(false);
         return false;
     }
 
@@ -2485,6 +2486,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     if (it->second.empty()) {
         m_migratingRows.erase(it);
     }
+    assert(found == 1);
     return found == 1;
 }
 
