@@ -62,8 +62,8 @@ public class ColumnTypes {
 
             // Note - ethan - 12/28/2018:
             // Not sure this works well. Internally, VoltDB stores GEOGRAPHY as VARBINARY.
-            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOMETRY),
-            Pair.of(VoltType.GEOGRAPHY_POINT, SqlTypeName.GEOMETRY)
+            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOGRAPHY),
+            Pair.of(VoltType.GEOGRAPHY_POINT, SqlTypeName.GEOGRAPHY_POINT)
         ).forEach(types -> {
             final VoltType vt = types.getFirst();
             final SqlTypeName ct = types.getSecond();

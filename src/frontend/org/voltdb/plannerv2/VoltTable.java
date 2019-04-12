@@ -163,13 +163,11 @@ public class VoltTable implements TranslatableTable {
     public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
         SqlTypeName sqlTypeName = ColumnTypes.getCalciteType(vt);
         RelDataType rdt;
-        // Note - ethan - 1/1/2019:
-        // We probably need some code refactor for this type conversion.
-        // See RelDataTypeSystemImpl and ENG-14727
         switch (vt) {
             case STRING:
             case VARBINARY:
-                // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
+            case GEOGRAPHY:
+                // The precision for VARBINARY, VARCHAR (STRING) and GEOGRAPHY is set in CreateTableUtils.addColumn
                 rdt = typeFactory.createSqlType(sqlTypeName, prec);
                 break;
             default:
