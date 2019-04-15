@@ -44,48 +44,21 @@ import java.util.List;
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltSeqTableScan extends VoltPhysicalTableScan {
+public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
 
-    public VoltSeqTableScan(RelOptCluster cluster,
-                               RelTraitSet traitSet,
-                               RelOptTable table,
-                               VoltTable voltTable,
-                               RexProgram program,
-                               RexNode offset,
-                               RexNode limit,
-                               RelNode aggregate,
-                               RelDataType preAggregateRowType,
-                               RexProgram preAggregateProgram,
-                               int splitCount) {
-        super(cluster,
-                traitSet,
-                table,
-                voltTable,
-                program,
-                offset,
-                limit,
-                aggregate,
-                preAggregateRowType,
-                preAggregateProgram,
-                splitCount);
+    public VoltPhysicalTableSequentialScan(
+            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable,
+            RexProgram program, RexNode offset, RexNode limit, RelNode aggregate,
+            RelDataType preAggregateRowType, RexProgram preAggregateProgram, int splitCount) {
+        super(cluster, traitSet, table, voltTable, program, offset, limit, aggregate, preAggregateRowType,
+                preAggregateProgram, splitCount);
     }
 
-    public VoltSeqTableScan(RelOptCluster cluster,
-                               RelTraitSet traitSet,
-                               RelOptTable table,
-                               VoltTable voltTable,
-                               int splitCount) {
-        this(cluster,
-                traitSet,
-                table,
-                voltTable,
-                RexProgram.createIdentity(voltTable.getRowType(cluster.getTypeFactory())),
-                null, // offset
-                null, // limit
-                null, // aggregate
-                null, // preAggregateRowType
-                null, // preAggregateProgram
-                splitCount);
+    public VoltPhysicalTableSequentialScan(
+            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltTable, int splitCount) {
+        this(cluster, traitSet, table, voltTable,
+                RexProgram.createIdentity(voltTable.getRowType(cluster.getTypeFactory())), null,
+                null, null, null, null, splitCount);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
     }
 
@@ -104,42 +77,19 @@ public class VoltSeqTableScan extends VoltPhysicalTableScan {
 
     @Override
     public AbstractVoltTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
-        VoltSeqTableScan newScan = new VoltSeqTableScan(
-                getCluster(),
-                traitSet,
-                getTable(),
-                getVoltTable(),
-                getProgram(),
-                offset,
-                limit,
-                getAggregateRelNode(),
-                getPreAggregateRowType(),
-                getPreAggregateProgram(),
-                m_splitCount);
-        return newScan;
+        return new VoltPhysicalTableSequentialScan(
+                getCluster(), traitSet, getTable(), getVoltTable(), getProgram(), offset, limit,
+                getAggregateRelNode(), getPreAggregateRowType(), getPreAggregateProgram(), m_splitCount);
     }
 
     @Override
     public AbstractVoltTableScan copyWithProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
         // Merge two programs program / m_program into a new merged program
-        RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
-                newProgram,
-                m_program,
-                programRexBuilder);
-
-        VoltSeqTableScan newScan = new VoltSeqTableScan(
-                getCluster(),
-                traitSet,
-                getTable(),
-                getVoltTable(),
-                mergedProgram,
-                getOffsetRexNode(),
-                getLimitRexNode(),
-                getAggregateRelNode(),
-                getPreAggregateRowType(),
-                getPreAggregateProgram(),
-                m_splitCount);
-        return newScan;
+        return new VoltPhysicalTableSequentialScan(
+                getCluster(), traitSet, getTable(), getVoltTable(),
+                RexProgramBuilder.mergePrograms(newProgram, m_program, programRexBuilder),
+                getOffsetRexNode(), getLimitRexNode(), getAggregateRelNode(), getPreAggregateRowType(),
+                getPreAggregateProgram(), m_splitCount);
     }
 
     @Override
@@ -147,28 +97,16 @@ public class VoltSeqTableScan extends VoltPhysicalTableScan {
         // Need to create a Program for the inline aggregate because it will define
         // the output row type for the scan
         // Preserve the original program and row type
-        RexProgram aggProgram = RexProgram.createIdentity(aggregate.getRowType());
-        RelDataType preAggRowType = getRowType();
-        RexProgram preAggProgram = getProgram();
-        VoltSeqTableScan newScan = new VoltSeqTableScan(
-                getCluster(),
-                traitSet,
-                getTable(),
-                getVoltTable(),
-                aggProgram,
-                getOffsetRexNode(),
-                getLimitRexNode(),
-                aggregate,
-                preAggRowType,
-                preAggProgram,
+        return new VoltPhysicalTableSequentialScan(
+                getCluster(), traitSet, getTable(), getVoltTable(), RexProgram.createIdentity(aggregate.getRowType()),
+                getOffsetRexNode(), getLimitRexNode(), aggregate, getRowType(), getProgram(),
                 m_splitCount);
-        return newScan;
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        SeqScanPlanNode sspn = new SeqScanPlanNode();
-        List<String> qualName = table.getQualifiedName();
+        final SeqScanPlanNode sspn = new SeqScanPlanNode();
+        final List<String> qualName = table.getQualifiedName();
         // index_0: schema name, Index_1: table name
         sspn.setTargetTableAlias(qualName.get(1));
         sspn.setTargetTableName(m_voltTable.getCatalogTable().getTypeName());

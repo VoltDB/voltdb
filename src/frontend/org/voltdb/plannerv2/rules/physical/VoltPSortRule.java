@@ -32,12 +32,12 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltDBPSortRule extends RelOptRule {
+public class VoltPSortRule extends RelOptRule {
 
     // TODO: I don't understand the purpose of this rule. I removed it from our ruleset.
-    public static final VoltDBPSortRule INSTANCE = new VoltDBPSortRule();
+    public static final VoltPSortRule INSTANCE = new VoltPSortRule();
 
-    VoltDBPSortRule() {
+    VoltPSortRule() {
         super(operand(VoltLogicalSort.class, VoltLogicalRel.CONVENTION, any()));
     }
 

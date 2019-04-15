@@ -468,9 +468,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 3, "क्षीण", 10, 1.1);
+        client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
+        client.callProcedure("P1.insert", 3, "क्षीण", 10, 1.1);
         cr = client.callProcedure("P1.insert", 4, null, 10, 1.1);
 
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -513,12 +513,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
      // try char_length on incompatible data type
         try {
-            cr = client.callProcedure("@AdHoc",
+            client.callProcedure("@AdHoc",
                     "select bdata, CHAR_LENGTH(bdata) from BINARYTEST where ID = 1");
           fail("char_length on columns which are not string expression is not supported");
         }
         catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'"));
+            final String msg = pce.getMessage();
+            assertTrue(msg
+                    .contains("Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'"));
         }
 
     }

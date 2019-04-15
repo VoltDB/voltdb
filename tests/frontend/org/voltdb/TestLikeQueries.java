@@ -35,21 +35,20 @@ import junit.framework.TestCase;
 
 public class TestLikeQueries extends TestCase {
 
-    static class LikeTest
-    {
+    static class LikeTest {
         String pattern;
         int matches;
         boolean crashes;
         boolean addNot = false;
         String escape  = null;
 
-        public LikeTest(String pattern, int matches) {
+        LikeTest(String pattern, int matches) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = false;
         }
 
-        public LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
+        LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
             this.pattern = pattern;
             this.matches = matches;
             this.crashes = crashes;
@@ -66,27 +65,27 @@ public class TestLikeQueries extends TestCase {
     }
 
     static class NotLikeTest extends LikeTest {
-        public NotLikeTest(String pattern, int matches) {
+        NotLikeTest(String pattern, int matches) {
             super(pattern, matches, false, true, null);
         }
     }
 
     static class EscapeLikeTest extends LikeTest {
-        public EscapeLikeTest(String pattern, int matches, String escape) {
+        EscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, false, false, escape);
         }
     }
 
     static class UnsupportedEscapeLikeTest extends LikeTest {
-        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
+        UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
             super(pattern, matches, true, false, escape);
         }
     }
 
     static class LikeTestData {
         public final String val;
-        public final String pat;
-        public LikeTestData(String val, String pat) {
+        final String pat;
+        LikeTestData(String val, String pat) {
             this.val = val;
             this.pat = pat;
         }
@@ -152,14 +151,14 @@ public class TestLikeQueries extends TestCase {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
             // ENG-15264
-//            new LikeTest("â_x一xxéyyԱ", 1),
+            // new LikeTest("â_x一xxéyyԱ", 1),
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };
 
     public static class LikeSuite {
         public void doTests(Client client, boolean forHSQLcomparison) throws IOException, ProcCallException {
             loadForTests(client);
-            if (forHSQLcomparison == false) {
+            if (! forHSQLcomparison) {
                 doViaStoredProc(client);
             }
             doViaAdHoc(client, forHSQLcomparison);
@@ -176,7 +175,7 @@ public class TestLikeQueries extends TestCase {
             }
         }
 
-        protected void doViaStoredProc(Client client) throws IOException {
+        private void doViaStoredProc(Client client) throws IOException {
             // Tests based on LikeTest list
             for (LikeTest test : tests) {
                 doTestViaStoredProc(client, test);

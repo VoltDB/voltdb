@@ -78,6 +78,23 @@ public class AccessPath {
     //
     final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
 
+    /**
+     * For Calcite
+     * @param index
+     * @param lookupType
+     * @param sortDirection
+     * @param stmtOrderByIsCompatible
+     */
+    public AccessPath(
+            Index index, IndexLookupType lookupType, SortDirectionType sortDirection, boolean stmtOrderByIsCompatible) {
+        this.index = index;
+        this.lookupType = lookupType;
+        this.sortDirection = sortDirection;
+        this.m_stmtOrderByIsCompatible = stmtOrderByIsCompatible;
+    }
+
+    public AccessPath() {}
+
     @Override
     public String toString() {
         final StringBuilder retval = new StringBuilder()
@@ -135,8 +152,33 @@ public class AccessPath {
         return "";
     }
 
+    public void setSortDirection(SortDirectionType sortDirection) {
+        this.sortDirection = sortDirection;
+    }
+
     public SortDirectionType getSortDirection() {
         return sortDirection;
     }
+
+    public IndexLookupType getIndexLookupType() {
+        return lookupType;
+    }
+
+    public List<AbstractExpression> getIndexExpressions() {
+        return indexExprs;
+    }
+
+    public List<AbstractExpression> getEndExpressions() {
+        return endExprs;
+    }
+
+    public List<AbstractExpression> getEliminatedPostExpressions() {
+        return eliminatedPostExprs;
+    }
+
+    public List<AbstractExpression> getOtherExprs() {
+        return otherExprs;
+    }
+
 }
 

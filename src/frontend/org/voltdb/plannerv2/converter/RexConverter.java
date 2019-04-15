@@ -35,6 +35,7 @@ import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
@@ -53,6 +54,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.apache.calcite.rel.type.RelDataType.PRECISION_NOT_SPECIFIED;
 
@@ -63,25 +66,19 @@ public class RexConverter {
     private RexConverter() {}
 
     // used to keep track of a RexDynamicParam's index.
-    private static ThreadLocal<Integer> NEXT_PARAMETER_ID = ThreadLocal.withInitial(() -> 0);
-
-    public static void resetParameterIndex() {
-        NEXT_PARAMETER_ID.set(0);
+    public static class DynamicParamCounter {
+        private final AtomicInteger m_nextIndex;
+        DynamicParamCounter() {
+            m_nextIndex = new AtomicInteger(0);
+        }
+        public void reset() {
+            m_nextIndex.set(0);
+        }
+        public int getAndIncrement() {
+            return m_nextIndex.getAndIncrement();
+        }
     }
-
-    public static int getParameterIndex() {
-        return NEXT_PARAMETER_ID.get();
-    }
-
-    public static void setParameterIndex(int index) {
-        NEXT_PARAMETER_ID.set(index);
-    }
-
-    public static int getAndIncrementParameterIndex() {
-        int val = NEXT_PARAMETER_ID.get();
-        setParameterIndex(val + 1);
-        return val;
-    }
+    public static final DynamicParamCounter PARAM_COUNTER = new DynamicParamCounter();
 
     public static void setType(AbstractExpression ae, RelDataType rdt) {
         VoltType vt = ColumnTypes.getVoltType(rdt.getSqlTypeName());
@@ -90,17 +87,14 @@ public class RexConverter {
     }
 
     public static void setType(AbstractExpression ae, VoltType vt, int precision) {
-
         ae.setValueType(vt);
         if (precision == PRECISION_NOT_SPECIFIED) {
             precision = vt.getLengthInBytesForFixedTypes();
         }
-
         if (vt.isVariableLength()) {
             int size;
             if ((ae instanceof ConstantValueExpression ||
-                    ae instanceof FunctionExpression)
-                    &&
+                    ae instanceof FunctionExpression) &&
                     (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
                 size = vt.getMaxLengthInBytes();
             } else {
@@ -126,6 +120,28 @@ public class RexConverter {
                         (left, right) -> new ConjunctionExpression(exprType, left, right));
     }
 
+    private static AbstractExpression buildCaseWhenExpression(List<AbstractExpression> operands, int index, RelDataType rt) {
+        switch (operands.size() - index) {
+            case 1:
+                return operands.get(index);
+            case 0:
+            case 2:
+                throw new CalcitePlanningException(
+                        "Case-when expression must bear at least 3 sub-expressions: got " + operands.size());
+            default:
+                final AbstractExpression result = new OperatorExpression(ExpressionType.OPERATOR_CASE_WHEN,
+                        operands.get(index),
+                        new OperatorExpression(ExpressionType.OPERATOR_ALTERNATIVE,
+                                operands.get(index + 1),
+                                buildCaseWhenExpression(operands, index + 2, rt)));
+                if (index + 2 < operands.size()) {
+                    setType(result.getRight(), rt);
+                }
+                setType(result, rt);
+                return result;
+        }
+    }
+
     /**
      * Convert a Calcite RexCall to Volt AbstractExpression.
      *
@@ -134,7 +150,7 @@ public class RexConverter {
      * @return The converted AbstractExpression.
      */
     public static AbstractExpression rexCallToAbstractExpression(RexCall call, List<AbstractExpression> aeOperands) {
-        AbstractExpression ae;
+        final AbstractExpression ae;
         switch (call.op.kind) {
             // Conjunction
             case AND:
@@ -280,7 +296,9 @@ public class RexConverter {
                         null);
                 RexConverter.setType(ae, call.getType());
                 break;
-
+            case CASE:
+                ae = buildCaseWhenExpression(aeOperands, 0, call.getType());
+                break;
 //            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
 //                // left || right (both must be char/varchar)
 //            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
@@ -292,7 +310,7 @@ public class RexConverter {
                     ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null);
                     RexConverter.setType(ae, call.getType());
                 } else {
-                    throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                    throw new CalcitePlanningException("Unsupported Calcite expression type? " +
                             call.op.kind.toString());
                 }
                 break;
@@ -301,41 +319,154 @@ public class RexConverter {
                 RexConverter.setType(ae, call.getType());
                 break;
             default:
-                throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                throw new CalcitePlanningException("Unsupported Calcite expression type! " +
                         call.op.kind.toString());
         }
-
         Preconditions.checkNotNull(ae);
         RexConverter.setType(ae, call.getType());
         return ae;
     }
 
     /**
+     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
+     * a corresponding TVE. If the numLhsFieldsForJoin is set to something other than -1 it means
+     * that this table is an inner table of some join and its expression indexes must be adjusted
+     *
+     * @param rexNode RexNode to be converted
+     * @param catTableName a catalog table name
+     * @param catColumns column name list
+     * @param program programs that is associated with this table
+     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
+
+     * @return
+     */
+    public static AbstractExpression convertRefExpression(
+            RexNode rexNode, String catTableName, List<Column> catColumns, RexProgram program, int numOuterFieldsForJoin) {
+        final AbstractExpression ae = rexNode.accept(
+                new RefExpressionConvertingVisitor(catTableName, catColumns, program, numOuterFieldsForJoin));
+        Preconditions.checkNotNull(ae);
+        return ae;
+    }
+
+    /**
+     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
+     * a corresponding TVE without setting table and column names
+     *
+     * @param rexNode RexNode to be converted
+     * @param program programs that is associated with this table
+     * @return
+     */
+    public static AbstractExpression convertRefExpression(RexNode rexNode, RexProgram program) {
+        final AbstractExpression ae = rexNode.accept(
+                new RefExpressionConvertingVisitor(program));
+        Preconditions.checkNotNull(ae);
+        return ae;
+    }
+
+    public static List<RexNode> expandLocalRef(List<RexLocalRef> localRefList, RexProgram program) {
+        return localRefList.stream().map(program::expandLocalRef).collect(Collectors.toList());
+    }
+
+
+    /**
+     * Resolve filter expression for a standalone table (numLhsFieldsForJoin = -1)
+     * or outer table from a join (possibly inline inner node for NLIJ).
+     * The resolved expression is used to identify a suitable index to access the data
+     *
+     */
+    private static class RefExpressionConvertingVisitor extends ConvertingVisitor {
+
+        final private RexProgram m_program;
+        final private List<Column> m_catColumns;
+        final private String m_catTableName;
+
+        RefExpressionConvertingVisitor(
+                String catTableName, List<Column> catColumns, RexProgram program, int numOuterFieldsForJoin) {
+            super(numOuterFieldsForJoin);
+            m_catTableName = catTableName;
+            m_catColumns = catColumns;
+            m_program = program;
+        }
+
+        RefExpressionConvertingVisitor(RexProgram program) {
+            this(null, null, program, -1);
+        }
+
+        @Override
+        public AbstractExpression visitLocalRef(RexLocalRef localRef) {
+            Preconditions.checkNotNull(m_program);
+            int exprIndx = localRef.getIndex();
+            if (isFromRHSTable(exprIndx)) {
+                exprIndx -= m_numOuterFieldsForJoin;
+            }
+
+            assert(exprIndx < m_program.getExprCount());
+            RexNode expr = m_program.getExprList().get(exprIndx);
+            return expr.accept(this);
+        }
+
+        @Override
+        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
+            int exprInputIndx = inputRef.getIndex();
+
+            int inputIdx = exprInputIndx;
+            RelDataType inputType = inputRef.getType();
+
+            final boolean rhsTable = isFromRHSTable(exprInputIndx);
+            String columnName = null;
+            String tableName = null;
+            final int tableIndex = rhsTable ? 1 : 0;
+            // Resolve column name if it is not a join or it's inner table from a join
+            // To resolve the names of the outer table set  the numLhsFieldsForJoin = -1
+            if (rhsTable || m_numOuterFieldsForJoin < 0) {
+                exprInputIndx -= Integer.max(0, m_numOuterFieldsForJoin);
+                if (rhsTable && m_program.getProjectList()!= null) {
+                    // This input reference is part of a join expression that refers an expression
+                    // that comes from the inner node. To resolve it we need to find its index
+                    // in the inner node's expression list using the inner node projection
+                    Preconditions.checkState(exprInputIndx < m_program.getProjectList().size());
+                    final RexLocalRef inputLocalRef = m_program.getProjectList().get(exprInputIndx);
+                    inputIdx = inputLocalRef.getIndex();
+                    inputType = inputLocalRef.getType();
+                }
+                if (m_catColumns != null && inputIdx < m_catColumns.size()) {
+                    columnName = m_catColumns.get(inputIdx).getTypeName();
+                }
+                tableName = m_catTableName;
+            }
+
+            return visitInputRef(tableIndex, inputIdx, inputType, tableName, columnName);
+        }
+    }
+
+
+    /**
      * A visitor that covert Calcite row expression node to Volt AbstractExpression.
      */
     private static class ConvertingVisitor extends RexVisitorImpl<AbstractExpression> {
 
-        public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
+        public static final ConvertingVisitor INSTANCE = new ConvertingVisitor(-1);
 
         // the number of the outer table column in the select query.
         // For example "SELECT foo.a, bar.b, bar.c FROM foo, bar" gets 1
         // because only one column of outer table gets selected.
-        int m_numOuterFieldsForJoin = -1;
+        final int m_numOuterFieldsForJoin;
 
-        ConvertingVisitor() {
+        ConvertingVisitor(int numOuterFields) {
             super(false);
+            m_numOuterFieldsForJoin = numOuterFields;
         }
 
-        public ConvertingVisitor(int numLhsFields) {
-            super(false);
-            m_numOuterFieldsForJoin = numLhsFields;
+        boolean isFromRHSTable(int columnIndex) {
+            return m_numOuterFieldsForJoin >= 0 && columnIndex >= m_numOuterFieldsForJoin;
         }
 
         boolean isFromInnerTable(int columnIndex) {
             return m_numOuterFieldsForJoin >= 0 && columnIndex >= m_numOuterFieldsForJoin;
         }
 
-        TupleValueExpression visitInputRef(int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
+        TupleValueExpression visitInputRef(
+                int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
             // null if the column comes from RexInputRef
             if (tableName == null) {
                 tableName = "";
@@ -345,7 +476,8 @@ public class RexConverter {
                 columnName = String.format("%03d", inputColumnIdx);
             }
 
-            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, inputColumnIdx, inputColumnIdx);
+            final TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName,
+                    columnName, inputColumnIdx, inputColumnIdx);
             tve.setTableIndex(tableIndex);
             RexConverter.setType(tve, inputType);
             return tve;
@@ -366,7 +498,7 @@ public class RexConverter {
         @Override
         public ParameterValueExpression visitDynamicParam(RexDynamicParam inputParam) {
             ParameterValueExpression pve = new ParameterValueExpression();
-            pve.setParameterIndex(getAndIncrementParameterIndex());
+            pve.setParameterIndex(PARAM_COUNTER.getAndIncrement());
             RexConverter.setType(pve, inputParam.getType());
             return pve;
         }
@@ -377,7 +509,7 @@ public class RexConverter {
 
             final String value;
             if (literal.getValue() instanceof NlsString) {
-                NlsString nlsString = (NlsString) literal.getValue();
+                final NlsString nlsString = (NlsString) literal.getValue();
                 value = nlsString.getValue();
             } else if (literal.getValue() instanceof BigDecimal) {
                 BigDecimal bd = (BigDecimal) literal.getValue();
@@ -391,8 +523,11 @@ public class RexConverter {
                 // VoltDB TIMESTAMPS expects time in microseconds
                 long time = ((GregorianCalendar) literal.getValue()).getTimeInMillis() * 1000;
                 value = Long.toString(time);
-            } else {
-                // @TODO Catch all
+            } else if (literal.getType().getSqlTypeName().getName().equals("BINARY")) {
+                value = literal.getValue().toString();
+            } else if (literal.getValue() == null) {
+                value = null;
+            } else { // @TODO Catch all
                 value = literal.getValue().toString();
             }
 
@@ -421,10 +556,10 @@ public class RexConverter {
     }
 
     public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType) {
-        NodeSchema nodeSchema = new NodeSchema();
+        final NodeSchema nodeSchema = new NodeSchema();
 
-        RelRecordType ty = (RelRecordType) rowType;
-        List<String> names = ty.getFieldNames();
+        final RelRecordType ty = (RelRecordType) rowType;
+        final List<String> names = ty.getFieldNames();
         int i = 0;
         for (RelDataTypeField item : ty.getFieldList()) {
             TupleValueExpression tve = new TupleValueExpression("", "", "", names.get(i), i, i);
@@ -436,14 +571,12 @@ public class RexConverter {
     }
 
     public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
-        NodeSchema newNodeSchema = new NodeSchema();
+        final NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
         for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
-            String name = item.right;
-            RexNode rexNode = program.expandLocalRef(item.left);
-            AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
+            final AbstractExpression ae = program.expandLocalRef(item.left).accept(ConvertingVisitor.INSTANCE);
             Preconditions.checkNotNull(ae);
-            newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));
+            newNodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
             ++i;
         }
 
@@ -451,13 +584,12 @@ public class RexConverter {
     }
 
     public static AbstractExpression convertDataTypeField(RelDataTypeField dataTypeField) {
-        int columnIndex = dataTypeField.getIndex();
-        int tableIndex = 0;
-        String tableName = "";
-        String columnName = String.format("%03d", columnIndex);
+        final int columnIndex = dataTypeField.getIndex();
+        final String columnName = String.format("%03d", columnIndex);
 
-        TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
-        tve.setTableIndex(tableIndex);
+        final TupleValueExpression tve = new TupleValueExpression(
+                "", "", columnName, columnName, columnIndex, columnIndex);
+        tve.setTableIndex(0);
         RexConverter.setType(tve, dataTypeField.getType());
         return tve;
     }

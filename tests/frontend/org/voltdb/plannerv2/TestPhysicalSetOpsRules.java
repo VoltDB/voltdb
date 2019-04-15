@@ -23,6 +23,7 @@
 
 package org.voltdb.plannerv2;
 
+import org.junit.Test;
 import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 
 public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
@@ -40,26 +41,28 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
         super.tearDown();
     }
 
+    @Test
     public void testUnion() {
         m_tester.sql("select si from R1 union ALL select si from R2 union select ii from R3")
                 .transform("VoltPhysicalUnion(all=[false])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
     }
 
+    @Test
     public void testSetOpsLimit() {
         m_tester.sql("select si from R1 union ALL select si from R2 limit ? offset ?")
                 .transform("VoltPhysicalLimit(split=[1], limit=[?0], offset=[?1])\n" +
                            "  VoltPhysicalUnion(all=[true])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
 
         m_tester.sql("select si from R1 union ALL select si from R2 order by 1 limit 5 offset 4")
@@ -67,36 +70,39 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
                            "  VoltPhysicalSort(sort0=[$0], dir0=[ASC], split=[1])\n" +
                            "    VoltPhysicalUnion(all=[true])\n" +
                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "        VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "        VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "      VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "        VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                           "        VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                .pass();
     }
 
+    @Test
     public void testSetOpsOrderBy() {
         m_tester.sql("select si*2 as si2, si as si1 from R1 union ALL select i, bi from R2 order by si2 ASC, si1 DESC")
                 .transform("VoltPhysicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], split=[1])\n" +
                            "  VoltPhysicalUnion(all=[true])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[2], expr#7=[*($t1, $t6)], SI2=[$t7], SI1=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
     }
 
+    @Test
     public void testIntersect() {
         m_tester.sql("select si from R1 intersect select si from R2 intersect ALL select ii from R3")
                 .transform("VoltPhysicalIntersect(all=[true])\n" +
                            "  VoltPhysicalIntersect(all=[false])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
     }
 
+    @Test
     public void testSetOpsWithExpressionSubqueiries() {
         // @TODO Need to validate the results
 //        m_tester.sql("select * from R1 where EXISTS (select si from R1 intersect select si from R2)")
@@ -109,60 +115,63 @@ public class TestPhysicalSetOpsRules extends Plannerv2TestCase {
 
     }
 
+    @Test
     public void testMultipleSetOps() {
         m_tester.sql("select si from R1 intersect select si from R2 union select ii from R3")
                 .transform("VoltPhysicalUnion(all=[false])\n" +
                            "  VoltPhysicalIntersect(all=[false])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
 
         m_tester.sql("select si from R1 intersect (select si from R2 union select ii from R3)")
                 .transform("VoltPhysicalIntersect(all=[false])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalUnion(all=[false])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
     }
 
+    @Test
     public void testExcept() {
         m_tester.sql("select si from R1 except ALL select si from R2 except ALL select ii from R3")
                 .transform("VoltPhysicalMinus(all=[true])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
 
         m_tester.sql("select si from R1 except (select si from R2 except select ii from R3)")
                 .transform("VoltPhysicalMinus(all=[false])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalMinus(all=[false])\n" +
                            "    VoltPhysicalCalc(expr#0..5=[{inputs}], SI=[$t1], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "    VoltPhysicalCalc(expr#0..2=[{inputs}], II=[$t2], split=[1])\n" +
-                           "      VoltSeqTableScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
+                           "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n")
                 .pass();
     }
 
+    @Test
     public void testSetOpsFilter() {
         m_tester.sql("select si from (select si from R1 union ALL select si from R2) u where si > 0")
                 .transform("VoltPhysicalUnion(all=[true])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                            "  VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[0], expr#7=[>($t1, $t6)], SI=[$t1], $condition=[$t7], split=[1])\n" +
-                           "    VoltSeqTableScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
+                           "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
     }
 }
