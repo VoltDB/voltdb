@@ -1116,6 +1116,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     "] from " + this.toString() + ". Searching other sites for missing data.");
             m_seqNoToDrain = nextSeqNo - 1;
             mastershipCheckpoint(nextSeqNo - 1);
+        } else {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.info("Export data missing from current queue [" +
+                        gap.getFirst() + ", " + gap.getSecond() +
+                        "] from " + this.toString() + ", migration in progress.");
+            }
         }
     }
 
