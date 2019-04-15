@@ -862,7 +862,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
+        VoltServerConfig config;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestAdHocPlannerCache.class);
         VoltProjectBuilder project = new VoltProjectBuilder();

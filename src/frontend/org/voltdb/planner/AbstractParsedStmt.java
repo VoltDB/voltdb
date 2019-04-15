@@ -920,7 +920,7 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
-        AbstractExpression expr = null;
+        AbstractExpression expr;
 
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");

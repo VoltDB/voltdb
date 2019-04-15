@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
@@ -40,12 +41,19 @@ public class ColumnTypes {
     private static final Map<SqlTypeName, VoltType> CALC_TO_VOLT;
     private static final Map<VoltType, SqlTypeName> VOLT_TO_CALC;
 
+    private static<K, V> void tryAdd(Map<K, V> map, Pair<K, V> kv) {
+        final K key = kv.getFirst();
+        final V value = kv.getSecond();
+        Preconditions.checkState(!map.containsKey(key),
+                "Map already contains key " + key.toString());
+        map.put(key, value);
+    }
+
     static {
         Map<SqlTypeName, VoltType> calcToVolt = new HashMap<>();
         Map<VoltType, SqlTypeName> voltToCalc = new HashMap<>();
 
-        Stream.of(
-            Pair.of(VoltType.STRING, SqlTypeName.CHAR),
+        Stream.of(  // one-to-one mappings get added to both maps
             Pair.of(VoltType.STRING, SqlTypeName.VARCHAR),
             Pair.of(VoltType.VARBINARY, SqlTypeName.VARBINARY),
 
@@ -62,14 +70,23 @@ public class ColumnTypes {
 
             // Note - ethan - 12/28/2018:
             // Not sure this works well. Internally, VoltDB stores GEOGRAPHY as VARBINARY.
-            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOMETRY),
-            Pair.of(VoltType.GEOGRAPHY_POINT, SqlTypeName.GEOMETRY)
+            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOMETRY)
         ).forEach(types -> {
             final VoltType vt = types.getFirst();
             final SqlTypeName ct = types.getSecond();
-            calcToVolt.put(ct, vt);
-            voltToCalc.put(vt, ct);
+            tryAdd(calcToVolt, Pair.of(ct, vt));
+            tryAdd(voltToCalc, types);
         });
+
+        // more-to-one mappings only get to add to either map
+        Stream.of(
+                Pair.of(SqlTypeName.CHAR, VoltType.STRING),
+                Pair.of(SqlTypeName.BINARY, VoltType.VARBINARY),
+                Pair.of(SqlTypeName.DOUBLE, VoltType.FLOAT)
+        ).forEach(types -> tryAdd(calcToVolt, types));
+
+        Stream.of(Pair.of(VoltType.GEOGRAPHY_POINT, SqlTypeName.GEOMETRY))
+                .forEach(types -> tryAdd(voltToCalc, types));
 
         CALC_TO_VOLT = Collections.unmodifiableMap(calcToVolt);
         VOLT_TO_CALC = Collections.unmodifiableMap(voltToCalc);

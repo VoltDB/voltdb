@@ -28,7 +28,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.plannerv2.utils.VoltDBRexUtil;
+import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -131,7 +131,7 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
         OrderByPlanNode opn = null;
         RelCollation collation = getCollation();
         if (collation != null) {
-            opn = VoltDBRexUtil.collationToOrderByNode(collation, fieldExps);
+            opn = VoltRexUtil.collationToOrderByNode(collation, fieldExps);
         }
         AbstractPlanNode result;
         if (opn != null) {

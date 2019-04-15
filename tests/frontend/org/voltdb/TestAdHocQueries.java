@@ -1043,8 +1043,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                             try {
                                 assertContentOfTable(new Object[][]{{expectedResult}},
                                         env.m_client.callProcedure("@AdHoc", sql).getResults()[0]);
+                            } catch (AssertionError e) {
+                                fail(String.format("Assertion error on %s: %s", sql, e.getMessage()));
                             } catch (Exception e) {
-                                fail(String.format("Query %s have worked fine", sql));
+                                fail(String.format("Query %s should have worked fine", sql));
                             }
                         }
                     });

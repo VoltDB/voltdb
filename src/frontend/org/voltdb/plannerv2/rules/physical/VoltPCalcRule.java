@@ -43,17 +43,13 @@ public class VoltPCalcRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalCalc calc = call.rel(0);
-        RelNode input = calc.getInput();
-        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
-        RelNode convertedInput = convert(input,
+        final VoltLogicalCalc calc = call.rel(0);
+        final RelNode input = calc.getInput();
+        final RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
-        int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
+        final int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
         call.transformTo(new VoltPhysicalCalc(
-                calc.getCluster(),
-                convertedTraits,
-                convertedInput,
-                calc.getProgram(),
-                splitCount));
+                calc.getCluster(), calc.getTraitSet().replace(VoltPhysicalRel.CONVENTION),
+                convertedInput, calc.getProgram(), splitCount));
     }
 }
