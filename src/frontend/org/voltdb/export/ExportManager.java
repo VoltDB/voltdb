@@ -624,6 +624,9 @@ public class ExportManager
         }
 
         for (int partitionId : m_masterOfPartitions) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Set mastership on partition " + partitionId);
+            }
             generation.acceptMastership(partitionId);
         }
     }

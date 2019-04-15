@@ -1550,7 +1550,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         }
-        unacceptMastershipInternal();
+        unacceptMastership();
     }
 
     private void sendTakeMastershipMessage() {
@@ -1586,6 +1586,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } else {
             // There is no other replica, promote myself.
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("No replicas, accepting mastership");
+            }
             acceptMastership();
         }
     }
@@ -1620,7 +1623,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void unacceptMastershipInternal() {
+    /**
+     * Release mastership, always executed synchronously.
+     */
+    public void unacceptMastership() {
 
         exportLog.info("Releasing mastership for " + this);
         m_mastershipAccepted.set(false);
@@ -1630,28 +1636,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_newLeaderHostId = null;
     }
 
-    public void unacceptMastership() {
-        m_es.submit(new Runnable() {
-
-            @Override
-            public void run() {
-                unacceptMastershipInternal();
-            }
-        });
-    }
-
     /**
-     * On processor shutdown, release mastership and clear pending poll.
+     * On processor shutdown, synchronously release mastership and clear pending poll.
+     * Only called from the Catalog update path.
      */
     public void onProcessorShutdown() {
-        m_es.submit(new Runnable() {
-
-            @Override
-            public void run() {
-                unacceptMastershipInternal();
-                m_pollTask = null;
-            }
-        });
+        unacceptMastership();
+        m_pollTask = null;
     }
 
     /**
@@ -1670,7 +1661,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 try {
                     if (!m_es.isShutdown() || !m_closed) {
-                        exportLog.info("Accepting mastership for " + this);
+                        exportLog.info("Accepting mastership");
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
@@ -1888,6 +1879,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_newLeaderHostId = CoreUtils.getHostIdFromHSId(senderHsId);
                     // mark the trigger
                     m_seqNoToDrain = Math.min(m_seqNoToDrain, m_lastPushedSeqNo);
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Delay mastership response to seqNo " + m_seqNoToDrain);
+                    }
                     mastershipCheckpoint(m_lastReleasedSeqNo);
                 } else {
                     sendTakeMastershipResponse(senderHsId, requestId);
