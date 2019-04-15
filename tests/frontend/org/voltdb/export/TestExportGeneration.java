@@ -124,7 +124,7 @@ public class TestExportGeneration {
     int m_part = 2;
 
     final AtomicReference<CountDownLatch> m_mbxNotifyCdlRef =
-            new AtomicReference<>(new CountDownLatch(1));
+            new AtomicReference<>(null);
     final AtomicReference<Matcher<VoltMessage>> m_ackMatcherRef =
             new AtomicReference<>();
     LocalMailbox m_mbox;
@@ -142,7 +142,9 @@ public class TestExportGeneration {
         config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
-        processor.startPolling();
+        // Do NOT start the actual processor as we don't have an actual
+        // export client
+        // processor.startPolling();
         return processor;
     }
 
@@ -177,6 +179,7 @@ public class TestExportGeneration {
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                long seqNo = -1L;
                 if (message instanceof BinaryPayloadMessage) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
                     ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
@@ -185,7 +188,19 @@ public class TestExportGeneration {
                     if (msgType != ExportManager.RELEASE_BUFFER) {
                         return;
                     }
+                    final int partition = buf.getInt();
+                    final int length = buf.getInt();
+                    byte stringBytes[] = new byte[length];
+                    buf.get(stringBytes);
+                    seqNo = buf.getLong();
                 }
+                if (message == null) {
+                    System.out.println("XXX NULL message");
+                }
+                if (m_ackMatcherRef.get() == null) {
+                    System.out.println("XXX NULL ackMatcher for seqNo " + seqNo);
+                }
+                System.out.println("XXX run ackMatcher for seqNo " + seqNo);
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -211,10 +226,10 @@ public class TestExportGeneration {
         }
 
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
-        m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
+        // Make sure the test EDS is always ready for polling
+        m_expDs.setReadyForPolling(true);
 
-        // Start polling
-        processor.readyForData();
+        m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
 
     @After
@@ -227,11 +242,9 @@ public class TestExportGeneration {
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
+
         // Promote the data source to be master first, otherwise it won't send acks.
         m_exportGeneration.acceptMastership(m_part);
-
-        // FIXME: must have a smarter wait on mastership
-        Thread.sleep(1000);
 
         int retries = 4000;
         long seqNo = 1L;
@@ -239,7 +252,7 @@ public class TestExportGeneration {
 
         while( --retries >= 0 && ! active) {
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
+            System.out.println("XXX set ackMatcher");
             m_exportGeneration.pushExportBuffer(
                     m_part,
                     m_streamName,
@@ -252,7 +265,9 @@ public class TestExportGeneration {
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
+
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
 
             cont.discard();
 
