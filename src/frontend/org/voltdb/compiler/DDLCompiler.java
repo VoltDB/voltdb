@@ -1299,9 +1299,11 @@ public class DDLCompiler {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-        final boolean isStream = (node.attributes.get("stream") != null);
+        final boolean isStream = node.attributes.get("stream") != null
+                && node.attributes.get("stream").equalsIgnoreCase("true");
         final String streamTarget = node.attributes.get("export");
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
+
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed;

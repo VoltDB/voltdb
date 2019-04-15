@@ -23,21 +23,20 @@
 
 package org.voltdb;
 
-import java.io.File;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -58,21 +57,18 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        m_verifier.m_verifySequenceNumber = false;
     }
 
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
         System.out.println("Shutting down client and server");
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
     }
 
     public void testExportDataAfterCatalogUpdateDropAndAdd() throws Exception {
@@ -85,20 +81,17 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testExportDataAfterCatalogUpdateDropAndAdd");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
         ClientResponse response;
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "ex" + i;
-            response = client.callProcedure("@AdHoc", "create stream " + tab + " partition on column i (i integer not null)");
+            response = client.callProcedure("@AdHoc", "create stream " + tab +
+                    " partition on column i export to target " + tab + " (i integer not null)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             response = client.callProcedure("@AdHoc", "insert into " + tab + " values(111)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         //create a non stream table
         for (int i = 0; i < numOfStreams; i++) {
@@ -110,7 +103,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         //drop a non stream table
         for (int i = 0; i < numOfStreams; i++) {
@@ -122,7 +115,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         //create a stream view table
         for (int i = 0; i < numOfStreams; i++) {
@@ -134,20 +127,21 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         if (MiscUtils.isPro() ) {
             // drop a new stream table
             for (int i = 0; i < numOfStreams; i++) {
                 String newtab = "nex" + i;
                 String etab = "ex" + i;
-                response = client.callProcedure("@AdHoc", "create stream " + newtab + " partition on column i (i integer not null)");
+                response = client.callProcedure("@AdHoc", "create stream " + newtab +
+                        " partition on column i export to target " + newtab + " (i integer not null)");
                 assertEquals(response.getStatus(), ClientResponse.SUCCESS);
                 response = client.callProcedure("@AdHoc", "insert into " + etab + " values(444)");
                 assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             }
             //We should consume all again.
-            waitForStreamedTableAllocatedMemoryZero(client);
+            waitForStreamedTargetAllocatedMemoryZero(client);
         }
 
         //drop a stream view table
@@ -160,7 +154,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
 
         for (int i = 0; i < numOfStreams; i++) {
@@ -168,19 +162,27 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
             response = client.callProcedure("@AdHoc", "drop stream " + tab);
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
-        //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+
+        if (MiscUtils.isPro()) {
+            // In the Pro path of the test the NEX streams don't get dropped
+            waitForStreamedTargetAllocatedMemoryZero(client);
+        }
+        else {
+            //After drop there should be no stats rows for export.
+            waitForStreamedTargetDeallocated(client);
+        }
 
         //recreate tables and export again
         for (int i = 0; i < numOfStreams; i++) {
             String tab = "ex" + i;
-            response = client.callProcedure("@AdHoc", "create stream " + tab + " (i integer)");
+            response = client.callProcedure("@AdHoc", "create stream " + tab +
+                    " export to target " + tab + " (i integer)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
             response = client.callProcedure("@AdHoc", "insert into " + tab + " values(111)");
             assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         }
         //We should consume all again.
-        waitForStreamedTableAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         // must still be able to verify the export data.
         client.close();
@@ -196,10 +198,6 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testExportDataAfterNonEEUpdate");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
         ClientResponse response;
         response = client.callProcedure("@AdHoc", "create table funny (i integer, j integer);");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
@@ -251,10 +249,6 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testInsertDataBeforeCatalogUpdate");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         client.callProcedure("@AdHoc", "create stream ex partition on column i (i integer not null)");
         client.callProcedure("@AdHoc", "insert into ex values(111)");
@@ -281,21 +275,20 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testCatalogUpdateNonEmptyExport");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
-        closeClientAndServer();
-        client.callProcedure("@AdHoc", "create stream ex (i integer not null)");
+        closeSocketExporterClientAndServer();
+        client.callProcedure("@AdHoc", "create stream ex partition on column i export to target ex (i integer not null)");
         StringBuilder insertSql = new StringBuilder();
+        Object[] param = new Object[2];
+        Arrays.fill(param, 1);
         for (int i=0;i<50;i++) {
-             insertSql.append("insert into ex values(" + i + ");");
+            param[1] = i;
+            m_verifier.addRow(client, "ex", i, param);
+            insertSql.append("insert into ex values(" + i + ");");
         }
         client.callProcedure("@AdHoc", insertSql.toString());
 
         startListener();
-        m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        quiesceAndVerifyStream(client,m_verifier);
+        quiesceAndVerifyTarget(client,m_verifier);
 
         // must still be able to verify the export data.
         client.close();
@@ -310,11 +303,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testLongTableSignature");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
-        closeClientAndServer();
+        closeSocketExporterClientAndServer();
         client.callProcedure("@AdHoc", "create stream tenletters (" +
                 "c1  varchar(20)," +
                 "c2  tinyint," +
@@ -443,12 +432,6 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         }
         System.out.println("testExportTableWithGeoTypes");
         Client client = getClient();
-        ClientResponse response;
-
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         client.callProcedure("@AdHoc", "create stream foo ( id integer not null," +
                                                          " region geography not null);" +
@@ -457,7 +440,7 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         // drop the tables
         String ddl = "drop stream foo;\n" +
                 "drop stream foobar;\n";
-        response = client.callProcedure("@AdHoc", ddl);
+        ClientResponse response = client.callProcedure("@AdHoc", ddl);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         quiesce(client);
@@ -487,6 +470,19 @@ public class TestExportLiveDDLSuiteLegacy extends TestExportBaseSocketExport {
         project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         wireupExportTableToSocketExport("ex");
+        int numOfStreams = 2;
+        if (MiscUtils.isPro()) {
+            numOfStreams += 2;
+        }
+        for (int i = 0; i < numOfStreams; i++) {
+            wireupExportTableToSocketExport("ex" + i);
+        }
+
+        if (MiscUtils.isPro()) {
+            for (int i = 0; i < numOfStreams; i++) {
+                wireupExportTableToSocketExport("nex" + i);
+            }
+        }
 
         /*
          * compile the catalog all tests start with

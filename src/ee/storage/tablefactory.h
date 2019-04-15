@@ -85,8 +85,7 @@ public:
         char *signature,
         bool tableIsMaterialized = false,
         int partitionColumn = 0, // defaults provided for ease of testing.
-        bool exportEnabled = false,
-        bool exportOnly = false,
+        TableType tableType = PERSISTENT,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
         int32_t compactionThreshold = 95,

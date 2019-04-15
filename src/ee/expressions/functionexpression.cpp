@@ -143,6 +143,10 @@ namespace functionexpression {
             return m_child->hasParameter();
          }
 
+         const std::vector<AbstractExpression*> getArgs() const override {
+            return std::vector<AbstractExpression*>(1, m_child);
+         }
+
          NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
             assert (m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
@@ -178,6 +182,10 @@ namespace functionexpression {
                   }
                }
                return false;
+            }
+
+            const std::vector<AbstractExpression*> getArgs() const override {
+               return m_args;
             }
 
             NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -226,6 +234,10 @@ namespace functionexpression {
                }
             }
             return false;
+         }
+
+         const std::vector<AbstractExpression*> getArgs() const override {
+            return m_args;
          }
 
          NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {

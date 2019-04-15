@@ -1238,9 +1238,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
-        return m_ee.getUSOForExportTable(signature);
+        return m_ee.getUSOForExportTable(streamName);
     }
 
     @Override
@@ -1412,10 +1412,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void exportAction(boolean syncAction,
                              long uso,
                              Long sequenceNumber,
-                             Integer partitionId, String tableSignature)
+                             Integer partitionId, String streamName)
     {
         m_ee.exportAction(syncAction, uso, sequenceNumber,
-                          partitionId, tableSignature);
+                          partitionId, streamName);
+    }
+
+    @Override
+    public int deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
+    {
+        return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
+                tableName, deletableTxnId, maxRowCount, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1485,9 +1497,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
-                    catalogTable.getSignature());
+                    catalogTable.getTypeName());
             // assign the stats to the other partition's value
-            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getSignature(),
+            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
                     false, true, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
         }
 
@@ -1862,5 +1874,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return m_loadedProcedures.getMigrateProcRunner(procName, catTable, column, op);
     }
 }

@@ -50,6 +50,7 @@
 
 namespace voltdb {
 
+const std::vector<AbstractExpression*> AbstractExpression::empty_expression;
 // ------------------------------------------------------------------
 // AbstractExpression
 // ------------------------------------------------------------------

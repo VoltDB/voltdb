@@ -109,6 +109,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -626,6 +627,65 @@ public abstract class CatalogUtil {
         return exportTables.build();
     }
 
+    public static NavigableSet<Table> getExportTablesExcludeViewOnly(CatalogMap<Connector> connectors) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : connectors) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                Table t = tinfo.getTable();
+                if (t.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
+                exportTables.add(t);
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
+
+        if (!logger.isDebugEnabled()) return;
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        logger.debug(sb.toString());
+    }
+
     public static NavigableSet<String> getExportTableNames(Database db) {
         ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
         for (Connector connector : db.getConnectors()) {
@@ -637,7 +697,7 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a streamed / export table
+     * Return true if a table is a stream
      * This function is duplicated in CatalogUtil.h
      * @param database
      * @param table
@@ -645,19 +705,24 @@ public abstract class CatalogUtil {
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table) {
-        // This implementation uses connectors instead of just looking at the tableType
-        // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
-        for (Connector connector : database.getConnectors()) {
-            // iterate the connector tableinfo list looking for tableIndex
-            // tableInfo has a reference to a table - can compare the reference
-            // to the desired table by looking at the relative index. ick.
-            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                    return true;
+        if (TableType.isInvalidType(table.getTabletype())) {
+            // This implementation uses connectors instead of just looking at the tableType
+            // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
+            for (Connector connector : database.getConnectors()) {
+                // iterate the connector tableinfo list looking for tableIndex
+                // tableInfo has a reference to a table - can compare the reference
+                // to the desired table by looking at the relative index. ick.
+                for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                    if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                        return true;
+                    }
                 }
             }
+            // Found no connectors
+            return false;
+        } else {
+            return TableType.isStream(table.getTabletype());
         }
-        return false;
     }
 
     public static boolean isExportEnabled() {
@@ -2483,10 +2548,6 @@ public abstract class CatalogUtil {
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        // create the previous catalog bytes zk node
-        zk.create(VoltZK.catalogbytesPrevious,
-                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     /**
@@ -3174,7 +3235,7 @@ public abstract class CatalogUtil {
         Map<String, Table> ttls = Maps.newHashMap();
         for (Table t : db.getTables()) {
             if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
-                ttls.put(t.getTypeName(),t);
+                ttls.put(t.getTypeName().toLowerCase(),t);
             }
         }
         return ttls;
@@ -3189,5 +3250,15 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+    public static int getPersistentMigrateBatchSize(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null && table.getTimetolive() != null ) {
+            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (ttl != null && !StringUtil.isEmpty(ttl.getMigrationtarget())) {
+                return ttl.getBatchsize();
+            }
+        }
+        return -1;
     }
 }

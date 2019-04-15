@@ -36,7 +36,8 @@ def check_exporter(runner):
         time.sleep(1)
         if last_table_stat_time > 1:
             curr_table_stat_time = check_export_stats(runner, export_tables_with_data, last_table_stat_time)
-            if last_table_stat_time == 1 or curr_table_stat_time > last_table_stat_time:
+            if last_table_stat_time == 1 or curr_table_stat_time == 1 or curr_table_stat_time > last_table_stat_time:
+                last_table_stat_time = curr_table_stat_time
                 # have a new sample from table stat cache or there are no tables
                 if not export_tables_with_data:
                     runner.info('All exporter transactions have been processed.')
@@ -206,10 +207,12 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
     collection_time = 0
     if not resp.table_count() > 0:
         # this is an empty database and we don't need to wait for export to drain
+        export_tables_with_data.clear()
         return 1
     else:
         tablestats = resp.table(0)
         if len(tablestats.tuples()) == 0:
+            export_tables_with_data.clear()
             return 1
         firsttuple = tablestats.tuple(0)
         if firsttuple.column(0) == last_collection_time:

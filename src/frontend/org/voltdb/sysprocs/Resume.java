@@ -37,6 +37,7 @@ import org.voltdb.snmp.SnmpTrapSender;
 
 public class Resume extends VoltSystemProcedure {
 
+    protected volatile Stat m_stat = null;
     private final static OperationMode RUNNING = OperationMode.RUNNING;
     @Override
     public long[] getPlanFragmentIds() {
@@ -86,6 +87,7 @@ public class Resume extends VoltSystemProcedure {
                     }
                 } while (zkMode != RUNNING && code == Code.BADVERSION);
 
+                m_stat = stat;
                 voltdb.getHostMessenger().unpause();
                 voltdb.setMode(RUNNING);
                 // for snmp

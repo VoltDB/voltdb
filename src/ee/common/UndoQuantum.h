@@ -139,6 +139,8 @@ public:
        return m_dataPool;
     }
 
+    inline const UndoReleaseAction* getLastUndoActionForTest() { return m_undoActions.back(); }
+
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
 private:
     const int64_t m_undoToken;

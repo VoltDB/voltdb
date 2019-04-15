@@ -30,6 +30,7 @@
 	<classpathentry kind="lib" path="lib/owner-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/owner-java8-1.0.10.jar"/>
 	<classpathentry kind="lib" path="lib/snmp4j-2.5.2.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/byte-buddy-1.9.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/mockito-core-2.24.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/powermock-core-2.0.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/powermock-api-mockito2-2.0.0.jar"/>
@@ -41,7 +42,7 @@
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
 
-     <classpathentry kind="lib" path="lib/kafka-clients-0.10.2.1.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-clients-0.10.2.1.jar"/>
 
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
@@ -70,9 +71,9 @@
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
-    <!-- zkclient is used for test only -->
+	<!-- zkclient is used for test only -->
 	<classpathentry kind="lib" path="third_party/java/jars/zkclient-0.10.jar"/>
-    <!-- regular zookeeper server 3.4.10 is used for test only -->
+	<!-- regular zookeeper server 3.4.10 is used for test only -->
 	<classpathentry kind="lib" path="third_party/java/jars/zookeeper-3.4.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-io-1.4.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/httpclient-4.3.4-tests.jar"/>

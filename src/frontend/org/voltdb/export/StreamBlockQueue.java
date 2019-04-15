@@ -45,19 +45,26 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    -- Segment Header ---
- *    crc(8) + numberOfEntries(4) + totalBytes(4)
- *    -- Export Segment Header ---
+ *    (defined in PBDSegment.java, see comments for segment header layout)
+ *
+ *    -- Export Extra Segment Header ---
  *    exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length) +
- *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) +
+ *    colType(1) + colLength(4) + ...
+ *
  *    --- Common Entry Header   ---
- *    crc(8) + length(4) + flags(4)
+ *   (defined in PBDSegment.java, see comments for entry header layout)
+ *
  *    --- Export Entry Header   ---
- *    seqNo(8) + tupleCount(4) + uniqueId(8)
+ *    seqNo(8) + committedSeqNo(8) + tupleCount(4) + uniqueId(8)
+ *
  *    --- Row Header      ---
  *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
  *    nullArrayLength(4) + nullArray(var length)
+ *
  *    --- Metadata        ---
  *    TxnId(8) + timestamp(8) + seqNo(8) + partitionId(8) + siteId(8) + exportOperation(1)
+ *
  *    --- Row Data        ---
  *    rowData(var length)
  *
@@ -131,6 +138,9 @@ public class StreamBlockQueue {
         }
 
         if (cont == null) {
+            if (schemaCont != null) {
+                schemaCont.discard();
+            }
             return null;
         } else {
             long segmentIndex = m_reader.getSegmentIndex();
@@ -138,13 +148,16 @@ public class StreamBlockQueue {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long seqNo = cont.b().getLong(StreamBlock.SEQUENCE_NUMBER_OFFSET);
+            long committedSeqNo = cont.b().getLong(StreamBlock.COMMIT_SEQUENCE_NUMBER_OFFSET);
             int tupleCount = cont.b().getInt(StreamBlock.ROW_NUMBER_OFFSET);
             long uniqueId = cont.b().getLong(StreamBlock.UNIQUE_ID_OFFSET);
+
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 schemaCont,
                 seqNo,
+                committedSeqNo,
                 tupleCount,
                 uniqueId,
                 segmentIndex,
@@ -337,6 +350,7 @@ public class StreamBlockQueue {
                     if (startSequenceNumber > truncationSeqNo) {
                         return PersistentBinaryDeque.fullTruncateResponse();
                     }
+                    final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
                     final int tupleCountPos = b.position();
                     final int tupleCount = b.getInt();
                     // There is nothing to do with this buffer
@@ -394,6 +408,7 @@ public class StreamBlockQueue {
                 ByteOrder endianness = b.order();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
+                final long committedSequenceNumber = b.getLong();
                 final int tupleCount = b.getInt();
                 b.order(endianness);
                 tracker.addRange(startSequenceNumber, startSequenceNumber + tupleCount - 1);
