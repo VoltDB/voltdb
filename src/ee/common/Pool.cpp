@@ -28,64 +28,24 @@
 using namespace voltdb;
 
 #ifndef MEMCHECK
-/*
- * Find next higher power of two
- * From http://en.wikipedia.org/wiki/Power_of_two
- * This is only used in USE_MMAP branch.
- */
-//template <class T> inline T nexthigher(T k) {
-//   if (k == 0)
-//      return 1;
-//   k--;
-//   for (int i=1; i<sizeof(T)*CHAR_BIT; i<<=1)
-//      k = k | k >> i;
-//   return k+1;
-//}
 
 Pool::Pool(): m_chunkSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0), m_oversizeChunkSize(0) {
    init();
 }
 
 Pool::Pool(uint64_t chunkSize, uint64_t maxChunkCount) :
-#ifdef USE_MMAP
-#error "Not using mmap"
-//   m_chunkSize(nexthigher(chunkSize)),
-#else
    m_chunkSize(chunkSize),
-#endif
    m_maxChunkCount(maxChunkCount), m_currentChunkIndex(0), m_oversizeChunkSize(0)
 {
    init();
 }
 
 void Pool::init() {
-#ifdef USE_MMAP
-//      char *storage =
-//         static_cast<char*>(::mmap( 0, m_chunkSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-//      if (storage == MAP_FAILED) {
-//         std::cout << strerror( errno ) << std::endl;
-//         throwFatalException("Failed mmap");
-//      }
-#endif
    m_chunks.reserve(m_maxChunkCount);
    m_chunks.emplace_back(m_chunkSize, 0);
 }
 
 Pool::~Pool() {
-#ifdef USE_MMAP
-//   for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
-//         if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-//            std::cout << strerror( errno ) << std::endl;
-//            throwFatalException("Failed munmap");    // NOTE: this is all wrong, but since we never USE_MMAP, we got no complaints whatsoever.
-//         }
-//   }
-//   for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
-//         if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-//            std::cout << strerror( errno ) << std::endl;
-//            throwFatalException("Failed munmap");
-//         }
-//   }
-#endif
 }
 
 void* Pool::allocate(std::size_t size) {
@@ -104,14 +64,6 @@ void* Pool::allocate(std::size_t size) {
           * Allocate an oversize chunk that will not be reused,
           * i.e. reclaimed in call to purge() method.
           */
-#ifdef USE_MMAP
-//         char *storage =
-//            static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-//         if (storage == MAP_FAILED) {
-//            std::cout << strerror( errno ) << std::endl;
-//            throwFatalException("Failed mmap");
-//         }
-#endif
          m_oversizeChunks.emplace_back(new char[size]);
          m_oversizeChunkSize += size;
          return m_oversizeChunks.back().get();
@@ -129,14 +81,6 @@ void* Pool::allocate(std::size_t size) {
                      "into structuring our pool sizes and allocations so the this doesn't "
                      "happen frequently");
             }
-#ifdef USE_MMAP
-//            char *storage =
-//               static_cast<char*>(::mmap( 0, m_chunkSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-//            if (storage == MAP_FAILED) {
-//               std::cout << strerror( errno ) << std::endl;
-//               throwFatalException("Failed mmap");
-//            }
-#endif
             m_chunks.emplace_back(m_chunkSize, size);    // and adjust chunk's offset
             return m_chunks.back().data();
          }
@@ -165,15 +109,6 @@ void Pool::purge() throw() {
    /*
     * Erase any oversize chunks that were allocated
     */
-#ifdef USE_MMAP
-//   const std::size_t numOversizeChunks = m_oversizeChunks.size();
-//   for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
-//      if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-//         std::cout << strerror( errno ) << std::endl;
-//         throwFatalException("Failed munmap");
-//      }
-//   }
-#endif
    m_oversizeChunks.clear();
    m_oversizeChunkSize = 0;
 
@@ -187,14 +122,6 @@ void Pool::purge() throw() {
     * If more than maxChunkCount chunks are allocated erase all extra chunks
     */
    if (numChunks > m_maxChunkCount) {
-#ifdef USE_MMAP
-//      for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
-//         if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-//            std::cout << strerror( errno ) << std::endl;
-//            throwFatalException("Failed munmap");
-//         }
-//      }
-#endif
       m_chunks.erase(std::next(m_chunks.begin(), m_maxChunkCount), m_chunks.end());
    }
 #ifdef MODERN_CXX
@@ -222,11 +149,3 @@ void Pool::purge() throw() {
 }
 
 #endif
-
-// Global shared pool for heteregeous STL container with
-// customized allocator: 1024 of 16KB chunks, totaling 4MB
-// of high-watermark overhead.
-Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
-std::mutex VoltAllocResourceMng::s_allocMutex;
-volatile sig_atomic_t VoltAllocResourceMng::s_numInstances = 0;
-

@@ -411,18 +411,6 @@ CREATE TABLE ENG_539 (
   PRIMARY KEY (ID)
 );
 
-create table swapper_table_foo (
-       i integer,
-       j varchar(32),
-       primary key (i)
-);
-
-create table swapper_table_bar (
-       i integer,
-       j varchar(32),
-       primary key (i)
-);
-
 -- Tables for reproducer for ENG-13852
 CREATE TABLE ENG_13852_P5 (
        ID      INTEGER  NOT NULL,
