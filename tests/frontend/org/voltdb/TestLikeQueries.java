@@ -151,7 +151,8 @@ public class TestLikeQueries extends TestCase {
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
-            new LikeTest("â_x一xxéyyԱ", 1),
+            // ENG-15264
+//            new LikeTest("â_x一xxéyyԱ", 1),
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };
 
