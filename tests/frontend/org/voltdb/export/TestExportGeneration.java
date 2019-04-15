@@ -142,6 +142,7 @@ public class TestExportGeneration {
         config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
+        processor.startPolling();
         return processor;
     }
 
@@ -165,6 +166,9 @@ public class TestExportGeneration {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
         m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
+
+        ExportDataProcessor processor = getProcessor();
+        processor.setExportGeneration(m_exportGeneration);
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
@@ -208,6 +212,9 @@ public class TestExportGeneration {
 
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
+
+        // Start polling
+        processor.readyForData();
     }
 
     @After
@@ -220,17 +227,19 @@ public class TestExportGeneration {
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
-        final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
-        promoted.await(5, TimeUnit.SECONDS);
+
+        // FIXME: must have a smarter wait on mastership
+        Thread.sleep(1000);
 
         int retries = 4000;
         long seqNo = 1L;
         boolean active = false;
 
         while( --retries >= 0 && ! active) {
+
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
             m_exportGeneration.pushExportBuffer(
                     m_part,
                     m_streamName,
@@ -243,8 +252,6 @@ public class TestExportGeneration {
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
-
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
 
             cont.discard();

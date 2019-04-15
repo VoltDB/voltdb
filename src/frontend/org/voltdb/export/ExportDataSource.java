@@ -144,7 +144,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
-    private Runnable m_onMastership;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
     // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
@@ -436,6 +435,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void setReadyForPolling(boolean readyForPolling) {
         m_readyForPolling = readyForPolling;
+        if (m_readyForPolling) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    if (m_readyForPolling && isMaster() && m_pollTask != null) {
+                        exportLog.info("Newly ready for polling master executes pending poll");
+                        pollImpl(m_pollTask);
+                    }
+                }
+            });
+        }
     }
 
     public void markInCatalog(boolean inCatalog) {
@@ -452,6 +462,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private int getGenerationCatalogVersion() {
         return m_generation == null ? 0 : m_generation.getCatalogVersion();
+    }
+
+    // Package private as only used for tests
+    boolean isMaster() {
+        return m_mastershipAccepted.get();
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -994,25 +1009,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         return;
                     }
-
-                    // ENG-14488, it's possible to have the export master gives up mastership
-                    // but still try to poll immediately after that, e.g. from Pico Network
-                    // thread the master gives up mastership, from decoder thread it tries to
-                    // poll periodically, they won't overlap but poll can happen after giving up
-                    // mastership. If it happens m_pollFuture can be mistakingly set, and when
-                    // the old master retakes mastership again it refuses to export because
-                    // m_pollFuture should be false on a fresh master.
-                    //
-                    // Add following check to eliminate this window.
-                    if (!m_mastershipAccepted.get()) {
-                        try {
-                            pollTask.clear();
-                        } catch (RejectedExecutionException rej) {
-                            // Ignore: the {@code GuestProcessor} was shut down
-                        }
-                        return;
-                    }
-
                     try {
                         if (!m_es.isShutdown()) {
                             pollImpl(pollTask);
@@ -1051,7 +1047,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
                             + ", discarding buffer (rows may be lost)."));
                 } catch (RejectedExecutionException reex) {
-                    /* Ignore */
+                    exportLog.error("Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
+                            + ", discarding buffer (rows may be lost).");
                 }
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Pending " + m_pendingContainer.get().toString()
@@ -1162,7 +1159,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         try {
-            handleDrainedSource();
+            if (handleDrainedSource()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Exiting a drained source");
+                }
+                return;
+            }
+
+            // Handle all obvious cases where we must defer responding to this poll
+            // Note that once m_pollTask is set we're called on each buffer push
+            if (!m_mastershipAccepted.get() || !m_readyForPolling) {
+                if (m_pollTask == null) {
+                    // Memorize the outstanding poll
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Memorize polling for " + m_firstUnpolledSeqNo);
+                    }
+                    m_pollTask = pollTask;
+                }
+                return;
+            }
 
             // Poll pending container before polling m_committedBuffers
             if (m_pendingContainer.get() != null) {
@@ -1457,7 +1472,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
       *
       * @throws IOException
       */
-     private void handleDrainedSource() throws IOException {
+     private boolean handleDrainedSource() throws IOException {
          if (!inCatalog() && m_committedBuffers.isEmpty()) {
              //Returning null indicates end of stream
              try {
@@ -1469,8 +1484,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
              }
              m_pollTask = null;
              m_generation.onSourceDrained(m_partitionId, m_tableName);
-             return;
+             return true;
          }
+         return false;
      }
 
      /**
@@ -1608,14 +1624,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         exportLog.info("Releasing mastership for " + this);
         m_mastershipAccepted.set(false);
-        try {
-        if (m_pollTask != null) {
-            m_pollTask.setFuture(null);
-        }
-        } catch (RejectedExecutionException reex) {
-            // Ignore, {@code GuestProcessor} was closed
-        }
-        m_pollTask = null;
 
         m_readyForPolling = false;
         m_seqNoToDrain = Long.MAX_VALUE;
@@ -1633,6 +1641,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
+     * On processor shutdown, release mastership and clear pending poll.
+     */
+    public void onProcessorShutdown() {
+        m_es.submit(new Runnable() {
+
+            @Override
+            public void run() {
+                unacceptMastershipInternal();
+                m_pollTask = null;
+            }
+        });
+    }
+
+    /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
@@ -1640,12 +1662,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (m_onMastership == null) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
-                    }
-                    return;
-                }
                 if (m_mastershipAccepted.get()) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
@@ -1658,15 +1674,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
-                            // ENG-15811 - not sure that the {@code GuestProcessor} is not already
-                            // running when we get there.
                             // FIXME: must remove info messages
                             if (m_pollTask != null) {
                                 exportLog.info("New master executes pending poll");
                                 pollImpl(m_pollTask);
-                            } else {
-                                exportLog.info("New master runs decoder");
-                                m_onMastership.run();
                             }
                         }
                     }
@@ -1677,31 +1688,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    /**
-     * set the runnable task that is to be executed on mastership designation
-     *
-     * @param toBeRunOnMastership a {@link @Runnable} task
-     * @param runEveryWhere       Set if connector "replicated" property is set to true Like replicated table, every
-     *                            replicated export stream is its own master.
-     */
-    public void setOnMastership(Runnable toBeRunOnMastership) {
-        Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
-        m_onMastership = toBeRunOnMastership;
-        // If connector "replicated" property is set to true then every
-        // replicated export stream is its own master
-        if (m_runEveryWhere) {
-            //export stream for run-everywhere clients doesn't need ack mailbox
-            m_ackMailboxRefs.set(null);
-            acceptMastership();
-        }
-    }
-
     public void setRunEveryWhere(boolean runEveryWhere) {
         if (exportLog.isDebugEnabled() && runEveryWhere != m_runEveryWhere) {
             exportLog.debug("Change " + toString() + " to " +
                     (runEveryWhere ? "replicated stream" : " non-replicated stream"));
         }
         m_runEveryWhere = runEveryWhere;
+        if (m_runEveryWhere) {
+            //export stream for run-everywhere clients doesn't need ack mailbox
+            m_ackMailboxRefs.set(null);
+        }
     }
 
     public ExportFormat getExportFormat() {

@@ -1026,13 +1026,13 @@ public class ExportGeneration implements Generation {
     }
 
     /**
-     * Signal all EDS to drop mastership. This is done asynchronously.
+     * Relay processor shutdown to all EDS. This is done asynchronously.
      */
-    public void unacceptMastership() {
+    public void onProcessorShutdown() {
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : partitionDataSourceMap.values()) {
-                    source.unacceptMastership();
+                    source.onProcessorShutdown();
                 }
             }
         }
