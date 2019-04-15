@@ -37,7 +37,7 @@ public interface Generation {
 
     public void pushExportBuffer(int partitionId, String signature,
                                 long seqNo, long committedSeqNo, int tupleCount,
-                                 long uniqueId, long genId, ByteBuffer buffer, boolean sync);
+                                 long uniqueId, long genId, ByteBuffer buffer);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, boolean isRejoin,
                                                 Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,

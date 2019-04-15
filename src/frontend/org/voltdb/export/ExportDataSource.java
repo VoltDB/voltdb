@@ -808,8 +808,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final int tupleCount,
             final long uniqueId,
             final long genId,
-            final ByteBuffer buffer,
-            final boolean sync) {
+            final ByteBuffer buffer) {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
@@ -844,16 +843,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             }));
-            if (sync) {
-                try {
-                    //Don't do a real sync, just write the in memory buffers
-                    //to a file. Blocking snapshot will do the fsync
-                    ListenableFuture<?> rslt = sync(true);
-                    rslt.get();
-                } catch (ExecutionException | InterruptedException e) {
-                    // swallow the exception since IOException will perform a CrashLocal
-                }
-            }
         } catch (RejectedExecutionException rej) {
             m_bufferPushPermits.release();
             //We are shutting down very much rolling generation so dont passup for error reporting.
@@ -894,23 +883,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private class SyncRunnable implements Runnable {
-        private final boolean m_nofsync;
-        SyncRunnable(final boolean nofsync) {
-            this.m_nofsync = nofsync;
-        }
-
         @Override
         public void run() {
             try {
-                m_committedBuffers.sync(m_nofsync);
+                m_committedBuffers.sync();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
     }
 
-    public ListenableFuture<?> sync(final boolean nofsync) {
-        return m_es.submit(new SyncRunnable(nofsync));
+    public ListenableFuture<?> sync() {
+        return m_es.submit(new SyncRunnable());
     }
 
     public boolean isClosed() {

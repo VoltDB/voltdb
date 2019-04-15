@@ -296,13 +296,8 @@ public class StreamBlockQueue {
         }
     }
 
-    /*
-     * This is a no-op now with nofsync=true
-     */
-    public void sync(boolean nofsync) throws IOException {
-        if (!nofsync) {
-            m_persistentDeque.sync();
-        }
+    public void sync() throws IOException {
+        m_persistentDeque.sync();
     }
 
     // Only used in tests, should be removed.
@@ -319,7 +314,7 @@ public class StreamBlockQueue {
     }
 
     public void close() throws IOException {
-        sync(true);
+        sync();
         m_persistentDeque.close();
         for (StreamBlock sb : m_memoryDeque) {
             sb.discard();

@@ -682,8 +682,7 @@ public class ExportManager
             long uniqueId,
             long genId,
             long bufferPtr,
-            ByteBuffer buffer,
-            boolean sync) {
+            ByteBuffer buffer) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -697,7 +696,7 @@ public class ExportManager
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, genId, buffer, sync);
+                    (int)tupleCount, uniqueId, genId, buffer);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
@@ -718,13 +717,13 @@ public class ExportManager
         }
     }
 
-    public static synchronized void sync(final boolean nofsync) {
+    public static synchronized void sync() {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
         ExportGeneration generation = instance().m_generation.get();
         if (generation != null) {
-            generation.sync(nofsync);
+            generation.sync();
         }
     }
 

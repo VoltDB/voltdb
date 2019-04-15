@@ -874,7 +874,7 @@ public class ExportGeneration implements Generation {
     @Override
     public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, long committedSequenceNumber,
-            int tupleCount, long uniqueId, long genId, ByteBuffer buffer, boolean sync) {
+            int tupleCount, long uniqueId, long genId, ByteBuffer buffer) {
 
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
@@ -895,7 +895,7 @@ public class ExportGeneration implements Generation {
              */
             exportLog.info("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
-                    + "seq: " + startSequenceNumber + ", count: " + tupleCount + ", sync:" + sync
+                    + "seq: " + startSequenceNumber + ", count: " + tupleCount
                     + ") is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
@@ -904,7 +904,7 @@ public class ExportGeneration implements Generation {
         }
 
         source.pushExportBuffer(startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, genId, buffer, sync);
+                tupleCount, uniqueId, genId, buffer);
     }
 
     private void cleanup() {
@@ -976,12 +976,12 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    public void sync(final boolean nofsync) {
+    public void sync() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : dataSources.values()) {
-                    ListenableFuture<?> syncFuture = source.sync(nofsync);
+                    ListenableFuture<?> syncFuture = source.sync();
                     if (syncFuture != null)
                         tasks.add(syncFuture);
                 }
