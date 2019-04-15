@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Strings;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -1785,6 +1786,34 @@ public class TestCSVLoader {
         String currentTime = new TimestampType().toString();
         String []myData = {
                 "1 ,1,1,11111111,first,2000000000000000000000000000000.000000000000,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+        };
+        int invalidLineCnt = 1;
+        int validLineCnt = 0;
+
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    @Test(timeout=2000)
+    public void testBadString() throws Exception {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String longString = Strings.repeat("a", (1024*1024)+1);
+        assertTrue(longString.length() > (1024*1024));
+        String []myData = {
+                "1 ,1,1,11111111,\""+longString+"\",2.0,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
         };
         int invalidLineCnt = 1;
         int validLineCnt = 0;
