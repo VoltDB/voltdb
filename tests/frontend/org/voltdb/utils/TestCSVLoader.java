@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Strings;
+import com.google_voltpatches.common.base.Strings;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
