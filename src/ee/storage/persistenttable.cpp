@@ -803,7 +803,8 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    } catch (ConstraintFailureException& e) {
+    }
+    catch (ConstraintFailureException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     } catch (TupleStreamException& e) {
@@ -867,6 +868,14 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     TableTuple conflict(m_schema);
     try {
         tryInsertOnAllIndexes(&target, &conflict);
+
+        // from stream snapshot/rejoin, add it to migrating index
+        if (m_shadowStream != nullptr) {
+            NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+            if(!txnId.isNull()){
+               migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+            }
+        }
     } catch (SQLException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
@@ -1417,6 +1426,14 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     // Make sure that they are not trying to delete the same tuple twice
     assert(target.isActive());
     deleteFromAllIndexes(&target);
+
+    // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
+    if (m_shadowStream != nullptr) {
+        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+        if(!txnId.isNull()){
+            migratingRemove(ValuePeeker::peekBigInt(txnId), target);
+        }
+    }
     deleteTupleFinalize(target); // also frees object columns
 }
 
