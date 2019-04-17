@@ -20,12 +20,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,7 +68,9 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.PbdSegmentName;
 import org.voltdb.utils.PbdSegmentName.Result;
 
+import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -1124,6 +1128,26 @@ public class ExportGeneration implements Generation {
                         results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
                     }
                 }
+            }
+        }
+    }
+
+    // On behalf of one Site thread to update all data sources managed by export manager
+    public void updateCatalog(CatalogContext catalogContext) {
+        long genId = catalogContext.m_genId;
+        // Flip the data source mapping from partition-to-sources to name-to-sources
+        Multimap<String, ExportDataSource> dataSourcesByName = ArrayListMultimap.create();
+        synchronized (m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> sourceByName : m_dataSourcesByPartition.values()) {
+                for (Entry<String, ExportDataSource> entry : sourceByName.entrySet()) {
+                    dataSourcesByName.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        for (Entry<String, Collection<ExportDataSource>> entry : dataSourcesByName.asMap().entrySet()) {
+            Table streamTable = catalogContext.database.getTables().get(entry.getKey());
+            for (ExportDataSource source : entry.getValue()) {
+                source.updateCatalog(streamTable, genId);
             }
         }
     }

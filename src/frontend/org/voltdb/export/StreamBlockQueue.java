@@ -25,7 +25,9 @@ import java.util.Iterator;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.StreamTableSchemaSerializer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
@@ -97,8 +99,10 @@ public class StreamBlockQueue {
     public StreamBlockQueue(String path, String nonce, String streamName)
             throws java.io.IOException {
         m_streamName = streamName;
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
-                VoltDB.instance().getCatalogContext(), m_streamName);
+                streamTable, m_streamName, catalogContext.m_genId);
         m_persistentDeque = new PersistentBinaryDeque(nonce, ds, new VoltFile(path), exportLog, !DISABLE_COMPRESSION);
         m_path = path;
         m_nonce = nonce;
@@ -384,8 +388,10 @@ public class StreamBlockQueue {
 
         // close reopen reader
         m_persistentDeque.close();
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
-                VoltDB.instance().getCatalogContext(), m_streamName);
+                streamTable, m_streamName, catalogContext.m_genId);
         m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog,
                 !DISABLE_COMPRESSION);
         m_reader = m_persistentDeque.openForRead(m_nonce);

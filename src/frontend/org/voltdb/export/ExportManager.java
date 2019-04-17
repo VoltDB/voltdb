@@ -577,6 +577,7 @@ public class ExportManager
             swapWithNewProcessor(catalogContext, generation,
                     connectors, localPartitionsToSites, m_processorConfig);
         }
+        generation.updateCatalog(catalogContext);
     }
 
     // remove and install new processor

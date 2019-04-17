@@ -54,7 +54,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
@@ -779,16 +778,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tupleCount += newTuples;
                 m_tuplesPending.addAndGet((int)newTuples);
 
-                if (genId != m_previousGenId) {
-                    assert (genId > m_previousGenId);
-                    // This serializer is used to write stream schema to pbd
-                    StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
-                            VoltDB.instance().getCatalogContext(), m_tableName);
-                    // check generation id change at every push to tell when to update the header
-                    m_committedBuffers.updateSchema(ds);
-                }
                 m_committedBuffers.offer(sb);
-                m_previousGenId = genId;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -2064,12 +2054,33 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    public void updateCatalog(Table table, long genId) {
+        m_es.execute(new Runnable() {
+            public void run() {
+                if (genId != m_previousGenId) {
+                    assert (genId > m_previousGenId);
+                    // This serializer is used to write stream schema to pbd
+                    StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(table, table.getTypeName(), genId);
+                    try {
+                        m_committedBuffers.updateSchema(ds);
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
+                    }
+                    m_previousGenId = genId;
+                }
+            }
+        });
+    }
+
     public static class StreamTableSchemaSerializer implements DeferredSerialization {
-        private final CatalogContext m_catalogContext;
+        private final Table m_streamTable;
         private final String m_streamName;
-        public StreamTableSchemaSerializer(CatalogContext catalogContext, String streamName) {
-            m_catalogContext = catalogContext;
+        private final long m_generationId;
+        public StreamTableSchemaSerializer(Table streamTable, String streamName, long genId) {
+            Preconditions.checkNotNull(streamTable, "Failed to find catalog table for stream: " + streamName);
+            m_streamTable = streamTable;
             m_streamName = streamName;
+            m_generationId = genId;
         }
 
         public static void writeMetaColumns(ByteBuffer buf) {
@@ -2152,7 +2163,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void serialize(ByteBuffer buf) throws IOException {
             buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
-            buf.putLong(m_catalogContext.m_genId);
+            buf.putLong(m_generationId);
             buf.putInt(buf.limit() - EXPORT_SCHEMA_HEADER_BYTES); // size of schema
             buf.putInt(m_streamName.length());
             buf.put(m_streamName.getBytes(Constants.UTF8ENCODING));
@@ -2160,9 +2171,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // write export meta columns
             writeMetaColumns(buf);
             // column name length, name, type, length
-            Table streamTable = m_catalogContext.database.getTables().get(m_streamName);
-            assert (streamTable != null);
-            for (Column c : CatalogUtil.getSortedCatalogItems(streamTable.getColumns(), "index")) {
+            assert (m_streamTable != null);
+            for (Column c : CatalogUtil.getSortedCatalogItems(m_streamTable.getColumns(), "index")) {
                 buf.putInt(c.getName().length());
                 buf.put(c.getName().getBytes(Constants.UTF8ENCODING));
                 buf.put((byte)c.getType());
@@ -2177,9 +2187,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public int getSerializedSize() throws IOException {
             int size = 0;
             // column name length, name, type, length
-            Table streamTable = m_catalogContext.database.getTables().get(m_streamName);
-            assert streamTable != null : "Failed to find stream " + m_streamName + " in catalog";
-            for (Column c : CatalogUtil.getSortedCatalogItems(streamTable.getColumns(), "index")) {
+            for (Column c : CatalogUtil.getSortedCatalogItems(m_streamTable.getColumns(), "index")) {
                 size += 4 + c.getName().length() + 1 + 4;
             }
             return EXPORT_SCHEMA_HEADER_BYTES + /* schema size */
