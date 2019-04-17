@@ -852,7 +852,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (RejectedExecutionException rej) {
             m_bufferPushPermits.release();
             //We are shutting down very much rolling generation so dont passup for error reporting.
-            exportLog.info("Error pushing export  buffer: ", rej);
+            exportLog.info("Export buffer rejected by data source executor: ", rej);
         }
     }
 
@@ -1006,6 +1006,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
                         } catch (RejectedExecutionException reex) {
                             // Ignore: the {@code GuestProcessor} was shut down...
+                            exportLog.info("XXX Reentrant Poll exception rejected ");
                         }
                         return;
                     }
@@ -1021,7 +1022,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             });
         } catch (RejectedExecutionException rej) {
-            exportLog.info("Polling from export data source rejected.");
+            exportLog.info("XXX Polling from export data source rejected by data source executor.");
         }
         return fut;
     }
@@ -1047,7 +1048,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
                             + ", discarding buffer (rows may be lost)."));
                 } catch (RejectedExecutionException reex) {
-                    exportLog.error("Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
+                    exportLog.error("XXX Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
                             + ", discarding buffer (rows may be lost).");
                 }
                 if (exportLog.isDebugEnabled()) {
@@ -1071,14 +1072,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // The pending container satisfies the poll
                 pollTask.setFuture(cont);
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
+                    exportLog.debug("XXX Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
                 }
             } catch (RejectedExecutionException reex) {
                 // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
                 // shut down by a catalog update): place the polled container in pending
                 // so it is picked up by the new GuestProcessor.
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Pending a rejected " + cont);
+                    exportLog.debug("XXX Pending a rejected " + cont);
                 }
                 setPendingContainer(cont);
             }
@@ -1087,7 +1088,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             polled = true;
         } else if (result == ContinuityCheckResult.ACKED) {
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Acked pending " + cont);
+                exportLog.debug("XXX Acked pending " + cont);
             }
             int tuplesDeleted = m_gapTracker.truncate(cont.getLastSeqNo());
             m_tuplesPending.addAndGet(-tuplesDeleted);
@@ -1212,9 +1213,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     ContinuityCheckResult result = checkBufferContinuity(
                             block.startSequenceNumber(), block.lastSequenceNumber(), nextSeqNo);
 
+                    m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                     if (result == ContinuityCheckResult.OK) {
                         first_unpolled_block = block;
-                        m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                         break;
                     } else if (result == ContinuityCheckResult.ACKED) {
                         blocksToDelete.add(block);
@@ -1271,7 +1272,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // shut down by a catalog update): place the polled container in pending
                     // so it is picked up by the new GuestProcessor.
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Pending a rejected " + ackingContainer);
+                        exportLog.debug("XXX Pending a rejected " + ackingContainer);
                     }
                     setPendingContainer(ackingContainer);
                 }
@@ -1281,7 +1282,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 pollTask.setException(t);
                 m_pollTask = null;
-            } catch (RejectedExecutionException reex) { /* Ignore */ }
+            } catch (RejectedExecutionException reex) {
+                /* Ignore */
+                exportLog.info("XXX Reentrant Poll exception rejected ");
+            }
         }
     }
 
@@ -1487,6 +1491,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  }
              } catch (RejectedExecutionException reex) {
                  // Ignore, {@code GuestProcessor} was closed
+                 exportLog.info("XXX Drained source event rejected ");
              }
              m_pollTask = null;
              m_generation.onSourceDrained(m_partitionId, m_tableName);
@@ -1636,9 +1641,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         exportLog.info("Releasing mastership for " + this);
         m_mastershipAccepted.set(false);
-
-        m_seqNoToDrain = Long.MAX_VALUE;
-        m_newLeaderHostId = null;
     }
 
     /**
@@ -1647,9 +1649,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * the polling.
      */
     public void onProcessorShutdown() {
-        unacceptMastership();
-        m_pollTask = null;
-        m_readyForPolling = false;
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                exportLog.info("Handling processor shutdown for " + this);
+
+                m_seqNoToDrain = Long.MAX_VALUE;
+                m_newLeaderHostId = null;
+                m_pollTask = null;
+                m_readyForPolling = false;
+            }
+        });
     }
 
     /**
