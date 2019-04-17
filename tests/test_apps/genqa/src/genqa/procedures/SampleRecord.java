@@ -25,6 +25,7 @@ package genqa.procedures;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Random;
+import java.util.Date;
 
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -53,7 +54,12 @@ public class SampleRecord
     public final Object type_not_null_varchar128;
     public final Object type_null_varchar1024;
     public final Object type_not_null_varchar1024;
-    public SampleRecord(long rowid, Random rand)
+
+    public SampleRecord(long rowid, Random rand) {
+        this(rowid, rand, ((TimestampType)nextTimestamp(rand)).asExactJavaDate());
+    }
+
+    public SampleRecord(long rowid, Random rand, Date tsNotNull)
     {
         this.rowid = rowid;
         this.rowid_group = (byte)((rowid % 255) - 127);
@@ -68,7 +74,7 @@ public class SampleRecord
         this.type_null_timestamp        = nextTimestamp(rand, true);
         this.type_not_null_timestamp    = nextTimestamp(rand);
         this.type_null_float            = nextFloat(rand, true);
-        this.type_not_null_float        = nextFloat(rand);
+        this.type_not_null_float        = tsNotNull;
         this.type_null_decimal          = nextDecimal(rand, true);
         this.type_not_null_decimal      = nextDecimal(rand);
         this.type_null_varchar25        = nextVarchar(rand, true, 1, 25);
