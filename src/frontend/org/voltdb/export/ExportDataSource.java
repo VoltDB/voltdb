@@ -540,8 +540,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
             //master stream cannot resolve a gap by receiving
             // an ACK from itself, only replica stream can do.
+            exportLog.info("Export queue gap resolved by releasing bytes at seqNo: "
+                    + releaseSeqNo + ", resuming export, tracker map = " + m_gapTracker.toString());
             assert (!m_mastershipAccepted.get());
-            exportLog.info("Export queue gap resolved by releasing bytes, resuming export.");
             clearGap(true);
         }
 
@@ -1030,9 +1031,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Poll a pending container before moving to m_commitedBuffers.
      *
-     * Note: May put the into pending. May also put the pollTask into m_pollTask to wait
-     * for gap resolution. The same pending container may be polled repeatedly on pushBuffer
-     * until the gap resolution protocol resolves the mastership.
+     * A pending container is set by the {@code GuestProcessor} instance when it is
+     * shut down while processing it. Therefore it should be the reply to the first poll
+     * of the new {@code GuestProcessor} instance.
      *
      * @param pollTask the polling task
      * @return true if the poll is completed, false if polling needs to proceed on m_committedBuffers
@@ -1040,6 +1041,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean pollPendingContainer(PollTask pollTask) {
 
         AckingContainer cont = m_pendingContainer.getAndSet(null);
+        if (cont == null) {
+            return false;
+        }
         if (cont.schema() == null && pollTask.forcePollSchema()) {
             // Ensure this first block has a schema
             BBContainer schemaContainer = m_committedBuffers.pollSchema();
@@ -1062,64 +1066,40 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
 
-        // Check that the pending buffer precedes the unpolled ones
-        boolean polled = false;
-        ContinuityCheckResult result = checkPendingContinuity(
-                cont.getStartSeqNo(), cont.getLastSeqNo());
-
-        if (result == ContinuityCheckResult.OK) {
-            try {
-                // The pending container satisfies the poll
-                pollTask.setFuture(cont);
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("XXX Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
-                }
-            } catch (RejectedExecutionException reex) {
-                // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
-                // shut down by a catalog update): place the polled container in pending
-                // so it is picked up by the new GuestProcessor.
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("XXX Pending a rejected " + cont);
-                }
-                setPendingContainer(cont);
-            }
-            // Clear the pending poll, if any
-            m_pollTask = null;
-            polled = true;
-        } else if (result == ContinuityCheckResult.ACKED) {
+        try {
+            // The pending container satisfies the poll
+            pollTask.setFuture(cont);
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("XXX Acked pending " + cont);
+                exportLog.debug("XXX Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
             }
-            int tuplesDeleted = m_gapTracker.truncate(cont.getLastSeqNo());
-            m_tuplesPending.addAndGet(-tuplesDeleted);
-            cont.internalDiscard();
-        } else {
-            assert (result == ContinuityCheckResult.GAP);
-            // Put the poll aside until the gap is resolved
-            m_pollTask = pollTask;
-            startMastershipMigration(m_firstUnpolledSeqNo, cont);
-            polled = true;
+        } catch (RejectedExecutionException reex) {
+            // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+            // shut down by a catalog update): place the polled container in pending
+            // so it is picked up by the new GuestProcessor.
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("XXX Pending a rejected " + cont);
+            }
+            setPendingContainer(cont);
         }
-        return polled;
+        // Clear the pending poll, if any
+        m_pollTask = null;
+        return true;
     }
 
-    private void startMastershipMigration(long nextSeqNo, AckingContainer ackingContainer) {
-        Preconditions.checkNotNull(ackingContainer, "Acking container must be not null.");
+    private void startMastershipMigration(long nextSeqNo) {
         Pair<Long, Long> gap = m_gapTracker.getFirstGap();
         assert (gap != null && nextSeqNo >= gap.getFirst() && nextSeqNo <= gap.getSecond());
-        // Mark the recently polled buffer as pending then query other nodes.
-        setPendingContainer(ackingContainer);
         // If an existing mastership migration is in progress and is before hitting gap,
         // don't start new migration.
         if (m_seqNoToDrain >= nextSeqNo) {
-            exportLog.info("Export data missing from current queue [" +
+            exportLog.info("XXX Export data missing from current queue [" +
                     gap.getFirst() + ", " + gap.getSecond() +
                     "] from " + this.toString() + ". Searching other sites for missing data.");
             m_seqNoToDrain = nextSeqNo - 1;
             mastershipCheckpoint(nextSeqNo - 1);
         } else {
             if (exportLog.isDebugEnabled()) {
-                exportLog.info("Export data missing from current queue [" +
+                exportLog.debug("XXX Export data missing from current queue [" +
                         gap.getFirst() + ", " + gap.getSecond() +
                         "] from " + this.toString() + ", migration in progress.");
             }
@@ -1142,21 +1122,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             return ContinuityCheckResult.GAP;
         }
-    }
-
-    // Check the continuity of a pending buffer, which stands BEFORE the unpolled ones
-    private ContinuityCheckResult checkPendingContinuity(long startSeqNo, long lastSeqNo) {
-
-        if (lastSeqNo <= m_lastReleasedSeqNo) {
-            return ContinuityCheckResult.ACKED;
-        }
-
-        if ((startSeqNo <= m_firstUnpolledSeqNo && m_firstUnpolledSeqNo <= lastSeqNo)
-                || (lastSeqNo + 1) == m_firstUnpolledSeqNo) {
-            return ContinuityCheckResult.OK;
-        }
-
-        return ContinuityCheckResult.GAP;
     }
 
     private synchronized void pollImpl(PollTask pollTask) {
@@ -1187,10 +1152,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
 
             // Poll pending container before polling m_committedBuffers
-            if (m_pendingContainer.get() != null) {
-                if (pollPendingContainer(pollTask)) {
-                    return;
-                }
+            if (pollPendingContainer(pollTask)) {
+                return;
             }
 
             StreamBlock first_unpolled_block = null;
@@ -1213,9 +1176,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     ContinuityCheckResult result = checkBufferContinuity(
                             block.startSequenceNumber(), block.lastSequenceNumber(), nextSeqNo);
 
-                    m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                     if (result == ContinuityCheckResult.OK) {
                         first_unpolled_block = block;
+                        m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                         break;
                     } else if (result == ContinuityCheckResult.ACKED) {
                         blocksToDelete.add(block);
@@ -1226,11 +1189,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     } else {
                         assert (result == ContinuityCheckResult.GAP);
-                        final AckingContainer ackingContainer = AckingContainer.create(
-                                this, block, m_committedBuffers, pollTask.forcePollSchema());
                         // Put the poll aside until the gap is resolved
                         m_pollTask = pollTask;
-                        startMastershipMigration(nextSeqNo, ackingContainer);
+                        startMastershipMigration(nextSeqNo);
                         return;
                     }
                 }
@@ -1303,8 +1264,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (exportLog.isTraceEnabled()) {
-                    exportLog.trace("Advance sequence number to: " + lastSeqNo);
+                if (exportLog.isDebugEnabled()) {
+                    // FIXME: trace
+                    exportLog.debug("XXX Advance sequence number to: " + lastSeqNo);
                 }
                 assert(startTime != 0);
                 long elapsedMS = System.currentTimeMillis() - startTime;
