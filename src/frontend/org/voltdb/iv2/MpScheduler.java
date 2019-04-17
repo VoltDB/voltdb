@@ -172,8 +172,9 @@ public class MpScheduler extends Scheduler
                 VoltMessage resp = counter.getLastResponse();
                 if (resp != null && resp instanceof InitiateResponseMessage) {
                     InitiateResponseMessage msg = (InitiateResponseMessage)resp;
-                    if (msg.shouldCommit() && msg.haveSentMpFragment()) {
+                    if (msg.haveSentMpFragment()) {
                         m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                        m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
                         m_repairLogAwaitingCommit = msg.getTxnId();
                     }
                     m_outstandingTxns.remove(msg.getTxnId());
@@ -520,8 +521,11 @@ public class MpScheduler extends Scheduler
                 m_duplicateCounters.remove(message.getTxnId());
                 // Only advance the truncation point on committed transactions that sent fragments to SPIs.
                 // See ENG-4211 & ENG-14563
-                if (message.shouldCommit() && message.haveSentMpFragment()) {
+
+                // Advance truncation handle for any completed transactions which have sent fragments to
+                if (message.haveSentMpFragment()) {
                     m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
                     m_repairLogAwaitingCommit = message.getTxnId();
                 }
                 m_outstandingTxns.remove(message.getTxnId());
@@ -536,9 +540,10 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // Only advance the truncation point on committed transactions that sent fragments to SPIs.
-            if (message.shouldCommit() && message.haveSentMpFragment()) {
+            // Only advance the truncation point on completed transactions which have sent fragments to SPIs.
+            if (message.haveSentMpFragment()) {
                 m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
                 m_repairLogAwaitingCommit = message.getTxnId();
             }
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
