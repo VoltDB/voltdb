@@ -1007,7 +1007,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
                         } catch (RejectedExecutionException reex) {
                             // Ignore: the {@code GuestProcessor} was shut down...
-                            exportLog.info("XXX Reentrant Poll exception rejected ");
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Reentrant Poll exception rejected ");
+                            }
                         }
                         return;
                     }
@@ -1023,7 +1025,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             });
         } catch (RejectedExecutionException rej) {
-            exportLog.info("XXX Polling from export data source rejected by data source executor.");
+            exportLog.info("Polling from export data source rejected by data source executor.");
         }
         return fut;
     }
@@ -1052,7 +1054,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
                             + ", discarding buffer (rows may be lost)."));
                 } catch (RejectedExecutionException reex) {
-                    exportLog.error("XXX Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
+                    exportLog.error("Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
                             + ", discarding buffer (rows may be lost).");
                 }
                 if (exportLog.isDebugEnabled()) {
@@ -1070,14 +1072,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // The pending container satisfies the poll
             pollTask.setFuture(cont);
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("XXX Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
+                exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
             }
         } catch (RejectedExecutionException reex) {
             // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
             // shut down by a catalog update): place the polled container in pending
             // so it is picked up by the new GuestProcessor.
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("XXX Pending a rejected " + cont);
+                exportLog.debug("Pending a rejected " + cont);
             }
             setPendingContainer(cont);
         }
@@ -1092,14 +1094,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // If an existing mastership migration is in progress and is before hitting gap,
         // don't start new migration.
         if (m_seqNoToDrain >= nextSeqNo) {
-            exportLog.info("XXX Export data missing from current queue [" +
+            exportLog.info("Export data missing from current queue [" +
                     gap.getFirst() + ", " + gap.getSecond() +
                     "] from " + this.toString() + ". Searching other sites for missing data.");
             m_seqNoToDrain = nextSeqNo - 1;
             mastershipCheckpoint(nextSeqNo - 1);
         } else {
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("XXX Export data missing from current queue [" +
+                exportLog.debug("Export data missing from current queue [" +
                         gap.getFirst() + ", " + gap.getSecond() +
                         "] from " + this.toString() + ", migration in progress.");
             }
@@ -1233,19 +1235,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // shut down by a catalog update): place the polled container in pending
                     // so it is picked up by the new GuestProcessor.
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("XXX Pending a rejected " + ackingContainer);
+                        exportLog.debug("Pending a rejected " + ackingContainer);
                     }
                     setPendingContainer(ackingContainer);
+                } finally {
+                    m_pollTask = null;
                 }
-                m_pollTask = null;
             }
         } catch (Throwable t) {
             try {
                 pollTask.setException(t);
-                m_pollTask = null;
             } catch (RejectedExecutionException reex) {
                 /* Ignore */
-                exportLog.info("XXX Reentrant Poll exception rejected ");
+                exportLog.error("Poll exception rejected");
+            } finally {
+                m_pollTask = null;
             }
         }
     }
@@ -1264,9 +1268,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (exportLog.isDebugEnabled()) {
-                    // FIXME: trace
-                    exportLog.debug("XXX Advance sequence number to: " + lastSeqNo);
+                if (exportLog.isTraceEnabled()) {
+                    exportLog.trace("Advance sequence number to: " + lastSeqNo);
                 }
                 assert(startTime != 0);
                 long elapsedMS = System.currentTimeMillis() - startTime;
@@ -1453,9 +1456,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  }
              } catch (RejectedExecutionException reex) {
                  // Ignore, {@code GuestProcessor} was closed
-                 exportLog.info("XXX Drained source event rejected ");
+                 exportLog.info("Drained source event rejected ");
+             } finally {
+                 m_pollTask = null;
              }
-             m_pollTask = null;
              m_generation.onSourceDrained(m_partitionId, m_tableName);
              return true;
          }
@@ -1598,6 +1602,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * Release mastership, always executed synchronously.
+     * Note: package private for invocation by JUnit test cases.
      */
     public void unacceptMastership() {
 
@@ -1606,9 +1611,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
-     * On processor shutdown, synchronously release mastership and clear pending poll.
-     * Only called from the Catalog update path: we expect a new processor to reactivate
-     * the polling.
+     * On processor shutdown, clear pending poll and expect to be reactivated by new
+     * {@code GuestProcessor} instance; preserve masterhip and status information.
      */
     public void onProcessorShutdown() {
         m_es.execute(new Runnable() {
@@ -1625,8 +1629,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
-     * Trigger an execution of the mastership runnable by the associated
-     * executor service
+     * Accept mastership and run a pending polling task.
      */
     public void acceptMastership() {
         m_es.execute(new Runnable() {
@@ -1644,9 +1647,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_mastershipAccepted.compareAndSet(false, true)) {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
-                            // FIXME: must remove info messages
                             if (m_pollTask != null) {
-                                exportLog.info("New master executes pending poll");
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("New master executes pending poll");
+                                }
                                 pollImpl(m_pollTask);
                             }
                         }
@@ -1950,7 +1954,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void mastershipCheckpoint(long seq) {
-        if (m_runEveryWhere) {
+        if (m_runEveryWhere || !m_mastershipAccepted.get()) {
             return;
         }
         if (exportLog.isTraceEnabled()) {
