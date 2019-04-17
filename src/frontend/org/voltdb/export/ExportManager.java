@@ -627,7 +627,9 @@ public class ExportManager
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Set mastership on partition " + partitionId);
             }
-            generation.acceptMastership(partitionId);
+            // Request mastership instead of unilaterally grabbing it,
+            // because a replica may be filling a gap right now.
+            generation.takeMastership(partitionId);
         }
     }
 
