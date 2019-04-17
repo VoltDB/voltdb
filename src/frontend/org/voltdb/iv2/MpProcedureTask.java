@@ -275,7 +275,9 @@ public class MpProcedureTask extends ProcedureTask
                     txnState.isNPartTxn(),
                     false,
                     txnState.drTxnDataCanBeRolledBack());
-            complete.setTruncationHandle(m_msg.getTruncationHandle());
+            final long truncationHandle = Math.max(((MpTransactionTaskQueue)m_queue).getRepairLogTruncationHandle(),
+                    m_msg.getTruncationHandle());
+            complete.setTruncationHandle(truncationHandle);
 
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();

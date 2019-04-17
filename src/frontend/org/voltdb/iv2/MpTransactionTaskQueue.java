@@ -51,6 +51,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
+    private long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
         super(queue, false);
@@ -318,5 +320,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         StringBuilder sb = new StringBuilder();
         toString(sb);
         return sb.toString();
+    }
+
+    public long getRepairLogTruncationHandle() {
+        return m_repairLogTruncationHandle;
+    }
+
+     public void setRepairLogTruncationHandle(long repairLogTruncationHandle) {
+        m_repairLogTruncationHandle = repairLogTruncationHandle;
     }
 }
