@@ -182,6 +182,11 @@ public class MpProcedureTask extends ProcedureTask
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("[MpProcedureTask] STARTING: " + this);
         }
+
+        final long truncationHandle = Math.max(((MpTransactionTaskQueue)m_queue).getRepairLogTruncationHandle(),
+                m_msg.getTruncationHandle());
+        txn.m_initiationMsg.setTruncationHandle(truncationHandle);
+        m_msg.setTruncationHandle(truncationHandle);
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
         // 1) We're not writing the Iv2InitiateTaskMessage to the first
@@ -275,9 +280,7 @@ public class MpProcedureTask extends ProcedureTask
                     txnState.isNPartTxn(),
                     false,
                     txnState.drTxnDataCanBeRolledBack());
-            final long truncationHandle = Math.max(((MpTransactionTaskQueue)m_queue).getRepairLogTruncationHandle(),
-                    m_msg.getTruncationHandle());
-            complete.setTruncationHandle(truncationHandle);
+            complete.setTruncationHandle(m_msg.getTruncationHandle());
 
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();
