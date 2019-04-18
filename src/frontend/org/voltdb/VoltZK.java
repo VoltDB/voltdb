@@ -52,7 +52,6 @@ public class VoltZK {
 
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
-    public static final String catalogbytesPrevious = "/db/catalogbytes_previous";
     //This node doesn't mean as much as it used to, it is accurate at startup
     //but isn't updated after elastic operation. We use the cartographer for most things
     //now

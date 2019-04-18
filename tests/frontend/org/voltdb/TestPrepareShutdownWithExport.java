@@ -23,10 +23,10 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -34,11 +34,11 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.TestExportBase;
 import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.utils.VoltFile;
 
 public class TestPrepareShutdownWithExport extends TestExportBase
 {
@@ -51,9 +51,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
     public void setUp() throws Exception {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
         m_serverSocket = new SocketExportTestServer(5001);
         m_serverSocket.start();

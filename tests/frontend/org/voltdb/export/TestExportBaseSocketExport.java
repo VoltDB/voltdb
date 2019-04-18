@@ -72,7 +72,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static VoltProjectBuilder project;
     protected boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
 
-    static class ServerListener extends Thread {
+    public static class ServerListener extends Thread {
 
         private ServerSocket ssocket;
         private int m_port;
@@ -141,7 +141,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return null;
         }
 
-        public int getSize() {
+        public int getReceivedRowCount() {
             return m_queue.size();
         }
 
@@ -246,7 +246,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         return client;
     }
 
-    protected void quiesce(final Client client) throws Exception {
+    protected static void quiesce(final Client client) throws Exception {
         client.drain();
         client.callProcedure("@Quiesce");
     }
@@ -293,7 +293,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @param client
      * @throws Exception
      */
-    public void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
+    public static void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
         boolean passed = false;
 
         // Quiesce to see all data flushed.
@@ -307,7 +307,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -320,6 +319,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 st = System.currentTimeMillis();
             }
             long ts = 0;
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (stats.advanceRow()) {
                 Long tts = stats.getLong("TIMESTAMP");
                 // Get highest timestamp and watch is change
@@ -328,12 +328,19 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 }
                 long m = stats.getLong("TUPLE_PENDING");
                 if (0 != m) {
-                    passedThisTime = false;
+                    String target = stats.getString("TARGET");
                     String ttable = stats.getString("SOURCE");
                     Long host = stats.getLong("HOST_ID");
                     Long pid = stats.getLong("PARTITION_ID");
-                    System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
-                    break;
+                    if (target.isEmpty()) {
+                        // Stream w/o target keeps pending data forever, log and skip counting this stream
+                        System.out.println("Pending export data is not zero but target is disabled: " +
+                                ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                    } else {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                        break;
+                    }
                 }
             }
             if (passedThisTime) {
@@ -347,6 +354,62 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                     break;
                 }
                 System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        // System.out.println(stats);
+        assertTrue(passed);
+    }
+
+    /**
+     * Wait for all Export Streams to be removed (after all the streams are dropped)
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedTargetDeallocated(Client client) throws Exception {
+        boolean passed = false;
+
+        // Quiesce to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long st = System.currentTimeMillis();
+        // Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            while (stats.advanceRow()) {
+                passedThisTime = false;
+                String target = stats.getString("TARGET");
+                String ttable = stats.getString("SOURCE");
+                Long host = stats.getLong("HOST_ID");
+                Long pid = stats.getLong("PARTITION_ID");
+                if (target.isEmpty()) {
+                    // Stream w/o target keeps pending data forever, log and skip counting this stream
+                    System.out.println("Stream Not Dropped but target is disabled: " +
+                            ttable + " host:" + host + " partid:" + pid);
+                } else {
+                    System.out.println("Stream Not Dropped: " + ttable + " to " + target + " host:" + host + " partid:" + pid);
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
             }
             Thread.sleep(5000);
         }
@@ -375,7 +438,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -388,6 +450,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 st = System.currentTimeMillis();
             }
             long ts = 0;
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
                 String ttable = stats.getString("TABLE_NAME");
@@ -426,13 +489,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-    public void quiesceAndVerifyStream(final Client client, ExportTestExpectedData tester) throws Exception {
-        client.drain();
-        waitForStreamedTableAllocatedMemoryZero(client);
-        tester.verifyRows();
-        System.out.println("Passed!");
-    }
-
     public void quiesceAndVerifyTarget(final Client client, ExportTestExpectedData tester) throws Exception {
         client.drain();
         waitForStreamedTargetAllocatedMemoryZero(client);
@@ -453,10 +509,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     public static void wireupExportTableToSocketExport(String streamName) {
-        wireupExportTableToSocketExport(streamName, false);
+        wireupExportTableToSocketExport(streamName, true, false);
     }
 
-    public static void wireupExportTableToSocketExport(String streamName, boolean exportReplicated) {
+    public static void wireupExportTableToSocketExport(String streamName, boolean enabled, boolean exportReplicated) {
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
         }
@@ -465,7 +521,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(true, ServerExportEnum.CUSTOM, props, streamName);
+        project.addExport(enabled, ServerExportEnum.CUSTOM, props, streamName);
     }
 
     private static Integer getNextPort() {
@@ -480,7 +536,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
     }
 
-    public static void closeClientAndServer() throws IOException {
+    public static void closeSocketExporterClientAndServer() throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
             ServerListener m_serverSocket = m_serverSockets.remove(target.getKey());
             if (m_serverSocket != null) {

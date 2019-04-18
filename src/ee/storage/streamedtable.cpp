@@ -62,8 +62,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::string tableName, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable();
     st->m_name = tableName;
-    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
-                                           ctx->m_siteId, 0, "sign", st->m_name, columnNames);
+    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId, ctx->m_siteId, 0, st->m_name);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
@@ -160,6 +159,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
             m_views[i]->processTupleInsert(source, true);
         }
         int64_t currSequenceNo = ++m_sequenceNo;
+        assert(m_columnNames.size() == source.columnCount());
         mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
                                       m_executorContext->currentSpHandle(),
                                       currSequenceNo,
@@ -199,9 +199,9 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis) {
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void StreamedTable::setGeneration(int64_t generation) {
     if (m_wrapper) {
-        m_wrapper->setSignatureAndGeneration(signature, generation);
+        m_wrapper->setGeneration(generation);
     }
 }
 
@@ -240,8 +240,8 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  * since startup (used for rejoin/recovery).
  */
 void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
-    // assume this only gets called from a fresh rejoined node
-    assert(m_sequenceNo == 0);
+    // assume this only gets called from a fresh rejoined node or after the reset of a wrapper
+    assert(m_sequenceNo == 0 || seqNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
         m_wrapper->setBytesUsed(seqNo, streamBytesUsed);

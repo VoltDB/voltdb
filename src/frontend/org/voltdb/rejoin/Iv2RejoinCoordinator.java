@@ -59,6 +59,8 @@ import com.google_voltpatches.common.collect.Multimap;
 public class Iv2RejoinCoordinator extends JoinCoordinator {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
+    static final int REJOIN_ACTION_BLOCKER_INTERVAL = Integer.getInteger("REJOIN_ACTION_BLOCKER_INTERVAL", 1000);
+
     private long m_startTime;
 
     // This lock synchronizes all data structure access. Do not hold this
@@ -162,7 +164,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     public static void acquireLock(HostMessenger messenger )
     {
         final long maxWaitTime = TimeUnit.MINUTES.toSeconds(10); // 10 minutes
-        final long checkInterval = 1; // 1 second
 
         Stopwatch sw = Stopwatch.createStarted();
         long elapsed = 0;
@@ -180,7 +181,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             }
 
             try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(checkInterval));
+                Thread.sleep(REJOIN_ACTION_BLOCKER_INTERVAL);
             } catch (InterruptedException ignoreIt) {
             }
         }

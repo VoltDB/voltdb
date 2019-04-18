@@ -303,4 +303,19 @@ public class LoadedProcedureSet {
         }
         return pr;
     }
+
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        ProcedureRunner runner = m_defaultProcCache.get(procName);
+        if (runner == null) {
+            Procedure newCatProc = StatementCompiler.compileMigrateProcedure(
+                            catTable, procName, column, op);
+            VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+            runner = new ProcedureRunner(voltProc, m_site, newCatProc);
+            runner.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
+            m_defaultProcCache.put(procName, runner);
+            m_defaultProcManager.m_defaultProcMap.put(procName.toLowerCase(), runner.getCatalogProcedure());
+        }
+        return runner;
+    }
 }

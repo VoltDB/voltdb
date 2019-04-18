@@ -384,7 +384,6 @@ public class TestPersistentBinaryDeque {
         long reportedSizeInBytes = reader.sizeInBytes();
         long blocksFound = 0;
         BBContainer cont = null;
-
         while ((cont = pollOnceWithoutDiscard(reader)) != null) {
             try {
                 ByteBuffer buffer = cont.b();

@@ -87,7 +87,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     // Note that the target table pointer in the node's tcd can change between p_init and p_execute
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
-
     TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;

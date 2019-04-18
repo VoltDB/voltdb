@@ -693,7 +693,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
     else {
         // Error handling
-        string errorMsg = udfResultIn.readTextString();
+        std::string errorMsg = udfResultIn.readTextString();
         throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
     }
 }
@@ -957,6 +957,24 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         if (tcd) {
             Table* table = tcd->getTable();
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
+            if (persistenttable) {
+                // IW-ENG14804, handle deleting companion stream
+                // FIXME: factorize deletion logic in common method
+                auto streamedtable = persistenttable->getStreamedTable();
+                if (streamedtable) {
+                    VOLT_DEBUG("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
+                    const std::string& name = streamedtable->name();
+                    streamedtable->setGeneration(timestamp);
+                    //Maintain the streams that will go away for which wrapper needs to be cleaned;
+                    auto wrapper = streamedtable->getWrapper();
+                    if (wrapper) {
+                        purgedStreams[name] = streamedtable->getWrapper();
+                        //Unset wrapper so it can be deleted after last push.
+                        streamedtable->setWrapper(NULL);
+                    }
+                    m_exportingTables.erase(name);
+                }
+            }
             if (persistenttable && persistenttable->isReplicatedTable()) {
                 isReplicatedTable = true;
                 ExecuteWithAllSitesMemory execAllSites;
@@ -971,13 +989,13 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             }
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
-                const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp);
+                const std::string& name = streamedtable->name();
+                streamedtable->setGeneration(timestamp);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
-                purgedStreams[signature] = streamedtable->getWrapper();
+                purgedStreams[name] = streamedtable->getWrapper();
                 //Unset wrapper so it can be deleted after last push.
                 streamedtable->setWrapper(NULL);
-                m_exportingTables.erase(signature);
+                m_exportingTables.erase(name);
             }
             if (isReplicatedTable) {
                 VOLT_TRACE("delete a REPLICATED table %s", tcd->getTable()->name().c_str());
@@ -1003,20 +1021,23 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
     }
 }
 
-static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2) {
+static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetTable, bool targetIsPersistentTable) {
     // covers column count
-    if (t1->columns().size() != t2->columnCount()) {
+    if (srcTable->columns().size() != targetTable->columnCount()) {
         return true;
     }
 
-    if (t1->isDRed() != t2->isDREnabled()) {
-        return true;
+    if (targetIsPersistentTable) {
+        PersistentTable* persistentTable = dynamic_cast<PersistentTable *>(targetTable);
+        if (srcTable->isDRed() != persistentTable->isDREnabled()) {
+            return true;
+        }
     }
 
     // make sure each column has same metadata
     std::map<std::string, catalog::Column*>::const_iterator outerIter;
-    for (outerIter = t1->columns().begin();
-         outerIter != t1->columns().end();
+    for (outerIter = srcTable->columns().begin();
+         outerIter != srcTable->columns().end();
          outerIter++) {
         int index = outerIter->second->index();
         int size = outerIter->second->size();
@@ -1025,11 +1046,11 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
         bool nullable = outerIter->second->nullable();
         bool inBytes = outerIter->second->inbytes();
 
-        if (t2->columnName(index).compare(name)) {
+        if (targetTable->columnName(index).compare(name)) {
             return true;
         }
 
-        auto columnInfo = t2->schema()->getColumnInfo(index);
+        auto columnInfo = targetTable->schema()->getColumnInfo(index);
 
         if (columnInfo->allowNull != nullable) {
             return true;
@@ -1098,7 +1119,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     }
                     assert(tcd->getStreamedTable() == NULL);
                 }
-                continue;
+                if (!tcd) {
+                    continue;
+                }
             }
             else {
                 if (updateReplicated) {
@@ -1114,23 +1137,24 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 m_delegatesByName[table->name()] = tcd;
             }
             // set export info on the new table
-            auto streamedtable = tcd->getStreamedTable();
-            if (streamedtable) {
-                streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                m_exportingTables[catalogTable->signature()] = streamedtable;
-                if (tcd->exportEnabled()) {
-                    ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                    if (wrapper == NULL) {
-                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                streamedtable->name(), streamedtable->getColumnNames());
-                        m_exportingStreams[catalogTable->signature()] = wrapper;
-                    } else {
-                        // If stream was dropped in UAC and the added back we should not purge the wrapper.
-                        // A case when exact same stream is dropped and added.
-                        purgedStreams[catalogTable->signature()] = NULL;
-                    }
-                    streamedtable->setWrapper(wrapper);
+            auto streamedTable = tcd->getStreamedTable();
+            if (!streamedTable) {
+                // Check if this table has a shadow stream
+                PersistentTable *persistentTable = tcd->getPersistentTable();
+                streamedTable = persistentTable->getStreamedTable();
+                if (streamedTable) {
+                    VOLT_DEBUG("setting up shadow stream for %s", persistentTable->name().c_str());
+                }
+            }
+            if (streamedTable) {
+                const std::string& name = streamedTable->name();
+                if (tableTypeNeedsTupleStream(tcd->getTableType())) {
+                    attachTupleStream(streamedTable, name, purgedStreams, timestamp);
+                }
+                else {
+                    // The table/stream type has been changed
+                    streamedTable->setWrapper(NULL);
+                    streamedTable->setExportStreamPositions(0, 0);
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -1139,7 +1163,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
 
                 const catalog::CatalogMap<catalog::MaterializedViewInfo>& views = catalogTable->views();
 
-                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
+                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedTable->views(),
                         views.begin(), views.end(),
                         survivingInfos, survivingViews, obsoleteViews);
 
@@ -1158,12 +1182,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                         }
                     }
                     // This guards its destTable from accidental deletion with a refcount bump.
-                    MaterializedViewTriggerForStreamInsert::build(streamedtable, destTable, currInfo);
+                    MaterializedViewTriggerForStreamInsert::build(streamedTable, destTable, currInfo);
                     obsoleteViews.push_back(currView);
                 }
 
                 BOOST_FOREACH (auto toDrop, obsoleteViews) {
-                    streamedtable->dropMaterializedView(toDrop);
+                    streamedTable->dropMaterializedView(toDrop);
                 }
 
             }
@@ -1173,10 +1197,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 // replicated tables should only be processed once for the entire cluster
                 continue;
             }
-
             //////////////////////////////////////////////
-            // update the export info for existing tables can not be done now so ignore streamed table.
-            //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
@@ -1186,32 +1207,25 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
              * which will cause it to notify the topend export data source
              * that no more data is coming for the previous generation
              */
+            PersistentTable *persistentTable = tcd->getPersistentTable();
+            bool tableSchemaChanged = false;
+
             auto streamedTable = tcd->getStreamedTable();
+            if (persistentTable) {
+                // Check if this table has a companion stream
+                streamedTable = persistentTable->getStreamedTable();
+                if (streamedTable) {
+                    VOLT_DEBUG("Updating companion stream for %s", persistentTable->name().c_str());
+                }
+                tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
+            }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
                 if (isStreamUpdate) {
-                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                    if (!tcd->exportEnabled()) {
-                        // Evaluate export enabled or not and cache it on the tcd.
-                        tcd->evaluateExport(*m_database, *catalogTable);
-                        // If enabled hook up streamer
-                        if (tcd->exportEnabled()) {
-                            //Reset generation after stream wrapper is created.
-                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                            m_exportingTables[catalogTable->signature()] = streamedTable;
-                            ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                            if (wrapper == NULL) {
-                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                        m_executorContext->m_siteId, timestamp, catalogTable->signature(),
-                                        streamedTable->name(), streamedTable->getColumnNames());
-                                m_exportingStreams[catalogTable->signature()] = wrapper;
-                            } else {
-                                //If stream was altered in UAC and the added back we should not purge the wrapper.
-                                //A case when alter has not changed anything that changes table signature.
-                                purgedStreams[catalogTable->signature()] = NULL;
-                            }
-                            streamedTable->setWrapper(wrapper);
-                        }
+                    const std::string& name = streamedTable->name();
+                    if (tableTypeNeedsTupleStream(tcd->getTableType())) {
+                        attachTupleStream(streamedTable, name, purgedStreams, timestamp);
+                        tableSchemaChanged = haveDifferentSchema(catalogTable, streamedTable, false);
                     }
                 }
 
@@ -1247,29 +1261,39 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 }
 
                 BOOST_FOREACH (auto toDrop, obsoleteViews) {
-
                     streamedTable->dropMaterializedView(toDrop);
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
-                continue;
+                if (!tableSchemaChanged) {
+                    continue;
+                }
             }
 
-            PersistentTable *persistentTable = tcd->getPersistentTable();
-
             //////////////////////////////////////////
-            // if the table schema has changed, build a new
+            // if the persistent table schema has changed, build a new
             // table and migrate tuples over to it, repopulating
             // indexes as we go
             //////////////////////////////////////////
 
-            if (haveDifferentSchema(catalogTable, persistentTable)) {
+            if (tableSchemaChanged) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
+                // update exporting tables with new stream
+                StreamedTable* stream = tcd->getStreamedTable();
+                if (!stream) {
+                   PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(tcd->getTable());
+                   if (persistenttable) {
+                       stream = persistenttable->getStreamedTable();
+                   }
+                }
+                if (stream) {
+                    m_exportingTables[stream->name()] = stream;
+                }
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
@@ -1464,6 +1488,31 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
     return true;
 }
 
+void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
+                                     const std::string& streamName,
+                                     std::map<std::string, ExportTupleStream*> & purgedStreams,
+                                     int64_t timestamp) {
+    m_exportingTables[streamName] = streamedTable;
+    ExportTupleStream* wrapper = streamedTable->getWrapper();
+    if (wrapper == NULL) {
+        wrapper = purgedStreams[streamName];
+        if (wrapper == NULL) {
+            wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                            m_executorContext->m_siteId,
+                                            timestamp,
+                                            streamName);
+        } else {
+            purgedStreams[streamName] = NULL;
+        }
+        streamedTable->setWrapper(wrapper);
+        VOLT_TRACE("created stream export wrapper stream %s", streamName.c_str());
+    } else {
+        // If stream was dropped in UAC and the added back we should not purge the wrapper.
+        // A case when exact same stream is dropped and added.
+        assert(purgedStreams[streamName] == NULL);
+    }
+    streamedTable->setGeneration(timestamp);
+}
 
 /*
  * Accept a list of catalog commands expressing a diff between the
@@ -1546,11 +1595,11 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 void
 VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams) {
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
-        //Do delete later
         if (entry.second) {
-            m_exportingStreams[entry.first] = NULL;
-            m_exportingDeletedStreams[entry.first] = entry.second;
+            entry.second->periodicFlush(-1L, -1L);
             entry.second->removeFromFlushList(this, false);
+            entry.second->pushEndOfStream();
+            delete entry.second;
         }
     }
 }
@@ -1876,11 +1925,11 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
 
     quiesce(lastCommittedSpHandle);
     if (m_executorContext->drStream()->drStreamStarted()) {
-        m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+        m_executorContext->drStream()->generateDREvent(SWAP_TABLE,
                 spHandle, uniqueId, payload);
     }
     if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
-        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE,
                 spHandle, uniqueId, payload);
     }
 }
@@ -2203,15 +2252,6 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
         }
         m_oldestExportStreamWithPendingRows = oldestUnflushed;
     }
-    //On Tick do cleanup of dropped streams.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
-        if (entry.second) {
-            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            entry.second->pushEndOfStream();
-            delete entry.second;
-        }
-    }
-    m_exportingDeletedStreams.clear();
 
     m_executorContext->drStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
@@ -2222,31 +2262,19 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 /** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    ExportTupleStream* oldestUnflushed = NULL;
-    ExportTupleStream* newestUnflushed = NULL;
-    ExportTupleStream* nextStreamToFlush = m_oldestExportStreamWithPendingRows;
-    while (nextStreamToFlush) {
-        // Get next stream before the flush because a successful flush sets next and prev to NULL
-        nextStreamToFlush = nextStreamToFlush->getNextFlushStream();
-        if (!m_oldestExportStreamWithPendingRows->periodicFlush(-1, lastCommittedSpHandle)) {
-            m_oldestExportStreamWithPendingRows->appendToList(&oldestUnflushed, &newestUnflushed);
+    for (auto const &streamTable : m_exportingTables) {
+        if (streamTable.second->getWrapper()) {
+#ifndef NDEBUG
+            // A quiesce should be transactional so periodicFlush should always succeed
+            bool streamFlushed =
+#endif
+            streamTable.second->getWrapper()->periodicFlush(-1, lastCommittedSpHandle);
+            assert(streamFlushed);
         }
-        m_oldestExportStreamWithPendingRows = nextStreamToFlush;
     }
-    // A quiesce should be transactional but in case we ever do this from the middle of an MP txn
-    // reinstate all streams that failed the flush into the next flush list.
-    m_oldestExportStreamWithPendingRows = oldestUnflushed;
-    m_newestExportStreamWithPendingRows = newestUnflushed;
+    m_oldestExportStreamWithPendingRows = NULL;
+    m_newestExportStreamWithPendingRows = NULL;
 
-    //On quiesce do cleanup of dropped streams.
-    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
-        if (entry.second) {
-            entry.second->periodicFlush(-1L, lastCommittedSpHandle);
-            entry.second->pushEndOfStream();
-            delete entry.second;
-        }
-    }
-    m_exportingDeletedStreams.clear();
     m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->periodicFlush(-1L, lastCommittedSpHandle);
@@ -2556,8 +2584,8 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 int64_t VoltDBEngine::exportAction(bool syncAction,
                                    int64_t uso,
                                    int64_t seqNo,
-                                   std::string tableSignature) {
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableSignature);
+                                   std::string streamName) {
+    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
@@ -2582,13 +2610,75 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableSignature) {
+int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+        std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
+    PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
+    if (table) {
+        setUndoToken(undoToken);
+        m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                                 txnId,
+                                                 spHandle,
+                                                 -1,
+                                                 uniqueId,
+                                                 false);
+
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+                (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            int32_t rowsToBeDeleted = 0;
+            try {
+                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+            }
+            catch (const SQLException &sqe) {
+                s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+                throw;
+            }
+            catch (const SerializableEEException& serializableExc) {
+                // Exceptions that are not constraint failures or sql exeception are treated as fatal.
+                // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+                // other kind of exception?
+                s_loadTableException = serializableExc.getType();
+                throwFatalException("%s", serializableExc.message().c_str());
+            }
+
+            // Indicate to other threads that load happened successfully.
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
+            return rowsToBeDeleted;
+        }
+        else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
+            // An sql exception was thrown on the lowest site thread and
+            // handle it on the other threads too.
+            std::ostringstream oss;
+            oss << "Replicated table deleteMigratedRows failed (sql exception) on other thread for table \""
+                << table->name() << "\".\n";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
+        }
+        else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
+            // This is fatal.
+            std::ostringstream oss;
+            oss << "An unknown exception occurred on another thread calling deleteMigratedRows \"" << table->name() << "\".";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throwFatalException("%s", oss.str().c_str());
+        }
+    }
+    if (LogManager::getLogLevel(LOGGERID_HOST) == LOGLEVEL_DEBUG) {
+        char msg[512];
+        snprintf(msg, sizeof(msg), "Attempted to delete migrated rows for a Table (%s) that has been removed.",
+                tableName.c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
+    }
+
+    return 0;
+}
+
+void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string streamName) {
 
     // defaults mean failure
     ackOffset = 0;
     seqNo = -1;
 
-    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(tableSignature);
+    std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
@@ -2752,8 +2842,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
                 new (*uq) ExecuteTaskUndoGenerateDREventAction(
                         m_executorContext->drStream(), m_executorContext->drReplicatedStream(),
                         m_executorContext->m_partitionId,
-                        type, lastCommittedSpHandle,
-                        spHandle, uniqueId, payloads));
+                        type, spHandle, uniqueId, payloads));
         break;
     }
     default:

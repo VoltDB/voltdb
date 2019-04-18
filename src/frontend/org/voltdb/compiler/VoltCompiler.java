@@ -72,6 +72,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
@@ -1390,6 +1391,11 @@ public class VoltCompiler {
                         t.setPartitioncolumn(t.getColumns().get(pc.getName()));
                     }
                 }
+            }
+            // This is used to enforce default connectors assigned to streams through the Java Property
+            // for streams that don't have the Export To Target clause
+            if (TableType.isStreamViewOnly(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
+                tableref.setTabletype(TableType.STREAM.get());
             }
         }
         if (tableref.getMaterializer() != null)

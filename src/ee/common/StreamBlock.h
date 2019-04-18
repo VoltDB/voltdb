@@ -167,13 +167,15 @@ namespace voltdb
         ExportStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
             StreamBlock(data, headerSize, capacity, uso),
             m_rowCount(0),
-            m_startSequenceNumber(0)
+            m_startSequenceNumber(0),
+            m_committedSequenceNumber(-1L)
         {}
 
         ExportStreamBlock(ExportStreamBlock* other) :
             StreamBlock(other),
             m_rowCount(other->m_rowCount),
-            m_startSequenceNumber(other->m_startSequenceNumber)
+            m_startSequenceNumber(other->m_startSequenceNumber),
+            m_committedSequenceNumber(other->m_committedSequenceNumber)
         {}
 
         ~ExportStreamBlock()
@@ -195,6 +197,14 @@ namespace voltdb
             return m_startSequenceNumber + (int64_t)getRowCount() - 1;
         }
 
+        inline int64_t getCommittedSequenceNumber() const {
+            return m_committedSequenceNumber;
+        }
+
+        inline void setCommittedSequenceNumber(int64_t committedSequenceNumber) {
+            m_committedSequenceNumber = committedSequenceNumber;
+        }
+
         inline char* headerDataPtr() {
             return m_data - (m_headerSize - MAGIC_HEADER_SPACE_FOR_JAVA);
         }
@@ -212,6 +222,7 @@ namespace voltdb
     private:
         size_t m_rowCount;
         int64_t m_startSequenceNumber;
+        int64_t m_committedSequenceNumber;
     };
 
 

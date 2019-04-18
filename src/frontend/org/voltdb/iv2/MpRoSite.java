@@ -525,7 +525,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -565,6 +565,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                              long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public int deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -742,6 +753,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return null;
     }
 
     @Override

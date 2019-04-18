@@ -70,4 +70,7 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     @Override
     public void resume(String msg) {
     }
+
+    public void streamBlocked(String msg) {
+    }
 }

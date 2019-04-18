@@ -41,8 +41,12 @@ public abstract class JoinCoordinator extends LocalMailbox {
         m_messenger = hostMessenger;
     }
 
-    public void initialize(int kfactor)
-        throws JSONException, KeeperException, InterruptedException, ExecutionException {}
+    public void initialize() throws JSONException, KeeperException, InterruptedException, ExecutionException {}
+
+    public int getHostsJoining() {
+        return 1;
+    }
+
     public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
     public AbstractTopology getTopology() {
         throw new UnsupportedOperationException("getTopology is only supported for elastic join");

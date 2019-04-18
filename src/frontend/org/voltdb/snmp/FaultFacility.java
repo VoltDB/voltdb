@@ -29,7 +29,8 @@ public enum FaultFacility {
     DISK,
     INITIATOR,
     CLUSTER,
-    DR;
+    DR,
+    EXPORT;
 
     static final List<FaultFacility> values = ImmutableList.copyOf(values());
 

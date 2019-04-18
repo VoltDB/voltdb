@@ -158,6 +158,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
     public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
+    public static final long MIGRATE_ROWS_DELETE_CID    = Long.MIN_VALUE + 11;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
@@ -2165,7 +2166,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                     final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                     m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                            () -> {startMigratePartitionLeader(message.isForStopNode());},
+                            () -> startMigratePartitionLeader(message.isForStopNode()),
                             delay, interval, TimeUnit.SECONDS);
                 }
                 hostLog.info("MigratePartitionLeader task is started.");
@@ -2257,11 +2258,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.debug("[@MigratePartitionLeader]\n" + vt.toFormattedString());
         }
 
+        boolean transactionStarted = false;
+        Long targetHSId = m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId);
+        if (targetHSId == null) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(String.format("Partition %d is no longer on host %d", partitionId, targetHostId));
+            }
+            return;
+        }
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@MigratePartitionLeader";
             Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-            Procedure proc = procedureConfig.asCatalogProcedure();
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
             spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
@@ -2270,7 +2278,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 spi = MiscUtils.roundTripForCL(spi);
             }
 
-            long targetHSId = m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId);
             //Info saved for the node failure handling
             MigratePartitionLeaderInfo spiInfo = new MigratePartitionLeaderInfo(
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
@@ -2285,33 +2292,42 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new IOException("failure simulation");
             }
             synchronized (m_executeTaskAdpater) {
-                createTransaction(m_executeTaskAdpater.connectionId(),
+                if (createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
-                        proc.getReadonly(),
-                        proc.getSinglepartition(),
-                        proc.getEverysite(),
+                        procedureConfig.getReadonly(),
+                        procedureConfig.getSinglepartition(),
+                        procedureConfig.getEverysite(),
                         partitionId,
                         spi.getSerializedSize(),
-                        System.nanoTime());
+                        System.nanoTime()) != CreateTransactionResult.SUCCESS) {
+                    tmLog.warn(String.format("Failed to start transaction for migration of partition %d to host %d",
+                            partitionId, targetHostId));
+                    notifyPartitionMigrationStatus(partitionId, targetHSId, true);
+                    return;
+                }
             }
 
+            transactionStarted = true;
+
             final long timeoutMS = 5 * 60 * 1000;
-            ClientResponse resp= cb.getResponse(timeoutMS);
-            if (resp.getStatus() == ClientResponse.SUCCESS) {
+            ClientResponse resp = cb.getResponse(timeoutMS);
+            if (resp != null && resp.getStatus() == ClientResponse.SUCCESS) {
                 tmLog.info(String.format("The partition leader for %d has been moved to host %d.",
                         partitionId, targetHostId));
             } else {
                 //not necessary a failure.
                 tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
-                        partitionId, targetHostId, resp.getStatusString()));
+                        partitionId, targetHostId, resp == null ? null : resp.getStatusString()));
                 notifyPartitionMigrationStatus(partitionId, targetHSId, true);
             }
-        } catch (IOException | InterruptedException e) {
-            tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
-            notifyPartitionMigrationStatus(partitionId,
-                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
-                    true);
+        } catch (Exception e) {
+            tmLog.warn(String.format("errors in leader change for partition %d", partitionId), e);
+            notifyPartitionMigrationStatus(partitionId, targetHSId, true);
         } finally {
+            if (!transactionStarted) {
+                return;
+            }
+
             //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
             //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
             long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
@@ -2347,9 +2363,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             if (!migrationComplete) {
-                notifyPartitionMigrationStatus(partitionId,
-                        m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
-                        true);
+                notifyPartitionMigrationStatus(partitionId, targetHSId, true);
             }
         }
     }
@@ -2361,27 +2375,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private void notifyPartitionMigrationStatus(int partitionId, long targetHSId, boolean failed) {
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
-            try {
-                cihm.connection.queueTask(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (cihm.repairCallback != null) {
-                            if (failed) {
-                                cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
-                            } else {
-                                cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
-                            }
-                        }
-                    }
-                });
-            } catch (UnsupportedOperationException ignore) {
-                // In case some internal connections don't implement queueTask()
-                if (cihm.repairCallback != null) {
+            if (cihm.repairCallback != null) {
+                Runnable notify = () -> {
                     if (failed) {
                         cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
                     } else {
                         cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
                     }
+                };
+
+                try {
+                    cihm.connection.queueTask(notify);
+                } catch (UnsupportedOperationException ignore) {
+                    // In case some internal connections don't implement queueTask()
+                    notify.run();
                 }
             }
         }

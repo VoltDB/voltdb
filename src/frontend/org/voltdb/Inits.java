@@ -459,7 +459,8 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
+                        DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole()),
+                        m_rvdb.getConfig().m_startAction))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);

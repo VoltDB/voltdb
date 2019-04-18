@@ -828,7 +828,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                                   preserveDRHiddenColumn,
                                                                                   preserveViewHiddenColumn,
-                                                                                  preserveMigrateHiddenColumn);
+                                                                                  preserveMigrateHiddenColumn,
+                                                                                  isRecover);
                         }
 
                         if (needsConversion) {
@@ -837,7 +838,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                      preserveDRHiddenColumn,
                                                                      preserveViewHiddenColumn,
-                                                                     preserveMigrateHiddenColumn);
+                                                                     preserveMigrateHiddenColumn,
+                                                                     isRecover);
                         } else {
                             ByteBuffer copy = ByteBuffer.allocate(c.b().remaining());
                             copy.put(c.b());
@@ -1431,7 +1433,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            String signature = t.getSignature();
             String name = t.getTypeName();
 
             //Sequence numbers for this table for every partition
@@ -1465,9 +1466,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     uso,
                     sequenceNumber,
                     myPartitionId,
-                    signature);
+                    name);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
-            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, name,
                     isRecover, false, sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }
@@ -2219,7 +2220,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         needsConversion = SavedTableConverter.needsConversion(oldTable, newCatalogTable,
                                                                               preserveDRHiddenColumn,
                                                                               preserveViewHiddenColumn,
-                                                                              preserveMigrateHiddenColumn);
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
                     final VoltTable oldTable = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
@@ -2227,7 +2229,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         table = SavedTableConverter.convertTable(oldTable, newCatalogTable,
                                                                  preserveDRHiddenColumn,
                                                                  preserveViewHiddenColumn,
-                                                                 preserveMigrateHiddenColumn);
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = oldTable;
                     }
@@ -2419,7 +2422,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                               preserveDRHiddenColumn,
                                                                               preserveViewHiddenColumn,
-                                                                              preserveMigrateHiddenColumn);
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b(), true);
@@ -2427,7 +2431,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                  preserveDRHiddenColumn,
                                                                  preserveViewHiddenColumn,
-                                                                 preserveMigrateHiddenColumn);
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = old_table;
                     }

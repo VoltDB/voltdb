@@ -210,4 +210,51 @@ public class TestAdhocCreateDropView extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    @Test
+    public void testENG15870_count_distinct() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE TABLE T1 (a int, b int);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("create table should have succeeded");
+            }
+
+            // This create view test will throw exception because column VCHAR
+            // is not a column in temp table
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertTrue(findTableInSystemCatalogResults("T1"));
+            System.out.println(resp.getResults()[0]);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "CREATE VIEW DV1 AS SELECT a, COUNT(*), COUNT(DISTINCT b) FROM T1 GROUP BY A ORDER BY A;");
+            } catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertEquals(threw, true);
+            m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("DV1"));
+        } finally {
+            teardownSystem();
+        }
+    }
 }

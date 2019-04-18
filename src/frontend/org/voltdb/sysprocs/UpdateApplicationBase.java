@@ -127,7 +127,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Otherwise, deploymentString has the right contents, don't need to touch it
             }
             else if ("@UpdateClasses".equals(invocationName)) {
-                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes.");
+                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes. Current catalog version: " + context.catalogVersion);
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (operationBytes != null) {
@@ -549,20 +549,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         if (errMsg != null) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
         }
 
         // ENG-14511 on assertion failures in test environment, ensure removal of action blocker

@@ -47,6 +47,7 @@ import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -59,7 +60,6 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataSource.AckingContainer;
@@ -79,7 +79,7 @@ public class TestExportGeneration {
 
     static String testout_jar;
     static CatalogMap<Connector> m_connectors;
-    static String m_tableSignature;
+    static String m_streamName;
     static File m_tempRoot;
 
     @BeforeClass
@@ -94,7 +94,7 @@ public class TestExportGeneration {
         testout_jar = m_tempRoot.getCanonicalPath() + File.separatorChar + "testout.jar";
 
         String schemaDDL =
-                "create stream e1 (id integer, f1 varchar(16)); ";
+                "create stream e1 export to target e1 (id integer, f1 varchar(16)); ";
 
         VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileDDLString(schemaDDL, testout_jar);
@@ -104,14 +104,14 @@ public class TestExportGeneration {
                 .getCatalog().getClusters().get("cluster")
                 .getDatabases().get("database")
                 .getConnectors();
-        Connector defaultConnector = m_connectors.get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        Connector defaultConnector = m_connectors.get("e1");
         defaultConnector.setEnabled(true);
 
-        m_tableSignature = defaultConnector
+        m_streamName = defaultConnector
                 .getTableinfo()
                 .getIgnoreCase("e1")
                 .getTable()
-                .getSignature();
+                .getTypeName();
     }
 
     File m_dataDirectory;
@@ -140,7 +140,7 @@ public class TestExportGeneration {
         props.put("outdir", m_tempRoot.getAbsolutePath() + "/my_exports");
         Set<String> tables = new HashSet<>();
         tables.add("e1");
-        config.put(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, new Pair<>(props, tables));
+        config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
         return processor;
@@ -165,10 +165,10 @@ public class TestExportGeneration {
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(m_dataDirectory);
+        m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
-                m_connectors, getProcessor(), m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
+                m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
                 ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
@@ -207,13 +207,13 @@ public class TestExportGeneration {
             cb.get();
         }
 
-        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature);
+        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
     }
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.close(null);
+        m_exportGeneration.close();
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
@@ -223,7 +223,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
@@ -234,7 +234,8 @@ public class TestExportGeneration {
         while( --retries >= 0 && ! active) {
             m_exportGeneration.pushExportBuffer(
                     m_part,
-                    m_tableSignature,
+                    m_streamName,
+                    seqNo,
                     seqNo,
                     1,
                     0L,
@@ -245,7 +246,7 @@ public class TestExportGeneration {
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
 
             cont.discard();
@@ -265,8 +266,9 @@ public class TestExportGeneration {
 
         m_exportGeneration.pushExportBuffer(
                 m_part,
-                m_tableSignature,
+                m_streamName,
                 /*seqNo*/1L,
+                1L,
                 1,
                 0L,
                 System.currentTimeMillis(),
@@ -292,7 +294,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, 1L).asVoltMessage()
+                new AckPayloadMessage(m_part, m_streamName, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -304,6 +306,63 @@ public class TestExportGeneration {
         }
         assertTrue("timeout on data source size poll", retries >= 0);
         assertEquals("unexpected data sources size", 0, m_expDs.sizeInBytes());
+    }
+
+    @Test
+    @Ignore
+    public void testStaleAckDelivery() throws Exception {
+        ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
+
+        int retries = 4000;
+        long size = m_expDs.sizeInBytes();
+
+        m_exportGeneration.pushExportBuffer(
+                m_part,
+                m_streamName,
+                /*seqNo*/1L,
+                1L,
+                1,
+                0L,
+                System.currentTimeMillis(),
+                foo.duplicate(),
+                false
+                );
+
+        while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+        assertTrue("timeout on data source size poll", retries >= 0);
+        assertEquals("unexpected data sources size", foo.capacity() - StreamBlock.HEADER_SIZE, m_expDs.sizeInBytes());
+
+        retries = 1000;
+        size = m_expDs.sizeInBytes();
+
+        Long hsid = getOtherMailboxHsid();
+        assertNotNull( "other mailbox not listed in zookeeper",  hsid);
+
+        // Send an ack message with a catalogVersion < the EDS catalogVersion
+        m_mbox.send(
+                hsid,
+                new AckPayloadMessage(m_part,
+                        m_streamName, 1L,
+                        m_expDs.getCatalogVersionCreated() - 1) // stale catalogVersion
+                    .asVoltMessage()
+                );
+
+        while( --retries >= 0) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+
+        // The ack should have been ignored
+        assertEquals("unexpected data sources size", size, m_expDs.sizeInBytes());
     }
 
     private Long getOtherMailboxHsid() throws Exception {

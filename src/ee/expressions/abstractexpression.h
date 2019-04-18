@@ -136,6 +136,11 @@ class AbstractExpression {
         return m_right;
     }
 
+    virtual const std::vector<AbstractExpression*> getArgs() const {
+       // Only FunctionExpression has children (as function arguments).
+       return empty_expression;
+    }
+
   protected:
     AbstractExpression();
     AbstractExpression(ExpressionType type);
@@ -145,6 +150,7 @@ class AbstractExpression {
 
   private:
     static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
+    static const std::vector<AbstractExpression*> empty_expression;
     bool initParamShortCircuits();
 
   protected:

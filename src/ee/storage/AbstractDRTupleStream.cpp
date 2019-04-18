@@ -129,9 +129,13 @@ void AbstractDRTupleStream::fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t
     std::string failureMessageForVoltLogger = reallysuperbig_failure_message;
     ExecutorContext::getPhysicalTopend()->pushPoisonPill(m_partitionId, failureMessageForVoltLogger, m_currBlock);
     m_currBlock = NULL;
+
+    bool wasOpened = m_opened;
+
+    commitTransactionCommon();
     extendBufferChain(0);
-    if (m_opened) {
-        commitTransactionCommon();
+
+    if (wasOpened) {
         ++m_openSequenceNumber;
         if (m_enabled) {
             beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
@@ -139,9 +143,6 @@ void AbstractDRTupleStream::fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t
         else {
             openTransactionCommon(spHandle, uniqueId);
         }
-    }
-    else {
-        commitTransactionCommon();
     }
 }
 

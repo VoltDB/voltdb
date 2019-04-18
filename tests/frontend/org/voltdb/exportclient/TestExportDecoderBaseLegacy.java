@@ -34,8 +34,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.TimeZone;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
@@ -49,6 +47,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import junit.framework.TestCase;
 
 public class TestExportDecoderBaseLegacy extends TestCase
 {
@@ -130,7 +129,7 @@ public class TestExportDecoderBaseLegacy extends TestCase
         }
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", "yankeelover", partitionColumn, 0, 32,
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "yankeelover", partitionColumn, 0, 32,
                 col_names, col_types, Arrays.asList(COLUMN_LENGTHS), ExportFormat.SEVENDOTX);
         return source;
     }

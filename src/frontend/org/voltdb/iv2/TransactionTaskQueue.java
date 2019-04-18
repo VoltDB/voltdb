@@ -478,7 +478,7 @@ public class TransactionTaskQueue
         sb.append("\tSIZE: ").append(size());
         if (!m_backlog.isEmpty()) {
             Iterator<TransactionTask> it = m_backlog.iterator();
-            sb.append("\tHEAD: ").append(it.next());
+            sb.append("  HEAD: ").append(it.next());
             // Print out any other MPs that are in the backlog
             while (it.hasNext()) {
                 TransactionTask tt = it.next();

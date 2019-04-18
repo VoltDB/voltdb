@@ -23,14 +23,14 @@
 
 package org.voltdb.exportclient;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 
 public class ExportClientTestBase {
 
@@ -85,7 +85,7 @@ public class ExportClientTestBase {
         String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", tableName,
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, tableName,
                 partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
                 AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;

@@ -1646,9 +1646,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void dump()
     {
-        m_replaySequencer.dump(m_mailbox.getHSId());
-        hostLog.warn("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
+        StringBuilder sb = new StringBuilder();
+        m_replaySequencer.dump(m_mailbox.getHSId(), sb);
+        sb.append("\n    current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
                 + m_bufferedReadLog.toString());
+        m_repairLog.indentedString(sb, 5);
+        hostLog.warn(sb.toString());
     }
 
     private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {

@@ -625,21 +625,35 @@ enum TableType {
      PERSISTENT_EXPORT = 5,
 };
 
-inline bool isStream(TableType tableType) {
-    return tableType == STREAM_VIEW_ONLY || tableType == STREAM;
+inline bool tableTypeIsExportStream(TableType tableType) {
+    return tableType == STREAM;
+}
+
+inline bool tableTypeIsViewStream(TableType tableType) {
+    return tableType == STREAM_VIEW_ONLY;
+}
+
+inline bool tableTypeIsStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) ||
+            tableTypeIsViewStream(tableType);
 }
 
 inline bool isTableWithExport(TableType tableType) {
     return tableType == PERSISTENT_EXPORT;
 }
 
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+}
+
+inline bool tableTypeNeedsTupleStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) || isTableWithStream(tableType);
+}
+
 inline bool isTableWithMigrate(TableType tableType) {
     return tableType == PERSISTENT_MIGRATE;
 }
 
-inline bool isTableWithStream(TableType tableType) {
-    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
-}
 
 // ------------------------------------------------------------------
 // Utility functions.

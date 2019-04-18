@@ -1457,7 +1457,7 @@ public class LocalCluster extends VoltServerConfig {
      * join multiple nodes to the cluster
      * @param hostIds a set of new host ids
      */
-    public void join(Set<Integer> hostIds) {
+    public boolean join(Set<Integer> hostIds) {
         for (int hostId : hostIds) {
             try {
                 if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
@@ -1469,7 +1469,7 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(ioe);
             }
         }
-        waitForAllReady();
+        return waitForAllReady();
     }
 
     /**
