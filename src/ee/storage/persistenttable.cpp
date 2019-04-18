@@ -1053,13 +1053,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     /**
      * Remove the current tuple from any indexes.
      */
-    bool someIndexGotUpdated = false;
+    const bool someIndexGotUpdated = !indexesToUpdate.empty();
     bool indexRequiresUpdate[indexesToUpdate.size()];
     if (indexesToUpdate.size()) {
-        someIndexGotUpdated = true;
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex* index = indexesToUpdate[i];
-            if (!index->keyUsesNonInlinedMemory()) {
+            if (!index->keyUsesNonInlinedMemory() || index->isPartialIndex()) {
                 if (!index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
                     indexRequiresUpdate[i] = false;
                     continue;

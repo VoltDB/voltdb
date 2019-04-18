@@ -81,7 +81,7 @@ protected:
 
     UpdatePlanNode* m_node;
 
-    std::vector<std::pair<int, int> > m_inputTargetMap;
+    std::vector<std::pair<int, int>> m_inputTargetMap;
     int m_inputTargetMapSize;
 
     AbstractTempTable* m_inputTable;
