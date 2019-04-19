@@ -20,8 +20,21 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.stream.StreamSupport;
 
@@ -67,8 +80,12 @@ import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
@@ -1315,7 +1332,7 @@ public class DDLCompiler {
             if(streamTarget != null && !Constants.DEFAULT_EXPORT_CONNECTOR_NAME.equals(streamTarget)) {
                 table.setTabletype(TableType.STREAM.get());
             } else {
-                table.setTabletype(TableType.STREAM_VIEW_ONLY.get());
+                table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
             }
         }
         // map of index replacements for later constraint fixup
