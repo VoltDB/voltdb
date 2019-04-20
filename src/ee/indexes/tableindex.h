@@ -192,7 +192,7 @@ public:
 };
 
 /**
- * voltdb::TableIndex class represents a secondary index on a table which
+ * voltdb::TableIndex class represents a index on a table which
  * is currently implemented as a binary tree (std::map) mapping from key value
  * to tuple pointers. This might involve overhead because of memory
  * fragmentation and pointer tracking on runtime, so we might shift to B+Tree

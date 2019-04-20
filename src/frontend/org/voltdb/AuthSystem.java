@@ -24,6 +24,7 @@ import static org.voltdb.common.Constants.AUTH_SERVICE_NAME;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
@@ -39,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.AccountExpiredException;
+import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.auth.login.Configuration;
 import javax.security.auth.login.CredentialExpiredException;
 import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginContext;
@@ -381,7 +384,7 @@ public class AuthSystem {
                 loginContext = new LoginContext(VOLTDB_SERVICE_LOGIN_MODULE);
             } catch (LoginException|SecurityException ex) {
                 VoltDB.crashGlobalVoltDB(
-                        "Cannot initialize JAAS LoginContext", true, ex);
+                        "Cannot initialize JAAS LoginContext using " + VOLTDB_SERVICE_LOGIN_MODULE, true, ex);
             }
             try {
                 loginContext.login();
@@ -392,22 +395,15 @@ public class AuthSystem {
                         .getName();
                 gssManager = GSSManager.getInstance();
             } catch (AccountExpiredException ex) {
-                VoltDB.crashGlobalVoltDB(
-                        "VoltDB assigned service principal has expired", true, ex);
-            } catch(CredentialExpiredException ex) {
-                VoltDB.crashGlobalVoltDB(
-                        "VoltDB assigned service principal credentials have expired", true, ex);
-            } catch(FailedLoginException ex) {
-                VoltDB.crashGlobalVoltDB(
-                        "VoltDB failed to authenticate against kerberos", true, ex);
-            }
-            catch (LoginException ex) {
-                VoltDB.crashGlobalVoltDB(
-                        "VoltDB service principal failed to login", true, ex);
-            }
-            catch (Exception ex) {
-                VoltDB.crashGlobalVoltDB(
-                        "Unexpected exception occured during service authentication", true, ex);
+                crashWithLoginInfo("VoltDB assigned service principal has expired", ex);
+            } catch (CredentialExpiredException ex) {
+                crashWithLoginInfo("VoltDB assigned service principal credentials have expired", ex);
+            } catch (FailedLoginException ex) {
+                crashWithLoginInfo("VoltDB failed to authenticate against kerberos", ex);
+            } catch (LoginException ex) {
+                crashWithLoginInfo("VoltDB service principal failed to login", ex);
+            } catch (Exception ex) {
+                crashWithLoginInfo("Unexpected exception occured during service authentication", ex);
             }
         }
         m_loginCtx = loginContext;
@@ -514,6 +510,28 @@ public class AuthSystem {
         if (principal != null && m_users.containsKey(principal)) {
             VoltDB.crashGlobalVoltDB("Kerberos service principal " + principal + " must not correspond to a database user", true, null);
         }
+    }
+
+    private static void crashWithLoginInfo(String prefix, Throwable thrown) {
+        StringBuilder sb = new StringBuilder(prefix).append(": Configuration name ").append(VOLTDB_SERVICE_LOGIN_MODULE)
+                .append(" entries:");
+        try {
+            Configuration config = AccessController
+                    .doPrivileged((PrivilegedAction<Configuration>) Configuration::getConfiguration);
+            for (AppConfigurationEntry entry : config.getAppConfigurationEntry(VOLTDB_SERVICE_LOGIN_MODULE)) {
+                sb.append("\n\tmodule: ").append(entry.getLoginModuleName()).append(", ")
+                        .append(entry.getControlFlag());
+                if (entry.getOptions().containsKey("principal")) {
+                    sb.append(", principal: ").append(entry.getOptions().get("principal"));
+                }
+            }
+        } catch (Exception e) {
+            if (authLogger.isDebugEnabled()) {
+                authLogger.debug("Could not obtain login configuration info for " + VOLTDB_SERVICE_LOGIN_MODULE, e);
+            }
+            sb.append(" unknown");
+        }
+        VoltDB.crashLocalVoltDB(sb.toString(), true, thrown);
     }
 
     //Is security enabled?

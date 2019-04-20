@@ -44,13 +44,13 @@ public class VoltPJoinRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalJoin join = call.rel(0);
-        RelNode left = join.getLeft();
-        RelNode right = join.getRight();
-        RelTraitSet convertedTraits = join.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
-        RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
-        RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
-        ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(join.getSystemFieldList());
+        final VoltLogicalJoin join = call.rel(0);
+        final RelNode left = join.getLeft();
+        final RelNode right = join.getRight();
+        final RelTraitSet convertedTraits = join.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
+        final RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
+        final RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
+        final ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(join.getSystemFieldList());
 
         // TODO: How many number of concurrent processes that a Join will be executed in ?
         // I use 1 for now.

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster hostcount="1"/>
+    <partition-detection/>
+    <heartbeat/>
+    <ssl/>
+    <httpd enabled="true">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="false"/>
+    <export>
+        <configuration target="table_test" enabled="true" type="file">
+            <property name="type">csv</property>
+            <property name="nonce">table_test</property>
+        </configuration>
+    </export>
+    <commandlog enabled="false">
+        <frequency/>
+    </commandlog>
+    <systemsettings>
+        <temptables/>
+        <snapshot/>
+        <elastic/>
+        <query/>
+        <procedure/>
+        <resourcemonitor>
+            <memorylimit/>
+        </resourcemonitor>
+    </systemsettings>
+    <security/>
+</deployment>

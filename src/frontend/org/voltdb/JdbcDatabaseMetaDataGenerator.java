@@ -28,7 +28,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
@@ -264,15 +263,9 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null)
+        else if (TableType.isStream(table.getTabletype()))
         {
-            for (Connector conn : m_database.getConnectors()) {
-                 if (conn.getTableinfo() != null &&
-                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
-                     type = "EXPORT";
-                     break;
-                 }
-            }
+            type = "EXPORT";
         }
         return type;
     }

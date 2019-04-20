@@ -67,11 +67,16 @@
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
+#include "storage/streamedtable.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 #include "common/SynchronizedThreadLock.h"
+#include <map>
+#include <set>
+
 
 class CompactionTest_BasicCompaction;
+class CompactionTest_CompactionWithMigratingRows;
 class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
 
@@ -102,14 +107,15 @@ public:
     void insertTupleForUndo(char* tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
-                            bool revertIndexes);
+                            bool revertIndexes,
+                            bool fromMigrate);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
     // The initial use case is a live catalog update that changes table schema and migrates tuples
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
-    void deleteTuple(TableTuple& tuple, bool fallible = true);
+    void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple& tuple, TBPtr block = TBPtr(NULL));
@@ -206,6 +212,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
+    friend class ::CompactionTest_CompactionWithMigratingRows;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
@@ -275,7 +282,7 @@ public:
     // The initial use case is a live catalog update that changes table schema
     // and migrates tuples and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
-    void deleteTuple(TableTuple& tuple, bool fallible = true);
+    void deleteTuple(TableTuple& tuple, bool fallible = true, bool removeMigratingIndex = true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool insertTuple(TableTuple& tuple);
     // Optimized version of update that only updates specific indexes.
@@ -295,7 +302,8 @@ public:
                                         TableTuple& sourceTupleWithNewValues,
                                         std::vector<TableIndex*> const& indexesToUpdate,
                                         bool fallible = true,
-                                        bool updateDRTimestamp = true);
+                                        bool updateDRTimestamp = true,
+                                        bool fromMigrate = false);
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -572,6 +580,29 @@ public:
                                 bool ignoreTupleLimit = true,
                                 bool elastic = false);
 
+    /**
+     * IW-ENG14804
+     * Set a companion streamed table to export tuples
+     */
+    void setStreamedTable(StreamedTable* st) {
+        m_shadowStream = st;
+    }
+
+    /**
+     * Get the shadow streamed table or nullptr
+     */
+    StreamedTable* getStreamedTable() {
+        return m_shadowStream;
+    }
+
+    void migratingAdd(int64_t txnId, TableTuple& tuple);
+    bool migratingRemove(int64_t txnId, TableTuple& tuple);
+    uint16_t getMigrateColumnIndex();
+    /**
+     * Delete the rows that have completed the migration process
+     */
+    int32_t deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount);
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
@@ -661,7 +692,8 @@ private:
 
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
-                            bool revertIndexes);
+                            bool revertIndexes,
+                            bool fromMigrate);
 
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
 
@@ -706,7 +738,6 @@ private:
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
-
     void computeSmallestUniqueIndex();
 
     void addViewHandler(MaterializedViewHandler* viewHandler);
@@ -846,6 +877,12 @@ private:
     // Objects used to coordinate compaction of Replicated tables
     SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
     SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
+
+    // Pointer to Shadow streamed table (For Migrate) or nullptr
+    StreamedTable* m_shadowStream;
+    typedef std::set<void*> MigratingBatch;
+    typedef std::map<int64_t, MigratingBatch> MigratingRows;
+    MigratingRows m_migratingRows;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
@@ -867,12 +904,13 @@ inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
 
 inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
                                                        char* sourceTupleWithNewValues,
-                                                       bool revertIndexes) {
-    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
+                                                       bool revertIndexes,
+                                                       bool fromMigrate) {
+    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes, fromMigrate);
 }
 
-inline void PersistentTableSurgeon::deleteTuple(TableTuple& tuple, bool fallible) {
-    m_table.deleteTuple(tuple, fallible);
+inline void PersistentTableSurgeon::deleteTuple(TableTuple& tuple, bool fallible,  bool removeMigratingIndex) {
+    m_table.deleteTuple(tuple, fallible, removeMigratingIndex);
 }
 
 inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {

@@ -27,7 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
@@ -50,6 +49,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
@@ -61,19 +61,13 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
     private ServerListener m_serverSocket;
     private final List<ClientConnectionHandler> clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
     private final ConcurrentMap<Long, AtomicLong> seenIds = new ConcurrentHashMap<Long, AtomicLong>();
-    private static final String SCHEMA = "CREATE STREAM t partition on column a (a integer not null, b integer not null);";
+    private static final String SCHEMA = "CREATE STREAM t partition on column a export to target utopia (a integer not null, b integer not null);";
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
 
-    static void resetDir() throws IOException {
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-         VoltFile.recursivelyDelete(f);
-         f.mkdirs();
-    }
-
     @Test
     public void testFlushEEBufferWhenRejoin() throws Exception {
-        resetDir();
+        ExportLocalClusterBase.resetDir();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
         VoltFile.resetSubrootForThisProcess();
@@ -97,7 +91,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             Properties props = new Properties();
             //props.put("replicated", "true");
             props.put("skipinternals", "true");
-            builder.addExport(true, "custom", props);
+            builder.addExport(true, "custom", props, "utopia");
 
             cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.setJavaProperty("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", "50000");

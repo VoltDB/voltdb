@@ -21,6 +21,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -61,6 +62,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
 
     static final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
+    static final int MAX_TABLE_ROW_COUNT = 1_000_000;
 
     protected final RexProgram m_program;
     protected final int m_splitCount;
@@ -87,17 +89,10 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      * @param preAggregateProgram The program before aggregation
      * @param splitCount Number of concurrent processes that this relational expression will be executed in
      */
-    protected VoltPhysicalTableScan(RelOptCluster cluster,
-                                       RelTraitSet traitSet,
-                                       RelOptTable table,
-                                       VoltTable voltDBTable,
-                                       RexProgram program,
-                                       RexNode offset,
-                                       RexNode limit,
-                                       RelNode aggregate,
-                                       RelDataType preAggregateRowType,
-                                       RexProgram preAggregateProgram,
-                                       int splitCount) {
+    protected VoltPhysicalTableScan(
+            RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, VoltTable voltDBTable, RexProgram program,
+            RexNode offset, RexNode limit, RelNode aggregate, RelDataType preAggregateRowType, RexProgram preAggregateProgram,
+            int splitCount) {
         super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
         Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltPhysicalAggregate);
@@ -130,10 +125,10 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             dg += "_program_" + m_program.toString();
         }
         if (m_limit != null) {
-            dg += "_limit_" + Integer.toString(getLimit());
+            dg += "_limit_" + getLimit();
         }
         if (m_offset != null) {
-            dg += "_offset_" + Integer.toString(getOffset());
+            dg += "_offset_" + getOffset();
         }
         if (m_aggregate != null) {
             dg += "_aggr_" + m_aggregate.getDigest();
@@ -256,6 +251,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      */
     public abstract AbstractVoltTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
 
+
     protected double estimateRowCountWithLimit(double rowCount) {
         if (m_limit != null) {
             int limitInt = getLimit();
@@ -272,6 +268,29 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         }
         return rowCount;
     }
+
+    protected double  estimateRowCountWithPredicate(double rowCount) {
+        if (m_program != null && m_program.getCondition() != null) {
+            double discountFactor = 1.0;
+            // Eliminated filters discount the cost of processing tuples with a rapidly
+            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
+            // to a discount approaching 0.888... (=8/9) for many skipped filters.
+            final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
+            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
+            int condSize = RelOptUtil.conjunctions(m_program.getCondition()).size();
+            for (int i = 0; i < condSize; ++i) {
+                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
+            }
+            if (discountFactor < 1.0) {
+                rowCount *= discountFactor;
+                if (rowCount < 4) {
+                    rowCount = 4;
+                }
+            }
+        }
+        return rowCount;
+    }
+
 
     private boolean hasLimitOffset() {
         return (m_limit != null || m_offset != null);
@@ -341,8 +360,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      */
     protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
         if (m_aggregate != null) {
-
-            assert (m_preAggregateRowType != null);
+            Preconditions.checkNotNull(m_preAggregateRowType);
             AbstractPlanNode aggr = ((AbstractVoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
             aggr.clearChildren();
             node.addInlinePlanNode(aggr);

@@ -1,0 +1,186 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2019 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.utils;
+
+import java.io.File;
+
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
+
+/**
+ * Dummy PBDSegment which represents a quarantined segment. A quarantined segment cannot be read because of header
+ * corruption but is kept around in case any data in the segment is needed to recover data.
+ */
+class PbdQuarantinedSegment extends PBDSegment {
+    PbdQuarantinedSegment(File file, long index, long id) {
+        super(file, index, id);
+    }
+
+    @Override
+    int getNumEntries() {
+        return 0;
+    }
+
+    @Override
+    boolean isBeingPolled() {
+        return false;
+    }
+
+    @Override
+    boolean isOpenForReading(String cursorId) {
+        return true;
+    }
+
+    @Override
+    PBDSegmentReader openForRead(String cursorId) {
+        return getReader(cursorId);
+    }
+
+    @Override
+    PBDSegmentReader getReader(String cursorId) {
+        return READER;
+    }
+
+    @Override
+    void openNewSegment(boolean compress) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    void openForTruncate() {
+    }
+
+    @Override
+    void closeAndDelete() {
+        m_file.delete();
+    }
+
+    @Override
+    boolean isClosed() {
+        return true;
+    }
+
+    @Override
+    void close() {}
+
+    @Override
+    void sync() {}
+
+    @Override
+    boolean hasAllFinishedReading() {
+        return true;
+    }
+
+    @Override
+    boolean offer(BBContainer cont) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    int offer(DeferredSerialization ds) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    int size() {
+        return 0;
+    }
+
+    @Override
+    void writeExtraHeader(DeferredSerialization ds) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    void setReadOnly() {}
+
+    @Override
+    int parseAndTruncate(BinaryDequeTruncator truncator) {
+        return 0;
+    }
+
+    @Override
+    int scan(BinaryDequeScanner scanner) {
+        return 0;
+    }
+
+    @Override
+    boolean isFinal() {
+        return false;
+    }
+
+    @Override
+    void finalize(boolean close) {}
+
+    private static final PBDSegmentReader READER = new PBDSegmentReader() {
+        @Override
+        public int uncompressedBytesToRead() {
+            return 0;
+        }
+
+        @Override
+        public void rewindReadOffset(int byBytes) {}
+
+        @Override
+        public void reopen() {}
+
+        @Override
+        public long readOffset() {
+            return 0;
+        }
+
+        @Override
+        public int readIndex() {
+            return 0;
+        }
+
+        @Override
+        public void purge() {}
+
+        @Override
+        public BBContainer poll(OutputContainerFactory factory) {
+            return null;
+        }
+
+        @Override
+        public boolean isClosed() {
+            return false;
+        }
+
+        @Override
+        public boolean hasMoreEntries() {
+            return false;
+        }
+
+        @Override
+        public BBContainer getExtraHeader() {
+            return null;
+        }
+
+        @Override
+        public void close() {}
+
+        @Override
+        public boolean anyReadAndDiscarded() {
+            return false;
+        }
+    };
+}

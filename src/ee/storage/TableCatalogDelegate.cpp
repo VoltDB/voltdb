@@ -395,8 +395,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable);
-    bool tableIsExportOnly = isTableExportOnly(catalogTable);
+    m_tableType = static_cast<TableType>(catalogTable.tableType());
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
@@ -416,14 +415,13 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
-    VOLT_DEBUG("Creating %s %s as %s, type: %d, export:%s", m_materialized?"VIEW":"TABLE",
-               tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType(), tableIsExportOnly ? "true":"false");
+    VOLT_DEBUG("Creating %s %s as %s, type: %d", m_materialized?"VIEW":"TABLE",
+               tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType());
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
                                                     partitionColumnIndex,
-                                                    exportEnabled,
-                                                    tableIsExportOnly,
+                                                    m_tableType,
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
@@ -464,8 +462,6 @@ void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
         return;
     }
 
-    evaluateExport(catalogDatabase, catalogTable);
-
     // configure for stats tables
     PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
     if (persistenttable) {
@@ -488,12 +484,6 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
     // So here we could use static_cast. But if we in the future want to lift this limitation,
     // we will have to put more thoughts on this.
     return static_cast<PersistentTable*>(deltaTable);
-}
-
-//After catalog is updated call this to ensure your export tables are connected correctly.
-void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
-        catalog::Table const& catalogTable) {
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable);
 }
 
 static void migrateChangedTuples(catalog::Table const& catalogTable,
@@ -738,6 +728,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     m_table->incrementRefcount();
     PersistentTable* newPersistentTable = dynamic_cast<PersistentTable*>(m_table);
     PersistentTable* existingPersistentTable = dynamic_cast<PersistentTable*>(existingTable);
+    StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
+    StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
 
     ///////////////////////////////////////////////
     // Move tuples from one table to the other
@@ -745,13 +737,18 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     if (existingPersistentTable && newPersistentTable) {
         migrateChangedTuples(catalogTable, existingPersistentTable, newPersistentTable);
         migrateViews(catalogTable.views(), existingPersistentTable, newPersistentTable, delegatesByName);
+        existingStreamedTable = existingPersistentTable->getStreamedTable();
+        newStreamedTable = newPersistentTable->getStreamedTable();
     }
-    else {
-        StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
-        StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
-        if (existingStreamedTable && newStreamedTable) {
-            migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
-        }
+    if (existingStreamedTable && newStreamedTable) {
+        ExportTupleStream* wrapper = existingStreamedTable->getWrapper();
+        // There should be no pending buffer at the time of UAC
+        assert(wrapper != NULL &&
+                (wrapper->getCurrBlock() == NULL ||
+                 wrapper->getCurrBlock()->getRowCount() == 0));
+        existingStreamedTable->setWrapper(NULL);
+        newStreamedTable->setWrapper(wrapper);
+        migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
     }
 
     ///////////////////////////////////////////////

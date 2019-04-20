@@ -18,6 +18,7 @@
 package org.voltdb.plannerv2.rules.physical;
 
 import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
@@ -57,26 +58,19 @@ public class VoltPAggregateRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLogicalAggregate aggregate = call.rel(0);
+        final VoltLogicalAggregate aggregate = call.rel(0);
         RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify();
 
-        RelNode input = aggregate.getInput();
+        final RelNode input = aggregate.getInput();
         RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify();
-        RelNode convertedInput = convert(input, convertedInputTraits);
+        final RelNode convertedInput = convert(input, convertedInputTraits);
 
         if (needHashAggregator(aggregate)) {
             // Transform to a physical Hash Aggregate
-            VoltPhysicalHashAggregate hashAggr = new VoltPhysicalHashAggregate(
-                    aggregate.getCluster(),
-                    convertedAggrTraits,
-                    convertedInput,
-                    aggregate.indicator,
-                    aggregate.getGroupSet(),
-                    aggregate.getGroupSets(),
-                    aggregate.getAggCallList(),
-                    null,
-                    false);
-            call.transformTo(hashAggr);
+            call.transformTo(new VoltPhysicalHashAggregate(
+                    aggregate.getCluster(), convertedAggrTraits, convertedInput, aggregate.indicator,
+                    aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList(), null,
+                    false));
             // We can't early return here, cause
             // hash aggregation are replaced with serial aggregation in large query
         }
@@ -87,36 +81,24 @@ public class VoltPAggregateRule extends RelOptRule {
         // The aggregate's output would also be effectively sorted by the same GROUP BY columns
         // (either because of an existing index or a Sort relation added by Calcite)
         if (hasGroupBy(aggregate)) {
-            RelCollation groupByCollation = buildGroupByCollation(aggregate);
+            final RelCollation groupByCollation = buildGroupByCollation(aggregate);
             convertedInputTraits = convertedInputTraits.plus(groupByCollation);
             convertedAggrTraits = convertedAggrTraits.plus(groupByCollation);
         }
-        RelNode convertedSerialAggrInput = convert(input, convertedInputTraits);
-        VoltPhysicalSerialAggregate serialAggr = new VoltPhysicalSerialAggregate(
-                aggregate.getCluster(),
-                convertedAggrTraits,
-                convertedSerialAggrInput,
-                aggregate.indicator,
-                aggregate.getGroupSet(),
-                aggregate.getGroupSets(),
-                aggregate.getAggCallList(),
-                null,
-                1,
-                false);
+        final RelNode serialAggr = new VoltPhysicalSerialAggregate(
+                aggregate.getCluster(), convertedAggrTraits, convert(input, convertedInputTraits), aggregate.indicator,
+                aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList(), null,
+                1, false);
         // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
         // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
         // that both (a new sort and the serial aggregate) relations are equivalent to the original
         // logical aggregate. This way Calcite will later eliminate the added sort because it would have
         // higher processing cost
         if (hasGroupBy(aggregate)) {
-            VoltPhysicalSort sort = new VoltPhysicalSort(
-                    aggregate.getCluster(),
-                    convertedAggrTraits,
-                    serialAggr,
-                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE),
-                    1);
-            Map<RelNode, RelNode> equiv = ImmutableMap.of(serialAggr, aggregate);
-            call.transformTo(sort, equiv);
+            final VoltPhysicalSort sort = new VoltPhysicalSort(
+                    aggregate.getCluster(), convertedAggrTraits, serialAggr,
+                    convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE), 1);
+            call.transformTo(sort, ImmutableMap.of(serialAggr, aggregate));
         } else {
             call.transformTo(serialAggr);
         }
@@ -130,11 +112,11 @@ public class VoltPAggregateRule extends RelOptRule {
         ImmutableBitSet groupBy = aggr.getGroupSet();
         List<RelDataTypeField> rowTypeList = aggr.getRowType().getFieldList();
         List<RelFieldCollation> collationFields = new ArrayList<>();
-        for (int index = groupBy.nextSetBit(0); index != -1; index = groupBy.nextSetBit(index + 1)) {
-            assert (index < rowTypeList.size());
+        for (int index = groupBy.nextSetBit(0); index != -1;
+             index = groupBy.nextSetBit(index + 1)) {
+            Preconditions.checkState(index < rowTypeList.size());
             collationFields.add(new RelFieldCollation(index));
         }
-
         return RelCollations.of(collationFields.toArray(new RelFieldCollation[collationFields.size()]));
     }
 

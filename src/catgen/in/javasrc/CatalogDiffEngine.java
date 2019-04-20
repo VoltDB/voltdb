@@ -38,6 +38,7 @@ import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
+import org.voltdb.TableType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.compiler.MaterializedViewProcessor;
@@ -528,22 +529,20 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
             if (ChangeType.DELETION == changeType) {
-                Table tbl = (Table)suspect;
-                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
                     m_requiresNewExportGeneration = true;
                 }
                 // No special guard against dropping a table or view
                 // (although some procedures may fail to plan)
                 return null;
             }
-
-            Table tbl = (Table)suspect;
             String tableName = tbl.getTypeName();
 
             // Remember the name of the new table.
             m_newTables.add(tableName.toUpperCase());
-            if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+            if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
                 // Remember that it's a new export table.
                 m_newTablesForExport.add(tbl.getTypeName());
                 m_requiresNewExportGeneration = true;
@@ -797,6 +796,9 @@ public class CatalogDiffEngine {
                     }
                 }
             }
+            if (TableType.isPersistentMigrate(tbl.getTabletype())) {
+                m_requiresNewExportGeneration = true;
+            }
         }
         return null;
     }
@@ -981,9 +983,11 @@ public class CatalogDiffEngine {
             return null;
         }
         if (suspect instanceof Connector && "enabled".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         if (suspect instanceof Connector && "loaderclass".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         // ENG-6511 Allow materialized views to change the index they use dynamically.

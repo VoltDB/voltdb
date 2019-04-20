@@ -456,8 +456,8 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
                 break; // legal value
             default: {
                 char message[128];
-                snprintf(message, 128, "Error in materialized view %s, column %s: aggregation %d expression type %s",
-                         mvInfo->dest()->name().c_str(), destCol->name().c_str() ,(int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+                snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                         (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                               message);
             }

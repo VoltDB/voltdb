@@ -370,7 +370,7 @@
     <include name='org/voltdb/exportclient/TestHttpExportClient.class' />
     <include name='org/voltdb/exportclient/decode/TestEntityDecoders.class' />
     <include name='org/voltdb/expressions/TestExpressionUtil.class' />
-    <include name='org/voltdb/fullddlfeatures/TestDDLFeatures.class' />
+    <include name='org/voltdb/fullddlfeatures/Test*.class' />
     <include name='org/voltdb/iv2/Test*.class' />
     <include name='org/voltdb/jdbc/Test*.class' />
     <include name='org/voltdb/jni/TestExecutionEngine.class' />

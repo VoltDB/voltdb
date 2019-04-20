@@ -93,7 +93,7 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "select pt from t where pt is null;").getResults()[0];
         assertTrue(vt.advanceRow());
-        ptByIndex = vt.getGeographyPointValue(0);
+        vt.getGeographyPointValue(0);
         assert(vt.wasNull());
     }
 
@@ -405,12 +405,11 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt, EPSILON);
 
         try {
-            vt = client.callProcedure("sel_in",
+            client.callProcedure("sel_in",
                     (Object)(new Object[] {SANTA_CLARA_PT, null, LOWELL_PT}))
-                    .getResults()[0];
+                    .getResults();
             fail("Expected an exception to be thrown");
-        }
-        catch (RuntimeException rte) {
+        } catch (RuntimeException rte) {
             // When ENG-9311 is fixed, then we shouldn't get this error and
             // the procedure call should succeed.
             assertTrue(rte.getMessage().contains("GeographyPointValue or GeographyValue instances "

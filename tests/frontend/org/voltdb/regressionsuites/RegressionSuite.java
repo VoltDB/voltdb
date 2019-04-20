@@ -29,6 +29,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
+import java.rmi.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,10 +44,7 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
@@ -59,14 +57,12 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SerializationHelper;
+import org.voltdb.utils.*;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -423,7 +419,7 @@ public class RegressionSuite extends TestCase {
     /**
      * Release a client instance and any resources associated with it
      */
-    public void releaseClient(Client c) throws IOException, InterruptedException {
+    public void releaseClient(Client c) throws InterruptedException {
         boolean removed = m_clients.remove(c);
         assert(removed);
         c.close();
@@ -516,13 +512,13 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, new long[][] {{modifiedTupleCount}});
     }
 
     static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
@@ -537,7 +533,7 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateTableOfScalarLongs(Client client, String sql, long[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
@@ -725,7 +721,7 @@ public class RegressionSuite extends TestCase {
 
 
     static protected void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarbinary(vt, 0, expected);
     }
@@ -749,7 +745,7 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateTableColumnOfScalarFloat(Client client, String sql, double[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarFloat(vt, 0, expected);
     }
@@ -828,9 +824,8 @@ public class RegressionSuite extends TestCase {
      * using the given mode.  If roundingEnabled is false, no
      * rounding is done.
      */
-    protected static final BigDecimal roundDecimalValue(String decimalValueString,
-                                                      boolean roundingEnabled,
-                                                      RoundingMode mode) {
+    protected static final BigDecimal roundDecimalValue(
+            String decimalValueString, boolean roundingEnabled, RoundingMode mode) {
         BigDecimal bd = new BigDecimal(decimalValueString);
         if (!roundingEnabled) {
             return bd;
@@ -852,15 +847,14 @@ public class RegressionSuite extends TestCase {
         return nbd;
     }
 
-    protected void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected)
-            throws Exception, IOException, ProcCallException {
+    protected void validateTableOfDecimal(Client c, String sql, BigDecimal[][] expected) throws Exception {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfDecimal(vt, expected);
     }
 
     static protected void validateTableColumnOfScalarDecimal(Client client, String sql, BigDecimal[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarDecimal(vt, 0, expected);
     }
@@ -1496,5 +1490,98 @@ public class RegressionSuite extends TestCase {
                     alternatingKeysAndValues[ii+1]);
         }
         return properties;
+    }
+
+    /**
+     * Test environment with configured schema and server.
+     */
+    public static class RegresssionEnv {
+        final VoltProjectBuilder m_builder;
+        LocalCluster m_cluster;
+        public Client m_client = null;
+
+        public RegresssionEnv(String ddlText, String pathToCatalog, String pathToDeployment,
+                int siteCount, int hostCount, int kFactor, boolean debug) {
+
+            m_builder = new VoltProjectBuilder();
+            //Increase query tmeout as long literal queries taking long time.
+            m_builder.setQueryTimeout(60000);
+            try {
+                m_builder.addLiteralSchema(ddlText);
+
+                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
+                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                fail("Failed to set up schema");
+            }
+
+            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
+                    BackendTarget.NATIVE_EE_JNI,
+                    LocalCluster.FailureState.ALL_RUNNING,
+                    debug);
+            m_cluster.setHasLocalServer(true);
+            boolean success = m_cluster.compile(m_builder);
+            assert(success);
+
+            try {
+                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
+            }
+            catch (Exception e) {
+                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
+            }
+        }
+
+        public void setUp() {
+            m_cluster.startUp();
+
+            try {
+                // do the test
+                m_client = ClientFactory.createClient();
+                m_client.createConnection("localhost", m_cluster.port(0));
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
+            } catch (IOException e) {
+                e.printStackTrace();
+                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
+            }
+        }
+
+        public void tearDown() {
+            if (m_client != null) {
+                try {
+                    m_client.close();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to close client");
+                }
+            }
+            m_client = null;
+
+            if (m_cluster != null) {
+                try {
+                    m_cluster.shutDown();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    fail("Failed to shut down cluster");
+                }
+            }
+            m_cluster = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+
+        public boolean isValgrind() {
+            if (m_cluster != null)
+                return m_cluster.isValgrind();
+            return true;
+        }
+
+        public boolean isMemcheckDefined() {
+            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
+        }
     }
 }

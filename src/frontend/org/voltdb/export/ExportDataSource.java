@@ -41,7 +41,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -67,6 +66,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
@@ -88,6 +88,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
     private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
@@ -96,9 +97,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
-    private final String m_signature;
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
+    private final int m_catalogVersionCreated;
 
     // For stats
     private final int m_siteId;
@@ -121,12 +122,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private long m_firstUnpolledSeqNo = 1L; // sequence number starts from 1
     private long m_lastReleasedSeqNo = 0L;
+
+    // The committed sequence number is the sequence number of the last row
+    // of the last committed transaction pushed up from the EE, and acknowledged by
+    // the export client.
+    private long m_committedSeqNo = 0L;
+
+    // Null value for last committed sequence number in EE buffer
+    // See {@code ExportStreamBlock} in EE code.
+    public static long NULL_COMMITTED_SEQNO = -1L;
+
     // End sequence number of most recently pushed export buffer
     private long m_lastPushedSeqNo = 0L;
     // Relinquish export master after this sequence number
     private long m_seqNoToDrain = Long.MAX_VALUE;
-    //This is released when all mailboxes are set.
-    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     // This EDS is export master when the flag set to true
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
     // This is set when mastership is going to transfer to another node.
@@ -172,8 +181,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
+    private MigrateRowsDeleter m_migrateRowsDeleter;
 
-    private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
+    private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 
     private static final String VOLT_TRANSACTION_ID = "VOLT_TRANSACTION_ID";
     private static final String VOLT_EXPORT_TIMESTAMP = "VOLT_EXPORT_TIMESTAMP";
@@ -204,17 +214,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         ReentrantPollException(String s) { super(s); }
     }
 
-    public static class PollTask {
+    private static class PollTask {
         private SettableFuture<AckingContainer> m_pollFuture;
         private boolean m_forcePollSchema;
 
         public PollTask(SettableFuture<AckingContainer> fut, Boolean forcePollSchema) {
             m_pollFuture = fut;
             m_forcePollSchema = forcePollSchema;
-        }
-
-        public SettableFuture<AckingContainer> getPollFuture() {
-            return m_pollFuture;
         }
 
         public boolean forcePollSchema() {
@@ -231,7 +237,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public void clear() {
             m_pollFuture.set(null);
-            m_pollFuture = null;
             m_forcePollSchema = false;
         }
     }
@@ -250,7 +255,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId,
             int siteId,
             long genId,
-            String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
             String overflowPath
@@ -258,16 +262,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     {
         m_previousGenId = genId;
         m_generation = generation;
+        m_catalogVersionCreated = m_generation == null ? 0 : m_generation.getCatalogVersion();
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
-        m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
-
-        PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(m_signatureBytes);
-        String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
-
+        m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
+        String nonce = m_tableName + "_" + partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
         m_gapTracker = m_committedBuffers.scanForGap();
         // Pretend it's rejoin so we set first unpolled to a safe place
@@ -346,6 +346,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = true;
         m_client = processor.getExportClient(m_tableName);
         if (m_client != null) {
+            m_exportTargetName = m_client.getTargetName();
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
                 exportLog.debug(toString() + " is a replicated export stream");
@@ -361,6 +362,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final long genId) throws IOException {
         m_previousGenId = genId;
         m_generation = generation;
+        m_catalogVersionCreated = m_generation == null ? 0 : m_generation.getCatalogVersion();
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -384,9 +386,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
             m_siteId = partitionsLocalSite;
-            m_signature = jsObj.getString("signature");
-            m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
+            m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
             JSONArray columns = jsObj.getJSONArray("columns");
             for (int ii = 0; ii < columns.length(); ii++) {
                 JSONObject column = columns.getJSONObject(ii);
@@ -411,12 +412,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new IOException(e);
         }
 
-        PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(m_signatureBytes);
-        final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
+        final String nonce = m_tableName + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
         m_gapTracker = m_committedBuffers.scanForGap();
-         // Pretend it's rejoin so we set first unpolled to a safe place
+
+        // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
@@ -425,6 +425,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = false;
         m_client = processor.getExportClient(m_tableName);
         if (m_client != null) {
+            m_exportTargetName = m_client.getTargetName();
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
                 exportLog.debug(toString() + " is a replicated export stream");
@@ -438,17 +439,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_readyForPolling = readyForPolling;
     }
 
-    public void markInCatalog() {
-        m_isInCatalog = true;
+    public void markInCatalog(boolean inCatalog) {
+        m_isInCatalog = inCatalog;
     }
 
     public boolean inCatalog() {
         return m_isInCatalog;
     }
 
+    public int getCatalogVersionCreated() {
+        return m_catalogVersionCreated;
+    }
+
+    private int getGenerationCatalogVersion() {
+        return m_generation == null ? 0 : m_generation.getCatalogVersion();
+    }
+
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         //export stream for run-everywhere clients doesn't need ack mailboxes
-        if (m_runEveryWhere) {
+        if (m_runEveryWhere || m_closed) {
             return;
         }
         if (exportLog.isDebugEnabled()) {
@@ -463,8 +472,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setClient(ExportClientBase client) {
-        //TODO precondition?
-        m_exportTargetName = client.getTargetName();
+        m_exportTargetName = client != null ? client.getTargetName() : "";
         m_client = client;
     }
 
@@ -473,10 +481,29 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private synchronized void releaseExportBytes(long releaseSeqNo) throws IOException {
-        // Released offset is in an already-released past
+
+        // Return if released offset is in an already-released past.
+        // Note: on recover the first RELEASE_BUFFER message received by a
+        // replica will come with releaseSeqNo == m_lastReleasedSeqNo;
+        // We must go over the release logic to properly truncate the gap
+        // tracker and update the tuples pending.
         if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
+
+        // Check whether a pending container was completely acked
+        AckingContainer pend = m_pendingContainer.get();
+        if (pend != null) {
+            if (releaseSeqNo > pend.m_lastSeqNo) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Discarding via ack a pending " + pend);
+                }
+                m_pendingContainer.set(null);
+                pend.internalDiscard();
+            }
+        }
+
+        // Release buffers
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
@@ -492,13 +519,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
+
+        // If blocked and we released past the first gap, revert to ACTIVE
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
             exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
-            setStatus(StreamStatus.ACTIVE);
-            m_queueGap = 0;
+            clearGap(true);
         }
+
         m_lastReleasedSeqNo = releaseSeqNo;
         int tuplesDeleted = m_gapTracker.truncate(releaseSeqNo);
         m_tuplesPending.addAndGet(-tuplesDeleted);
@@ -523,10 +552,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public String getSignature() {
-        return m_signature;
-    }
-
     public final int getPartitionId() {
         return m_partitionId;
     }
@@ -542,7 +567,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
-        stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
         stringer.keySymbolValuePair("startTime", ManagementFactory.getRuntimeMXBean().getStartTime());
         stringer.key("columns").array();
@@ -583,11 +607,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        result = m_signature.compareTo(o.m_signature);
-        if (result != 0) {
-            return result;
-        }
-
         return 0;
     }
 
@@ -610,7 +629,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result = 0;
         result += m_database.hashCode();
         result += m_tableName.hashCode();
-        result += m_signature.hashCode();
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
@@ -688,6 +706,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long startSequenceNumber,
+            long committedSequenceNumber,
             int tupleCount,
             long uniqueId,
             long genId,
@@ -703,8 +722,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // header space along is 8 bytes
             assert (buffer.capacity() > StreamBlock.HEADER_SIZE);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
-            // Drop already acked buffer
             final BBContainer cont = DBBPool.wrapBB(buffer);
+
+            // Drop already acked buffer
             if (isAcked(lastSequenceNumber)) {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
@@ -712,6 +732,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
                             " last released seq: " + m_lastReleasedSeqNo);
                 }
+                cont.discard();
+                return;
+            }
+
+            // We should never try to push data on a source that is not in catalog
+            if (!inCatalog()) {
+                exportLog.warn("Source not in catalog, dropping buffer. " +
+                        " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
+                        " last released seq: " + m_lastReleasedSeqNo);
                 cont.discard();
                 return;
             }
@@ -725,7 +754,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, null, startSequenceNumber, tupleCount, uniqueId, -1, false);
+                        },
+                        null,
+                        startSequenceNumber,
+                        committedSequenceNumber,
+                        tupleCount, uniqueId, -1, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -771,6 +804,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long startSequenceNumber,
+            final long committedSequenceNumber,
             final int tupleCount,
             final long uniqueId,
             final long genId,
@@ -785,7 +819,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, false);
+                pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                        tupleCount, uniqueId, genId, buffer, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -799,7 +834,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, genId, buffer, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
+                                    tupleCount, uniqueId, genId, buffer, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -847,6 +883,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(sequenceNumber, isRejoin);
+                    // Need to handle drained source if truncate emptied the buffers
+                    handleDrainedSource();
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -879,15 +917,48 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_closed;
     }
 
+    /**
+     * This is called on updateCatalog when an exporting stream is dropped.
+     *
+     * Note: The {@code ExportDataProcessor} must have been shut down prior
+     *      to calling this method.
+     *
+     * @return
+     */
     public ListenableFuture<?> closeAndDelete() {
+
+        // We're going away, so shut ourselves from the external world
         m_closed = true;
+        m_ackMailboxRefs.set(null);
+
+        // Export mastership should have been released: force it.
+        m_mastershipAccepted.set(false);
+
+        // FIXME: necessary? Old processor should have been shut down.
+        // Returning null indicates end of stream
+        try {
+            if (m_pollTask != null) {
+                m_pollTask.setFuture(null);
+            }
+        } catch (RejectedExecutionException reex) {
+            // Ignore, {@code GuestProcessor} was closed
+        }
+        m_pollTask = null;
+
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
+                    // Discard the pending container, shortcutting the standard discard logic
+                    AckingContainer ack = m_pendingContainer.getAndSet(null);
+                    if (ack != null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Discard pending container, lastSeqNo: " + ack.getLastSeqNo());
+                        }
+                        ack.internalDiscard();
+                    }
                     m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
-                    m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
@@ -899,8 +970,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<?> close() {
         m_closed = true;
-        //If we are waiting at this allow to break out when close comes in.
-        m_allowAcceptingMastership.release();
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -919,11 +988,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
     public void setPendingContainer(AckingContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
-        m_pendingContainer.set(container);
+        if (m_closed) {
+            // A very slow export decoder must have noticed the export processor shutting down
+            exportLog.info("Discarding stale pending container");
+            container.internalDiscard();
+        } else {
+            m_pendingContainer.set(container);
+        }
     }
 
     public ListenableFuture<AckingContainer> poll(boolean forcePollSchema) {
-        final SettableFuture<AckingContainer> fut = SettableFuture.create();
+        //ENG-15763, create SettableFuture that lets us handle executor exceptions
+        final SettableFuture<AckingContainer> fut = SettableFuture.create(false);
         PollTask pollTask = new PollTask(fut, forcePollSchema);
         try {
             m_es.execute(new Runnable() {
@@ -939,33 +1015,50 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
-                        pollTask.clear();
+                        try {
+                            pollTask.clear();
+                        } catch (RejectedExecutionException rej) {
+                            // Ignore: the {@code GuestProcessor} was shut down
+                        }
                         m_pollTask = null;
                         return;
                     }
 
+                    AckingContainer cont = null;
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            AckingContainer cont = m_pendingContainer.getAndSet(null);
-                            boolean hasSchema = cont.schema() != null;
-                            if (!hasSchema) {
+                            cont = m_pendingContainer.getAndSet(null);
+                            if (cont.schema() == null) {
                                 // Ensure this first block has a schema
                                 BBContainer schemaContainer = m_committedBuffers.pollSchema();
                                 if (schemaContainer == null) {
-                                    pollTask.setException(new IOException("No schema for committedSeqNo " + cont));
+                                    try {
+                                        pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
+                                                + ", discarding buffer (rows may be lost)."));
+                                    } catch (RejectedExecutionException reex) { /* Ignore */ }
+                                    cont.internalDiscard();
                                     return;
                                 } else {
                                     cont.setSchema(schemaContainer);
                                 }
                             }
-                            pollTask.setFuture(cont);
-                            if (m_pollTask != null) {
+
+                            try {
+                                pollTask.setFuture(cont);
                                 if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Pick up work from pending container, set poll future to null");
+                                    exportLog.debug("Picked up pending container with committedSeqNo " + cont.m_commitSeqNo);
                                 }
-                                m_pollTask = null;
+                            } catch (RejectedExecutionException reex) {
+                                // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+                                // shut down by a catalog update): place the polled container in pending
+                                // so it is picked up by the new GuestProcessor.
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Pending a rejected " + cont);
+                                }
+                                setPendingContainer(cont);
                             }
+                            m_pollTask = null;
                             return;
                         }
                         /*
@@ -982,15 +1075,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             pollImpl(pollTask);
                         }
                     } catch (Exception e) {
-                        exportLog.error("Exception polling export buffer", e);
+                        if (cont != null) {
+                            exportLog.error("Exception polling export buffer, discarding buffer with for committedSeqNo" + cont.m_commitSeqNo
+                                    + ", rows may be lost", e);
+                            cont.internalDiscard();
+                        } else  {
+                            exportLog.error("Exception polling export buffer", e);
+                        }
                     } catch (Error e) {
                         VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
                 }
             });
         } catch (RejectedExecutionException rej) {
-            //Don't expect this to happen outside of test, but in test it's harmless
-            exportLog.info("Polling from export data source rejected, this should be harmless");
+            exportLog.info("Polling from export data source rejected.");
         }
         return fut;
     }
@@ -1001,7 +1099,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         try {
-            cleanupEmptySource();
+            handleDrainedSource();
+
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
@@ -1074,8 +1173,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
-                    setStatus(StreamStatus.ACTIVE);
-                    m_queueGap = 0;
+                    clearGap(true);
                 }
                 BBContainer schemaContainer = null;
                 if (pollTask.forcePollSchema()) {
@@ -1086,30 +1184,49 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 schemaContainer,
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1);
+                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
+                                first_unpolled_block.committedSequenceNumber(),
+                                m_migrateRowsDeleter);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Posting Export data for " + ackingContainer.toString());
+                }
                 try {
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
-                    //We are closing source dont discard next processor will pick it up.
+                    // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
+                    // shut down by a catalog update): place the polled container in pending
+                    // so it is picked up by the new GuestProcessor.
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Pending a rejected " + ackingContainer);
+                    }
+                    setPendingContainer(ackingContainer);
                 }
                 m_pollTask = null;
             }
         } catch (Throwable t) {
-            pollTask.setException(t);
+            try {
+                pollTask.setException(t);
+            } catch (RejectedExecutionException reex) { /* Ignore */ }
         }
     }
 
     public class AckingContainer extends BBContainer {
         final long m_lastSeqNo;
+        final long m_commitSeqNo;
         final BBContainer m_backingCont;
         BBContainer m_schemaCont;
         long m_startTime = 0;
+        long m_commitSpHandle = 0;
+        final MigrateRowsDeleter m_migrateRowsDeleter;
 
-        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq) {
+        public AckingContainer(BBContainer cont, BBContainer schemaCont, long seq, long commitSeq,
+                MigrateRowsDeleter migrateRowsDeleter) {
             super(cont.b());
             m_lastSeqNo = seq;
+            m_commitSeqNo = commitSeq;
             m_backingCont = cont;
             m_schemaCont = schemaCont;
+            m_migrateRowsDeleter = migrateRowsDeleter;
         }
 
         public void updateStartTime(long startTime) {
@@ -1129,6 +1246,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 throw new IllegalStateException("Overwriting schema");
             }
             m_schemaCont = schemaCont;
+        }
+
+        public long getCommittedSeqNo() {
+            return m_commitSeqNo;
+        }
+
+        public void setCommittedSpHandle(long spHandle) {
+            m_commitSpHandle = spHandle;
         }
 
         // Package private
@@ -1175,10 +1300,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              }
                             try {
                                 if (!m_es.isShutdown()) {
+                                    setCommittedSeqNo(m_commitSeqNo);
                                     ackImpl(m_lastSeqNo);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_lastSeqNo);
+                                forwardAckToOtherReplicas();
+                            }
+                            if (m_migrateRowsDeleter != null && m_mastershipAccepted.get()) {
+                                m_migrateRowsDeleter.delete(m_commitSpHandle);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1192,34 +1321,42 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                   exportLog.info("Acking export data task rejected, this should be harmless");
                   m_backingCont.discard();
                   synchronized(this) {
-                      m_schemaCont.discard();
+                      if (m_schemaCont != null) {
+                          m_schemaCont.discard();
+                      }
                   }
             }
+        }
+
+        @Override
+        public String toString() {
+            return new String("Container: ending at " + m_lastSeqNo + " (Committed " + m_commitSeqNo + ")");
         }
     }
 
     public void forwardAckToOtherReplicas() {
-        forwardAckToOtherReplicas(m_lastReleasedSeqNo);
-    }
-
-    private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
             return;
         }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip forwarding ack of seq " + m_committedSeqNo);
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
-            // msgType:byte(1) + partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8).
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+            final int msgLen = getAckMessageLength();
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.RELEASE_BUFFER);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(seq);
+            buf.putLong(m_committedSeqNo);
+            buf.putInt(getGenerationCatalogVersion());
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1227,7 +1364,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 mbx.send(siteId, bpm);
             }
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + seq
+                exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                        + " with sequence number " + m_committedSeqNo
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
@@ -1246,18 +1384,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                if (p == null) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug(ExportDataSource.this.toString() + ": Skip forwarding ack to new replicas");
+                    }
+                    return;
+                }
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
-                 // msg type(1) + partition:int(4) + length:int(4) +
-                    // signaturesBytes.length + ackUSO:long(8).
-                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+                    final int msgLen = getAckMessageLength();
 
                     ByteBuffer buf = ByteBuffer.allocate(msgLen);
                     buf.put(ExportManager.RELEASE_BUFFER);
                     buf.putInt(m_partitionId);
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
-                    buf.putLong(m_lastReleasedSeqNo);
+                    buf.putLong(m_committedSeqNo);
+                    buf.putInt(getGenerationCatalogVersion());
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1265,7 +1408,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         mbx.send(siteId, bpm);
                     }
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + m_lastReleasedSeqNo
+                        exportLog.debug("Send RELEASE_BUFFER to " + toString()
+                                + " with sequence number " + m_committedSeqNo
                                 + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                                 + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                     }
@@ -1274,7 +1418,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long seq) {
+    private int getAckMessageLength() {
+        // msg type(1) + partition:int(4) + length:int(4) +
+        // signaturesBytes.length + ackUSO:long(8) + catalogVersion:int(4).
+        final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
+        return msgLen;
+    }
+
+    /**
+     * Entry point for receiving acknowledgments from remote entities.
+     *
+     * @param seq acknowledged sequence number, ALWAYS last row of a transaction, or 0.
+     */
+    public void remoteAck(final long seq) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1296,6 +1452,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
+                        setCommittedSeqNo(seq);
                         ackImpl(seq);
                     }
                 } catch (Exception e) {
@@ -1312,7 +1469,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (seq > 0) {
             try {
                 releaseExportBytes(seq);
-                cleanupEmptySource();
+                handleDrainedSource();
                 mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
@@ -1321,24 +1478,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    // Discard dangling or dropped export data source when the buffer is empty
-    private void cleanupEmptySource() throws IOException {
-        if ((!this.m_isInCatalog || m_status == StreamStatus.DROPPED) && m_committedBuffers.isEmpty()) {
-            //Returning null indicates end of stream
-            try {
-                if (m_pollTask != null) {
-                    m_pollTask.setFuture(null);
-                }
-            } catch (RejectedExecutionException reex) {
-                //We are closing source.
-            }
-            m_pollTask = null;
-            m_generation.onSourceDone(m_partitionId, m_signature);
-            return;
-        }
-    }
+     /**
+      * Notify the generation when source is drained on an unused partition.
+      *
+      * @throws IOException
+      */
+     private void handleDrainedSource() throws IOException {
+         if (!inCatalog() && m_committedBuffers.isEmpty()) {
+             //Returning null indicates end of stream
+             try {
+                 if (m_pollTask != null) {
+                     m_pollTask.setFuture(null);
+                 }
+             } catch (RejectedExecutionException reex) {
+                 // Ignore, {@code GuestProcessor} was closed
+             }
+             m_pollTask = null;
+             m_generation.onSourceDrained(m_partitionId, m_tableName);
+             return;
+         }
+     }
 
-    /**
+     /**
      * indicate the partition leader has been migrated away
      * prepare to give up the mastership,
      * has to drain existing PBD and then notify new leaders (through ack)
@@ -1361,11 +1522,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private void sendGiveMastershipMessage(int newLeaderHostId, long curSeq) {
+    private void sendGiveMastershipMessage(int newLeaderHostId) {
         if (m_runEveryWhere) {
             return;
         }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending give mastership message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 ) {
             // msg type(1) + partition:int(4) + length:int(4) +
@@ -1376,7 +1543,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
-            buf.putLong(curSeq);
+            buf.putLong(m_committedSeqNo);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1386,7 +1553,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     mbx.send(siteId, bpm);
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug(toString() + " send GIVE_MASTERSHIP message to " +
-                                CoreUtils.hsIdToString(siteId) + " curruent sequence number " + curSeq);
+                                CoreUtils.hsIdToString(siteId)
+                                + " with sequence number " + m_committedSeqNo);
                     }
                     break;
                 }
@@ -1398,6 +1566,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void sendTakeMastershipMessage() {
         m_queryResponses.clear();
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         m_currentRequestId = System.nanoTime();
         if (mbx != null && p.getSecond().size() > 0) {
@@ -1428,6 +1602,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending query response message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
@@ -1544,7 +1724,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info(toString() + " skipped stream gap because it's a replicated stream, " +
                         "setting next poll sequence number to " + m_firstUnpolledSeqNo);
             }
-            m_queueGap = 0;
+            clearGap(false);
             return;
         }
 
@@ -1553,6 +1733,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
             m_queryResponses.clear();
             Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            if (p == null) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug(ExportDataSource.this.toString() + ": Skip sending gap query.");
+                }
+                return;
+            }
             Mailbox mbx = p.getFirst();
             m_currentRequestId = System.nanoTime();
             if (mbx != null && p.getSecond().size() > 0) {
@@ -1639,6 +1825,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     m_queryResponses.put(sendHsId, new QueryResponse(lastSeq));
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                    if (p == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore query response.");
+                        }
+                        return;
+                    }
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
                         List<Entry<Long, QueryResponse>> candidates =
                                 m_queryResponses.entrySet().stream()
@@ -1662,13 +1854,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
-                                if (DISABLE_AUTO_GAP_RELEASE) {
-                                    // Show warning only in full cluster.
-                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin export release' command to skip the missing data.");
-                                } else {
+                                if (ENABLE_AUTO_GAP_RELEASE) {
                                     processStreamControl(OperationMode.RELEASE);
+                                } else {
+                                    // Show warning only in full cluster.
+                                    String warnMsg = "Export is blocked, missing [" +
+                                            gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                            ExportDataSource.this.toString() +
+                                            ". Please rejoin a node with the missing export queue data or " +
+                                            "use 'voltadmin export release' command to skip the missing data.";
+                                    exportLog.warn(warnMsg);
+                                    consoleLog.warn(warnMsg);
+                                    SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
+                                    if (snmp != null) {
+                                        try {
+                                            snmp.streamBlocked(warnMsg);
+                                        } catch (Throwable t) {
+                                            VoltLogger log = new VoltLogger("HOST");
+                                            log.warn("failed to issue a streamBlocked SNMP trap", t);
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -1702,6 +1907,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void sendTakeMastershipResponse(long senderHsId, long requestId) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        if (p == null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership response message.");
+            }
+            return;
+        }
         Mailbox mbx = p.getFirst();
         if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
@@ -1731,6 +1942,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     m_queryResponses.put(sendHsId, null);
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                    if (p == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore take mastership response.");
+                        }
+                        return;
+                    }
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
                         acceptMastership();
                     }
@@ -1768,12 +1985,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
                     " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
-                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_lastPushedSeqNo " + m_lastPushedSeqNo);
+                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_committedSeqNo " + m_committedSeqNo +
+                    " m_lastPushedSeqNo " + m_lastPushedSeqNo);
         }
         // time to give away leadership
         if (seq >= m_seqNoToDrain) {
             if (m_newLeaderHostId != null) {
-                sendGiveMastershipMessage(m_newLeaderHostId, seq);
+                sendGiveMastershipMessage(m_newLeaderHostId);
             } else {
                 sendGapQuery();
             }
@@ -1793,6 +2011,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, initialSequenceNumber);
         }
+        // Rejoin or recovery should be on a transaction boundary (except maybe in a gap situation)
+        m_committedSeqNo = m_lastReleasedSeqNo;
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }
@@ -1809,8 +2029,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
                         "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
-                setStatus(StreamStatus.ACTIVE);
-                m_queueGap = 0;
+                clearGap(true);
+
+                // Satisfy a pending poll request
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!m_mastershipAccepted.get() || m_pollTask == null) {
+                            return;
+                        }
+                        try {
+                            pollImpl(m_pollTask);
+                        } catch (Exception e) {
+                            exportLog.error("Exception polling export buffer after RELEASE", e);
+                        } catch (Error e) {
+                            VoltDB.crashLocalVoltDB("Error polling export bufferafter RELEASE", true, e);
+                        }
+                    }
+                });
                 return true;
             }
             break;
@@ -1818,6 +2054,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // should not happen since the operation is verified prior to this call
         }
         return false;
+    }
+
+    private void clearGap(boolean setActive) {
+        m_queueGap = 0;
+        m_seqNoToDrain = Long.MAX_VALUE;
+        if (setActive) {
+            setStatus(StreamStatus.ACTIVE);
+        }
+    }
+
+    private void setCommittedSeqNo(long committedSeqNo) {
+        if (committedSeqNo == NULL_COMMITTED_SEQNO) return;
+        if (committedSeqNo > m_committedSeqNo) {
+            m_committedSeqNo  = committedSeqNo;
+        }
+    }
+
+    public void setupMigrateRowsDeleter(int batchSize) {
+        if (batchSize > 0) {
+            m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, m_partitionId, batchSize);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + m_partitionId);
+            }
+        }
     }
 
     public static class StreamTableSchemaSerializer implements DeferredSerialization {
@@ -1934,7 +2194,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int size = 0;
             // column name length, name, type, length
             Table streamTable = m_catalogContext.database.getTables().get(m_streamName);
-            assert (streamTable != null);
+            assert streamTable != null : "Failed to find stream " + m_streamName + " in catalog";
             for (Column c : CatalogUtil.getSortedCatalogItems(streamTable.getColumns(), "index")) {
                 size += 4 + c.getName().length() + 1 + 4;
             }
@@ -1948,6 +2208,5 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     4 + VOLT_EXPORT_OPERATION.length() + 1 + 4 +
                     size;
         }
-
     }
 }

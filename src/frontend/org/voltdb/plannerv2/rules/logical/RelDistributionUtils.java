@@ -638,10 +638,17 @@ final class RelDistributionUtils {
                             joinColumnSets.stream().noneMatch(set ->
                                     (! outerIsPartitioned || intersects(set, outerPartColumns)) &&
                                             (! innerIsPartitioned || intersects(set, adjustedInnerPartColumns)))) {
-                        if (outerIsPartitioned && innerIsPartitioned) {
+                        if (outerIsPartitioned && innerIsPartitioned &&
+                                !isAggregateNode(outer) && !isAggregateNode(inner)) {
                             // Both relations are partitioned; but the join condition
                             // does **not** join on their partition columns.
                             // We can assert that VoltDB cannot handle such join.
+                            //
+                            // Note that we also exclude the case when either (or both) join rels is an aggregation,
+                            // in which case it is MP query that Volt should be able to plan. An example is:
+                            // CREATE TABLE P1(id int not null, tiny int, num int, vchar VARCHAR(64), pt GEOGRAPHY(164)); PARTITION TABLE p1 ON COLUMN id;
+                            // CREATE TABLE R1(vchar VARCHAR(64), pt GEOGRAPHY(164));
+                            // SELECT 'foo', P1.tiny FROM P1 WHERE vchar != (SELECT MAX(vchar) FROM R1 WHERE pt != P1.pt ORDER BY COUNT(*)) ORDER BY num;
                             throw new PlanningErrorException("SQL error while compiling query: " +
                                     "This query is not plannable.  " +
                                     "The planner cannot guarantee that all rows would be in a single partition.");

@@ -85,6 +85,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/LargeTempTableSortTest
   storage/DRBinaryLog_test
   catalog/catalog_test
+  catalog/ExportTupleStreamTest
   common/debuglog_test
   common/elastic_hashinator_test
   common/nvalue_test

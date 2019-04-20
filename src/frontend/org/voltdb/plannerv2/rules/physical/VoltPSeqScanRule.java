@@ -25,10 +25,10 @@ import org.apache.calcite.rel.RelDistribution.Type;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltSeqTableScan;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableSequentialScan;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltSeqTableScan}.
+ * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltPhysicalTableSequentialScan}.
  * And add {@link AbstractVoltDBPExchange} on top of it.
  *
  * @author Michael Alexeev
@@ -52,7 +52,7 @@ public class VoltPSeqScanRule extends RelOptRule {
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
                 1 : Constants.DISTRIBUTED_SPLIT_COUNT;
 
-        VoltSeqTableScan scanRel = new VoltSeqTableScan(
+        VoltPhysicalTableSequentialScan scanRel = new VoltPhysicalTableSequentialScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),
                 tableScan.getTable(),
