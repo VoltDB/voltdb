@@ -84,6 +84,18 @@ public class TestValidation extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testAmbiguousUsing() {
+        m_tester.sql("select ^I^ from R1 left join R2 using(I)")
+        .exception("Column 'I' is ambiguous")
+        .pass();
+    }
+
+    public void testAmbiguous3WayUsing() {
+        m_tester.sql("select i from R1 full join R2 using(i) full join RI1 using(^i^)")
+        .exception("Column name 'I' in USING clause is not unique on one side of join")
+        .pass();
+    }
+
     public void testFunctionArg() {
         m_tester.sql("select sum(i) from R2").pass();
 

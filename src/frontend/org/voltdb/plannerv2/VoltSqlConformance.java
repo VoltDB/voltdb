@@ -34,6 +34,10 @@ public class VoltSqlConformance extends SqlAbstractConformance {
         return true;
     }
 
+    @Override public boolean isHavingAlias() {
+        return true;
+    }
+
     @Override public boolean isBangEqualAllowed() {
         return true;
     }

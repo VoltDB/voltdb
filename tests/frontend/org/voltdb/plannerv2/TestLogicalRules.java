@@ -554,4 +554,90 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .transform("VoltLogicalValues(tuples=[[]])\n")
                 .pass();
     }
+
+    public void testFullJoinWithUsing() {
+        m_tester.sql("select i from R1 full join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing1() {
+        m_tester.sql("select max(r1.i), i from R1 full join R2 using(i) group by i")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], I=[$t0])\n" +
+                    "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
+                    "    VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3], $f1=[$t0])\n" +
+                    "      VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing2() {
+        m_tester.sql("select max(r1.i), i from R1 full join R2 using(i) group by i having i > 0")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t0, $t2)], EXPR$0=[$t1], I=[$t0], $condition=[$t3])\n" +
+                    "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
+                    "    VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3], $f1=[$t0])\n" +
+                    "      VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "          VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing3() {
+        m_tester.sql("select max(i) from R1 full join R2 using(i)")
+        .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[MAX($0)])\n" +
+                    "  VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], $f0=[$t3])\n" +
+                    "    VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing4() {
+        m_tester.sql("select r1.i from R1 full join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t0])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing5() {
+        m_tester.sql("select case when r1.i is not null then r1.i else r2.i end as i "
+                + " from R1 full join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t0)], expr#3=[CASE($t2, $t0, $t1)], I=[$t3])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullJoinWithUsing6() {
+        m_tester.sql("select RANK() OVER ( ORDER BY i) AS rnk, i "
+                + "from R1 full join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], " +
+                    "expr#4=[RANK() OVER (ORDER BY $t3 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)], RNK=[$t4], I=[$t3])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
 }
