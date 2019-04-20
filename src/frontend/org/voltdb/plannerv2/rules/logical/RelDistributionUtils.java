@@ -413,8 +413,7 @@ final class RelDistributionUtils {
      * @return
      */
     static RelDistribution getDistribution(RelNode node) {
-        return isAggregateNode(node) ? RelDistributions.SINGLETON :
-                node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
     }
 
     private static Pair<Map<Integer, RexNode>, Map<Integer, RexNode>> fillColumnLiteralEqualPredicates(

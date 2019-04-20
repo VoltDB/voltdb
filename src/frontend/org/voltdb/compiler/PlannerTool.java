@@ -285,7 +285,6 @@ public class PlannerTool {
             // Renumber the plan node ids to start with 1
             compiledPlan.resetPlanNodeIds(1);
         } catch (Exception e){
-            e.printStackTrace();
             throw new PlannerFallbackException(e.getMessage());
         }
         planner.close();
