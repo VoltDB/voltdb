@@ -277,13 +277,13 @@ public class PerPartitionTable {
                     row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
                             currRow.m_rowData[i]);
                 }
+                m_table.addRow(row_args);
             } catch (Exception e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
                 loader.m_outstandingRowCount.decrementAndGet();
                 it.remove();
                 continue;
             }
-            m_table.addRow(row_args);
 
             Long prevValue;
             if ((prevValue = batchSizes.put(loader, 1L)) != null) {
