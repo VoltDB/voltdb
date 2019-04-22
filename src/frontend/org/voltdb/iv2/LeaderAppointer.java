@@ -588,7 +588,7 @@ public class LeaderAppointer implements Promotable
                 List<String> replicas = partition.getReplicas();
 
                 if (replicas.isEmpty()) {
-                    if (partitionNotOnHashRing) {
+                    if (partitionNotOnHashRing && VoltDB.instance().getElasticService().canRemovePartitions()) {
                         // no replica for the new partition, clean it up
                         removeAndCleanupPartition(pid);
                         continue;
