@@ -179,6 +179,7 @@ SET (VOLTDB_SRC
   executors/materializedscanexecutor.cpp
   executors/materializeexecutor.cpp
   executors/mergereceiveexecutor.cpp
+  executors/mergejoinexecutor.cpp
   executors/nestloopexecutor.cpp
   executors/nestloopindexexecutor.cpp
   executors/OptimizedProjector.cpp
@@ -223,6 +224,7 @@ SET (VOLTDB_SRC
   plannodes/limitnode.cpp
   plannodes/materializedscanplannode.cpp
   plannodes/materializenode.cpp
+  plannodes/mergejoinnode.cpp
   plannodes/mergereceivenode.cpp
   plannodes/nestloopindexnode.cpp
   plannodes/nestloopnode.cpp

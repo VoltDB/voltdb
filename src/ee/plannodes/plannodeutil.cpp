@@ -46,7 +46,6 @@
 #include "plannodes/plannodeutil.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
-#include "plannodes/migratenode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"
@@ -55,6 +54,8 @@
 #include "plannodes/materializenode.h"
 #include "plannodes/materializedscanplannode.h"
 #include "plannodes/mergereceivenode.h"
+#include "plannodes/mergejoinnode.h"
+#include "plannodes/migratenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/orderbynode.h"
@@ -125,6 +126,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_NESTLOOPINDEX):
             ret = new voltdb::NestLoopIndexPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // MergeJoin
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MERGEJOIN):
+            ret = new voltdb::MergeJoinPlanNode();
             break;
         // ------------------------------------------------------------------
         // Update
