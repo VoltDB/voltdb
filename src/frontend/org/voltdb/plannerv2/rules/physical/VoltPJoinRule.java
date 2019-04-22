@@ -26,6 +26,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalNestLoopJoin;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 
 /**
@@ -54,7 +55,7 @@ public class VoltPJoinRule extends RelOptRule {
 
         // TODO: How many number of concurrent processes that a Join will be executed in ?
         // I use 1 for now.
-        call.transformTo(new VoltPhysicalJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
+        call.transformTo(new VoltPhysicalNestLoopJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
                 join.getCondition(), join.getVariablesSet(), join.getJoinType(),
                 join.isSemiJoinDone(), systemFieldList, Constants.JOIN_SPLIT_COUNT));
     }

@@ -581,6 +581,16 @@ public class RexConverter {
         return ae;
     }
 
+    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond) {
+        if (cond != null) {
+            final AbstractExpression expr = cond.accept(new ConvertingVisitor(numOuterFields));
+            Preconditions.checkNotNull(expr, "RexNode converted to null expression");
+            return expr;
+        } else {
+            return null;
+        }
+    }
+
     public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType, int offset) {
         final NodeSchema nodeSchema = new NodeSchema();
 
