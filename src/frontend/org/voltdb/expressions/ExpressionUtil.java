@@ -341,7 +341,7 @@ public final class ExpressionUtil {
         if (stack.isEmpty()) {
             return null;
         }
-        return combineStack(stack);
+        return combineStack(ExpressionType.CONJUNCTION_AND, stack);
     }
 
     /**
@@ -349,7 +349,7 @@ public final class ExpressionUtil {
      * @param colExps
      */
     @SafeVarargs
-    public static AbstractExpression combinePredicates(Collection<AbstractExpression>... colExps) {
+    public static AbstractExpression combinePredicates(ExpressionType type, Collection<AbstractExpression>... colExps) {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         for (Collection<AbstractExpression> exps : colExps) {
             if (exps != null) {
@@ -359,10 +359,10 @@ public final class ExpressionUtil {
         if (stack.isEmpty()) {
             return null;
         }
-        return combineStack(stack);
+        return combineStack(type, stack);
     }
 
-    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
+    private static AbstractExpression combineStack(ExpressionType type, Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.
@@ -378,7 +378,7 @@ public final class ExpressionUtil {
             // If our return node is null, then we need to make a new one
             //
             if (ret == null) {
-                ret = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND);
+                ret = new ConjunctionExpression(type);
                 ret.setLeft(child_exp);
             //
             // Check whether we can add it to the right side
@@ -571,7 +571,7 @@ public final class ExpressionUtil {
             subExprMap.put(subExpr.m_id, subExpr);
         }
         // Now reconstruct the expression
-        return ExpressionUtil.combinePredicates(subExprMap.values());
+        return ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, subExprMap.values());
     }
 
     /**

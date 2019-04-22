@@ -180,5 +180,8 @@ public class AccessPath {
         return otherExprs;
     }
 
+    public Index getIndex() {
+        return index;
+    }
 }
 

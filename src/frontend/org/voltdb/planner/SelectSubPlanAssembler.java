@@ -37,6 +37,7 @@ import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.utils.PermutationGenerator;
 
@@ -777,7 +778,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // the inner node ONLY, that can not be pushed down.
                 joinClauses.addAll(innerAccessPath.otherExprs);
             }
-            nljNode.setJoinPredicate(ExpressionUtil.combinePredicates(joinClauses));
+            nljNode.setJoinPredicate(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, joinClauses));
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(outerPlan);
@@ -818,8 +819,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return null;
         }
         ajNode.setJoinType(joinNode.getJoinType());
-        ajNode.setPreJoinPredicate(ExpressionUtil.combinePredicates(joinNode.m_joinOuterList));
-        ajNode.setWherePredicate(ExpressionUtil.combinePredicates(whereClauses));
+        ajNode.setPreJoinPredicate(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, joinNode.m_joinOuterList));
+        ajNode.setWherePredicate(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, whereClauses));
         ajNode.resolveSortDirection();
         return ajNode;
     }

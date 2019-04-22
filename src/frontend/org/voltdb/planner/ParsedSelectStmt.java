@@ -1473,14 +1473,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 whereList.add(selectStmt.m_joinTree.getWhereExpression());
             }
             selectStmt.m_joinTree.setWhereExpression(
-                    ExpressionUtil.combinePredicates(whereList));
+                    ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, whereList));
         }
         // Add new HAVING expressions
         if (!havingList.isEmpty()) {
             if (selectStmt.m_having != null) {
                 havingList.add(selectStmt.m_having);
             }
-            selectStmt.m_having = ExpressionUtil.combinePredicates(havingList);
+            selectStmt.m_having = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, havingList);
             // reprocess HAVING expressions
             ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
         }
