@@ -573,6 +573,7 @@ public class LeaderAppointer implements Promotable
         Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
         ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
         final long statTs = System.currentTimeMillis();
+        Set<Integer> partitionsOnHashRing = TheHashinator.getCurrentHashinator().getPartitions();
         for (Cartographer.AsyncPartition partition : partitions) {
             int pid = partition.getPid();
 
@@ -583,7 +584,7 @@ public class LeaderAppointer implements Promotable
                 if (!partition.isInitialized()) {
                     continue;
                 }
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+                final boolean partitionNotOnHashRing = !partitionsOnHashRing.contains(pid);
 
                 List<String> replicas = partition.getReplicas();
 
@@ -689,10 +690,6 @@ public class LeaderAppointer implements Promotable
         } catch (Exception e) {
             tmLog.error(WHOMIM + "Error removing partition info", e);
         }
-    }
-
-    private static boolean partitionNotOnHashRing(int pid) {
-        return TheHashinator.getRanges(pid).isEmpty();
     }
 
     /**
