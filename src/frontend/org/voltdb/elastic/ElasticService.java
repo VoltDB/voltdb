@@ -49,4 +49,12 @@ public interface ElasticService {
      * @param failedHostIds {@link Collection} of host IDs which failed
      */
     void hostsFailed(Collection<Integer> failedHostIds);
+
+    /**
+     * During some elastic operations partitions might exist which are not on the hash ring but they cannot be removed
+     * from the system. This method is a way to test if any partitions can be removed from the system.
+     *
+     * @return {@code true} if partitions can be removed from the system
+     */
+    boolean canRemovePartitions();
 }
