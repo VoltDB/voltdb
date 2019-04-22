@@ -192,7 +192,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         try {
-            return ptool.planSql(sqlStatement,
+            return ptool.planSqlHsql(sqlStatement,
                                  partitioning,
                                  explainMode != ExplainMode.NONE,
                                  userParamSet,
