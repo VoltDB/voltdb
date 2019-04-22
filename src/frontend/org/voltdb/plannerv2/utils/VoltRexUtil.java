@@ -18,15 +18,10 @@
 package org.voltdb.plannerv2.utils;
 
 import com.google_voltpatches.common.base.Preconditions;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.*;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexFieldAccess;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLocalRef;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
 import org.json_voltpatches.JSONException;
@@ -198,27 +193,42 @@ public class VoltRexUtil {
         return RelDistributions.hash(newPartitionIndexes);
     }
 
-        /**
+    public static RelCollation adjustCollationForProgram(
+            RexBuilder builder,
+            RexProgram program,
+            RelCollation inputCollation) {
+        return adjustCollationForProgram(builder, program, inputCollation, false);
+    }
+
+    /**
      * Convert a collation into a new collation which column indexes are adjusted for a possible projection.
      * Adopted from the RexProgram.deduceCollations
      *
      * @param program - New program
      * @param inputCollation - index collation
+     * @param allowCast
      * @return RelCollation
      */
     public static RelCollation adjustCollationForProgram(
             RexBuilder builder,
             RexProgram program,
-            RelCollation inputCollation) {
-        assert (program != null);
-
+            RelCollation inputCollation, boolean allowCast) {
+        Preconditions.checkNotNull("Program is null", program);
         int sourceCount = program.getInputRowType().getFieldCount();
         List<RexLocalRef> refs = program.getProjectList();
         int[] targets = new int[sourceCount];
         Arrays.fill(targets, -1);
         for (int i = 0; i < refs.size(); i++) {
             final RexLocalRef ref = refs.get(i);
-            final int source = ref.getIndex();
+            int source = ref.getIndex();
+            if (source > sourceCount && allowCast && source < program.getExprCount()) {
+                // Possibly CAST expression
+                final RexNode expr = program.getExprList().get(source);
+                final int adjustedSource = getReferenceOrAccessIndex(program, expr, true);
+                if (adjustedSource != -1) {
+                    source = adjustedSource;
+                }
+            }
             if ((source < sourceCount) && (targets[source] == -1)) {
                 targets[source] = i;
             }
@@ -280,6 +290,41 @@ public class VoltRexUtil {
         return getReferenceOrAccessIndex(node, false);
     }
 
+    /**
+     * Return TRUE if a join's expression is a field equivalence expression (field1 = field2)
+     * where field1 and field2 represent fields from inner and outer tables
+     * or a conjunction of field equivalence expressions
+     *
+     * @param expression
+     * @param numLhsFields for joins the count of a outer table fields
+     * @return
+     */
+    public static boolean isFieldEquivalenceExpr(RexNode expression, int numLhsFields) {
+        List<RexNode> exprs = RelOptUtil.conjunctions(expression);
+        boolean isEquivExpr = true;
+        for (RexNode expr : exprs) {
+            if (!expr.isA(SqlKind.EQUALS)) {
+                return false;
+            }
+            assert(expr instanceof RexCall);
+            RexCall call = (RexCall) expr;
+            if (numLhsFields != -1) {
+                int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
+                int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
+                isEquivExpr = isEquivExpr && index0 >= 0 && index1 >= 0 &&
+                        ((index0 < numLhsFields && index1 >= numLhsFields) ||
+                        (index1 < numLhsFields && index0 >= numLhsFields));
+            } else {
+                isEquivExpr = isEquivExpr && RexUtil.isReferenceOrAccess(call.operands.get(0), true) &&
+                        RexUtil.isReferenceOrAccess(call.operands.get(1), true);
+            }
+            if (!isEquivExpr) {
+                return isEquivExpr;
+            }
+        }
+        return isEquivExpr;
+    }
+
     private static int getReferenceOrAccessIndex(RexNode node, boolean allowCast) {
         if (node instanceof RexInputRef) {
             return ((RexInputRef)node).getIndex();
@@ -291,4 +336,33 @@ public class VoltRexUtil {
         }
         return -1;
     }
+
+    /**
+     * For a given join's field equivalence expression return a collection of pairs where each pair
+     * represents field's indexes for outer and inner tables.
+     * Each pair from the collection represents a tuple of outer and inner fields indexes for each equivalence
+     * sub-expression
+     *
+     * @param expression
+     * @param numLhsFields for joins the count of a outer table fields
+     * @return
+     */
+    public static List<Pair<Integer, Integer>> extractFieldIndexes(RexNode expression, int numLhsFields) {
+        assert(isFieldEquivalenceExpr(expression, numLhsFields));
+        List<RexNode> exprs = RelOptUtil.conjunctions(expression);
+        List<Pair<Integer, Integer>> result = new ArrayList<>();
+        for (RexNode expr : exprs) {
+            assert(expr instanceof RexCall);
+            RexCall call = (RexCall) expr;
+            int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
+            int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
+            assert(index0 >= 0 && index1 >= 0);
+            Pair<Integer, Integer> nextPair = (index0 < numLhsFields) ?
+                    Pair.of(index0, index1) :
+                        Pair.of(index1, index0);
+            result.add(nextPair);
+        }
+        return result;
+    }
+
 }

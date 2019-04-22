@@ -63,14 +63,13 @@ public class IndexUtil {
             Index index,
             SortDirectionType sortDirection) {
         return getCalciteRelevantAccessPathForIndex(
-                table, catColumns, condRef, program, index, sortDirection, -1);
+                table, catColumns, condRef, program, index, sortDirection, -1, false);
     }
 
     /**
      * Given a table (stand alone or from a join), a predicate expression, and an index, find
      * the best way to access the data using the given index, or return null if no good way exists.
-     * If the numLhsFieldsForJoin is specified and != -1 it means that this table is on the inner side
-     * of a join.
+     * If numOuterFieldsForJoin != -1 then the expression belongs to a stand-alone table.
      *
      * @param table The table we want data from.
      * @param catColumns The table columns
@@ -78,20 +77,21 @@ public class IndexUtil {
      * @param program Program to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
      * @param sortDirection sort direction to use
-     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
+     * @param numOuterFieldsForJoin number of fields that come from outer table (-1 if not a join)
+     * @param isInnerTable if the table is the inner relation
      *
      * @return A valid access path using the data or null if none found.
      */
     static AccessPath getCalciteRelevantAccessPathForIndex(
             Table table, List<Column> catColumns, RexNode condRef, RexProgram program,
-            Index index, SortDirectionType sortDirection, int numOuterFieldsForJoin) {
+            Index index, SortDirectionType sortDirection, int numOuterFieldsForJoin, boolean isInnerTable) {
         // Get filter condition or NULL
         if (condRef == null) { // No filters to pick an index
             return null;
         } else { // Convert Calcite expressions to VoltDB ones
             final Collection<AbstractExpression> voltSubExprs = ExpressionUtil.uncombineAny(
                     RexConverter.convertRefExpression(condRef, table.getTypeName(), catColumns,
-                            program, numOuterFieldsForJoin));
+                            program, numOuterFieldsForJoin, isInnerTable));
             final StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
             // Partial Index Check
             return SubPlanAssembler.processPartialIndex(index, tableScan,
@@ -134,7 +134,7 @@ public class IndexUtil {
             final Map<AbstractExpression, Integer> convertedProgExprs = program.getExprList().stream()
                     .map(expr -> new AbstractMap.SimpleEntry<>(
                             RexConverter.convertRefExpression(
-                                    expr, tableScan.getTableName(), columns, program, -1),
+                                    expr, tableScan.getTableName(), columns, program, -1, false),
                             exprIndex.getAndIncrement()))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b)-> b));
             // Build a collation based on index expressions
