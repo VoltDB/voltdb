@@ -131,7 +131,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
-import org.voltdb.compiler.AdHocCompilerCache;
+import org.voltdb.compiler.HSQLAdHocCompilerCache;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -3670,7 +3670,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_latencyCompressedStats = null;
                 m_latencyHistogramStats = null;
 
-                AdHocCompilerCache.clearHashCache();
+                HSQLAdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();

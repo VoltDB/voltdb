@@ -42,7 +42,7 @@ final class SqlPlanner {
     private final String m_sql;
     private final boolean m_isLargeQuery, m_isSwapTables, m_isExplainMode;
     private final Object[] m_userParams;
-    private final AdHocCompilerCache m_cache;
+    private final HSQLAdHocCompilerCache m_cache;
     private final VoltLogger m_logger;
     // outcomes
     private final CompiledPlan m_plan;
@@ -57,7 +57,7 @@ final class SqlPlanner {
 
     SqlPlanner(Database database, StatementPartitioning partitioning, HSQLInterface hsql, String sql,
             boolean isLargeQuery, boolean isSwapTables, boolean isExplainMode, long adHocLargeFallbackCount,
-            Object[] userParams, AdHocCompilerCache cache, VoltLogger logger) {
+            Object[] userParams, HSQLAdHocCompilerCache cache, VoltLogger logger) {
         m_database = database;
         m_partitioning = partitioning;
         m_hsql = hsql;

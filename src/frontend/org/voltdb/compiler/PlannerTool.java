@@ -17,6 +17,9 @@
 
 package org.voltdb.compiler;
 
+import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
+
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
@@ -27,18 +30,24 @@ import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.common.Constants;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -46,7 +55,11 @@ import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
+import org.voltdb.plannerv2.ColumnTypes;
+import org.voltdb.plannerv2.ParameterizationVisitor;
+import org.voltdb.plannerv2.ParameterizedSqlTask;
 import org.voltdb.plannerv2.SqlTask;
+import org.voltdb.plannerv2.VoltFastSqlParser;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
@@ -56,10 +69,6 @@ import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-
-
-import static org.voltdb.planner.QueryPlanner.fragmentizePlan;
-import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
@@ -73,7 +82,8 @@ public class PlannerTool {
 
     private Database m_database;
     private byte[] m_catalogHash;
-    private AdHocCompilerCache m_cache;
+    private HSQLAdHocCompilerCache m_hsqlCache;
+    private CalciteAdHocCompilerCache m_calciteCache;
     private SchemaPlus m_schemaPlus;
     private long m_adHocLargeFallbackCount = 0;
     private long m_adHocLargeModeCount = 0;
@@ -94,7 +104,8 @@ public class PlannerTool {
 
         m_database = database;
         m_catalogHash = catalogHash;
-        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_hsqlCache = HSQLAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_calciteCache = CalciteAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
         m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         // LOAD HSQL
@@ -141,9 +152,9 @@ public class PlannerTool {
     public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
         m_database = database;
         m_catalogHash = catalogHash;
-        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_hsqlCache = HSQLAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        //m_calciteCache = CalciteAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
         m_schemaPlus = VoltSchemaPlus.from(m_database);
-
         return this;
     }
 
@@ -161,7 +172,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null, false, false);
+        return planSqlHsql(sqlIn, infer, false, null, false, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -301,14 +312,63 @@ public class PlannerTool {
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException, PlannerFallbackException {
-        CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
-        plan.sql = task.getSQL();
-        CorePlan core = new CorePlan(plan, m_catalogHash);
-        throw new PlannerFallbackException();
-//        return new AdHocPlannedStatement(plan, core);
+        CacheUse cacheUse = CacheUse.FAIL;
+
+        // check L1 cache is hit or miss
+        AdHocPlannedStatement cachedPlan = m_calciteCache.getWithSQL(task.getSQL());
+        if (cachedPlan != null) {
+            cacheUse = CacheUse.HIT1;
+            return cachedPlan;
+        } else {
+            cacheUse = CacheUse.MISS;
+        }
+
+        // check L2 cache is hit or miss
+        SqlNode parsedQuery = null;
+        AdHocPlannedStatement ahps = null;
+        ParameterizedSqlTask ptask;
+        try {
+            parsedQuery = VoltFastSqlParser.parse(task.getSQL());
+            ptask = new ParameterizedSqlTask(task);
+            final CorePlan corePlan = m_calciteCache.getWithParsedQuery(ptask.getParsedQuery());
+            if (corePlan != null) {
+                ParameterizationVisitor visitor = new ParameterizationVisitor();
+                ptask.getParsedQuery().accept(visitor);
+                ahps = new AdHocPlannedStatement(ptask.getSQL().getBytes(Constants.UTF8ENCODING),
+                    corePlan, ParameterSet.fromArrayNoCopy(ptask.getSqlLiteralList()), null);
+                return ahps;
+            } else {
+                //////////////////////
+                // PLAN THE STMT
+                //////////////////////
+                CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, ptask.getParsedQuery());
+                plan.sql = ptask.getParsedQuery().toString();
+                CorePlan core = new CorePlan(plan, m_catalogHash);
+                //throw new PlannerFallbackException();
+                Object[] params = new Object[ptask.getSqlLiteralList().size()];
+                int i = 0;
+                // convert calcite literal to volt parameter
+                for (Object obj: ptask.getSqlLiteralList()) {
+                    SqlLiteral lit = (SqlLiteral) obj;
+                    SqlTypeName typeName = lit.getTypeName();
+                    VoltType type = ColumnTypes.getVoltType(typeName);
+                    String val = lit.toValue();
+                    params[i++] = ParameterizationInfo.valueForStringWithType(val, type);
+                }
+                ahps = new AdHocPlannedStatement(plan.sql.getBytes(Constants.UTF8ENCODING),
+                                                 core,
+                                                 ParameterSet.fromArrayNoCopy(params),
+                                                 null);
+                m_calciteCache.put(task, ptask.getParsedQuery(), ahps, null, false, false);
+                return ahps;
+            }
+        } catch (SqlParseException e) {
+            e.printStackTrace();
+        }
+        return ahps;
     }
 
-    public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
+    public synchronized AdHocPlannedStatement planSqlHsql(String sql, StatementPartitioning partitioning,
                                                       boolean isExplainMode, final Object[] userParams,
                                                       boolean isSwapTables, boolean isLargeQuery) {
         // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
@@ -341,7 +401,7 @@ public class PlannerTool {
             // point it seems worthwhile to cache such plans, we can explore it.
             if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
-                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sql);
+                AdHocPlannedStatement cachedPlan = m_hsqlCache.getWithSQL(sql);
                 if (cachedPlan != null) {
                     cacheUse = CacheUse.HIT1;
                     return cachedPlan;
@@ -355,7 +415,7 @@ public class PlannerTool {
             //////////////////////
 
             final SqlPlanner planner = new SqlPlanner(m_database, partitioning, m_hsql, sql,
-                    isLargeQuery, isSwapTables, isExplainMode, m_adHocLargeFallbackCount, userParams, m_cache, compileLog);
+                    isLargeQuery, isSwapTables, isExplainMode, m_adHocLargeFallbackCount, userParams, m_hsqlCache, compileLog);
             final CompiledPlan plan = planner.getCompiledPlan();
             final AdHocPlannedStatement adhocPlan = planner.getAdhocPlan();
             assert (plan == null) != (adhocPlan == null) : "It should be either planned or cached";
@@ -383,14 +443,14 @@ public class PlannerTool {
                     core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
                     assert (parsedToken != null);
                     // Again, plans with inferred partitioning are the only ones supported in the cache.
-                    m_cache.put(sql, parsedToken, ahps, planner.getExtractedLiterals(), planner.hasQuestionMark(),
+                    m_hsqlCache.put(sql, parsedToken, ahps, planner.getExtractedLiterals(), planner.hasQuestionMark(),
                             planner.hasExceptionWhenParameterized());
                 }
                 return ahps;
             }
         } finally {
             if (m_plannerStats != null) {
-                m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+                m_plannerStats.endStatsCollection(m_hsqlCache.getLiteralCacheSize(), m_hsqlCache.getCoreCacheSize(), cacheUse, -1);
             }
         }
     }

@@ -140,6 +140,7 @@ public class NonDdlBatchPlanner {
             throw ex;
         } catch (Exception ex) {
             Throwable cause = ex.getCause();
+            ex.printStackTrace();
             while(cause != null && cause.getCause() != null) {
                 cause = cause.getCause();
             }
