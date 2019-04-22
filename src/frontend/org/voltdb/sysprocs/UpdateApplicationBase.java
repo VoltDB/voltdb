@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -542,6 +541,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // This means no more @UAC calls when using DDL mode.
             noteRestoreCompleted();
             compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
+        }
+
+        // catalog update will wait for snap shot to be completed, which will block site thread.
+        if (ccr.requiresSnapshotIsolation && VoltZK.hasHostsSnapshotting(zk)) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            errMsg = "Snapshot in progress. Please retry catalog update later.";
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
         // write the new catalog to a temporary jar file
