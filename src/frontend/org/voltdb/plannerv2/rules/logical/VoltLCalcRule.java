@@ -44,6 +44,7 @@ public class VoltLCalcRule extends RelOptRule {
                 calc.getCluster(),
                 convertedTraits,
                 convertedInput,
-                calc.getProgram()));
+                calc.getProgram(),
+                false));
     }
 }

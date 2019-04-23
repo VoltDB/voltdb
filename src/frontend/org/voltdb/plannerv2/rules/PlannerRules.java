@@ -119,7 +119,13 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
+            // Joins
             VoltLJoinRule.INSTANCE,
+            VoltLCalcJoinTransposeRule.INSTANCE,
+            FilterJoinRule.FILTER_ON_JOIN,
+            FilterJoinRule.JOIN,
+
+            // Setops
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,

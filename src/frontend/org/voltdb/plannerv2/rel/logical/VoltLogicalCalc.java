@@ -19,12 +19,12 @@ package org.voltdb.plannerv2.rel.logical;
 
 import java.util.Set;
 
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 
@@ -40,24 +40,52 @@ import com.google.common.base.Preconditions;
 public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 
     /**
+     * If this Calc is a result of pushing a projection down through a Join, by splitting the original projection into
+     * a projection on top of the Join (TRUE) and projections for each child of Join (FALSE), we want to discount its
+     * cost for the first case
+     */
+    private final boolean m_topJoin;
+
+    /**
      * Create a VoltLogicalCalc.
      *
      * @param cluster Cluster
-     * @param traits Traits
-     * @param child Input relation
+     * @param traitSet Traits
+     * @param input Input relation
      * @param program Calc program
+     * @param topJoin Does this Calc push down a projection through join, such that the projection is on top of join
      */
     public VoltLogicalCalc(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RexProgram program) {
+            RexProgram program,
+            boolean topJoin) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+        m_topJoin = topJoin;
     }
 
     @Override public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
-        return new VoltLogicalCalc(getCluster(), traitSet, child, program);
+        return new VoltLogicalCalc(getCluster(), traitSet, child, program, m_topJoin);
+    }
+
+    @Override public RelWriter explainTerms(RelWriter writer) {
+        super.explainTerms(writer);
+        writer.item("topJoin", m_topJoin);
+        return writer;
+    }
+
+    @Override public double estimateRowCount(RelMetadataQuery meta) {
+        return getInput().estimateRowCount(meta);
+    }
+
+    @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery meta) {
+        double rowCount = estimateRowCount(meta);
+        if (m_topJoin) {
+            rowCount /= 10;
+        }
+        return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
     @Override public void collectVariablesUsed(Set<CorrelationId> variableSet) {

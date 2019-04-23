@@ -39,7 +39,7 @@ import com.google.common.collect.ImmutableList;
  *
  * @see org.apache.calcite.rel.logical.LogicalJoin
  * @author Chao Zhou
- * @since 9.0
+ * @since 9.1
  */
 public class VoltLogicalJoin extends Join implements VoltLogicalRel {
 
