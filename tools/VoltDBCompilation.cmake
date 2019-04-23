@@ -222,7 +222,7 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-absolute-value)
   ENDIF()
   IF ( "9.0.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-user-defined-warnings -Wno-inconsistent-missing-override)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-user-defined-warnings)
   ENDIF()
 ELSE()
   MESSAGE (FATAL_ERROR "Unknown compiler family ${CMAKE_CXX_COMPILER_ID}.  We only support GNU and Clang.")
