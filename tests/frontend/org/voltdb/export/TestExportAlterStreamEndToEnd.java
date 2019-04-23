@@ -27,8 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 
 import org.junit.After;
@@ -70,17 +68,14 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
         builder.setDeadHostTimeout(30);
         // Each stream needs an exporter configuration
         String streamName = "t";
+
         builder.addExport(true /* enabled */,
-                         ServerExportEnum.CUSTOM, /* custom exporter: org.voltdb.exportclient.SocketExporter */
+                         ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                          createSocketExportProperties(streamName, false /* is replicated stream? */),
                          streamName);
         // Start socket exporter client
         startListener();
 
-        // A test hack to use socket exporter
-        Map<String, String> additionalEnv = new HashMap<String, String>();
-        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
 
         m_cluster = new LocalCluster("testFlushExportBuffer.jar", 3, 2, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setNewCli(true);
