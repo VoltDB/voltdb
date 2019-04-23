@@ -81,7 +81,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 Long HSId = entry.getValue().m_HSId;
                 leaders.add(HSId);
                 if (HSId == getInitiatorHSId()){
-                    if (!m_promoted) {
+
+                    // The site could still be the leader although partition migration tries to move away but fail
+                    // In this case, SpScheduler has been marked as none leader, re-appoint itself to go through the repair
+                    // process and master update.
+                    if (!m_promoted || (!m_scheduler.m_isLeader && entry.getValue().m_lastHSId == HSId)) {
                         acceptPromotionImpl(entry.getValue().m_lastHSId,
                                 entry.getValue().m_isMigratePartitionLeaderRequested);
                         m_promoted = true;
@@ -254,11 +258,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             "SpInitiator-iv2masters-" + m_partitionId,
                             m_zkMailboxNode);
 
-                    if (migratePartitionLeader) {
+                    // If lastLeaderHSId == m_initiatorMailbox.getHSId(), leader migration fails and re-elect itself as
+                    // partition leader. Update the master to trigger all call backs on the master.
+                    if (migratePartitionLeader || lastLeaderHSId == m_initiatorMailbox.getHSId()) {
                         String hsidStr = LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(
                                 m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId, hsidStr);
-                        tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
+                        if (lastLeaderHSId == m_initiatorMailbox.getHSId()) {
+                            tmLog.info(m_whoami + "reinstate as partition leader.");
+                        } else {
+                            tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
+                        }
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
