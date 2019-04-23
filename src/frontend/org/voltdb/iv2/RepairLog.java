@@ -58,6 +58,9 @@ public class RepairLog
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
 
+    // The MP repair truncation handle
+    long m_repairTruncationHandle = Long.MIN_VALUE;
+
     // Truncation point
     long m_truncationHandle = Long.MIN_VALUE;
     final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
@@ -197,6 +200,7 @@ public class RepairLog
             if (newMp) {
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                 m_lastSpHandle = m.getSpHandle();
+                m_repairTruncationHandle = Math.max(m.getTruncationHandle(), m_repairTruncationHandle);
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
@@ -218,6 +222,7 @@ public class RepairLog
             truncate(ctm.getTruncationHandle(), IS_MP);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
+            m_repairTruncationHandle = Math.max(ctm.getTruncationHandle(), m_repairTruncationHandle);
         } else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
             repairLogger.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
@@ -313,7 +318,9 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfigCooked());
+                        TheHashinator.getCurrentVersionedConfigCooked(),
+                        m_repairTruncationHandle);
+
         responses.add(hheader);
 
         int seq = responses.size(); // = 1, as the first sequence
