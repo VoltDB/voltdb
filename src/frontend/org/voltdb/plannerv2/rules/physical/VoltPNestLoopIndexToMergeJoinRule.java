@@ -2,16 +2,16 @@
  * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General License as
+ * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -435,7 +435,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         final int lhsFieldsCount = join.getLeft().getRowType().getFieldCount();
         return VoltRexUtil.isFieldEquivalenceExpr(joinCondition, lhsFieldsCount);
     }
- 
+
     private RelNode newMergeJoin(
             VoltPhysicalJoin join, RelNode outerChild, RelNode innerChild,
             String ourterCollationName, String innerCollationName) {
@@ -584,5 +584,4 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                         outerChildJoin.getInputs().get(0).getRowType().getFieldCount());
         return Stream.of(childJoinExpressionCollation);
     }
-
 }

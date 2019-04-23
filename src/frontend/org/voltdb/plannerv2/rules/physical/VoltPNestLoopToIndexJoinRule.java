@@ -141,5 +141,4 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
             call.transformTo(nliJoin, equiv);
         }
     }
-
 }
