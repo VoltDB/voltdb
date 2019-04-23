@@ -25,7 +25,7 @@ package org.voltdb;
 public enum TableType {
     INVALID_TYPE(0),
     PERSISTENT(1),              // Regular PersistentTable
-    STREAM_VIEW_ONLY(2),        // StreamTable without ExportTupleStream (Views only)
+    CONNECTOR_LESS_STREAM(2),        // StreamTable without ExportTupleStream (Views only)
     STREAM(3),                  // StreamTable with ExportTupleStream
     PERSISTENT_MIGRATE(4),      // PersistentTable with associated Stream for migrating DELETES
     PERSISTENT_EXPORT(5);       // PersistentTable with associated Stream for linking INSERTS
@@ -38,12 +38,12 @@ public enum TableType {
         return type;
     }
 
-    public static boolean isStreamViewOnly(int e) {
-        return (e == STREAM_VIEW_ONLY.get());
+    public static boolean isConnectorLessStream(int e) {
+        return (e == CONNECTOR_LESS_STREAM.get());
     }
 
     public static boolean isStream(int e) {
-        return (e == STREAM.get() || e == STREAM_VIEW_ONLY.get());
+        return (e == STREAM.get() || e == CONNECTOR_LESS_STREAM.get());
     }
 
     public static boolean isPersistentMigrate(int e) {
