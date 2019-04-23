@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexProgram;
 import org.json_voltpatches.JSONException;
@@ -69,9 +70,9 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         //
         // If there is an index that can be satisfied by the join condition, it will be a NLIJ
 
-        VoltPhysicalJoin join = call.rel(0);
-        RelNode outerScan = call.rel(1);
-        VoltPhysicalTableScan innerScan;
+        final VoltPhysicalJoin join = call.rel(0);
+        final RelNode outerScan = call.rel(1);
+        final VoltPhysicalTableScan innerScan;
         Calc innerCalc = null;
         if (call.rels.length == 3) {
             innerScan = call.rel(2);
@@ -80,9 +81,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
             innerScan = call.rel(3);
         }
 
-        int numLhsFieldsForJoin = outerScan.getRowType().getFieldCount();
-
-        JoinRelType joinType = join.getJoinType();
+        final JoinRelType joinType = join.getJoinType();
         // INNER only at the moment
         if (joinType != JoinRelType.INNER) {
             return;
@@ -108,7 +107,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
             // need to pass the join outer child columns count to the visitor
             final AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
                     catTableable, columns, join.getCondition(), innerProgram,
-                    index, SortDirectionType.INVALID, numLhsFieldsForJoin, true);
+                    index, SortDirectionType.INVALID, outerScan.getRowType().getFieldCount(), true);
 
             if (accessPath != null) {
                 // Index's collation needs to be based on its own program only - the Calc sits above the scan
@@ -120,7 +119,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                     throw new CalcitePlanningException(e.getMessage());
                 }
 
-                VoltPhysicalTableScan indexScan = new VoltPhysicalTableIndexScan(
+                final TableScan indexScan = new VoltPhysicalTableIndexScan(
                         innerScan.getCluster(), innerScan.getTraitSet(), innerScan.getTable(), innerScan.getVoltTable(),
                         innerScan.getProgram(), index, accessPath, innerScan.getLimitRexNode(), innerScan.getOffsetRexNode(),
                         null, null, null, innerScan.getSplitCount(),

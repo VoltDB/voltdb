@@ -35,21 +35,18 @@ import org.voltdb.types.JoinType;
 import com.google.common.collect.ImmutableList;
 
 public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
-    public VoltPhysicalNestLoopJoin(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode left, RelNode right, RexNode condition,
-            Set<CorrelationId> variablesSet, JoinRelType joinType,
-            boolean semiJoinDone,
+    public VoltPhysicalNestLoopJoin(
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList, int splitCount) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
                 semiJoinDone, systemFieldList, splitCount, null, null);
     }
 
-    private VoltPhysicalNestLoopJoin(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode left, RelNode right, RexNode condition,
-            Set<CorrelationId> variablesSet, JoinRelType joinType,
-            boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount,
-            RexNode offset, RexNode limit) {
+    private VoltPhysicalNestLoopJoin(
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
+            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
                 semiJoinDone, systemFieldList, splitCount, offset, limit);
     }
@@ -58,41 +55,31 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
     public Join copy(
             RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right,
             JoinRelType joinType, boolean semiJoinDone) {
-        ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(getSystemFieldList());
         return new VoltPhysicalNestLoopJoin(getCluster(),
                 traitSet, left, right, conditionExpr,
-                variablesSet, joinType, semiJoinDone, systemFieldList, getSplitCount());
+                variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()), getSplitCount());
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
-        ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(getSystemFieldList());
         return new VoltPhysicalNestLoopJoin(
                 getCluster(), traits, left, right, condition, variablesSet, joinType, isSemiJoinDone(),
-                systemFieldList, getSplitCount(), offset, limit);
+                ImmutableList.copyOf(getSystemFieldList()), getSplitCount(), offset, limit);
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        NestLoopPlanNode nlpn = new NestLoopPlanNode();
+        final NestLoopPlanNode nlpn = new NestLoopPlanNode();
 
         // TODO: INNER join for now
         assert(joinType == JoinRelType.INNER);
         nlpn.setJoinType(JoinType.INNER);
-
-        // Set children
-        AbstractPlanNode lch = inputRelNodeToPlanNode(this, 0);
-        AbstractPlanNode rch = inputRelNodeToPlanNode(this, 1);
-        nlpn.addAndLinkChild(lch);
-        nlpn.addAndLinkChild(rch);
-
+        nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
+        nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));
         // Set join predicate
-        int numLhsFields = getInput(0).getRowType().getFieldCount();
-        nlpn.setJoinPredicate(RexConverter.convertJoinPred(numLhsFields, getCondition()));
-
+        nlpn.setJoinPredicate(RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(), getCondition()));
         // Inline LIMIT / OFFSET
         addLimitOffset(nlpn);
-
         // Set output schema
         return setOutputSchema(nlpn);
     }

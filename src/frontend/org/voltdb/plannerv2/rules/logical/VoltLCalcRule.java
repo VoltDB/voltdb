@@ -20,15 +20,13 @@ package org.voltdb.plannerv2.rules.logical;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 public class VoltLCalcRule extends RelOptRule {
-
-    public static final VoltLCalcRule INSTANCE = new VoltLCalcRule();
+    public static final RelOptRule INSTANCE = new VoltLCalcRule();
 
     VoltLCalcRule() {
         super(operand(LogicalCalc.class, Convention.NONE, any()));
@@ -36,15 +34,11 @@ public class VoltLCalcRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalCalc calc = call.rel(0);
-        RelNode input = calc.getInput();
-        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltLogicalRel.CONVENTION);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION));
+        final LogicalCalc calc = call.rel(0);
+        final RelNode input = calc.getInput();
         call.transformTo(new VoltLogicalCalc(
-                calc.getCluster(),
-                convertedTraits,
-                convertedInput,
-                calc.getProgram(),
-                false));
+                calc.getCluster(), calc.getTraitSet().replace(VoltLogicalRel.CONVENTION),
+                convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION)),
+                calc.getProgram(), false));
     }
 }

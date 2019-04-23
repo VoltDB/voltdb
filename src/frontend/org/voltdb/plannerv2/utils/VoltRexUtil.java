@@ -170,10 +170,9 @@ public class VoltRexUtil {
         // which index matches the partitioning column index from the input distribution
         // The index of this project will be the new index of a partitioning column
         for (int idx = 0; idx < program.getProjectList().size(); ++idx) {
-            RexLocalRef projRef = program.getProjectList().get(idx);
-            int source = projRef.getIndex();
-            assert(source < program.getExprList().size());
-            RexNode rexNode = program.getExprList().get(source);
+            final int source = program.getProjectList().get(idx).getIndex();
+            assert source < program.getExprList().size();
+            final RexNode rexNode = program.getExprList().get(source);
             if (rexNode instanceof RexInputRef) {
                 // This is an actual field
                 int exprInputIndex = ((RexInputRef)rexNode).getIndex();
