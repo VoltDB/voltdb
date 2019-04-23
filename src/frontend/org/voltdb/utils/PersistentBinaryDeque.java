@@ -90,6 +90,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         private int m_numRead;
         // If a rewind occurred this is set to the segment id where this cursor was before the rewind
         private long m_rewoundFromId = -1;
+        private boolean m_cursorClosed = false;
 
         public ReadCursor(String cursorId, int numObjectsDeleted) {
             m_cursorId = cursorId;
@@ -99,7 +100,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public BBContainer poll(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
@@ -138,7 +139,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public BBContainer getExtraHeader(long segmentIndex) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
                 PBDSegmentReader segmentReader = null;
@@ -184,7 +185,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public int getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("Cannot compute object count of " + m_cursorId + " - Reader has been closed");
                 }
                 return m_numObjects - m_numObjectsDeleted - m_numRead;
@@ -199,7 +200,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public long sizeInBytes() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("Cannot compute size of " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
@@ -223,7 +224,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public boolean isEmpty() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("Closed");
                 }
                 assertions();
@@ -255,10 +256,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     synchronized(PersistentBinaryDeque.this) {
                         checkDoubleFree();
                         retcont.discard();
-                        assert(m_closed || m_segments.containsKey(segment.segmentIndex()));
+                        assert m_cursorClosed || m_segments.containsKey(segment.segmentIndex());
 
                         // Only continue if open there is another segment and this is the first entry of a segment
-                        if (m_closed || m_segments.size() == 1
+                        if (m_cursorClosed || m_segments.size() == 1
                                 || (entryNumber != 1 && m_rewoundFromId != segment.m_id)
                                 || !canDeleteSegmentsBefore(segment)) {
                             return;
@@ -291,7 +292,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         @Override
         public boolean isStartOfSegment() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
-                if (m_closed) {
+                if (m_cursorClosed) {
                     throw new IOException("Cannot call isStartOfSegment: PBD has been closed");
                 }
                 assertions();
@@ -330,6 +331,21 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
                 return m_segment.segmentIndex();
             }
+        }
+
+        void close() {
+            if (m_segment != null) {
+                PBDSegmentReader reader = m_segment.getReader(m_cursorId);
+                if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (IOException e) {
+                        m_usageSpecificLog.warn("Failed to close reader " + reader, e);
+                    }
+                }
+                m_segment = null;
+            }
+            m_cursorClosed = true;
         }
 
     }
@@ -1019,16 +1035,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
         ReadCursor reader = m_readCursors.remove(cursorId);
-        // If we never did a poll from this segment for this cursor,
-        // there is no reader initialized for this cursor.
-        if (reader != null && reader.m_segment != null && reader.m_segment.getReader(cursorId) != null) {
-            try {
-                reader.m_segment.getReader(cursorId).close();
-            }
-            catch (IOException e) {
-                // TODO ignore this for now, it is just the segment file failed to be closed
-            }
+        if (reader == null) {
+            return;
         }
+        reader.close();
+
         // check all segments from latest to oldest to see if segments before that segment can be deleted
         // We need this only in closeCursor() now, which is currently only used when removing snapshot placeholder
         // cursor in one-to-many DR, this extra check is needed because other normal cursors may have read past some
@@ -1087,23 +1098,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public synchronized void close() throws IOException {
-        if (m_closed) {
-            return;
-        }
-        m_readCursors.clear();
-
-        for (PBDSegment segment : m_segments.values()) {
-
-            // When closing a PBD, all segments may be finalized because on
-            // recover a new segment will be opened for writing
-            segment.finalize(true);
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Closed segment " + segment.file()
-                    + " (final: " + segment.isFinal() + "), on PBD close");
-            }
-        }
-        m_closed = true;
+    public void close() throws IOException {
+        close(false);
     }
 
     @Override
@@ -1118,17 +1114,29 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public synchronized void closeAndDelete() throws IOException {
+    public void closeAndDelete() throws IOException {
+        close(true);
+    }
+
+    private synchronized void close(boolean delete) throws IOException {
         if (m_closed) {
             return;
         }
+        m_readCursors.values().forEach(ReadCursor::close);
         m_readCursors.clear();
 
-        for (PBDSegment qs : m_segments.values()) {
-            if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
+        for (PBDSegment segment : m_segments.values()) {
+            if (delete) {
+                closeAndDeleteSegment(segment);
+            } else {
+                // When closing a PBD, all segments may be finalized because on
+                // recover a new segment will be opened for writing
+                segment.finalize(true);
+                if (m_usageSpecificLog.isDebugEnabled()) {
+                    m_usageSpecificLog.debug(
+                            "Closed segment " + segment.file() + " (final: " + segment.isFinal() + "), on PBD close");
+                }
             }
-            closeAndDeleteSegment(qs);
         }
         m_segments.clear();
         m_closed = true;

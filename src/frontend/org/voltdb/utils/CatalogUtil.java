@@ -632,7 +632,7 @@ public abstract class CatalogUtil {
         for (Connector connector : connectors) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 Table t = tinfo.getTable();
-                if (t.getTabletype() == TableType.STREAM_VIEW_ONLY.get()) {
+                if (t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get()) {
                     // Skip view-only streams
                     continue;
                 }
@@ -705,7 +705,8 @@ public abstract class CatalogUtil {
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table) {
-        if (TableType.isInvalidType(table.getTabletype())) {
+        int type = table.getTabletype();
+        if (TableType.isInvalidType(type)) {
             // This implementation uses connectors instead of just looking at the tableType
             // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
             for (Connector connector : database.getConnectors()) {
@@ -721,7 +722,7 @@ public abstract class CatalogUtil {
             // Found no connectors
             return false;
         } else {
-            return TableType.isStream(table.getTabletype());
+            return TableType.isStream(type);
         }
     }
 
