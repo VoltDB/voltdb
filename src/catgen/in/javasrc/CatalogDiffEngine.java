@@ -143,13 +143,7 @@ public class CatalogDiffEngine {
 
     // Track all new tables.  We use this to know which
     // tables do not need to be checked for emptiness.
-    // This may be redundant with m_newTablesForExport,
-    // at least in use.  That is to say, we might be able
-    // to keep only one of them.
     private final SortedSet<String> m_newTables = new TreeSet<>();
-    //Track new tables to help determine which export table is new or
-    //modified
-    private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
@@ -530,23 +524,18 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             Table tbl = (Table)suspect;
+            if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
+                m_requiresNewExportGeneration = true;
+            }
+            // No special guard against dropping a table or view
+            // (although some procedures may fail to plan)
             if (ChangeType.DELETION == changeType) {
-                if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
-                    m_requiresNewExportGeneration = true;
-                }
-                // No special guard against dropping a table or view
-                // (although some procedures may fail to plan)
                 return null;
             }
             String tableName = tbl.getTypeName();
 
             // Remember the name of the new table.
             m_newTables.add(tableName.toUpperCase());
-            if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
-                // Remember that it's a new export table.
-                m_newTablesForExport.add(tbl.getTypeName());
-                m_requiresNewExportGeneration = true;
-            }
 
             String viewName = null;
             String sourceTableName = null;
@@ -572,7 +561,8 @@ public class CatalogDiffEngine {
                     sourceTableName = tbl.getMaterializer().getTypeName();
                 }
             }
-            if (viewName != null) {
+            // Skip guard for view on stream, given the fact that stream table is always empty
+            if (viewName != null && !TableType.isStream(tbl.getMaterializer().getTabletype())) {
                 return createViewDisallowedMessage(viewName, sourceTableName);
             }
             // Otherwise, support add/drop of the top level object.
@@ -623,12 +613,14 @@ public class CatalogDiffEngine {
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
             }
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+            boolean isStreamOrStreamView = CatalogUtil.isTableExportOnly((Database)table.getParent(), table);
+            if (isStreamOrStreamView) {
                 m_requiresNewExportGeneration = true;
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
-                if ((! col.getNullable()) && (col.getDefaultvalue() == null)) {
+                // Skip guard for view on stream, given the fact that stream table is always empty
+                if ((! col.getNullable()) && (col.getDefaultvalue() == null) && !isStreamOrStreamView) {
                     return "May not dynamically add non-nullable column without default value.";
                 }
             }
@@ -1897,5 +1889,4 @@ public class CatalogDiffEngine {
 
         return sb.toString();
     }
-
 }
