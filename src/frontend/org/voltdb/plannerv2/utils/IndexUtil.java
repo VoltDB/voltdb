@@ -82,7 +82,7 @@ public class IndexUtil {
      *
      * @return A valid access path using the data or null if none found.
      */
-    static AccessPath getCalciteRelevantAccessPathForIndex(
+    public static AccessPath getCalciteRelevantAccessPathForIndex(
             Table table, List<Column> catColumns, RexNode condRef, RexProgram program,
             Index index, SortDirectionType sortDirection, int numOuterFieldsForJoin, boolean isInnerTable) {
         // Get filter condition or NULL

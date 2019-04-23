@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.utils;
 import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.*;
-import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
@@ -37,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class VoltRexUtil {
     private VoltRexUtil() {}
@@ -76,12 +76,9 @@ public class VoltRexUtil {
     public static RelCollation createIndexCollation(
             Index index, Table catTable, RexBuilder builder, RexProgram program) throws JSONException {
         if (IndexType.isScannable(index.getType())) {
-            final List<RelFieldCollation> indexCollationFields =
-                    IndexUtil.getIndexCollationFields(catTable, index, program);
-
-            RelCollation indexCollation = RelCollations.of(indexCollationFields);
             // Convert index collation to take the program into an account
-            return VoltRexUtil.adjustCollationForProgram(builder, program, indexCollation);
+            return VoltRexUtil.adjustCollationForProgram(builder, program,
+                    RelCollations.of(IndexUtil.getIndexCollationFields(catTable, index, program)));
         } else {
             return RelCollations.EMPTY;
         }
@@ -89,15 +86,11 @@ public class VoltRexUtil {
 
 
     private static List<Pair<Integer, SortDirectionType>> convertCollation(RelCollation collation) {
-        List<Pair<Integer, SortDirectionType>> collFields = new ArrayList<>();
-        for (RelFieldCollation collField : collation.getFieldCollations()) {
-            Direction dir = collField.getDirection();
-            SortDirectionType voltDir = ("ASC".equalsIgnoreCase(dir.shortString)) ? SortDirectionType.ASC :
-                    SortDirectionType.DESC;
-            int fieldIndex = collField.getFieldIndex();
-            collFields.add(Pair.of(fieldIndex, voltDir));
-        }
-        return collFields;
+        return collation.getFieldCollations().stream().map(col ->
+                Pair.of(col.getFieldIndex(),
+                        "ASC".equalsIgnoreCase(col.getDirection().shortString) ?
+                                SortDirectionType.ASC : SortDirectionType.DESC))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -124,23 +117,25 @@ public class VoltRexUtil {
             return SortDirectionType.INVALID;
         }
         assert(collationFields1.size() > 0);
-        RelFieldCollation.Direction collationDirection1 = collationFields1.get(0).getDirection();
+        final RelFieldCollation.Direction collationDirection1 = collationFields1.get(0).getDirection();
         assert(collationFields2.size() > 0);
-        RelFieldCollation.Direction collationDirection2 = collationFields2.get(0).getDirection();
-
-        for (int i = 0; i < collationFields1.size(); ++i) {
-            RelFieldCollation fieldCollation1 = collationFields1.get(i);
-            RelFieldCollation fieldCollation2 = collationFields2.get(i);
-            if (fieldCollation1.direction != collationDirection1 ||
-                    fieldCollation2.direction != collationDirection2 ||
-                    fieldCollation1.getFieldIndex() != fieldCollation2.getFieldIndex()) {
-                return SortDirectionType.INVALID;
+        final RelFieldCollation.Direction collationDirection2 = collationFields2.get(0).getDirection();
+        if (IntStream.range(0, collationFields1.size()).anyMatch(i -> {
+            final RelFieldCollation col1 = collationFields1.get(i);
+            final RelFieldCollation col2 = collationFields2.get(i);
+            return col1.direction != collationDirection1 || col2.direction != collationDirection2 ||
+                    col1.getFieldIndex() != col2.getFieldIndex();
+        })) {
+            return SortDirectionType.INVALID;
+        } else {
+            switch (collationDirection1) {
+                case STRICTLY_ASCENDING:
+                case ASCENDING:
+                    return SortDirectionType.ASC;
+                default:
+                    return SortDirectionType.DESC;
             }
         }
-        SortDirectionType sortDirection =
-                (Direction.ASCENDING == collationDirection1 || Direction.STRICTLY_ASCENDING == collationDirection1) ?
-                SortDirectionType.ASC : SortDirectionType.DESC;
-        return sortDirection;
     }
 
 
@@ -156,22 +151,20 @@ public class VoltRexUtil {
      * @return RelDistribution
      */
     public static RelDistribution adjustRelDistributionForProgram(
-            RexBuilder builder,
-            RexProgram program,
-            RelDistribution distribution) {
-        assert (program != null);
+            RexBuilder builder, RexProgram program, RelDistribution distribution) {
+        Preconditions.checkArgument(program != null, "Cannot adjust RelDistribution for null Program");
         if (distribution.getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
             return distribution;
         }
 
-        List<Integer> distColumnIndexes = distribution.getKeys();
+        final List<Integer> distColumnIndexes = distribution.getKeys();
         if (distColumnIndexes.isEmpty()) {
             return distribution;
         }
         // VoltDB supports only one partition column per table.
         assert(distColumnIndexes.size() == 1);
         final int partitionIndex = distColumnIndexes.get(0);
-        List<Integer> newPartitionIndexes = new ArrayList<>(1);
+        final List<Integer> newPartitionIndexes = new ArrayList<>(1);
 
         // Iterate over the project list to find a corresponding input reference
         // which index matches the partitioning column index from the input distribution
@@ -194,9 +187,7 @@ public class VoltRexUtil {
     }
 
     public static RelCollation adjustCollationForProgram(
-            RexBuilder builder,
-            RexProgram program,
-            RelCollation inputCollation) {
+            RexBuilder builder, RexProgram program, RelCollation inputCollation) {
         return adjustCollationForProgram(builder, program, inputCollation, false);
     }
 
@@ -210,9 +201,7 @@ public class VoltRexUtil {
      * @return RelCollation
      */
     public static RelCollation adjustCollationForProgram(
-            RexBuilder builder,
-            RexProgram program,
-            RelCollation inputCollation, boolean allowCast) {
+            RexBuilder builder, RexProgram program, RelCollation inputCollation, boolean allowCast) {
         Preconditions.checkNotNull("Program is null", program);
         int sourceCount = program.getInputRowType().getFieldCount();
         List<RexLocalRef> refs = program.getProjectList();
@@ -245,8 +234,7 @@ public class VoltRexUtil {
                     // Stop at the first mismatched field
                     return RelCollations.of(fieldCollations);
                 }
-                fieldCollations.add(
-                        fieldCollation.copy(target));
+                fieldCollations.add(fieldCollation.copy(target));
             } else {
                 // @TODO Index expression
 //                RexLocalRef adjustedCollationExpr = adjustExpression(builder, program, fieldCollation.getFieldIndex());
@@ -278,16 +266,16 @@ public class VoltRexUtil {
      */
     public static int getReferenceOrAccessIndex(RexProgram program, RexNode node, boolean allowCast) {
         if (allowCast && node.isA(SqlKind.CAST)){
-            RexCall call = (RexCall) node;
-            node =  call.operands.get(0);
-            return getReferenceOrAccessIndex(program, node, false);
+            return getReferenceOrAccessIndex(program,
+                    ((RexCall) node).getOperands().get(0),
+                    false);
+        } else if (node instanceof RexLocalRef && program != null) {
+            return getReferenceOrAccessIndex(program,
+                    program.getExprList().get(((RexLocalRef) node).getIndex()),
+                    true);
+        } else {
+            return getReferenceOrAccessIndex(node, false);
         }
-        if (node instanceof RexLocalRef && program != null) {
-            int idx = ((RexLocalRef) node).getIndex();
-            node = program.getExprList().get(idx);
-            return getReferenceOrAccessIndex(program, node, true);
-        }
-        return getReferenceOrAccessIndex(node, false);
     }
 
     /**
@@ -300,26 +288,25 @@ public class VoltRexUtil {
      * @return
      */
     public static boolean isFieldEquivalenceExpr(RexNode expression, int numLhsFields) {
-        List<RexNode> exprs = RelOptUtil.conjunctions(expression);
         boolean isEquivExpr = true;
-        for (RexNode expr : exprs) {
+        for (RexNode expr : RelOptUtil.conjunctions(expression)) {
             if (!expr.isA(SqlKind.EQUALS)) {
                 return false;
             }
-            assert(expr instanceof RexCall);
-            RexCall call = (RexCall) expr;
+            Preconditions.checkState(expr instanceof RexCall);
+            final RexCall call = (RexCall) expr;
             if (numLhsFields != -1) {
-                int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
-                int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
-                isEquivExpr = isEquivExpr && index0 >= 0 && index1 >= 0 &&
+                final int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
+                final int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
+                isEquivExpr = index0 >= 0 && index1 >= 0 &&
                         ((index0 < numLhsFields && index1 >= numLhsFields) ||
                         (index1 < numLhsFields && index0 >= numLhsFields));
             } else {
-                isEquivExpr = isEquivExpr && RexUtil.isReferenceOrAccess(call.operands.get(0), true) &&
+                isEquivExpr = RexUtil.isReferenceOrAccess(call.operands.get(0), true) &&
                         RexUtil.isReferenceOrAccess(call.operands.get(1), true);
             }
-            if (!isEquivExpr) {
-                return isEquivExpr;
+            if (! isEquivExpr) {
+                break;
             }
         }
         return isEquivExpr;
@@ -338,6 +325,28 @@ public class VoltRexUtil {
     }
 
     /**
+     * Merges two programs together.
+     *
+     * @param topProgram    Top program. Its expressions are in terms of the
+     *                      outputs of the bottom program.
+     * @param bottomProgram Bottom program.
+     * @param rexBuilder    Rex builder
+     * @return Merged program
+     */
+    public static RexProgram mergeProgram(RexProgram bottomProgram, RexProgram topProgram, RexBuilder rexBuilder) {
+        Preconditions.checkArgument(topProgram != null,
+                "top program cannot be null when merging programs");
+        final RexProgram mergedProgram;
+        if (bottomProgram != null) {
+            // Merge two programs topProgram / bottomProgram into a new merged program
+            mergedProgram = RexProgramBuilder.mergePrograms(topProgram, bottomProgram, rexBuilder);
+        } else {
+            mergedProgram = topProgram;
+        }
+        return mergedProgram;
+    }
+
+    /**
      * For a given join's field equivalence expression return a collection of pairs where each pair
      * represents field's indexes for outer and inner tables.
      * Each pair from the collection represents a tuple of outer and inner fields indexes for each equivalence
@@ -348,21 +357,17 @@ public class VoltRexUtil {
      * @return
      */
     public static List<Pair<Integer, Integer>> extractFieldIndexes(RexNode expression, int numLhsFields) {
-        assert(isFieldEquivalenceExpr(expression, numLhsFields));
-        List<RexNode> exprs = RelOptUtil.conjunctions(expression);
-        List<Pair<Integer, Integer>> result = new ArrayList<>();
-        for (RexNode expr : exprs) {
-            assert(expr instanceof RexCall);
-            RexCall call = (RexCall) expr;
-            int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
-            int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
-            assert(index0 >= 0 && index1 >= 0);
-            Pair<Integer, Integer> nextPair = (index0 < numLhsFields) ?
-                    Pair.of(index0, index1) :
-                        Pair.of(index1, index0);
-            result.add(nextPair);
-        }
-        return result;
+        Preconditions.checkState(isFieldEquivalenceExpr(expression, numLhsFields));
+        return RelOptUtil.conjunctions(expression).stream()
+                .map(expr -> {
+                    assert(expr instanceof RexCall);
+                    final RexCall call = (RexCall) expr;
+                    final int index0 = getReferenceOrAccessIndex(call.operands.get(0), true);
+                    final int index1 = getReferenceOrAccessIndex(call.operands.get(1), true);
+                    assert index0 >= 0 && index1 >= 0;
+                    return index0 < numLhsFields ? Pair.of(index0, index1) : Pair.of(index1, index0);
+                })
+                .collect(Collectors.toList());
     }
 
 }
