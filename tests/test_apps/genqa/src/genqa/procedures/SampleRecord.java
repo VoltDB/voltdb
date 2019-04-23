@@ -72,9 +72,9 @@ public class SampleRecord
         this.type_null_bigint           = nextBigint(rand, true);
         this.type_not_null_bigint       = nextBigint(rand);
         this.type_null_timestamp        = nextTimestamp(rand, true);
-        this.type_not_null_timestamp    = nextTimestamp(rand);
+        this.type_not_null_timestamp    = tsNotNull;
         this.type_null_float            = nextFloat(rand, true);
-        this.type_not_null_float        = tsNotNull;
+        this.type_not_null_float        = nextFloat(rand);
         this.type_null_decimal          = nextDecimal(rand, true);
         this.type_not_null_decimal      = nextDecimal(rand);
         this.type_null_varchar25        = nextVarchar(rand, true, 1, 25);
