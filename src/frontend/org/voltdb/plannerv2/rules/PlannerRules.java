@@ -35,12 +35,7 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalAggregateScanMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcAggregateMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.*;
 import org.voltdb.plannerv2.rules.logical.*;
 import org.voltdb.plannerv2.rules.physical.*;
 
@@ -189,7 +184,9 @@ public class PlannerRules {
             VoltPhysicalLimitSerialAggregateMergeRule.INSTANCE,
             VoltPhysicalLimitSortMergeRule.INSTANCE_1,
             VoltPhysicalAggregateScanMergeRule.INSTANCE,
-            VoltPhysicalLimitScanMergeRule.INSTANCE_1
+            VoltPhysicalLimitScanMergeRule.INSTANCE_1,
+            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_JOIN,
+            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_CALC_JOIN
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(

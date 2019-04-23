@@ -20,6 +20,7 @@ package org.voltdb.plannerv2.rules.logical;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -50,7 +51,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
  */
 public class VoltLCalcJoinTransposeRule extends RelOptRule {
 
-    public static final VoltLCalcJoinTransposeRule INSTANCE =
+    public static final RelOptRule INSTANCE =
             new VoltLCalcJoinTransposeRule(expr -> true, RelFactories.LOGICAL_BUILDER);
 
     //~ Instance fields --------------------------------------------------------
@@ -68,12 +69,11 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
      * @param preserveExprCondition Condition for expressions that should be
      *                              preserved in the projection
      */
-    public VoltLCalcJoinTransposeRule(
+    private VoltLCalcJoinTransposeRule(
             PushProjector.ExprCondition preserveExprCondition,
             RelBuilderFactory relFactory) {
-        super(
-                operand(VoltLogicalCalc.class,
-                        operand(VoltLogicalJoin.class, any())),
+        super(operand(VoltLogicalCalc.class,
+                operand(VoltLogicalJoin.class, any())),
                 relFactory, null);
         this.preserveExprCondition = preserveExprCondition;
     }
@@ -96,64 +96,50 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
             return;
         }
         // Re-create a LogicalProject to be able to pass it to the PushProjector
-        LogicalProject origProject = new LogicalProject(
-                origCalc.getCluster(),
-                origCalc.getTraitSet().replace(Convention.NONE),
-                origCalc.getInput(),
-                projectFilter.left,
-                origCalc.getRowType());
+        final Project origProject = new LogicalProject(
+                origCalc.getCluster(), origCalc.getTraitSet().replace(Convention.NONE), origCalc.getInput(),
+                projectFilter.left, origCalc.getRowType());
 
         // locate all fields referenced in the projection and join condition;
         // determine which inputs are referenced in the projection and
         // join condition; if all fields are being referenced and there are no
         // special expressions, no point in proceeding any further
-        PushProjector pushProject = new PushProjector(
-                origProject,
-                join.getCondition(),
-                join,
-                preserveExprCondition,
-                call.builder());
+        final PushProjector pushProject = new PushProjector(
+                origProject, join.getCondition(), join, preserveExprCondition, call.builder());
         if (pushProject.locateAllRefs()) {
             return;
         }
 
         // create left and right projections, projecting only those
         // fields referenced on each side
-        RelNode leftProjRel = pushProject.createProjectRefsAndExprs(
-                join.getLeft(),
-                true,
-                false);
+        final RelNode leftProjRel = pushProject.createProjectRefsAndExprs(
+                join.getLeft(), true, false);
         // Convert LogicalProject to a VoltDBLCalc
-        VoltLogicalCalc leftCalcRel = projectToVoltCalc(leftProjRel, false);
+        final VoltLogicalCalc leftCalcRel = projectToVoltCalc(leftProjRel, false);
 
-        RelNode rightProjRel = pushProject.createProjectRefsAndExprs(
-                join.getRight(),
-                true,
-                true);
-        VoltLogicalCalc rightCalcRel = projectToVoltCalc(rightProjRel, false);
+        final RelNode rightProjRel = pushProject.createProjectRefsAndExprs(
+                join.getRight(), true, true);
+        final VoltLogicalCalc rightCalcRel = projectToVoltCalc(rightProjRel, false);
 
         // convert the join condition to reference the projected columns
-        RexNode newJoinFilter = null;
-        int[] adjustments = pushProject.getAdjustments();
+        final RexNode newJoinFilter;
+        final int[] adjustments = pushProject.getAdjustments();
         if (join.getCondition() != null) {
-            List<RelDataTypeField> projJoinFieldList = new ArrayList<>();
-            projJoinFieldList.addAll(join.getSystemFieldList());
-            projJoinFieldList.addAll(leftProjRel.getRowType().getFieldList());
-            projJoinFieldList.addAll(rightProjRel.getRowType().getFieldList());
-            newJoinFilter = pushProject.convertRefsAndExprs(
-                    join.getCondition(),
-                    projJoinFieldList,
+            newJoinFilter = pushProject.convertRefsAndExprs(join.getCondition(),
+                    new ArrayList<RelDataTypeField>() {{
+                        addAll(join.getSystemFieldList());
+                        addAll(leftProjRel.getRowType().getFieldList());
+                        addAll(rightProjRel.getRowType().getFieldList());
+                    }},
                     adjustments);
+        } else {
+            newJoinFilter = null;
         }
 
         // create a new join with the projected children
-        Join newJoinRel = join.copy(
-                join.getTraitSet(),
-                newJoinFilter,
-                leftCalcRel,
-                rightCalcRel,
-                join.getJoinType(),
-                join.isSemiJoinDone());
+        final Join newJoinRel = join.copy(
+                join.getTraitSet(), newJoinFilter, leftCalcRel,
+                rightCalcRel, join.getJoinType(), join.isSemiJoinDone());
 
         // put the original project on top of the join, converting it to
         // reference the modified projection list
@@ -163,7 +149,6 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         if (resultRel instanceof Project) {
             resultRel = projectToVoltCalc(resultRel, true);
         }
-
         call.transformTo(resultRel);
     }
 
@@ -176,20 +161,14 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
      * @return VoltDBLCalc
      */
     private VoltLogicalCalc projectToVoltCalc(RelNode relNode, boolean isTopJoin) {
-        assert(relNode instanceof Project);
-        Project projectRel = (Project) relNode;
+        Preconditions.checkState(relNode instanceof Project, "RelNode is not a Project");
+        final Project projectRel = (Project) relNode;
         final RexProgram program = RexProgram.create(
-                projectRel.getInput(0).getRowType(),
-                projectRel.getProjects(),
-                null,
-                projectRel.getRowType(),
-                projectRel.getCluster().getRexBuilder());
+                projectRel.getInput(0).getRowType(), projectRel.getProjects(), null,
+                projectRel.getRowType(), projectRel.getCluster().getRexBuilder());
         return new VoltLogicalCalc(
-                projectRel.getCluster(),
-                projectRel.getTraitSet().replace(VoltLogicalRel.CONVENTION),
-                projectRel.getInput(0),
-                program,
-                isTopJoin);
+                projectRel.getCluster(), projectRel.getTraitSet().replace(VoltLogicalRel.CONVENTION),
+                projectRel.getInput(0), program, isTopJoin);
     }
 }
 
