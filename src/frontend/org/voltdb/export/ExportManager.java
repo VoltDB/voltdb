@@ -541,7 +541,7 @@ public class ExportManager
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 generation.initializeGenerationFromCatalog(catalogContext,
-                        connectors, newProcessor, m_hostId, localPartitionsToSites);
+                        connectors, newProcessor, m_hostId, localPartitionsToSites, true);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -577,7 +577,6 @@ public class ExportManager
             swapWithNewProcessor(catalogContext, generation,
                     connectors, localPartitionsToSites, m_processorConfig);
         }
-        generation.updateCatalog(catalogContext);
     }
 
     // remove and install new processor
@@ -604,7 +603,7 @@ public class ExportManager
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
-                    m_hostId, partitions);
+                    m_hostId, partitions, true);
             for (Pair<Integer, Integer> partition : partitions) {
                 generation.updateAckMailboxes(partition.getFirst(), null);
             }

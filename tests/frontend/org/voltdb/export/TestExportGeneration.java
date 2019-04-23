@@ -169,7 +169,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
-                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
+                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))), false);
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override

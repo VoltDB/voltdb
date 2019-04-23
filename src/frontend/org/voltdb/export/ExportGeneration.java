@@ -20,14 +20,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,9 +66,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.PbdSegmentName;
 import org.voltdb.utils.PbdSegmentName.Result;
 
-import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -146,7 +142,7 @@ public class ExportGeneration implements Generation {
         if (files != null) {
             initializeGenerationFromDisk(connectors, processor, files, localPartitionsToSites, catalogContext.m_genId);
         }
-        initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, localPartitionsToSites);
+        initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, localPartitionsToSites, false);
     }
 
     /**
@@ -245,7 +241,8 @@ public class ExportGeneration implements Generation {
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
             int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites)
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            boolean isCatalogUpdate)
     {
         // Update catalog version so that datasources use this version when propagating acks
         m_catalogVersion = catalogContext.catalogVersion;
@@ -276,7 +273,7 @@ public class ExportGeneration implements Generation {
         Set<String> exportedTables = new HashSet<>();
         for (Table stream : streams) {
             addDataSources(stream, hostId, localPartitionsToSites, partitionsInUse,
-                    processor, catalogContext.m_genId);
+                    processor, catalogContext.m_genId, isCatalogUpdate);
             exportedTables.add(stream.getTypeName());
             createdSources = true;
         }
@@ -731,7 +728,8 @@ public class ExportGeneration implements Generation {
             List<Pair<Integer, Integer>> localPartitionsToSites,
             Set<Integer> partitionsInUse,
             final ExportDataProcessor processor,
-            final long genId)
+            final long genId,
+            boolean isCatalogUpdate)
     {
         for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
 
@@ -767,7 +765,9 @@ public class ExportGeneration implements Generation {
                                     + " partition " + partition + " site " + siteId);
                         }
                         dataSourcesForPartition.put(key, exportDataSource);
-
+                        if (isCatalogUpdate) {
+                            exportDataSource.updateCatalog(table, genId);
+                        }
                     } else {
                         // Associate any existing EDS to the export client in the new processor
                         ExportDataSource eds = dataSourcesForPartition.get(key);
@@ -785,6 +785,9 @@ public class ExportGeneration implements Generation {
 
                         // Mark in catalog only if partition is in use
                         eds.markInCatalog(partitionsInUse.contains(partition));
+                        if (isCatalogUpdate) {
+                            eds.updateCatalog(table, genId);
+                        }
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB(
@@ -1128,26 +1131,6 @@ public class ExportGeneration implements Generation {
                         results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
                     }
                 }
-            }
-        }
-    }
-
-    // On behalf of one Site thread to update all data sources managed by export manager
-    public void updateCatalog(CatalogContext catalogContext) {
-        long genId = catalogContext.m_genId;
-        // Flip the data source mapping from partition-to-sources to name-to-sources
-        Multimap<String, ExportDataSource> dataSourcesByName = ArrayListMultimap.create();
-        synchronized (m_dataSourcesByPartition) {
-            for (Map<String, ExportDataSource> sourceByName : m_dataSourcesByPartition.values()) {
-                for (Entry<String, ExportDataSource> entry : sourceByName.entrySet()) {
-                    dataSourcesByName.put(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-        for (Entry<String, Collection<ExportDataSource>> entry : dataSourcesByName.asMap().entrySet()) {
-            Table streamTable = catalogContext.database.getTables().get(entry.getKey());
-            for (ExportDataSource source : entry.getValue()) {
-                source.updateCatalog(streamTable, genId);
             }
         }
     }

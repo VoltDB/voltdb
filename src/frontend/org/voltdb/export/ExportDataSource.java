@@ -2055,10 +2055,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void updateCatalog(Table table, long genId) {
+        // Skip unneeded catalog update
+        if (m_previousGenId >= genId) {
+            return;
+        }
         m_es.execute(new Runnable() {
             public void run() {
-                if (genId != m_previousGenId) {
-                    assert (genId > m_previousGenId);
+                if (m_previousGenId < genId) {
                     // This serializer is used to write stream schema to pbd
                     StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(table, table.getTypeName(), genId);
                     try {
