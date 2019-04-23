@@ -98,11 +98,11 @@ namespace functionexpression {
                : AbstractExpression(EXPRESSION_TYPE_FUNCTION) {
                };
 
-            NValue eval(const TableTuple*, const TableTuple*) const {
+            NValue eval(const TableTuple*, const TableTuple*) const override {
                return NValue::callConstant<F>();
             }
 
-            std::string debugInfo(const std::string &spacer) const {
+            std::string debugInfo(const std::string &spacer) const override {
                std::stringstream buffer;
                buffer << spacer << "ConstantFunctionExpression " << F << std::endl;
                return (buffer.str());
@@ -139,7 +139,7 @@ namespace functionexpression {
             delete m_child;
          }
 
-         virtual bool hasParameter() const {
+         bool hasParameter() const override {
             return m_child->hasParameter();
          }
 
@@ -147,12 +147,12 @@ namespace functionexpression {
             return std::vector<AbstractExpression*>(1, m_child);
          }
 
-         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
             assert (m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
          }
 
-         std::string debugInfo(const std::string &spacer) const {
+         std::string debugInfo(const std::string &spacer) const override {
             std::stringstream buffer;
             buffer << spacer << "UnaryFunctionExpression " << F << std::endl;
             return (buffer.str());
@@ -174,7 +174,7 @@ namespace functionexpression {
                }
             }
 
-            virtual bool hasParameter() const {
+            virtual bool hasParameter() const override {
                for (size_t i = 0; i < m_args.size(); i++) {
                   assert(m_args[i]);
                   if (m_args[i]->hasParameter()) {
@@ -188,7 +188,7 @@ namespace functionexpression {
                return m_args;
             }
 
-            NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+            NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
                //TODO: Could make this vector a member, if the memory management implications
                // (of the NValue internal state) were clear -- is there a penalty for longer-lived
                // NValues that outweighs the current per-eval allocation penalty?
@@ -199,7 +199,7 @@ namespace functionexpression {
                return NValue::call<F>(nValue);
             }
 
-            std::string debugInfo(const std::string &spacer) const {
+            std::string debugInfo(const std::string &spacer) const override {
                std::stringstream buffer;
                buffer << spacer << "GeneralFunctionExpression " << F << std::endl;
                return (buffer.str());
@@ -226,7 +226,7 @@ namespace functionexpression {
             }
          }
 
-         virtual bool hasParameter() const {
+         bool hasParameter() const override {
             for (size_t i = 0; i < m_args.size(); i++) {
                assert(m_args[i]);
                if (m_args[i]->hasParameter()) {
@@ -240,7 +240,7 @@ namespace functionexpression {
             return m_args;
          }
 
-         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
             std::vector<NValue> nValue(m_args.size());
             for (int i = 0; i < m_args.size(); ++i) {
                nValue[i] = m_args[i]->eval(tuple1, tuple2);
@@ -248,7 +248,7 @@ namespace functionexpression {
             return m_engine->callJavaUserDefinedFunction(m_functionId, nValue);
          }
 
-         std::string debugInfo(const std::string &spacer) const {
+         std::string debugInfo(const std::string &spacer) const override {
             std::stringstream buffer;
             buffer << spacer << "UserDefinedFunctionExpression (function ID = " << m_functionId << ")" << std::endl;
             return (buffer.str());

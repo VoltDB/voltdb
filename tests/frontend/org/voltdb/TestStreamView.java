@@ -27,7 +27,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.util.Properties;
+import java.util.Random;
 
 import org.junit.After;
 import org.junit.Before;
@@ -35,6 +37,8 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
@@ -49,6 +53,46 @@ public class TestStreamView
     private VoltDB.Configuration m_config;
     private ServerThread m_localServer;
     private Client m_client;
+
+    @Test
+    public void testStreamViewOnCatalogUpdate() throws NoConnectionsException, IOException, ProcCallException {
+        String createStream = "CREATE STREAM ddata_stream "
+                + "PARTITION ON COLUMN vin "
+                + "EXPORT TO TARGET ddata_stream_target "
+                + "( "
+                + "     VIN VARCHAR(18) NOT NULL, "
+                + "     PRICE INTEGER NOT NULL,"
+                + "     COLLECT_DATE TIMESTAMP NOT NULL,"
+                + ");";
+        ClientResponse response = m_client.callProcedure("@AdHoc", createStream);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        String createStreamView = "CREATE VIEW message_count_by_vin AS "
+                + "SELECT VIN, dayofweek(collect_date), count(*) how_many, sum(price), min(price), max(price) "
+                + "FROM ddata_stream "
+                + "GROUP BY VIN, dayofweek(collect_date);";
+        response = m_client.callProcedure("@AdHoc", createStreamView);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        VoltTable[] results;
+        Random r = new Random();
+        // insert into stream make sure you get more blocks
+        for (int i=0; i < 1000; i++) {
+            String vin = String.valueOf(Math.abs(r.nextInt()));
+            int price = Math.abs(r.nextInt(10_000));
+            String insertStmt = "insert into ddata_stream VALUES ('%s', '%d', now);";
+            String q = String.format(insertStmt, vin, price);
+            results = m_client.callProcedure("@AdHoc", q).getResults();
+            assertEquals(1, results[0].asScalarLong());
+        }
+        response = m_client.callProcedure("@AdHoc", "alter stream ddata_stream add column d int not null;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = m_client.callProcedure("@AdHoc", "alter stream ddata_stream alter column d varchar(32) not null;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = m_client.callProcedure("@AdHoc", "alter stream ddata_stream drop column d;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        results = m_client.callProcedure("@AdHoc", "select * from message_count_by_vin;").getResults();
+        assertTrue(results[0].m_rowCount > 1);
+    }
 
     @Test
     public void testDeleteAll() throws Exception
@@ -323,7 +367,6 @@ public class TestStreamView
             results = m_client.callProcedure("@AdHoc", "select count(*) from bidask_minmax").getResults();
             assertEquals(0, results[0].asScalarLong());
         }
-
     }
 
     @Before
@@ -345,6 +388,7 @@ public class TestStreamView
 
         Properties props = new Properties();
         project.addExport(true, "custom", props, "noop");
+        project.setUseDDLSchema(true);
 
         boolean compiled = project.compile(Configuration.getPathToCatalogForTest("test-stream-view.jar"), 1, 1, 0);
         assertTrue(compiled);
