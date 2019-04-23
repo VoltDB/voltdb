@@ -561,20 +561,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
-        }
-
         // ENG-14511 on assertion failures in test environment, ensure removal of action blocker
         long genId = 0L;
         try {
