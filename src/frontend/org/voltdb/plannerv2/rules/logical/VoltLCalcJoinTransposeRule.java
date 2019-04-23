@@ -18,17 +18,13 @@
 package org.voltdb.plannerv2.rules.logical;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.core.SemiJoin;
+import org.apache.calcite.rel.core.*;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.rules.PushProjector;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -59,7 +55,7 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
     /**
      * Condition for expressions that should be preserved in the projection.
      */
-    private final PushProjector.ExprCondition preserveExprCondition;
+    private final PushProjector.ExprCondition m_preserveExprCondition;
 
     //~ Constructors -----------------------------------------------------------
 
@@ -75,17 +71,17 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         super(operand(VoltLogicalCalc.class,
                 operand(VoltLogicalJoin.class, any())),
                 relFactory, null);
-        this.preserveExprCondition = preserveExprCondition;
+        m_preserveExprCondition = preserveExprCondition;
     }
 
     //~ Methods ----------------------------------------------------------------
 
     // implement RelOptRule
     public void onMatch(RelOptRuleCall call) {
-        final VoltLogicalCalc origCalc = call.rel(0);
-        final VoltLogicalJoin join = call.rel(1);
+        final Calc origCalc = call.rel(0);
+        final Join join = call.rel(1);
 
-        if ((Join) join instanceof SemiJoin) {
+        if (join instanceof SemiJoin) {
             return; // TODO: support SemiJoin
         }
         // Split project (left) and filter (right) expressions
@@ -105,7 +101,7 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         // join condition; if all fields are being referenced and there are no
         // special expressions, no point in proceeding any further
         final PushProjector pushProject = new PushProjector(
-                origProject, join.getCondition(), join, preserveExprCondition, call.builder());
+                origProject, join.getCondition(), join, m_preserveExprCondition, call.builder());
         if (pushProject.locateAllRefs()) {
             return;
         }
@@ -115,11 +111,11 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         final RelNode leftProjRel = pushProject.createProjectRefsAndExprs(
                 join.getLeft(), true, false);
         // Convert LogicalProject to a VoltDBLCalc
-        final VoltLogicalCalc leftCalcRel = projectToVoltCalc(leftProjRel, false);
+        final Calc leftCalcRel = projectToVoltCalc(leftProjRel, false);
 
         final RelNode rightProjRel = pushProject.createProjectRefsAndExprs(
                 join.getRight(), true, true);
-        final VoltLogicalCalc rightCalcRel = projectToVoltCalc(rightProjRel, false);
+        final Calc rightCalcRel = projectToVoltCalc(rightProjRel, false);
 
         // convert the join condition to reference the projected columns
         final RexNode newJoinFilter;
@@ -160,7 +156,7 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
      *
      * @return VoltDBLCalc
      */
-    private VoltLogicalCalc projectToVoltCalc(RelNode relNode, boolean isTopJoin) {
+    private Calc projectToVoltCalc(RelNode relNode, boolean isTopJoin) {
         Preconditions.checkState(relNode instanceof Project, "RelNode is not a Project");
         final Project projectRel = (Project) relNode;
         final RexProgram program = RexProgram.create(

@@ -166,7 +166,19 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
+
             VoltPJoinRule.INSTANCE,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_NLOOP_SEQSCAN,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_NLOOP_CALC_SEQSCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
+
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SEQSCAN,
             VoltPCalcScanToIndexRule.INSTANCE,
@@ -175,7 +187,9 @@ public class PlannerRules {
             VoltPSetOpsRule.INSTANCE_UNION,
             VoltPSetOpsRule.INSTANCE_INTERSECT,
             VoltPSetOpsRule.INSTANCE_EXCEPT,
-            VoltPValuesRule.INSTANCE
+            VoltPValuesRule.INSTANCE,
+
+            VoltPJoinExchangeTransposeRule.INSTANCE
     );
 
     private static final RuleSet INLINE = RuleSets.ofList(

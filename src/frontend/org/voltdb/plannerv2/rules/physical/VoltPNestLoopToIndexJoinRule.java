@@ -18,7 +18,6 @@
 package org.voltdb.plannerv2.rules.physical;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.calcite.plan.RelOptRule;
@@ -30,10 +29,8 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexProgram;
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
@@ -87,34 +84,33 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
             return;
         }
 
-        final Table catTableable = innerScan.getVoltTable().getCatalogTable();
-        final List<Column> columns = CatalogUtil.getSortedCatalogItems(catTableable.getColumns(), "index");
-
+        final Table table = innerScan.getVoltTable().getCatalogTable();
         // Combine inner calc and scan programs
         final RexProgram innerProgram;
         if (call.rels.length == 3) {
             innerProgram = innerScan.getProgram();
         } else {
-            assert(innerCalc != null);
+            assert innerCalc != null;
             innerProgram = VoltRexUtil.mergeProgram(
                     innerScan.getProgram(), innerCalc.getProgram(), innerCalc.getCluster().getRexBuilder());
         }
         RelNode nliJoin = null;
-        Map<RelNode, RelNode> equiv = new HashMap<>();
+        final Map<RelNode, RelNode> equiv = new HashMap<>();
 
         for (Index index : innerScan.getVoltTable().getCatalogTable().getIndexes()) {
             assert(innerScan.getProgram() != null);
             // need to pass the join outer child columns count to the visitor
             final AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTableable, columns, join.getCondition(), innerProgram,
-                    index, SortDirectionType.INVALID, outerScan.getRowType().getFieldCount(), true);
+                    table, CatalogUtil.getSortedCatalogItems(table.getColumns(), "index"),
+                    join.getCondition(), innerProgram, index, SortDirectionType.INVALID,
+                    outerScan.getRowType().getFieldCount(), true);
 
             if (accessPath != null) {
                 // Index's collation needs to be based on its own program only - the Calc sits above the scan
                 final RelCollation indexCollation;
                 try {
                     indexCollation = VoltRexUtil.createIndexCollation(
-                            index, catTableable, innerScan.getCluster().getRexBuilder(), innerScan.getProgram());
+                            index, table, innerScan.getCluster().getRexBuilder(), innerScan.getProgram());
                 } catch (JSONException e) {
                     throw new CalcitePlanningException(e.getMessage());
                 }
