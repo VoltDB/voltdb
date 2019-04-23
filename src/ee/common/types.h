@@ -605,6 +605,9 @@ enum DRConflictOnPK {
     CONFLICT_ON_PK,
 };
 
+/*
+ * Keep it sync with frontend/org/voltdb/TableType.java
+ */
 enum TableType {
      // This will be unset and hence 0 for pre-9.0 catalogs
      INVALID = 0,
@@ -612,8 +615,8 @@ enum TableType {
       // Regular PersistentTable
      PERSISTENT = 1,
 
-      // StreamTable without ExportTupleStream (Views only)
-     STREAM_VIEW_ONLY = 2,
+      // StreamTable without ExportTupleStream
+     CONNECTOR_LESS_STREAM = 2,
 
      // StreamTable with ExportTupleStream
      STREAM = 3,
@@ -629,13 +632,13 @@ inline bool tableTypeIsExportStream(TableType tableType) {
     return tableType == STREAM;
 }
 
-inline bool tableTypeIsViewStream(TableType tableType) {
-    return tableType == STREAM_VIEW_ONLY;
+inline bool tableTypeIsConnectorLessStream(TableType tableType) {
+    return tableType == CONNECTOR_LESS_STREAM;
 }
 
 inline bool tableTypeIsStream(TableType tableType) {
     return tableTypeIsExportStream(tableType) ||
-            tableTypeIsViewStream(tableType);
+            tableTypeIsConnectorLessStream(tableType);
 }
 
 inline bool isTableWithExport(TableType tableType) {
