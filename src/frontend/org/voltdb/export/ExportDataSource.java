@@ -48,6 +48,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -180,6 +181,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
     private MigrateRowsDeleter m_migrateRowsDeleter;
+
+    private ExportCoordinator m_coordinator;
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 
@@ -431,6 +434,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
+    }
+
+    public void setCoordination(HostMessenger messenger) {
+        m_coordinator = new ExportCoordinator(messenger, this);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -1642,6 +1649,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 try {
+                    m_coordinator.becomeLeader();
                     if (!m_es.isShutdown() || !m_closed) {
                         exportLog.info("Accepting mastership");
                         if (m_mastershipAccepted.compareAndSet(false, true)) {

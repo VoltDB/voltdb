@@ -194,13 +194,6 @@ public class TestExportGeneration {
                     buf.get(stringBytes);
                     seqNo = buf.getLong();
                 }
-                if (message == null) {
-                    System.out.println("XXX NULL message");
-                }
-                if (m_ackMatcherRef.get() == null) {
-                    System.out.println("XXX NULL ackMatcher for seqNo " + seqNo);
-                }
-                System.out.println("XXX run ackMatcher for seqNo " + seqNo);
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -252,7 +245,6 @@ public class TestExportGeneration {
 
         while( --retries >= 0 && ! active) {
 
-            System.out.println("XXX set ackMatcher");
             m_exportGeneration.pushExportBuffer(
                     m_part,
                     m_streamName,
