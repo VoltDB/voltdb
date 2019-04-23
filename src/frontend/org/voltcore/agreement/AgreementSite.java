@@ -57,6 +57,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -620,6 +621,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     false,
                     null);
         }
+
+        // Don't try to go through agreement process for a rejoining node.
+        if (VoltDB.instance().rejoining()) {
+            VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
+                    "As a result, the rejoin operation has been canceled. Please try again.");
+        }
+
         Set<Long> unknownFaultedHosts = new TreeSet<>();
 
         // This one line is a biggie. Gets agreement on what the post-fault cluster will be.
