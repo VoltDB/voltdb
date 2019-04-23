@@ -439,4 +439,14 @@ public class TestInlineRules extends Plannerv2TestCase {
                         "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n")
                 .pass();
     }
+
+    public void testVoltFunctions() {
+        m_tester.sql("select i from R1 where not migrating")
+                .transform("VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=[MIGRATING()], expr#7=[NOT($t6)], I=[$t0], $condition=[$t7])\n")
+                .pass();
+
+        m_tester.sql("select i from R1 where not migrating() and v = 'aaa'")
+                .transform("VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], expr#6=['aaa'], expr#7=[=($t5, $t6)], expr#8=[MIGRATING()], expr#9=[NOT($t8)], expr#10=[AND($t7, $t9)], I=[$t0], $condition=[$t10])\n")
+                .pass();
+    }
 }
