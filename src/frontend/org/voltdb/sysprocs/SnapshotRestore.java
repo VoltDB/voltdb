@@ -486,8 +486,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     String errorMsg = null;
                     if (!outputPath.exists()) {
                         errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" does not exist";
-                    }
-                    if (!outputPath.canExecute()) {
+                    } else if (!outputPath.canExecute()) {
                         errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" is not executable";
                     }
                     // error check and early return
