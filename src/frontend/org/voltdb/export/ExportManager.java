@@ -504,6 +504,11 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         if (!requiresNewExportGeneration) {
+            // Even for catalog update doesn't affect export, genId still need to pass to EDS.
+            // Because each ACK message is associated with a genId.
+            if (m_generation.get() != null) {
+                m_generation.get().updateGenerationId(catalogContext.m_genId);
+            }
             exportLog.info("No stream related changes in update catalog.");
             return;
         }
@@ -541,7 +546,7 @@ public class ExportManager
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 generation.initializeGenerationFromCatalog(catalogContext,
-                        connectors, newProcessor, m_hostId, localPartitionsToSites);
+                        connectors, newProcessor, m_hostId, localPartitionsToSites, true);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -603,7 +608,7 @@ public class ExportManager
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
-                    m_hostId, partitions);
+                    m_hostId, partitions, true);
             for (Pair<Integer, Integer> partition : partitions) {
                 generation.updateAckMailboxes(partition.getFirst(), null);
             }
@@ -682,8 +687,7 @@ public class ExportManager
             long uniqueId,
             long genId,
             long bufferPtr,
-            ByteBuffer buffer,
-            boolean sync) {
+            ByteBuffer buffer) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -697,7 +701,7 @@ public class ExportManager
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, genId, buffer, sync);
+                    (int)tupleCount, uniqueId, genId, buffer);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
@@ -718,13 +722,13 @@ public class ExportManager
         }
     }
 
-    public static synchronized void sync(final boolean nofsync) {
+    public static synchronized void sync() {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
         ExportGeneration generation = instance().m_generation.get();
         if (generation != null) {
-            generation.sync(nofsync);
+            generation.sync();
         }
     }
 

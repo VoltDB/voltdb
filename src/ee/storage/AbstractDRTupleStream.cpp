@@ -49,9 +49,8 @@ void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
     m_secondaryCapacity = capacity;
 }
 
-void AbstractDRTupleStream::pushStreamBuffer(DrStreamBlock *block, bool sync)
+void AbstractDRTupleStream::pushStreamBuffer(DrStreamBlock *block)
 {
-    if (sync) return;
     int64_t rowTarget = ExecutorContext::getPhysicalTopend()->pushDRBuffer(m_partitionId, block);
     if (rowTarget >= 0) {
         m_rowTarget = rowTarget;
