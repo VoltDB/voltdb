@@ -670,18 +670,27 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
-    // ENG-15253 Here, a user provided alias II is clashing with a synthesized one 'I' for CASE WHEN ... END expression
-    // which resolves otherwise ambiguous column I
-//    public void testFullUsingJoinWithAmbiguousSelectColumn9() {
-//        m_tester.sql("select I as ii from R1 full join R2 using(i)")
-//        .transform("")
-//        .pass();
-//    }
-//    public void testFullUsingJoinWithAmbiguousSelectColumn10() {
-//        m_tester.sql("select max(si), i as ii from R1 full join R2 using(i) group by ii")
-//        .transform("")
-//        .pass();
-//    }
+    public void testFullUsingJoinWithAmbiguousSelectColumn9() {
+        m_tester.sql("select I as ii from R1 full join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], II=[$t3])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testFullUsingJoinWithAmbiguousSelectColumn10() {
+        m_tester.sql("select max(R1.si), i as ii from R1 full join R2 using(i) group by ii")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], EXPR$0=[$t1], II=[$t0])\n" +
+                    "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
+                    "    VoltLogicalCalc(expr#0..11=[{inputs}], expr#12=[IS NOT NULL($t6)], expr#13=[CASE($t12, $t6, $t0)], II=[$t13], SI=[$t1])\n" +
+                    "      VoltLogicalJoin(condition=[=($0, $6)], joinType=[full])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
 
 
 }
