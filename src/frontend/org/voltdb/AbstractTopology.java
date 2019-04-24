@@ -1373,21 +1373,16 @@ public class AbstractTopology {
      * @return all the hostIds in the partition group
      */
     public Set<Integer> getPartitionGroupPeersContainHighestPid() {
-        Set<Integer> peers = Sets.newHashSet();
         // find highest partition
         int hPid = getPartitionCount() -1;
 
         // find the host that contains the highest partition
         Collection<Integer> hHostIds = getHostIdList(hPid);
-        if (hHostIds == null) {
-            return peers;
+        if (hHostIds == null || hHostIds.isEmpty()) {
+            return Collections.emptySet();
         }
         int hHostId = hHostIds.iterator().next();
-        assert hostsById.get(hHostId) != null;
-        for (Partition p : hostsById.get(hHostId).partitions) {
-            peers.addAll(p.hostIds);
-        }
-        return peers;
+        return getPartitionGroupPeers(hHostId);
     }
 
     /**
