@@ -32,7 +32,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
@@ -59,7 +58,6 @@ import org.voltdb.plannerv2.ColumnTypes;
 import org.voltdb.plannerv2.ParameterizationVisitor;
 import org.voltdb.plannerv2.ParameterizedSqlTask;
 import org.voltdb.plannerv2.SqlTask;
-import org.voltdb.plannerv2.VoltFastSqlParser;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
@@ -153,7 +151,7 @@ public class PlannerTool {
         m_database = database;
         m_catalogHash = catalogHash;
         m_hsqlCache = HSQLAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
-        //m_calciteCache = CalciteAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_calciteCache = CalciteAdHocCompilerCache.getCacheForCatalogHash(catalogHash);
         m_schemaPlus = VoltSchemaPlus.from(m_database);
         return this;
     }
@@ -314,21 +312,23 @@ public class PlannerTool {
             throws ValidationException, RelConversionException, PlannerFallbackException {
         CacheUse cacheUse = CacheUse.FAIL;
 
-        // check L1 cache is hit or miss
-        AdHocPlannedStatement cachedPlan = m_calciteCache.getWithSQL(task.getSQL());
-        if (cachedPlan != null) {
-            cacheUse = CacheUse.HIT1;
-            return cachedPlan;
-        } else {
-            cacheUse = CacheUse.MISS;
+        // start planner cache stats collection
+        if (m_plannerStats != null) {
+            m_plannerStats.startStatsCollection();
         }
-
-        // check L2 cache is hit or miss
-        SqlNode parsedQuery = null;
-        AdHocPlannedStatement ahps = null;
-        ParameterizedSqlTask ptask;
         try {
-            parsedQuery = VoltFastSqlParser.parse(task.getSQL());
+            // check L1 cache is hit or miss
+            AdHocPlannedStatement cachedPlan = m_calciteCache.getWithSQL(task.getSQL());
+            if (cachedPlan != null) {
+                cacheUse = CacheUse.HIT1;
+                return cachedPlan;
+            } else {
+                cacheUse = CacheUse.MISS;
+            }
+
+            // check L2 cache is hit or miss
+            AdHocPlannedStatement ahps = null;
+            ParameterizedSqlTask ptask;
             ptask = new ParameterizedSqlTask(task);
             final CorePlan corePlan = m_calciteCache.getWithParsedQuery(ptask.getParsedQuery());
             if (corePlan != null) {
@@ -336,7 +336,6 @@ public class PlannerTool {
                 ptask.getParsedQuery().accept(visitor);
                 ahps = new AdHocPlannedStatement(ptask.getSQL().getBytes(Constants.UTF8ENCODING),
                     corePlan, ParameterSet.fromArrayNoCopy(ptask.getSqlLiteralList()), null);
-                return ahps;
             } else {
                 //////////////////////
                 // PLAN THE STMT
@@ -360,12 +359,13 @@ public class PlannerTool {
                                                  ParameterSet.fromArrayNoCopy(params),
                                                  null);
                 m_calciteCache.put(task, ptask.getParsedQuery(), ahps, null, false, false);
-                return ahps;
             }
-        } catch (SqlParseException e) {
-            e.printStackTrace();
+            return ahps;
+        } finally {
+            if (m_plannerStats != null) {
+                m_plannerStats.endStatsCollection(m_calciteCache.getLiteralCacheSize(), m_calciteCache.getCoreCacheSize(), cacheUse, -1);
+            }
         }
-        return ahps;
     }
 
     public synchronized AdHocPlannedStatement planSqlHsql(String sql, StatementPartitioning partitioning,
