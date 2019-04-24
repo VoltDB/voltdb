@@ -1368,6 +1368,24 @@ public class AbstractTopology {
     }
 
     /**
+     * get all the hostIds in the partition group
+     * contain the host(s) that have highest partition id
+     * @return all the hostIds in the partition group
+     */
+    public Set<Integer> getPartitionGroupPeersContainHighestPid() {
+        // find highest partition
+        int hPid = getPartitionCount() -1;
+
+        // find the host that contains the highest partition
+        Collection<Integer> hHostIds = getHostIdList(hPid);
+        if (hHostIds == null || hHostIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        int hHostId = hHostIds.iterator().next();
+        return getPartitionGroupPeers(hHostId);
+    }
+
+    /**
      * get all the hostIds in the partition group where the host with the given host id belongs
      * @param hostId the given hostId
      * @return all the hostIds in the partition group
