@@ -359,7 +359,7 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i, R2.v from R1, R2 " +
                 "where R2.si = R1.i and R2.v = 'foo'")
                 .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], I=[$t0], V=[$t2], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=(CAST($1):INTEGER, $0)], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=(CAST($1):INTEGER, $0)], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], " +
                         "expr#6=['foo'], expr#7=[=($t5, $t6)], SI=[$t1], V=[$t5], $condition=[$t7])\n")
@@ -368,7 +368,7 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i, R2.v from R1 inner join R2 " +
                 "on R2.si = R1.i where R2.v = 'foo'")
                 .transform("VoltPhysicalCalc(expr#0..2=[{inputs}], proj#0..1=[{exprs}], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($2, $0)], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], " +
                         "expr#6=[CAST($t1):INTEGER], expr#7=['foo'], expr#8=[=($t5, $t7)], V=[$t5], SI0=[$t6], $condition=[$t8])\n")
@@ -377,7 +377,7 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select R2.si, R1.i from R1 inner join " +
                 "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i")
                 .transform("VoltPhysicalCalc(expr#0..6=[{inputs}], SI=[$t5], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[AND(=($4, $3), >($2, $4))], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[AND(=($4, $3), >($2, $4))], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], " +
                         "expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..2=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], " +
@@ -387,7 +387,7 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.si where R1.I + R2.ti = 5")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[AND(=($1, $2), =(+($0, $3), 5))], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[AND(=($1, $2), =(+($0, $3), 5))], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], SI=[$t1], TI=[$t2])\n")
                 .pass();
@@ -398,10 +398,10 @@ public class TestInlineRules extends Plannerv2TestCase {
                 "R2  on R1.si = R2.i inner join " +
                 "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(256) CHARACTER SET " +
                         "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..1=[{exprs}], V00=[$t5], split=[1])\n" +
-                        "      VoltPhysicalJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
+                        "      VoltPhysicalNestLoopJoin(condition=[=($2, $3)], joinType=[inner], split=[1])\n" +
                         "        VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], " +
                         "expr#6=[CAST($t1):INTEGER], expr#7=[4], expr#8=[>($t1, $t7)], proj#0..1=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
                         "        VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], I=[$t0], V=[$t5])\n" +
@@ -419,7 +419,7 @@ public class TestInlineRules extends Plannerv2TestCase {
                 + "on t1.i = t2.i "
                 + "where t1.i = 3")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], V=[$t1], V0=[$t3], split=[1])\n" +
-                        "  VoltPhysicalJoin(condition=[=($0, $2)], joinType=[inner], split=[1])\n" +
+                        "  VoltPhysicalNestLoopJoin(condition=[=($0, $2)], joinType=[inner], split=[1])\n" +
                         "    VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], " +
                         "expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], " +
                         "I=[$t0], V=[$t5], $condition=[$t10])\n" +
@@ -432,7 +432,7 @@ public class TestInlineRules extends Plannerv2TestCase {
         m_tester.sql("select count(i) from (select max(i) from r1 ) as subquery, r1")
                 .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], split=[1], coordinator=[false], type=[serial])\n" +
                         "  VoltPhysicalCalc(expr#0..6=[{inputs}], I=[$t1], split=[1])\n" +
-                        "    VoltPhysicalJoin(condition=[true], joinType=[inner], split=[1])\n" +
+                        "    VoltPhysicalNestLoopJoin(condition=[true], joinType=[inner], split=[1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0=[{inputs}], EXPR$0=[$t0], " +
                         "aggregate=[VoltPhysicalSerialAggregate.CONVENTION.[].single(input=HepRelVertex,group={},EXPR$0=MAX($0)," +
                         "split=1,coordinator=false,type=serial)_split_1_coordinator_false])\n" +

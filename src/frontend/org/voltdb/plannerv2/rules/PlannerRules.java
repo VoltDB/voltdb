@@ -198,7 +198,7 @@ public class PlannerRules {
             VoltPhysicalLimitSerialAggregateMergeRule.INSTANCE,
             VoltPhysicalLimitSortMergeRule.INSTANCE_1,
             VoltPhysicalAggregateScanMergeRule.INSTANCE,
-            VoltPhysicalLimitScanMergeRule.INSTANCE_1,
+            VoltPhysicalLimitScanMergeRule.INSTANCE_LIMIT_SCAN,
             VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_JOIN,
             VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_CALC_JOIN
     );

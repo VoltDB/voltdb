@@ -75,8 +75,8 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
         writer.item("topJoin", m_topJoin);
         return writer;
     }
-
-    @Override public double estimateRowCount(RelMetadataQuery meta) {
+    // TODO: enabling these fails TestMPQueryFallbackRules
+    /*@Override public double estimateRowCount(RelMetadataQuery meta) {
         return getInput().estimateRowCount(meta);
     }
 
@@ -86,7 +86,7 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
             rowCount /= 10;
         }
         return planner.getCostFactory().makeCost(rowCount, 0, 0);
-    }
+    }*/
 
     @Override public void collectVariablesUsed(Set<CorrelationId> variableSet) {
         final RelOptUtil.VariableUsedVisitor vuv = new RelOptUtil.VariableUsedVisitor(null);
