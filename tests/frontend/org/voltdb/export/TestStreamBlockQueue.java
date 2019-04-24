@@ -182,7 +182,7 @@ public class TestStreamBlockQueue extends TestCase {
                     break;
                 case 1:
                     System.out.println("Iteration " + iteration + " Action sync");
-                    m_sbq.sync(r.nextBoolean());
+                    m_sbq.sync();
                     break;
                 case 2:
                     System.out.println("Iteration " + iteration + " Action peek");
@@ -350,7 +350,7 @@ public class TestStreamBlockQueue extends TestCase {
         long weirdSizeValue = 1024 * 1024 * 2 * 30;
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
 
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
@@ -415,7 +415,7 @@ public class TestStreamBlockQueue extends TestCase {
         long weirdSizeValue = ((1024 * 1024 * 2) * 30);
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
 
         m_sbq.close();
         m_sbq = null;
