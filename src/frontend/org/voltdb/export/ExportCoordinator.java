@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
@@ -98,10 +97,9 @@ public class ExportCoordinator {
         @Override
         protected void lockRequestCompleted()
         {
-            exportLog.info("XXX Got deferred lock, invoke");
             Runnable runnable = m_invocation;   // FIXME: atomicRef?
             if (runnable == null) {
-                exportLog.warn("XXX no runnable to invoke, canceling lock");
+                exportLog.warn("XXX No runnable to invoke, canceling lock");
                 cancelLockRequest();
                 return;
             }
@@ -111,9 +109,7 @@ public class ExportCoordinator {
 
         @Override
         public void stateChangeProposed(ByteBuffer newState) {
-            // FIXME: always accept for now
-            // Could implement an evaluation of the proposed state
-            exportLog.info("XXX Accepting state change");
+            // We always accept the proposed state change.
             requestedStateChangeAcceptable(true);
         }
 
@@ -130,7 +126,7 @@ public class ExportCoordinator {
                         exportLog.warn("XXX Rejected change to new leader host: " + newLeaderHostId);
                         return;
                     }
-                    exportLog.info("XXX Host: " + m_hostId + " Accepting new leader host: " + newLeaderHostId);
+                    exportLog.info("XXX Host: " + m_hostId + " accepting new leader host: " + newLeaderHostId);
                     m_leaderHostId = newLeaderHostId;
                 }
             });
@@ -143,7 +139,6 @@ public class ExportCoordinator {
                 throw new IllegalStateException("Reentrant invocation");
             }
             if (requestLock()) {
-                exportLog.info("XXX Got immediate lock, invoke");
                 m_eds.getExecutorService().execute(runnable);
             } else {
                 m_invocation = runnable;
@@ -156,21 +151,20 @@ public class ExportCoordinator {
         }
     }
 
-    public ExportCoordinator(HostMessenger messenger, ExportDataSource eds) {
+    public ExportCoordinator(ZooKeeper zk, Integer hostId, ExportDataSource eds) {
 
-        m_hostId = messenger.getHostId();
+        m_hostId = hostId;
         m_eds = eds;
 
         SynchronizedStatesManager ssm = null;
         ExportCoordinationTask task = null;
         try {
-            ZooKeeper zk = messenger.getZK();
             ZKUtil.addIfMissing(zk, VoltZK.exportCoordination, CreateMode.PERSISTENT, null);
 
             // Set up a SynchronizedStateManager for the topic/partition
             String topicName = eds.getTableName() + "_" + eds.getPartitionId();
             ssm = new SynchronizedStatesManager(
-                    messenger.getZK(),
+                    zk,
                     VoltZK.exportCoordination,
                     topicName,
                     m_hostId.toString(),
@@ -203,7 +197,6 @@ public class ExportCoordinator {
 
             @Override
             public void run() {
-                exportLog.info("XXX propose change to new leader hostId: " + m_hostId);
                 ByteBuffer changeState = ByteBuffer.allocate(4);
                 changeState.putInt(m_hostId);
                 changeState.flip();

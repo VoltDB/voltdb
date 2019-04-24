@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -48,7 +49,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -436,8 +436,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public void setCoordination(HostMessenger messenger) {
-        m_coordinator = new ExportCoordinator(messenger, this);
+    public void setCoordination(ZooKeeper zk, Integer hostId) {
+        m_coordinator = new ExportCoordinator(zk, hostId, this);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {

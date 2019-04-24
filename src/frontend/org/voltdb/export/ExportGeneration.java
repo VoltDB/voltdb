@@ -693,7 +693,7 @@ public class ExportGeneration implements Generation {
             final ExportDataProcessor processor,
             final long genId) throws IOException {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
-        source.setCoordination(m_messenger);
+        source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
         source.setupMigrateRowsDeleter(migrateBatchSize);
@@ -759,7 +759,7 @@ public class ExportGeneration implements Generation {
                                 table.getColumns(),
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
-                        exportDataSource.setCoordination(m_messenger);
+                        exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
                         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
                         exportDataSource.setupMigrateRowsDeleter(migrateBatchSize);
                         if (exportLog.isDebugEnabled()) {
