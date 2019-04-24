@@ -1135,6 +1135,17 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
+    public void updateGenerationId(long genId) {
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    source.updateGenerationId(genId);
+                }
+            }
+        }
+    }
+
     // Naming convention for export pdb file: [table name]_[partition]_[segmentId]_[prevId].pdb,
     private static String getStreamNameFromNonce(String nonce) {
         // it's possible the stream name contains underscore

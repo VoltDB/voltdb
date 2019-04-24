@@ -504,6 +504,11 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         if (!requiresNewExportGeneration) {
+            // Even for catalog update doesn't affect export, genId still need to pass to EDS.
+            // Because each ACK message is associated with a genId.
+            if (m_generation.get() != null) {
+                m_generation.get().updateGenerationId(catalogContext.m_genId);
+            }
             exportLog.info("No stream related changes in update catalog.");
             return;
         }

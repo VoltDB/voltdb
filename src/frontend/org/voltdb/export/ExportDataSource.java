@@ -2204,4 +2204,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     size;
         }
     }
+
+    // This is called when schema update doesn't affect export
+    public void updateGenerationId(long genId) {
+        m_previousGenId = genId;
+    }
 }

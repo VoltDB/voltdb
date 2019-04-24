@@ -44,5 +44,8 @@ public interface Generation {
                                                 boolean isLowestSite);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
+
     public int getCatalogVersion();
-    }
+
+    public void updateGenerationId(long genId);
+}

@@ -142,6 +142,9 @@ public class TestExportDataSource extends TestCase {
         public int getCatalogVersion() {
             return 0;
         }
+
+        public void updateGenerationId(long genId) {
+        }
     }
 
     @Override
