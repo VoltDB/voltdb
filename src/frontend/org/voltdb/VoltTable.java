@@ -723,19 +723,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     @Override
     public final int getColumnIndex(String name) {
 
-        if (m_columnNameIndexMap == null) {
-            m_columnNameIndexMap = new HashMap<String, Integer>(m_colCount);
+        if (m_columnNameIndexMap != null) {
+            Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
+            if (cachedIndex != null) {
+                return cachedIndex;
+            }
+        } else {
+            m_columnNameIndexMap = new HashMap<String,Integer>(m_colCount);
+        }
 
-            for (int i = 0; i < m_colCount; i++) {
-                m_columnNameIndexMap.put(getColumnName(i), Integer.valueOf(i));
+        assert(verifyTableInvariants());
+        for (int i = 0; i < m_colCount; i++) {
+            if (getColumnName(i).equalsIgnoreCase(name)) {
+                m_columnNameIndexMap.put(name.toUpperCase(), Integer.valueOf(i));
+                return i;
             }
         }
-        assert(verifyTableInvariants());
-        Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
-        if (cachedIndex != null) {
-            return cachedIndex;
-        }
-
         String msg = "No Column named '" + name + "'. Existing columns are:";
         for (int i = 0; i < m_colCount; i++) {
             msg += "[" + i + "]" + getColumnName(i) + ",";
