@@ -1879,7 +1879,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
                 String msg = "The host with new partition leader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
                 hostLog.info(msg);
-                initiator.resetMigratePartitionLeaderStatus(newHostId);
             }
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
         }
