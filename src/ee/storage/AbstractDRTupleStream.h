@@ -53,7 +53,7 @@ public:
 
     virtual ~AbstractDRTupleStream() {}
 
-    void pushStreamBuffer(DrStreamBlock *block, bool sync);
+    void pushStreamBuffer(DrStreamBlock *block);
 
     /** truncate stream back to mark (only virtual for Mock override) */
     inline void rollbackDrTo(size_t mark, size_t drRowCost)
