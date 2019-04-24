@@ -48,9 +48,11 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.StreamTableSchemaSerializer;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
@@ -86,8 +88,9 @@ public class TestPersistentBinaryDeque {
         m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
-        m_ds = new StreamTableSchemaSerializer(
-                VoltDB.instance().getCatalogContext(), "TableName");
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get("TableName");
+        m_ds = new StreamTableSchemaSerializer(streamTable, "TableName", catalogContext.m_genId);
         m_pbd = new PersistentBinaryDeque(TEST_NONCE, m_ds, TEST_DIR, logger, true);
     }
 

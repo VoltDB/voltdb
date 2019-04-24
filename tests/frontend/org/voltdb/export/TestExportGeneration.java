@@ -169,7 +169,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
-                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
+                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))), false);
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
@@ -240,8 +240,7 @@ public class TestExportGeneration {
                     1,
                     0L,
                     System.currentTimeMillis(),
-                    foo.duplicate(),
-                    false
+                    foo.duplicate()
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
@@ -272,8 +271,7 @@ public class TestExportGeneration {
                 1,
                 0L,
                 System.currentTimeMillis(),
-                foo.duplicate(),
-                false
+                foo.duplicate()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -324,8 +322,7 @@ public class TestExportGeneration {
                 1,
                 0L,
                 System.currentTimeMillis(),
-                foo.duplicate(),
-                false
+                foo.duplicate()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

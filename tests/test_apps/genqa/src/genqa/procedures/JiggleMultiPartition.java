@@ -24,7 +24,6 @@ package genqa.procedures;
 
 import java.util.Random;
 
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -37,11 +36,11 @@ public class JiggleMultiPartition extends VoltProcedure {
 
     public VoltTable[] run(long rowid, long ignore)
     {
-        @SuppressWarnings("deprecation")
-        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+
+         long txid = getUniqueId();
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = new Random(txid);
+        Random rand = getSeededRandomNumberGenerator();
 
         // Check if the record exists first
         voltQueueSQL(check, rowid);
@@ -54,7 +53,7 @@ public class JiggleMultiPartition extends VoltProcedure {
                 voltQueueSQL(delete, rowid);
             else
             {
-                SampleRecord record = new SampleRecord(rowid, rand);
+                SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               update
                             , record.type_null_tinyint
@@ -84,7 +83,7 @@ public class JiggleMultiPartition extends VoltProcedure {
         else
         {
                 // Insert a new record
-                SampleRecord record = new SampleRecord(rowid, rand);
+                SampleRecord record = new SampleRecord(rowid, rand, getTransactionTime());
                 voltQueueSQL(
                               insert
                             , rowid

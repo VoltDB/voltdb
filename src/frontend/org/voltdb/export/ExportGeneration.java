@@ -142,7 +142,7 @@ public class ExportGeneration implements Generation {
         if (files != null) {
             initializeGenerationFromDisk(connectors, processor, files, localPartitionsToSites, catalogContext.m_genId);
         }
-        initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, localPartitionsToSites);
+        initializeGenerationFromCatalog(catalogContext, connectors, processor, hostId, localPartitionsToSites, false);
     }
 
     /**
@@ -241,7 +241,8 @@ public class ExportGeneration implements Generation {
             final CatalogMap<Connector> connectors,
             final ExportDataProcessor processor,
             int hostId,
-            List<Pair<Integer, Integer>> localPartitionsToSites)
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            boolean isCatalogUpdate)
     {
         // Update catalog version so that datasources use this version when propagating acks
         m_catalogVersion = catalogContext.catalogVersion;
@@ -272,7 +273,7 @@ public class ExportGeneration implements Generation {
         Set<String> exportedTables = new HashSet<>();
         for (Table stream : streams) {
             addDataSources(stream, hostId, localPartitionsToSites, partitionsInUse,
-                    processor, catalogContext.m_genId);
+                    processor, catalogContext.m_genId, isCatalogUpdate);
             exportedTables.add(stream.getTypeName());
             createdSources = true;
         }
@@ -727,7 +728,8 @@ public class ExportGeneration implements Generation {
             List<Pair<Integer, Integer>> localPartitionsToSites,
             Set<Integer> partitionsInUse,
             final ExportDataProcessor processor,
-            final long genId)
+            final long genId,
+            boolean isCatalogUpdate)
     {
         for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
 
@@ -763,7 +765,9 @@ public class ExportGeneration implements Generation {
                                     + " partition " + partition + " site " + siteId);
                         }
                         dataSourcesForPartition.put(key, exportDataSource);
-
+                        if (isCatalogUpdate) {
+                            exportDataSource.updateCatalog(table, genId);
+                        }
                     } else {
                         // Associate any existing EDS to the export client in the new processor
                         ExportDataSource eds = dataSourcesForPartition.get(key);
@@ -781,6 +785,9 @@ public class ExportGeneration implements Generation {
 
                         // Mark in catalog only if partition is in use
                         eds.markInCatalog(partitionsInUse.contains(partition));
+                        if (isCatalogUpdate) {
+                            eds.updateCatalog(table, genId);
+                        }
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB(
@@ -874,7 +881,7 @@ public class ExportGeneration implements Generation {
     @Override
     public void pushExportBuffer(int partitionId, String tableName,
             long startSequenceNumber, long committedSequenceNumber,
-            int tupleCount, long uniqueId, long genId, ByteBuffer buffer, boolean sync) {
+            int tupleCount, long uniqueId, long genId, ByteBuffer buffer) {
 
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
@@ -895,7 +902,7 @@ public class ExportGeneration implements Generation {
              */
             exportLog.info("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
-                    + "seq: " + startSequenceNumber + ", count: " + tupleCount + ", sync:" + sync
+                    + "seq: " + startSequenceNumber + ", count: " + tupleCount
                     + ") is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
@@ -904,7 +911,7 @@ public class ExportGeneration implements Generation {
         }
 
         source.pushExportBuffer(startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, genId, buffer, sync);
+                tupleCount, uniqueId, genId, buffer);
     }
 
     private void cleanup() {
@@ -976,12 +983,12 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    public void sync(final boolean nofsync) {
+    public void sync() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : dataSources.values()) {
-                    ListenableFuture<?> syncFuture = source.sync(nofsync);
+                    ListenableFuture<?> syncFuture = source.sync();
                     if (syncFuture != null)
                         tasks.add(syncFuture);
                 }
@@ -1123,6 +1130,17 @@ public class ExportGeneration implements Generation {
                     if (eds.processStreamControl(operation)) {
                         results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
                     }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void updateGenerationId(long genId) {
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    source.updateGenerationId(genId);
                 }
             }
         }
