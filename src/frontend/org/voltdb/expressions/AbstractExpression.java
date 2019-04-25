@@ -1334,7 +1334,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
             return false;
         } else if (hasUserDefinedFunctionExpression()) {
-            msg.append("cannot contain calls to user defined functions.");
+            assert false; // cannot reach here
             return false;
         } else {
             return true;

@@ -439,7 +439,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
     @Test
     public void testENG15213() throws Exception {
         final VoltDB.Configuration config = new VoltDB.Configuration();
-        final String ddl = "CREATE TABLE P5 (i INTEGER, j FLOAT);";
+        final String ddl = "CREATE TABLE P5 (i INTEGER, j FLOAT, ts timestamp);";
         try {
             createSchema(config, ddl, 2, 1, 0);
             startSystem(config);
@@ -450,13 +450,20 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                     Pair.of("CREATE INDEX PI4 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with columns and unsafe predicate on empty table: passes
                     Pair.of("CREATE INDEX PI5 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", true), // partial index with unsafe expression and unsafe predicate on empty table: passes
                     Pair.of("DROP INDEX PI2; DROP INDEX PI4; DROP INDEX PI5", true),        // clean up indexes with unsafe operations
-                    Pair.of("INSERT INTO P5 values(0, 0);", true),                          // Table has rows: passes
+                    // ENG-15786
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE 'ABC' > STR(i, i);", false),   // STR function is invalid in expressions for indexes
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE ts > CURRENT_TIMESTAMP;", false), // CURRENT_TIMESTAMP function is invalid in expressions for indexes
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE ts < NOW;", false), // NOW function is invalid in expressions for indexes
+                    Pair.of("INSERT INTO P5 values(0, 0, NOW);", true),                          // Table has rows: passes
                     Pair.of("CREATE INDEX PI11 ON P5(i, j);", true),                        // normal index on columns only: passes
                     Pair.of("CREATE INDEX PI31 ON P5(i) WHERE j > 0;", true),               // partial index with columns and safe predicate on non-empty table: passes
                     Pair.of("CREATE INDEX PI21 ON P5(i, LOG10(j));", false),                 // normal index with unsafe expression on non-empty table: rejected
                     Pair.of("CREATE INDEX PI41 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", false),// partial index with columns and unsafe predicate on non-empty table: rejected
                     Pair.of("CREATE INDEX PI51 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", false),  // partial index with unsafe expression and unsafe predicate on non-empty table: rejected
-                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE 'ABC' > STR(i, i);", false))   // STR function is invalid in expressions for indexes
+                    // ENG-15786
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE 'ABC' > STR(i, i);", false),   // STR function is invalid in expressions for indexes
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE ts > CURRENT_TIMESTAMP;", false), // CURRENT_TIMESTAMP function is invalid in expressions for indexes
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE ts < NOW;", false)) // NOW function is invalid in expressions for indexes)
                     .forEachOrdered(stmtAndShouldPass -> {
                         final String stmt = stmtAndShouldPass.getFirst();
                         final boolean shouldPass = stmtAndShouldPass.getSecond();
