@@ -60,6 +60,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
@@ -623,10 +624,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
 
         // Don't try to go through agreement process for a rejoining node.
-        if (VoltDB.instance().rejoining()) {
-            VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
-                    "As a result, the rejoin operation has been canceled. Please try again.");
-        }
+        // Check out if the current host is rejoining, if so shut itself down.
+        m_failedHostsCallback.disconnect(null);
 
         Set<Long> unknownFaultedHosts = new TreeSet<>();
 
