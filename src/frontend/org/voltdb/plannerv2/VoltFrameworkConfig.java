@@ -38,6 +38,7 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParser.Config;
 import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
 import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -121,7 +122,9 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     @Override public SqlOperatorTable getOperatorTable() {
-        return SqlStdOperatorTable.instance();
+        // use m_catalogReader+SqlStdOperatorTable instead of SqlStdOperatorTable.instance,
+        // otherwise the operators/functions we added cannot be found
+        return ChainedSqlOperatorTable.of(SqlStdOperatorTable.instance(), getCatalogReader());
     }
 
     @Override public RelOptCostFactory getCostFactory() {

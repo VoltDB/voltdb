@@ -19,7 +19,9 @@ package org.voltdb.plannerv2;
 
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.voltdb.catalog.Database;
+import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
@@ -50,8 +52,13 @@ public class VoltSchemaPlus {
         // Get all tables from the database and add them to the SchemaPlus.
         db.getTables().forEach(table -> {
             schema.add(table.getTypeName(), new VoltTable(table));
-            // TODO: Get all functions, etc. from database
         });
+
+        // add Volt extend SQL functions to the SchemaPlus
+        VoltSqlFunctions.VOLT_SQL_FUNCTIONS.forEach(functionPair -> {
+            schema.add(functionPair.getFirst().toUpperCase(), ScalarFunctionImpl.create(functionPair.getSecond(),"eval"));
+        });
+
         return schema;
     }
 }

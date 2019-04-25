@@ -435,6 +435,12 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         comparePlans("select i from R1 where i=? limit ?");
     }
 
+    public void testVoltFunction() {
+        comparePlans("select i from R1 where not migrating");
+
+        comparePlans("select * from R1 where not migrating() and i > 3");
+    }
+
     // TODO: tests on index table scan
     // TODO: tests on Aggr
     // TODO: tests on Join
