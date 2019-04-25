@@ -55,7 +55,6 @@ import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannerv2.ColumnTypes;
-import org.voltdb.plannerv2.ParameterizationVisitor;
 import org.voltdb.plannerv2.ParameterizedSqlTask;
 import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltPlanner;
@@ -328,14 +327,14 @@ public class PlannerTool {
 
             // check L2 cache is hit or miss
             AdHocPlannedStatement ahps = null;
-            ParameterizedSqlTask ptask;
-            ptask = new ParameterizedSqlTask(task);
-            final CorePlan corePlan = m_calciteCache.getWithParsedQuery(ptask.getParsedQuery());
+            ParameterizedSqlTask ptask = new ParameterizedSqlTask(task);
+            String parameterizedQuery = ptask.getParsedQuery().toString();
+            final CorePlan corePlan = m_calciteCache.getWithParsedQuery(parameterizedQuery);
             if (corePlan != null) {
-                ParameterizationVisitor visitor = new ParameterizationVisitor();
-                ptask.getParsedQuery().accept(visitor);
                 ahps = new AdHocPlannedStatement(ptask.getSQL().getBytes(Constants.UTF8ENCODING),
-                    corePlan, ParameterSet.fromArrayNoCopy(ptask.getSqlLiteralList()), null);
+                                                 corePlan,
+                                                 ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
+                                                 null);
             } else {
                 //////////////////////
                 // PLAN THE STMT
@@ -344,21 +343,11 @@ public class PlannerTool {
                 plan.sql = ptask.getParsedQuery().toString();
                 CorePlan core = new CorePlan(plan, m_catalogHash);
                 //throw new PlannerFallbackException();
-                Object[] params = new Object[ptask.getSqlLiteralList().size()];
-                int i = 0;
-                // convert calcite literal to volt parameter
-                for (Object obj: ptask.getSqlLiteralList()) {
-                    SqlLiteral lit = (SqlLiteral) obj;
-                    SqlTypeName typeName = lit.getTypeName();
-                    VoltType type = ColumnTypes.getVoltType(typeName);
-                    String val = lit.toValue();
-                    params[i++] = ParameterizationInfo.valueForStringWithType(val, type);
-                }
                 ahps = new AdHocPlannedStatement(plan.sql.getBytes(Constants.UTF8ENCODING),
                                                  core,
-                                                 ParameterSet.fromArrayNoCopy(params),
+                                                 ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
                                                  null);
-                m_calciteCache.put(task, ptask.getParsedQuery(), ahps, null, false, false);
+                m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
             }
             return ahps;
         } finally {
@@ -366,6 +355,20 @@ public class PlannerTool {
                 m_plannerStats.endStatsCollection(m_calciteCache.getLiteralCacheSize(), m_calciteCache.getCoreCacheSize(), cacheUse, -1);
             }
         }
+    }
+
+    private Object[] generateVoltParams(ParameterizedSqlTask ptask) {
+        Object[] params = new Object[ptask.getSqlLiteralList().size()];
+        int i = 0;
+        // convert calcite literal to volt parameter
+        for (Object obj: ptask.getSqlLiteralList()) {
+            SqlLiteral lit = (SqlLiteral) obj;
+            SqlTypeName typeName = lit.getTypeName();
+            VoltType type = ColumnTypes.getVoltType(typeName);
+            String val = lit.toValue();
+            params[i++] = ParameterizationInfo.valueForStringWithType(val, type);
+        }
+        return params;
     }
 
     public synchronized AdHocPlannedStatement planSqlHsql(String sql, StatementPartitioning partitioning,

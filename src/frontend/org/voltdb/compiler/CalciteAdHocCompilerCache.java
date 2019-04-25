@@ -23,10 +23,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import org.apache.calcite.sql.SqlNode;
 import org.voltdb.planner.CorePlan;
-import org.voltdb.plannerv2.ParameterizedSqlTask;
-import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.cache.Cache;
@@ -88,7 +85,7 @@ public class CalciteAdHocCompilerCache implements Serializable {
     /** cache of parameterized plan descriptions to one or more core parameterized plans,
      *  each plan optionally has its own requirements for which parameters need to be bound
      *  to what values to enable its specialized (expression-indexed) plan. */
-    final Map<SqlNode, CorePlan> m_coreCache;
+    final Map<String, CorePlan> m_coreCache;
 
     // placeholder stats used during development that may/may not survive
     long m_literalHits = 0;
@@ -124,12 +121,12 @@ public class CalciteAdHocCompilerCache implements Serializable {
 
         // an LRU cache map which contains many caches
         // TODO change the key type to SqlNode???
-        m_coreCache = new LinkedHashMap<SqlNode, CorePlan>(MAX_CORE_ENTRIES * 2, .75f, true) {
+        m_coreCache = new LinkedHashMap<String, CorePlan>(MAX_CORE_ENTRIES * 2, .75f, true) {
             private static final long serialVersionUID = 1L;
 
             // This method is called just after a new entry has been added
             @Override
-            public boolean removeEldestEntry(Map.Entry<SqlNode, CorePlan> eldest) {
+            public boolean removeEldestEntry(Map.Entry<String, CorePlan> eldest) {
                 if (size() > MAX_CORE_ENTRIES) {
                     ++m_planEvictions;
                     return true;
@@ -243,7 +240,7 @@ public class CalciteAdHocCompilerCache implements Serializable {
      * SQL statement
      * @return A list of CorePlan that needs parameter values to run.
      */
-    public synchronized CorePlan getWithParsedQuery(SqlNode parsedQuery) {
+    public synchronized CorePlan getWithParsedQuery(String parsedQuery) {
         ++m_planQueries;
         CorePlan retval = m_coreCache.get(parsedQuery);
         if (retval != null) {
@@ -270,14 +267,14 @@ public class CalciteAdHocCompilerCache implements Serializable {
      * @param hasUserQuestionMarkParameters is user provided parameterized query
      * @param hasAutoParameterizedException is the auto parameterized query has parameter exception
      */
-    public synchronized void put(SqlTask task,
-                                 SqlNode parsedQuery,
+    public synchronized void put(String originalQuery,
+                                 String parsedQuery,
                                  AdHocPlannedStatement planIn,
                                  String[] extractedLiterals,
                                  boolean hasUserQuestionMarkParameters,
                                  boolean hasAutoParameterizedException)
     {
-        assert(task.getSQL() != null);
+        assert(originalQuery != null);
         assert(parsedQuery != null);
         assert(planIn != null);
         AdHocPlannedStatement plan = planIn;
@@ -297,8 +294,7 @@ public class CalciteAdHocCompilerCache implements Serializable {
 
             if (corePlan == null) {
                 corePlan = planIn.core;
-                ParameterizedSqlTask ptask = new ParameterizedSqlTask(task);
-                m_coreCache.put(ptask.getParsedQuery(), corePlan);
+                m_coreCache.put(parsedQuery, corePlan);
                 // Note that there is an edge case in which more than one plan is getting counted as one
                 // "plan insertion". This only happens when two different plans arose from the same parameterized
                 // query (token) because one invocation used the correct constants to trigger an expression index and
@@ -311,10 +307,10 @@ public class CalciteAdHocCompilerCache implements Serializable {
 
         // then deal with the L1 cache
         if (! hasUserQuestionMarkParameters) {
-            AdHocPlannedStatement cachedPlan = m_literalCache.get(task.getSQL());
+            AdHocPlannedStatement cachedPlan = m_literalCache.get(originalQuery);
             if (cachedPlan == null) {
                 //* enable to debug */ System.out.println("DEBUG: Caching literal '" + sql + "'");
-                m_literalCache.put(task.getSQL(), plan);
+                m_literalCache.put(originalQuery, plan);
                 ++m_literalInsertions;
             }
             else {
