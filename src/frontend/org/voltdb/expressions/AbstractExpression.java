@@ -1317,7 +1317,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 msg.append("cannot include the function STR.");
                 return false;
             } else {
-                msg.append("cannot include invalid function.");
+                assert false; // cannot reach here
                 return false;
             }
         } else if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
@@ -1334,7 +1334,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
             return false;
         } else if (hasUserDefinedFunctionExpression()) {
-            assert false; // cannot reach here
+            msg.append("cannot contain calls to user defined functions.");
             return false;
         } else {
             return true;
@@ -1445,10 +1445,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return If found, return the functionId. Otherwise, return -1
      */
     private int containsFunctionByIds(Set<Integer> functionIds) {
-        if (this instanceof AbstractValueExpression) {
-            return -1;
-        }
-
         List<AbstractExpression> functionsList = findAllFunctionSubexpressions();
         for (AbstractExpression funcExpr : functionsList) {
             assert (funcExpr instanceof FunctionExpression);
