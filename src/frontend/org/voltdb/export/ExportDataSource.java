@@ -2071,6 +2071,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
         m_es.execute(new Runnable() {
+            @Override
             public void run() {
                 if (m_previousGenId < genId) {
                     // This serializer is used to write stream schema to pbd
@@ -2219,5 +2220,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // This is called when schema update doesn't affect export
     public void updateGenerationId(long genId) {
         m_previousGenId = genId;
+    }
+
+    // Called from {@code ExportCoordinator}, returns duplicate of tracker
+    ExportSequenceNumberTracker getTracker() {
+        ExportSequenceNumberTracker tracker = m_gapTracker.duplicate();
+        return tracker;
     }
 }

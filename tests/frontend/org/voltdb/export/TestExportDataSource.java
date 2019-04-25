@@ -142,6 +142,7 @@ public class TestExportDataSource extends TestCase {
             return 0;
         }
 
+        @Override
         public void updateGenerationId(long genId) {
         }
     }
@@ -658,16 +659,16 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, 0, foo, false);
+            s.pushExportBuffer(1, 1, 1, 0, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, 0, foo, false);
+            s.pushExportBuffer(2, 2, 1, 0, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, 0, foo, false);
+            s.pushExportBuffer(3, 3, 1, 0, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(4, 4, 1, 0, 0, foo, false);
+            s.pushExportBuffer(4, 4, 1, 0, 0, foo);
 
             // Poll the 2 first buffers
             AckingContainer cont = s.poll(false).get();
