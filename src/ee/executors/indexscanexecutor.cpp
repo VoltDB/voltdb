@@ -165,8 +165,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-            searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
+    // TODO
+    //assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+    //        searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
