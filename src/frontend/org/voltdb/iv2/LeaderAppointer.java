@@ -51,6 +51,7 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -589,10 +590,13 @@ public class LeaderAppointer implements Promotable
                 List<String> replicas = partition.getReplicas();
 
                 if (replicas.isEmpty()) {
-                    if (partitionNotOnHashRing && VoltDB.instance().getElasticService().canRemovePartitions()) {
-                        // no replica for the new partition, clean it up
-                        removeAndCleanupPartition(pid);
-                        continue;
+                    if (partitionNotOnHashRing) {
+                        ElasticService elasticService = VoltDB.instance().getElasticService();
+                        if (elasticService == null || elasticService.canRemovePartitions()) {
+                            // no replica for the new partition, clean it up
+                            removeAndCleanupPartition(pid);
+                            continue;
+                        }
                     }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
@@ -601,8 +605,6 @@ public class LeaderAppointer implements Promotable
                     // The replicas may still be in the process of adding themselves to the dir.
                     continue;
                 }
-
-                assert(!partitionNotOnHashRing);
 
                 //if a partition is on hash ring, go through its partition leader assignment.
                 //masters cache is not empty only on the appointer with master LeaderCache started.
