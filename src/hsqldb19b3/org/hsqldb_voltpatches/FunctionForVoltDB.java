@@ -157,7 +157,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
 
         static final int FUNC_VOLT_ROUND                  = 20042;
-        static final int FUNC_VOLT_STR                    = 20043;
+        public static final int FUNC_VOLT_STR             = 20043;
 
         // our local functions for networking
         static final int FUNC_VOLT_INET_NTOA                   = 20044;

@@ -106,6 +106,10 @@ public class FunctionExpression extends AbstractExpression {
 
     public boolean hasFunctionId(int functionId) { return m_functionId == functionId; }
 
+    public int getFunctionId() {
+        return m_functionId;
+    }
+
     public void setResultTypeParameterIndex(int resultTypeParameterIndex) {
         m_resultTypeParameterIndex = resultTypeParameterIndex;
     }

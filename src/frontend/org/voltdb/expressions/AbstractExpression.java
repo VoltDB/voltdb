@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -72,6 +74,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * aggregate function applied to a floating point expression.
      */
     private String m_contentDeterminismMessage = null;
+
+    // a set of blacklist which contains the functions that is disallow for Indexes and MVs.
+    private static final ImmutableSet<Integer> INVALID_FUNCTIONS_FOR_IDXS_AND_MVS =
+            ImmutableSet.of(
+                    FunctionSQL.voltGetCurrentTimestampId(),
+                    FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_STR);
 
     /**
      * Note that this expression is inherently non-deterministic. This may be
@@ -1299,9 +1307,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return true iff the expression can be part of an index.
      */
     public boolean isValidExprForIndexesAndMVs(StringBuffer msg, boolean isMV) {
-        if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
-            msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
-            return false;
+        // check if there is any invalid function.
+        final int invalidFunctionId = containsFunctionByIds(INVALID_FUNCTIONS_FOR_IDXS_AND_MVS);
+        if (invalidFunctionId != -1) {
+            if (invalidFunctionId == FunctionSQL.voltGetCurrentTimestampId()) {
+                msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
+                return false;
+            } else if (invalidFunctionId == FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_STR) {
+                msg.append("cannot include the function STR.");
+                return false;
+            } else {
+                msg.append("cannot include invalid function.");
+                return false;
+            }
         } else if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
             msg.append("cannot contain aggregate expressions.");
             return false;
@@ -1418,6 +1436,27 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return false;
+    }
+
+    /**
+     * This function will recursively find any function expression with any ID in the functionIds.
+     * If found, return the functionId. Otherwise, return -1.
+     * @param functionIds
+     * @return If found, return the functionId. Otherwise, return -1
+     */
+    private int containsFunctionByIds(Set<Integer> functionIds) {
+        if (this instanceof AbstractValueExpression) {
+            return -1;
+        }
+
+        List<AbstractExpression> functionsList = findAllFunctionSubexpressions();
+        for (AbstractExpression funcExpr : functionsList) {
+            assert (funcExpr instanceof FunctionExpression);
+            if (functionIds.contains(((FunctionExpression) funcExpr).getFunctionId())) {
+                return ((FunctionExpression) funcExpr).getFunctionId();
+            }
+        }
+        return -1;
     }
 
     private List<AbstractExpression> findAllFunctionSubexpressions() {

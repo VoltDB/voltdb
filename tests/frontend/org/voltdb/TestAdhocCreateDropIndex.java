@@ -455,7 +455,8 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                     Pair.of("CREATE INDEX PI31 ON P5(i) WHERE j > 0;", true),               // partial index with columns and safe predicate on non-empty table: passes
                     Pair.of("CREATE INDEX PI21 ON P5(i, LOG10(j));", false),                 // normal index with unsafe expression on non-empty table: rejected
                     Pair.of("CREATE INDEX PI41 ON P5(i) WHERE LOG(j) > 1 OR j <= 0;", false),// partial index with columns and unsafe predicate on non-empty table: rejected
-                    Pair.of("CREATE INDEX PI51 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", false))  // partial index with unsafe expression and unsafe predicate on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI51 ON P5(LOG(i)) WHERE LOG(j) > 1 OR j <= 0;", false),  // partial index with unsafe expression and unsafe predicate on non-empty table: rejected
+                    Pair.of("CREATE INDEX PI6 ON P5(i) WHERE 'ABC' > STR(i, i);", false))   // STR function is invalid in expressions for indexes
                     .forEachOrdered(stmtAndShouldPass -> {
                         final String stmt = stmtAndShouldPass.getFirst();
                         final boolean shouldPass = stmtAndShouldPass.getSecond();
