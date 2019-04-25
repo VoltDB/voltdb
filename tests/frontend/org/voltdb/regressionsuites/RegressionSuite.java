@@ -540,7 +540,7 @@ public class RegressionSuite extends TestCase {
     }
 
     static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());

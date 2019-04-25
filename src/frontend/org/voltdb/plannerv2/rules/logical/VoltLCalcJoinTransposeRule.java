@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableList;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.types.JoinType;
 
 /**
  * Planner rule that pushes a {@link org.voltdb.plannerv2.rel.logical.VoltLogicalCalc}
@@ -81,8 +82,8 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         final Calc origCalc = call.rel(0);
         final Join join = call.rel(1);
 
-        if (join instanceof SemiJoin) {
-            return; // TODO: support SemiJoin
+        if (join.getJoinType() != JoinRelType.INNER || join instanceof SemiJoin) {
+            return; // TODO: support SemiJoin; other types of join
         }
         // Split project (left) and filter (right) expressions
         final Pair<ImmutableList<RexNode>, ImmutableList<RexNode>> projectFilter =

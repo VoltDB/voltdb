@@ -28,6 +28,7 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.types.JoinType;
@@ -72,7 +73,9 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
         final NestLoopPlanNode nlpn = new NestLoopPlanNode();
 
         // TODO: INNER join for now
-        assert(joinType == JoinRelType.INNER);
+        if (joinType != JoinRelType.INNER) {
+            throw new PlannerFallbackException("Unsupported join type: " + joinType.name());
+        }
         nlpn.setJoinType(JoinType.INNER);
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));

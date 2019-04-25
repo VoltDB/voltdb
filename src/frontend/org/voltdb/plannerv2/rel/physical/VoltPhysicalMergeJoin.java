@@ -34,6 +34,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.MergeJoinPlanNode;
 import org.voltdb.types.JoinType;
@@ -109,7 +110,9 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         // @TODO MergeJoinPlanNode
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
         // TODO: INNER join for now
-        assert(joinType == JoinRelType.INNER);
+        if (joinType != JoinRelType.INNER) {
+            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
+        }
         mjpn.setJoinType(JoinType.INNER);
         mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));

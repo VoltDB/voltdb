@@ -30,6 +30,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
@@ -77,7 +78,9 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         final NestLoopIndexPlanNode nlipn = new NestLoopIndexPlanNode();
 
         // TODO: INNER join for now
-        assert(joinType == JoinRelType.INNER);
+        if (joinType != JoinRelType.INNER) {
+            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
+        }
         nlipn.setJoinType(JoinType.INNER);
 
         // Set children
