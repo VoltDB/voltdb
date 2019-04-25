@@ -102,7 +102,7 @@ AS
 ----, type_not_null_polygon     GEOGRAPHY       NOT NULL
 --);
 
-CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
+--CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
 --(
 --  txnid                     BIGINT          NOT NULL
 --, rowid                     BIGINT          NOT NULL
