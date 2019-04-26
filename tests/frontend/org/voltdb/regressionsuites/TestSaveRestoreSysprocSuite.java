@@ -56,6 +56,7 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.FlakyTestRule;
 import org.voltdb.FlakyTestRule.Flaky;
@@ -1393,19 +1394,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertEquals(0, proc.waitFor());
         validateSnapshot(true, false, TESTNONCE);
 
-        byte firstStringBytes[] = new byte[1048576];
-        java.util.Arrays.fill(firstStringBytes, (byte)'c');
-        byte secondStringBytes[] = new byte[1048564];
-        java.util.Arrays.fill(secondStringBytes, (byte)'a');
-
         try {
             client.callProcedure("@SnapshotRestore", TMPDIR + "x", TESTNONCE);
-        } catch(Exception ex) {
-            System.err.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Output path for Json duplicatesPath"));
-            assertTrue(ex.getMessage().contains("does not exist") || ex.getMessage().contains("is not executable"));
+        } catch (ProcCallException ex) {
+            System.err.println(((ClientResponseImpl) ex.getClientResponse()).toJSONString());
+            assertEquals("Restore failed to complete. See response table for additional info.", ex.getMessage());
+            VoltTable table = ex.getClientResponse().getResults()[0];
+            String tableString = table.toString();
+            assertTrue(tableString, table.advanceRow());
+            assertTrue(tableString, table.getString(1).contains("No snapshot related digests files found"));
+            assertTrue(tableString, table.advanceRow());
+            assertTrue(tableString, table.getString(1).contains("does not exist"));
         }
-
     }
 
     @Test
