@@ -182,6 +182,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
     private MigrateRowsDeleter m_migrateRowsDeleter;
 
+    // Export coordinator manages Export Mastership and gap correction.
     private ExportCoordinator m_coordinator;
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
@@ -436,6 +437,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tableName + " partition " + m_partitionId, 1);
     }
 
+    /**
+     * Set the {@code ExportCoordinator} - we expect this just after the constructor.
+     *
+     * FIXME: put in constructor? But adds 2 additional params
+     *
+     * @param zk
+     * @param hostId
+     */
     public void setCoordination(ZooKeeper zk, Integer hostId) {
         m_coordinator = new ExportCoordinator(zk, hostId, this);
     }
@@ -957,7 +966,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
-                } catch(IOException e) {
+                    m_coordinator.shutdown();
+
+                } catch(Exception e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
                     m_es.shutdown();
@@ -974,7 +985,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     m_committedBuffers.close();
                     m_ackMailboxRefs.set(null);
-                } catch (IOException e) {
+                    m_coordinator.shutdown();
+
+                } catch (Exception e) {
                     exportLog.error(e.getMessage(), e);
                 } finally {
                     m_es.shutdown();
