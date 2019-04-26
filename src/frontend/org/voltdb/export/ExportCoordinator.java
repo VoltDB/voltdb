@@ -333,6 +333,11 @@ public class ExportCoordinator {
                         normalizeTrackers();
                         dumpTrackers();
 
+                        // JUnit test synchronization
+                        if (m_testReady != null) {
+                            m_testReady.set(true);
+                        }
+
                         m_eds.resumePolling();
 
                     } catch (Exception e) {
@@ -418,7 +423,6 @@ public class ExportCoordinator {
     private final SynchronizedStatesManager m_ssm;
     private final ExportCoordinationTask m_task;
 
-
     private Integer m_leaderHostId = NO_HOST_ID;
     private static final int NO_HOST_ID =  Integer.MIN_VALUE;
 
@@ -430,6 +434,9 @@ public class ExportCoordinator {
 
     private boolean m_isMaster = false;
     private long m_safePoint = 0L;
+
+    // For JUnit test support
+    private AtomicBoolean m_testReady;
 
     private void resetCoordinator(boolean resetLeader, boolean resetTrackers) {
         if (resetLeader) {
@@ -445,6 +452,17 @@ public class ExportCoordinator {
     private void resetSafePoint() {
         m_isMaster = false;
         m_safePoint = 0L;
+    }
+
+    // This constructor only for JUnit tests
+    ExportCoordinator(ZooKeeper zk, String rootPath, Integer hostId, ExportDataSource eds, boolean setTestReady) {
+        this(zk, rootPath, hostId, eds);
+        m_testReady = new AtomicBoolean(false);
+    }
+
+    // This method only for JUnit tests
+    boolean isTestReady() {
+        return m_testReady != null && m_testReady.get();
     }
 
     public ExportCoordinator(ZooKeeper zk, String rootPath, Integer hostId, ExportDataSource eds) {
@@ -562,15 +580,15 @@ public class ExportCoordinator {
         }
 
         // First reset the safe point if we're polling past it
-        if (isSafePoint(exportSeqNo)) {
+        if (isSafePoint(exportSeqNo - 1)) {
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Polling passed safe point at " + exportSeqNo);
+                exportLog.debug("Polling passed safe point at " + (exportSeqNo - 1));
             }
         }
 
         // If we're beneath the safe point return the current mastership
         if (m_safePoint > 0L) {
-            assert(exportSeqNo < m_safePoint);
+            assert(exportSeqNo <= m_safePoint);
             return m_isMaster;
         }
 
@@ -585,14 +603,18 @@ public class ExportCoordinator {
             return false;
         }
 
+        // Note: the trackers are truncated so the seqNo should not be past the first gap
         Pair<Long, Long> gap = leaderTracker.getFirstGap();
-        if (gap == null || exportSeqNo < gap.getFirst() || gap.getSecond() < exportSeqNo) {
+        if (gap != null) {
+            assert (exportSeqNo <= gap.getSecond());
+        }
+        if (gap == null || exportSeqNo < (gap.getFirst() - 1)) {
 
             m_isMaster = isLeader();
             if (gap == null) {
                 m_safePoint = INFINITE_SEQNO;
             } else {
-                m_safePoint = gap.getFirst();
+                m_safePoint = gap.getFirst() - 1;
             }
 
             if (exportLog.isDebugEnabled()) {
@@ -604,12 +626,13 @@ public class ExportCoordinator {
         // Return the lowest hostId that can fill the gap
         assert (gap != null);
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Leader host " + m_leaderHostId + " hits gap [" + gap.getFirst()
-                + ", " + gap.getSecond() + "], look for candidate replicas");
+            exportLog.debug("Leader host " + m_leaderHostId + " at seqNo " + exportSeqNo
+                    + ", hits gap [" + gap.getFirst() + ", " + gap.getSecond()
+                    + "], look for candidate replicas");
         }
 
         Integer replicaId = Integer.MIN_VALUE;
-        long leaderSafePoint = gap.getSecond();
+        long leaderNextSafePoint = gap.getSecond() + 1;
         long  replicaSafePoint = 0L;
 
         for (Integer hostId : m_trackers.keySet()) {
@@ -618,12 +641,15 @@ public class ExportCoordinator {
                 continue;
             }
             Pair<Long, Long> rgap = m_trackers.get(hostId).getFirstGap();
-            if (rgap == null || exportSeqNo < rgap.getFirst() || rgap.getSecond() < exportSeqNo) {
+            if (rgap != null) {
+                assert (exportSeqNo <= rgap.getSecond());
+            }
+            if (rgap == null || exportSeqNo < (rgap.getFirst() - 1)) {
                 replicaId = hostId;
                 if (rgap == null) {
                     replicaSafePoint = INFINITE_SEQNO;
                 } else {
-                    replicaSafePoint = rgap.getFirst();
+                    replicaSafePoint = rgap.getSecond() + 1;
                 }
                 break;
             }
@@ -631,7 +657,7 @@ public class ExportCoordinator {
 
         if (!replicaId.equals(NO_HOST_ID)) {
             m_isMaster = m_hostId.equals(replicaId);
-            m_safePoint = Math.min(leaderSafePoint, replicaSafePoint);
+            m_safePoint = Math.min(leaderNextSafePoint, replicaSafePoint);
             exportLog.debug("Replica host " + replicaId + " fills gap [" + gap.getFirst()
             + ", " + gap.getSecond() + "], until safe point " + m_safePoint);
             return m_isMaster;
@@ -689,7 +715,7 @@ public class ExportCoordinator {
             if (tracker.isEmpty()) {
                 tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
-                tracker.append(highestSeqNo, INFINITE_SEQNO);
+                tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
             }
         }
     }

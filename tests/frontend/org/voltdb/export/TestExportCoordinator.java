@@ -23,6 +23,7 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
@@ -43,6 +44,13 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 /**
  * @author rdykiel
  *
+ * Test {@code ExportCoordinator} using a mocked {@code ExportDataSource}.
+ *
+ * NOTE: the JUnit test cases violate the contract that requires only invoking
+ * the public methods of an ExportCoordinator through an ExportDataSource runnable.
+ * Therefore the test cases rely on a special synchronization mechanism ensuring that
+ * the exchange of tracker information has been completed before starting invoking the
+ * public methods. Also these tests don't exercise membership changes.
  */
 public class TestExportCoordinator extends ZKTestBase {
 
@@ -78,10 +86,12 @@ public class TestExportCoordinator extends ZKTestBase {
         ZKUtil.addIfMissing(zk, "/test/db", CreateMode.PERSISTENT, null);
         ZKUtil.addIfMissing(zk, stateMachineManagerRoot, CreateMode.PERSISTENT, null);
 
+        /*
         eds0 = mockDataSource(0, tracker0);
         eds1 = mockDataSource(0, tracker1);
         eds2 = mockDataSource(0, tracker2);
         eds3 = mockDataSource(0, tracker3);
+        */
     }
 
     private ExportDataSource mockDataSource(
@@ -119,30 +129,32 @@ public class TestExportCoordinator extends ZKTestBase {
     }
 
     @Test
-    public void testSingleNodeNoGaps() throws InterruptedException {
+    public void testSingleNodeNoGaps() {
 
         try {
             tracker0.truncateAfter(0L);
             tracker0.append(1L, 100L);
+            eds0 = mockDataSource(0, tracker0);
 
+            // Note: use the special constructor for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
                     m_messengers.get(0).getZK(),
                     stateMachineManagerRoot,
                     0,
-                    eds0);
+                    eds0,
+                    true);
 
             ec0.becomeLeader();
-            while(!ec0.isLeader()) {
+            while(!ec0.isTestReady()) {
                 Thread.yield();
             }
 
-            // Wait for the mastership to be resolved
-            while(!ec0.isExportMaster(1L)) {
-                Thread.yield();
-            }
+            // Check leadership
+            assertTrue(ec0.isLeader());
 
             // Check the leader is export master forever even
             // past the initial tracker info
+            assertTrue(ec0.isExportMaster(1L));
             assertTrue(ec0.isExportMaster(10L));
             assertTrue(ec0.isExportMaster(100L));
             assertTrue(ec0.isExportMaster(101L));
@@ -155,4 +167,107 @@ public class TestExportCoordinator extends ZKTestBase {
         }
     }
 
+    @Test
+    public void testSingleNodeWithGap() {
+
+        try {
+            tracker0.truncateAfter(0L);
+            tracker0.append(1L, 100L);
+            tracker0.append(200L, 300L);
+            eds0 = mockDataSource(0, tracker0);
+
+            // Note: use the special constructor for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isLeader());
+
+            // Check the leader is always export master since we have no replica
+            // (EDS trying to poll would become BLOCKED)
+            assertTrue(ec0.isExportMaster(1L));
+            assertTrue(ec0.isExportMaster(10L));
+            assertTrue(ec0.isExportMaster(100L));
+            assertTrue(ec0.isExportMaster(101L));
+            assertTrue(ec0.isExportMaster(200L));
+            assertTrue(ec0.isExportMaster(300L));
+            assertTrue(ec0.isExportMaster(301L));
+            assertTrue(ec0.isExportMaster(1000L));
+
+            ec0.shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    @Test
+    public void test2NodesWithGap() {
+
+        try {
+            tracker0.truncateAfter(0L);
+            tracker0.append(1L, 100L);
+            tracker0.append(200L, 300L);
+            eds0 = mockDataSource(0, tracker0);
+
+            tracker1.truncateAfter(0L);
+            tracker1.append(1L, 300L);
+            eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isLeader());
+
+            // Check the leader is export master up to the gap
+            // and verify replica becomes master, then leader
+            // gets mastership past the gap
+            // NOTE: this test does not verify the ack path
+            assertTrue(ec0.isExportMaster(1L));
+            assertTrue(ec0.isExportMaster(10L));
+            assertTrue(ec0.isExportMaster(100L));
+            assertFalse(ec0.isExportMaster(101L));
+
+            assertTrue(ec1.isExportMaster(101L));
+            assertTrue(ec1.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(201L));
+
+            assertTrue(ec0.isExportMaster(201L));
+            assertTrue(ec0.isExportMaster(300L));
+            assertTrue(ec0.isExportMaster(301L));
+            assertTrue(ec0.isExportMaster(1000L));
+
+            ec0.shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
 }
