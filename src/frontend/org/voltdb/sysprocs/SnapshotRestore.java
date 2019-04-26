@@ -112,6 +112,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.primitives.Longs;
 
 public class SnapshotRestore extends VoltSystemProcedure {
@@ -485,9 +486,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     VoltFile outputPath = new VoltFile(dupPath);
                     String errorMsg = null;
                     if (!outputPath.exists()) {
-                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" does not exist";
+                        errorMsg = "Path \"" + outputPath + "\" does not exist";
                     } else if (!outputPath.canExecute()) {
-                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" is not executable";
+                        errorMsg = "Path \"" + outputPath + "\" is not executable";
                     }
                     // error check and early return
                     if (errorMsg != null) {
@@ -1057,6 +1058,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         List<String> includeList = tableOptParser(tableNames);
         List<String> excludeList = tableOptParser(skiptableNames);
 
+        List<String> warnings = Lists.newArrayList();
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
             // empty error messages indicate SUCCESS
@@ -1064,9 +1066,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Long hostId = savefile_data[0].getLong("CURRENT_HOST_ID");
                 String hostName = savefile_data[0].getString("CURRENT_HOSTNAME");
                 // hack to store the error messages without changing API
-                String errorMsg = savefile_data[0].getString("ORIGINAL_HOSTNAME");
-                throw new VoltAbortException("Error scanning restore work from host id " + hostId + " hostname "
-                        + hostName + ":" + errorMsg);
+                String warningMsg = savefile_data[0].getString("ORIGINAL_HOSTNAME");
+                warnings.add("Skip scanning snapshot file on host id " + hostId + " hostname " + hostName + ", " + warningMsg);
             }
         }
         savefile_data[0].resetRowPosition();
@@ -1115,21 +1116,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
             }
         } catch (VoltAbortException e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         ClusterSaveFileState savefile_state = null;
         try {
             savefile_state = new ClusterSaveFileState(savefile_data[0]);
         } catch (IOException e) {
-            throw new VoltAbortException(e);
+            noteOperationalFailure(RESTORE_FAILED);
+            return getFailureResult(e.toString(), warnings);
         }
 
         HashSet<String> relevantTableNames = new HashSet<String>();
@@ -1144,14 +1140,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
             }
         } catch (Exception e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
         assert(relevantTableNames != null);
 
@@ -1164,11 +1154,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         for (String tableName : relevantTableNames) {
             if (!savefile_state.getSavedTableNames().contains(tableName)) {
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow("FAILURE", "Save data contains no information for table " + tableName);
                 break;
@@ -1179,11 +1165,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow( "FAILURE", "Save data contains no information for table " + tableName);
             }
@@ -1191,11 +1173,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Also pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow( "FAILURE", saveFileState.getConsistencyResult());
             } else if (TRACE_LOG.isTraceEnabled()) {
@@ -1204,6 +1182,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         if (results != null) {
             noteOperationalFailure(RESTORE_FAILED);
+            for (String warning : warnings) {
+                results[0].addRow("WARNING", warning);
+            }
             return results;
         }
 
@@ -1225,14 +1206,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         try {
             updatePerPartitionTxnIdsToZK(perPartitionTxnIds);
         } catch (Exception e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int i = 0;
-            result_columns[i++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[i++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            results = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         // if this is a truncation snapshot that is on the boundary of partition count change
@@ -1289,13 +1264,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         try {
             validateIncludeTables(savefile_state, includeList);
         } catch (VoltAbortException e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            results = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, includeList, excludeList);
@@ -1364,6 +1333,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             }
                         }},
                     null);
+        }
+        for (String warning : warnings) {
+            results[0].addRow(-1, "", -1, "", -1, "WARNING", warning);
         }
         return results;
     }
@@ -1529,6 +1501,23 @@ public class SnapshotRestore extends VoltSystemProcedure {
         result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         return new VoltTable(result_columns);
+    }
+
+    private VoltTable[] constructFailureResultsTable() {
+        ColumnInfo[] result_columns = new ColumnInfo[2];
+        int ii = 0;
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+        return new VoltTable[] { new VoltTable(result_columns) };
+    }
+
+    private VoltTable[] getFailureResult(String failure, List<String> warnings) {
+        VoltTable results[] = constructFailureResultsTable();
+        results[0].addRow("FAILURE", failure);
+        for (String warning : warnings) {
+            results[0].addRow("WARNING", warning);
+        }
+        return results;
     }
 
     private File getSaveFileForReplicatedTable(String tableName)
