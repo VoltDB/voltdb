@@ -42,6 +42,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.RegressionSuite;
@@ -905,7 +906,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         //builder.setTableAsExportOnly("blah_replicated", false);
         //builder.setTableAsExportOnly("PARTITIONED", false);
         //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
-        builder.addExport(true, "file", null);  // authGroups (off)
+        builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -998,7 +999,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        builder.addExport(true, "file", null);  // authGroups (off)
+        builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");

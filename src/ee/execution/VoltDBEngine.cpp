@@ -2954,6 +2954,14 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     } while (updateReplicated);
 }
 
+void VoltDBEngine::disableExternalStreams() {
+    m_executorContext->disableExternalStreams();
+}
+
+bool VoltDBEngine::externalStreamsEnabled() {
+    return m_executorContext->externalStreamsEnabled();
+}
+
 void VoltDBEngine::loadBuiltInJavaFunctions() {
     // Hard code the info of format_timestamp function
     UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();

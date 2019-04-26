@@ -110,28 +110,6 @@ public class MiscUtils {
     }
 
     /**
-     * Try to load a PRO class. If it's running the community edition, an error
-     * message will be logged and null will be returned.
-     *
-     * @param classname The class name of the PRO class
-     * @param feature The name of the feature
-     * @param suppress true to suppress the log message
-     * @return null if running the community edition
-     */
-    public static Class<?> loadProClass(String classname, String feature, boolean suppress) {
-        try {
-            Class<?> klass = Class.forName(classname);
-            return klass;
-        } catch (ClassNotFoundException e) {
-            if (!suppress) {
-                hostLog.warn("Cannot load " + classname + " in VoltDB community edition. " +
-                             feature + " will be disabled.");
-            }
-            return null;
-        }
-    }
-
-    /**
      * Instantiate the license api impl based on enterprise/community editions
      * @return a valid API for community and pro editions, or null on error.
      */
@@ -234,24 +212,10 @@ public class MiscUtils {
             };
         }
 
-        // boilerplate to create a license api interface
-        LicenseApi licenseApi = null;
-        Class<?> licApiKlass = MiscUtils.loadProClass("org.voltdb.licensetool.LicenseApiImpl",
-                                                      "License API", false);
-        if (licApiKlass != null) {
-            try {
-                licenseApi = (LicenseApi)licApiKlass.newInstance();
-            } catch (InstantiationException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return null;
-            } catch (IllegalAccessException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return null;
-            }
-        }
-
+        LicenseApi licenseApi = ProClass
+                .<LicenseApi>load("org.voltdb.licensetool.LicenseApiImpl", "License API", hostLog::fatal)
+                .errorHandler(hostLog::fatal).newInstance();
         if (licenseApi == null) {
-            hostLog.fatal("Unable to load license file: could not create License API.");
             return null;
         }
 
@@ -600,7 +564,8 @@ public class MiscUtils {
         if (m_isPro == null) {
             //Allow running pro kit as community.
             if (!Boolean.parseBoolean(System.getProperty("community", "false"))) {
-                m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+                m_isPro = ProClass.load("org.voltdb.CommandLogImpl", "Command logging", ProClass.HANDLER_IGNORE)
+                        .hasProClass();
             } else {
                 m_isPro = false;
             }

@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -214,6 +215,8 @@ public class LocalCluster extends VoltServerConfig {
     private String m_mismatchSchema = null;
     /** Node to initialize with a different schema, or null to use the same schema on all nodes. */
     private Integer m_mismatchNode = null;
+    /** Set of hosts which were removed from the cluster. This is a bit hacky because it just skips these hosts */
+    private Set<Integer> m_removedHosts = Collections.emptySet();
 
     public void setHttpOverridePort(int port) {
         m_httpOverridePort = port;
@@ -224,8 +227,7 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        for (int i = 0; i < regexes.size(); i++) {
-            String s = regexes.get(i);
+        for (String s : regexes) {
             Pattern p = Pattern.compile(s);
             m_logMessageMatchPatterns.put(s, p);
         }
@@ -681,7 +683,6 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltFilePrefix(subroot.getPath());
         }
         cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
-        cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
@@ -724,7 +725,7 @@ public class LocalCluster extends VoltServerConfig {
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(action == StartAction.JOIN);
-            cmdln.m_hostCount = m_hostCount;
+            cmdln.hostCount(m_hostCount - m_removedHosts.size());
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
@@ -890,7 +891,20 @@ public class LocalCluster extends VoltServerConfig {
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
-        templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
+
+        NavigableSet<String> coordinators = internalPortGenerator.getCoordinators();
+        if (!m_removedHosts.isEmpty()) {
+            ImmutableSortedSet.Builder<String> sb = ImmutableSortedSet.naturalOrder();
+            int i = 0;
+            for (String coordinator : coordinators) {
+                if (!m_removedHosts.contains(i++)) {
+                    sb.add(coordinator);
+                }
+            }
+            coordinators = sb.build();
+        }
+
+        templateCmdLine.coordinators(coordinators);
         if (m_httpPortEnabled) {
             templateCmdLine.httpPort(0); // Set this value to 0 would enable http port assignment
         }
@@ -912,14 +926,16 @@ public class LocalCluster extends VoltServerConfig {
 
         // create the in-process server instance.
         if (m_hasLocalServer) {
+            while (m_removedHosts.contains(oopStartIndex)) {
+                ++oopStartIndex;
+            }
             try {
-                //Init
+                // Init
                 if (isNewCli && !skipInit) {
                     initLocalServer(oopStartIndex, clearLocalDataDirectories);
                 }
                 startLocalServer(oopStartIndex, clearLocalDataDirectories);
-            }
-            catch (IOException ioe) {
+            } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
             ++oopStartIndex;
@@ -927,6 +943,9 @@ public class LocalCluster extends VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < hostCount; i++) {
+            if (m_removedHosts.contains(i)) {
+                continue;
+            }
             try {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
@@ -1164,7 +1183,7 @@ public class LocalCluster extends VoltServerConfig {
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(startAction == StartAction.JOIN);
-            cmdln.hostCount(m_hostCount);
+            cmdln.hostCount(m_hostCount - m_removedHosts.size());
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
@@ -1180,7 +1199,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         try {
             cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
-            cmdln.coordinators(internalPortGenerator.getCoordinators());
             if (m_replicationPort != -1) {
                 int index = m_hasLocalServer ? hostId + 1 : hostId;
                 cmdln.drAgentStartPort(m_replicationPort + index);
@@ -1479,6 +1497,15 @@ public class LocalCluster extends VoltServerConfig {
         waitForAllReady();
     }
 
+    /**
+     * Update the set of removed hosts to be {@code removeHosts}
+     *
+     * @param removeHosts Set of hosts which were removed
+     */
+    public void setRemovedHosts(Set<Integer> removeHosts) {
+        m_removedHosts = removeHosts;
+    }
+
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
         return recoverOne(false, 0, hostId, portOffset, rejoinHost, StartAction.REJOIN);
     }
@@ -1521,7 +1548,7 @@ public class LocalCluster extends VoltServerConfig {
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
-        if (templateCmdLine.target().isIPC && m_eeProcs.contains(hostId)) {
+        if (templateCmdLine.target().isIPC && m_eeProcs.size() < hostId) {
             EEProcess eeProc = m_eeProcs.get(hostId);
             File valgrindOutputFile = null;
             try {
@@ -1919,6 +1946,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
+        return getListenerAddresses(false);
+    }
+
+    public List<String> getListenerAddresses(boolean useAdmin) {
         if (!m_running) {
             return null;
         }
@@ -1928,7 +1959,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + cl.m_port);
+                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
             }
         }
         return listeners;
@@ -2432,7 +2463,9 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        client.createConnection(getAdminAddress(0));
+        for (String address : getListenerAddresses(true)) {
+            client.createConnection(address);
+        }
         return client;
     }
 
@@ -2442,7 +2475,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // Reset the message match result
     public void resetLogMessageMatchResult(int hostNum, String regex) {
-        assert(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assert(m_logMessageMatchResults.containsKey(hostNum));
         assert(m_logMessageMatchPatterns.containsKey(regex));
         m_logMessageMatchResults.get(hostNum).remove(regex);
@@ -2455,7 +2488,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // verify the presence of message in the log from specified host
     public boolean verifyLogMessage(int hostNum, String regex) {
-        assertTrue(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assertTrue(m_logMessageMatchResults.containsKey(hostNum));
         assertTrue(m_logMessageMatchPatterns.containsKey(regex));
         return m_logMessageMatchResults.get(hostNum).contains(regex);
@@ -2500,6 +2533,10 @@ public class LocalCluster extends VoltServerConfig {
     // verify the message does not exist in all the logs
     public boolean verifyLogMessageNotExist(String regex) {
         return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
+    }
+
+    public boolean anyHostHasLogMessage(String regex) {
+        return m_logMessageMatchResults.values().stream().anyMatch(s -> s.contains(regex));
     }
 
     private void resetLogMessageMatchResults(int hostId) {

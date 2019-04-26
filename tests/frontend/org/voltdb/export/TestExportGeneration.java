@@ -368,7 +368,7 @@ public class TestExportGeneration {
         ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
         m_zk.getChildren(m_zkPartitionDN, null, callback, null);
 
-        for ( String child: callback.getChildren()) {
+        for ( String child: callback.get()) {
             long asLong = Long.parseLong(child);
             if( asLong != m_mbox.getHSId()) {
                 otherHsid = asLong;

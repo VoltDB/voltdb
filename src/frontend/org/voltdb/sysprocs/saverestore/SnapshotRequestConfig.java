@@ -36,20 +36,50 @@ import com.google_voltpatches.common.collect.Sets;
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
+    public final boolean emptyConfig;
     public final Table[] tables;
+    public final Integer newPartitionCount;
+    public final String truncationRequestId;
 
     /**
      * @param tables    Tables to snapshot, cannot be null.
      */
     public SnapshotRequestConfig(List<Table> tables)
     {
-        Preconditions.checkNotNull(tables);
-        this.tables = tables.toArray(new Table[0]);
+        this(Preconditions.checkNotNull(tables), null);
+    }
+
+    public SnapshotRequestConfig(int newPartitionCount) {
+        this((Table[]) null, Integer.valueOf(newPartitionCount));
+    }
+
+    public SnapshotRequestConfig(int newPartitionCount, Database catalogDatabase) {
+        this(getTablesToInclude(null, catalogDatabase), Integer.valueOf(newPartitionCount));
+    }
+
+    protected SnapshotRequestConfig(List<Table> tables, Integer newPartitionCount) {
+        this(tables.toArray(new Table[tables.size()]), newPartitionCount);
+    }
+
+    private SnapshotRequestConfig(Table[] tables, Integer newPartitionCount) {
+        emptyConfig = false;
+        this.tables = tables;
+        this.newPartitionCount = newPartitionCount;
+        truncationRequestId = null;
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
     {
         tables = getTablesToInclude(jsData, catalogDatabase);
+        if (jsData == null) {
+            emptyConfig = true;
+            newPartitionCount = null;
+            truncationRequestId = null;
+        } else {
+            emptyConfig = false;
+            newPartitionCount = (Integer) jsData.opt("newPartitionCount");
+            truncationRequestId = (String) jsData.opt("truncReqId");
+        }
     }
 
     private static Table[] getTablesToInclude(JSONObject jsData,
@@ -94,7 +124,7 @@ public class SnapshotRequestConfig {
         if (tableNamesToInclude != null && tableNamesToInclude.isEmpty()) {
             // Stream snapshot may specify empty snapshot sometimes.
             tables.clear();
-        } else {
+        } else if (tableNamesToInclude != null || tableNamesToExclude != null) {
             ListIterator<Table> iter = tables.listIterator();
             while (iter.hasNext()) {
                 Table table = iter.next();
@@ -118,7 +148,7 @@ public class SnapshotRequestConfig {
                     Joiner.on(", ").join(tableNamesToExclude));
         }
 
-        return tables.toArray(new Table[0]);
+        return tables.toArray(new Table[tables.size()]);
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException
@@ -130,6 +160,9 @@ public class SnapshotRequestConfig {
                 stringer.value(table.getTypeName());
             }
             stringer.endArray();
+        }
+        if (newPartitionCount != null) {
+            stringer.keySymbolValuePair("newPartitionCount", newPartitionCount.longValue());
         }
     }
 }

@@ -41,6 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.utils.MiscUtils;
@@ -372,7 +373,6 @@ public class TestStreamView
     @Before
     public void setUp() throws Exception
     {
-        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.NoOpExporter");
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema(
            "CREATE STREAM testexporttable1 PARTITION ON COLUMN symbol EXPORT TO TARGET noop\n" +
@@ -387,7 +387,7 @@ public class TestStreamView
            "CREATE INDEX bidask_minmax_idx on bidask_minmax ( ABS(min_ask) );");
 
         Properties props = new Properties();
-        project.addExport(true, "custom", props, "noop");
+        project.addExport(true, ServerExportEnum.CUSTOM, "org.voltdb.exportclient.NoOpExporter", props, "noop");
         project.setUseDDLSchema(true);
 
         boolean compiled = project.compile(Configuration.getPathToCatalogForTest("test-stream-view.jar"), 1, 1, 0);

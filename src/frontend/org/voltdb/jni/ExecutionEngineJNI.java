@@ -942,4 +942,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
     }
+
+    @Override
+    public void disableExternalStreams() {
+        nativeDisableExternalStreams(pointer);
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return nativeExternalStreamsEnabled(pointer);
+    }
 }

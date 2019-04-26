@@ -760,4 +760,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             ComparisonOperation op) {
         return null;
     }
+
+    @Override
+    public void disableExternalStreams() {
+        throw new RuntimeException("disableExternalStreams should not be called on MpRoSite");
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        throw new RuntimeException("externalStreamsEnabled should not be called on MpRoSite");
+    }
 }
