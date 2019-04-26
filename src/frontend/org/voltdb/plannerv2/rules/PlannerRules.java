@@ -168,8 +168,8 @@ public class PlannerRules {
             VoltPAggregateRule.INSTANCE,
 
             VoltPJoinRule.INSTANCE,
-            VoltPNestLoopToIndexJoinRule.INSTANCE_NLOOP_SEQSCAN,
-            VoltPNestLoopToIndexJoinRule.INSTANCE_NLOOP_CALC_SEQSCAN,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_CALC_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_ISCAN,

@@ -149,8 +149,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool IndexScanExecutor::p_execute(const NValueArray &params)
-{
+bool IndexScanExecutor::p_execute(const NValueArray &params) {
     assert(m_node);
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
@@ -164,6 +163,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
+
+    if (m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
+            searchKey.getSchema()->columnCount() != m_numOfSearchkeys) {
+       FILE* fp = fopen("/tmp/foo", "w");
+       fprintf(fp, "schema column count = %d; #searchKeys = %d:\nplan node: %s\n",
+            searchKey.getSchema()->columnCount(), m_numOfSearchkeys, m_node->debug().c_str());
+       fprintf(fp, "Index key schema: '%s'\n", tableIndex->getKeySchema()->debug().c_str());
+       fprintf(fp, "IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
+       fclose(fp);
+    }
 
     // TODO
     //assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||

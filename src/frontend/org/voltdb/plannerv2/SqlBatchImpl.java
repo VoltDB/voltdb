@@ -114,7 +114,7 @@ public class SqlBatchImpl extends SqlBatch {
                 if (! CALCITE_CHECKS.check(sql)) {
                     // The query cannot pass the compatibility check, throw a fall-back exception
                     // so that VoltDB will use the legacy parser and planner.
-                    throw new PlannerFallbackException();
+                    throw new PlannerFallbackException("Not in white list, or is black listed: " + sql);
                 }
             } catch (SqlParseException e) {
                 final String errMsg = "Error: invalid SQL statement in line: " + (lineNo + e.getPos().getLineNum()) + ", column: " + e.getPos().getColumnNum() + ". " +

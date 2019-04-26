@@ -85,7 +85,8 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
 
         for (Index index : catTable.getIndexes()) {
             final AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTable, columns, filterCondition, mergedProgram, index, SortDirectionType.INVALID);
+                    catTable, columns, filterCondition, mergedProgram, index, SortDirectionType.INVALID,
+                    -1, false);
 
             if (accessPath != null) {
                 // if accessPath.other is not null, need to create a new Filter

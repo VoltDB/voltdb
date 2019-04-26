@@ -44,29 +44,6 @@ import org.voltdb.utils.CatalogUtil;
 public class IndexUtil {
 
     /**
-     * Given a table, a predicate expression, and an index, find
-     * the best way to access the data using the given index, or return null if no good way exists.
-     *
-     * @param table The table we want data from.
-     * @param catColumns The table columns
-     * @param condRef RexNode representing the predicate expression.
-     * @param program Program to resolve the condRef expression if its a reference expression
-     * @param index The index we want to use to access the data.
-     * @param sortDirection sort direction to use
-     *
-     * @return A valid access path using the data or null if none found.
-     */
-    public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
-            List<Column> catColumns,
-            RexNode condRef,
-            RexProgram program,
-            Index index,
-            SortDirectionType sortDirection) {
-        return getCalciteRelevantAccessPathForIndex(
-                table, catColumns, condRef, program, index, sortDirection, -1, false);
-    }
-
-    /**
      * Given a table (stand alone or from a join), a predicate expression, and an index, find
      * the best way to access the data using the given index, or return null if no good way exists.
      * If numOuterFieldsForJoin != -1 then the expression belongs to a stand-alone table.
