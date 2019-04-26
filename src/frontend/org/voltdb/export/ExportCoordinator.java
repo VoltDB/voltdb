@@ -29,10 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 
 /**
@@ -43,8 +43,11 @@ import org.voltdb.VoltZK;
  * the transfer of export mastership between the replicas of an export partition.
  *
  * Synchronization: the ExportCoordinator instance is confined to the thread-of the
- * monothread executor used by the associated ExportDataSource. All access to the
- * state variables must be through Runnable executed on the ExportDataSource executor.
+ * monothread executor used by the associated ExportDataSource. All access to the state
+ * variables must be through a Runnable executed on the ExportDataSource executor.
+ *
+ * Likewise, all the public methods MUST be invoked through a Runnable executed on
+ * the ExportDataSource executor.
  *
  * Terminology:
  *
@@ -62,41 +65,6 @@ import org.voltdb.VoltZK;
  *  Export Master of any row being exported (identified by its sequence number, or seqNo).
  */
 public class ExportCoordinator {
-
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    public static final String s_coordinatorTaskName = "coordinator";
-
-    // ExportSequenceNumberTracker uses closed ranges and using
-    // Long.MAX_VALUE throws IllegalStateException in Range.java.
-    public static final long MAX_TRACKER_SEQNO = Long.MAX_VALUE - 1;
-
-    private final Integer m_hostId;
-    private final ExportDataSource m_eds;
-
-    private final SynchronizedStatesManager m_ssm;
-    private final ExportCoordinationTask m_task;
-
-    private Integer m_leaderHostId = Integer.MIN_VALUE;
-
-    // Map of state machine id to hostId
-    private Map<String, Integer> m_hosts = new HashMap<>();
-
-    // Map of hostId to ExportSequenceNumberTracker
-    private TreeMap<Integer, ExportSequenceNumberTracker> m_trackers = new TreeMap<>();
-
-    private boolean m_isMaster = false;
-    private long m_safePoint = 0L;
-
-    private void resetCoordinator(boolean resetLeader) {
-        if (resetLeader) {
-            m_leaderHostId = Integer.MIN_VALUE;
-        }
-        m_hosts.clear();
-        m_trackers.clear();
-        m_isMaster = false;
-        m_safePoint = 0L;
-
-    }
 
     /**
      * @author rdykiel
@@ -130,7 +98,7 @@ public class ExportCoordinator {
         protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
             // FIXME: should we crash voltdb
             exportLog.error("State machine was reset");
-            resetCoordinator(true);
+            resetCoordinator(true, true);
             return null;
         }
 
@@ -328,6 +296,7 @@ public class ExportCoordinator {
          * correlatedTaskCompleted()
          * Reset the coordinator with the new trackers included in task results.
          * Normalize the trackers to align any gaps occurring at the end.
+         * Kick any pending poll on the EDS.
          */
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest,
@@ -338,7 +307,7 @@ public class ExportCoordinator {
                 public void run() {
 
                     try {
-                        resetCoordinator(false);
+                        resetCoordinator(false, true);
                         for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
                             if (!entry.getValue().hasRemaining()) {
                                 exportLog.warn("Received empty response from: " + entry.getKey());
@@ -364,9 +333,11 @@ public class ExportCoordinator {
                         normalizeTrackers();
                         dumpTrackers();
 
+                        m_eds.resumePolling();
+
                     } catch (Exception e) {
                         exportLog.error("Failed to handle coordination trackers: " + e);
-                        resetCoordinator(false);
+                        resetCoordinator(false, true);
                     }
                 }
             });
@@ -404,7 +375,7 @@ public class ExportCoordinator {
                         exportLog.info("Removing members: " + removedMembers);
 
                         for (String memberId: removedMembers) {
-                            Integer hostId = m_hosts.get(memberId);
+                            Integer hostId = m_hosts.remove(memberId);
                             if (hostId == null) {
                                 throw new IllegalStateException("Unknown memberId: " + memberId);
                             }
@@ -414,8 +385,16 @@ public class ExportCoordinator {
                                         + ", hostId: " + hostId);
                             }
                             tracker = null;
+                            if (m_leaderHostId == hostId) {
+                                // If the leader went away, wait for the next leader
+                                exportLog.warn("Lost leader host " + hostId + " reset coordinator");
+                                resetCoordinator(true, true);
+                                return;
+                            }
                         }
-                        resetCoordinator(false);
+
+                        // After removing members, we want to reevaluate Export Mastership
+                        resetSafePoint();
                     }
                     } catch (Exception e) {
                         exportLog.error("Failed to handle membership change (added: " + addedMembers
@@ -426,7 +405,49 @@ public class ExportCoordinator {
         }
     }
 
-    public ExportCoordinator(ZooKeeper zk, Integer hostId, ExportDataSource eds) {
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    public static final String s_coordinatorTaskName = "coordinator";
+
+    // ExportSequenceNumberTracker uses closed ranges and using
+    // Long.MAX_VALUE throws IllegalStateException in Range.java.
+    private static final long INFINITE_SEQNO = Long.MAX_VALUE - 1;
+
+    private final Integer m_hostId;
+    private final ExportDataSource m_eds;
+
+    private final SynchronizedStatesManager m_ssm;
+    private final ExportCoordinationTask m_task;
+
+
+    private Integer m_leaderHostId = NO_HOST_ID;
+    private static final int NO_HOST_ID =  Integer.MIN_VALUE;
+
+    // Map of state machine id to hostId
+    private Map<String, Integer> m_hosts = new HashMap<>();
+
+    // Map of hostId to ExportSequenceNumberTracker
+    private TreeMap<Integer, ExportSequenceNumberTracker> m_trackers = new TreeMap<>();
+
+    private boolean m_isMaster = false;
+    private long m_safePoint = 0L;
+
+    private void resetCoordinator(boolean resetLeader, boolean resetTrackers) {
+        if (resetLeader) {
+            m_leaderHostId = NO_HOST_ID;
+        }
+        if (resetTrackers) {
+            m_hosts.clear();
+            m_trackers.clear();
+        }
+        resetSafePoint();
+    }
+
+    private void resetSafePoint() {
+        m_isMaster = false;
+        m_safePoint = 0L;
+    }
+
+    public ExportCoordinator(ZooKeeper zk, String rootPath, Integer hostId, ExportDataSource eds) {
 
         m_hostId = hostId;
         m_eds = eds;
@@ -434,13 +455,13 @@ public class ExportCoordinator {
         SynchronizedStatesManager ssm = null;
         ExportCoordinationTask task = null;
         try {
-            ZKUtil.addIfMissing(zk, VoltZK.exportCoordination, CreateMode.PERSISTENT, null);
+            ZKUtil.addIfMissing(zk, rootPath, CreateMode.PERSISTENT, null);
 
             // Set up a SynchronizedStateManager for the topic/partition
-            String topicName = eds.getTableName() + "_" + eds.getPartitionId();
+            String topicName = m_eds.getTableName() + "_" + m_eds.getPartitionId();
             ssm = new SynchronizedStatesManager(
                     zk,
-                    VoltZK.exportCoordination,
+                    rootPath,
                     topicName,
                     m_hostId.toString(),
                     1);
@@ -463,6 +484,11 @@ public class ExportCoordinator {
         }
     }
 
+    /**
+     * Shutdown this coordinator.
+     *
+     * @throws InterruptedException
+     */
     public void shutdown() throws InterruptedException {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Shutting down...");
@@ -470,6 +496,9 @@ public class ExportCoordinator {
         m_ssm.ShutdownSynchronizedStatesManager();
     }
 
+    /**
+     * Initiate a state change to make this host the partition leader.
+     */
     public void becomeLeader() {
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
@@ -485,11 +514,143 @@ public class ExportCoordinator {
             }});
     }
 
-    boolean isLeader() {
+    /**
+     * @return true if this host is the partition leader.
+     */
+    public boolean isLeader() {
         return m_hostId.equals(m_leaderHostId);
     }
 
-    void requestTrackers() {
+    /**
+     * Return true if this host is the export master.
+     * @return
+     */
+    public boolean isMaster() {
+        return m_isMaster;
+    }
+
+    /**
+     * Returns true if the acked sequence number passes the safe point.
+     *
+     * @param ackedSeqNo the acked sequence number
+     * @return true if this passed the safe point
+     */
+    public boolean isSafePoint(long ackedSeqNo) {
+
+        if (m_safePoint == 0L || m_safePoint > ackedSeqNo) {
+            // Not waiting for safe point or not reached safe point
+            return false;
+        }
+
+        // Truncate the trackers and reset the safe point
+        m_trackers.forEach((k, v) -> v.truncate(ackedSeqNo));
+        resetSafePoint();
+        return true;
+    }
+
+    /**
+     * Return true if this host is the Export Master for this sequence number
+     *
+     * @param exportSeqNo the sequence number we want to export
+     * @return if we are the Export Master
+     */
+    public boolean isExportMaster(long exportSeqNo) {
+
+        // No leader, no master.
+        if (m_leaderHostId == NO_HOST_ID) {
+            return false;
+        }
+
+        // First reset the safe point if we're polling past it
+        if (isSafePoint(exportSeqNo)) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Polling passed safe point at " + exportSeqNo);
+            }
+        }
+
+        // If we're beneath the safe point return the current mastership
+        if (m_safePoint > 0L) {
+            assert(exportSeqNo < m_safePoint);
+            return m_isMaster;
+        }
+
+        // Now we need to re-evaluate export mastership
+        assert(m_safePoint == 0);
+
+        // If the leader isn't in a gap the leader is master
+        ExportSequenceNumberTracker leaderTracker = m_trackers.get(m_leaderHostId);
+        if (leaderTracker == null) {
+            // This means that the leadership has been resolved but the
+            // trackers haven't been gathered
+            return false;
+        }
+
+        Pair<Long, Long> gap = leaderTracker.getFirstGap();
+        if (gap == null || exportSeqNo < gap.getFirst() || gap.getSecond() < exportSeqNo) {
+
+            m_isMaster = isLeader();
+            if (gap == null) {
+                m_safePoint = INFINITE_SEQNO;
+            } else {
+                m_safePoint = gap.getFirst();
+            }
+
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
+            }
+            return m_isMaster;
+        }
+
+        // Return the lowest hostId that can fill the gap
+        assert (gap != null);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Leader host " + m_leaderHostId + " hits gap [" + gap.getFirst()
+                + ", " + gap.getSecond() + "], look for candidate replicas");
+        }
+
+        Integer replicaId = Integer.MIN_VALUE;
+        long leaderSafePoint = gap.getSecond();
+        long  replicaSafePoint = 0L;
+
+        for (Integer hostId : m_trackers.keySet()) {
+
+            if (m_leaderHostId.equals(hostId)) {
+                continue;
+            }
+            Pair<Long, Long> rgap = m_trackers.get(hostId).getFirstGap();
+            if (rgap == null || exportSeqNo < rgap.getFirst() || rgap.getSecond() < exportSeqNo) {
+                replicaId = hostId;
+                if (rgap == null) {
+                    replicaSafePoint = INFINITE_SEQNO;
+                } else {
+                    replicaSafePoint = rgap.getFirst();
+                }
+                break;
+            }
+        }
+
+        if (!replicaId.equals(NO_HOST_ID)) {
+            m_isMaster = m_hostId.equals(replicaId);
+            m_safePoint = Math.min(leaderSafePoint, replicaSafePoint);
+            exportLog.debug("Replica host " + replicaId + " fills gap [" + gap.getFirst()
+            + ", " + gap.getSecond() + "], until safe point " + m_safePoint);
+            return m_isMaster;
+        }
+
+        // If no replicas were found, the leader is Export Master and will become BLOCKED
+        m_safePoint = gap.getFirst();
+        m_isMaster = isLeader();
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Leader host " + m_leaderHostId + " is Export Master and will be blocked");
+        }
+        return m_isMaster;
+    }
+
+    /**
+     * Start a task requesting export trackers from all nodes.
+     * Only the partition leader should initiate this.
+     */
+    private void requestTrackers() {
         exportLog.info("Host: " + m_hostId + " requesting export trackers");
 
         m_task.invoke(new Runnable() {
@@ -509,7 +670,7 @@ public class ExportCoordinator {
      * Normalize the trackers to account for any host having a gap at the end; one
      * of the other hosts will have a higher sequence number.
      */
-    void normalizeTrackers() {
+    private void normalizeTrackers() {
 
         long highestSeqNo = 0L;
         long lowestSeqNo = Long.MAX_VALUE;
@@ -526,14 +687,15 @@ public class ExportCoordinator {
         }
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
-                tracker.append(lowestSeqNo, MAX_TRACKER_SEQNO);
+                tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
-                tracker.append(highestSeqNo, MAX_TRACKER_SEQNO);
+                tracker.append(highestSeqNo, INFINITE_SEQNO);
             }
         }
     }
 
-    void dumpTrackers() {
+
+    private void dumpTrackers() {
         if (!exportLog.isDebugEnabled()) {
             return;
         }

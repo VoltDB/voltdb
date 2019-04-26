@@ -59,6 +59,7 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
@@ -440,13 +441,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Set the {@code ExportCoordinator} - we expect this just after the constructor.
      *
-     * FIXME: put in constructor? But adds 2 additional params
+     * Note: made separate from constructor for JUnit test support.
      *
      * @param zk
      * @param hostId
      */
     public void setCoordination(ZooKeeper zk, Integer hostId) {
-        m_coordinator = new ExportCoordinator(zk, hostId, this);
+        m_coordinator = new ExportCoordinator(zk, VoltZK.exportCoordination, hostId, this);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -586,7 +587,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_tableName;
     }
 
-    public final int getPartitionId() {
+    public int getPartitionId() {
         return m_partitionId;
     }
 
@@ -1008,6 +1009,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    /**
+     * Callback from {@code ExportCoordinator} to resume polling after trackers
+     * were collected from the other nodes; will try to satisfy a pending poll.
+     */
+    public void resumePolling() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Resuming polling...");
+        }
+        pollImpl(m_pollTask);
+    }
+
+    /**
+     * Poll request from {@code GuestProcessor}
+     *
+     * @param forcePollSchema
+     * @return
+     */
     public ListenableFuture<AckingContainer> poll(boolean forcePollSchema) {
         //ENG-15763, create SettableFuture that lets us handle executor exceptions
         final SettableFuture<AckingContainer> fut = SettableFuture.create(false);
