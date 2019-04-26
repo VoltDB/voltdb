@@ -57,7 +57,6 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.RateLimitedLogger;
-
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 /*
@@ -620,6 +619,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     false,
                     null);
         }
+
+        // Don't try to go through agreement process for a rejoining node.
+        // Check out if the current host is rejoining, if so shut itself down.
+        m_failedHostsCallback.disconnect(null);
+
         Set<Long> unknownFaultedHosts = new TreeSet<>();
 
         // This one line is a biggie. Gets agreement on what the post-fault cluster will be.
