@@ -44,7 +44,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -432,7 +431,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // start sequence number - 8 bytes
                     // tupleCount - 8 bytes
                     // uniqueId - 8 bytes
-                    // sync - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
                     int partitionId = getBytes(4).getInt();
@@ -444,7 +442,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
-                    boolean sync = getBytes(1).get() == 1 ? true : false;
                     long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
@@ -456,8 +453,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uniqueId,
                             genId,
                             0,
-                            length == 0 ? null : getBytes(length),
-                            sync);
+                            length == 0 ? null : getBytes(length));
                 }
                 else if (status == kErrorCode_pushEndOfStream) {
                     ByteBuffer header = ByteBuffer.allocate(8);

@@ -231,7 +231,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     @Override
                     public void run()
                     {
-                        ExportManager.sync(false);
+                        ExportManager.sync();
                     }
                 });
 

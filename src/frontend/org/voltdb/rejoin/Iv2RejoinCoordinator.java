@@ -195,7 +195,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         m_catalog = catalog;
         boolean schemaHasPersistentTables = false;
         for (Table t : catalog.getTables()) {
-            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.STREAM_VIEW_ONLY.get()) {
+            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.CONNECTOR_LESS_STREAM.get()) {
                 schemaHasPersistentTables = true;
                 break;
             }

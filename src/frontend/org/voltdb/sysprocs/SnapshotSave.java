@@ -90,7 +90,9 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             // Tell each site to quiesce - bring the Export and DR system to a steady state with
-            // no pending committed data.
+            // no pending committed data. It's asynchronous, SnapshotSave sysproc doesn't wait
+            // for Export and DR system to have *seen* the pending committed data.
+            // NativeSnapshotWritePlan.createDeferredSetup() will force the wait then do the fsync
             context.getSiteProcedureConnection().quiesce();
 
             Object[] paramsArray = params.toArray();

@@ -160,7 +160,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJJJJJLjava/nio/ByteBuffer;Z)V");
+            "(ILjava/lang/String;JJJJJJLjava/nio/ByteBuffer;)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -537,7 +537,6 @@ void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string tableName,
         ExportStreamBlock *block,
-        bool sync,
         int64_t generationId) {
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
@@ -558,8 +557,7 @@ void JNITopend::pushExportBuffer(
                 block->lastSpUniqueId(),
                 generationId,
                 reinterpret_cast<jlong>(block->rawPtr()),
-                buffer,
-                sync ? JNI_TRUE : JNI_FALSE);
+                buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
         m_jniEnv->CallStaticVoidMethod(
@@ -573,8 +571,7 @@ void JNITopend::pushExportBuffer(
                 static_cast<int64_t>(0),
                 generationId,
                 NULL,
-                NULL,
-                sync ? JNI_TRUE : JNI_FALSE);
+                NULL);
     }
     m_jniEnv->DeleteLocalRef(tableNameString);
     if (m_jniEnv->ExceptionCheck()) {

@@ -81,7 +81,7 @@ public:
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
-    void pushStreamBuffer(ExportStreamBlock *block, bool sync);
+    void pushStreamBuffer(ExportStreamBlock *block);
     void pushEndOfStream();
 
     /** write a tuple to the stream */
