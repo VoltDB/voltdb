@@ -1737,10 +1737,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return;
                 }
 
-                if (failedHosts == null) {
-                    return;
-                }
-
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
