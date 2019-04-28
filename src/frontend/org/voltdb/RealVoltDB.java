@@ -1762,7 +1762,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return;
                 }
 
-                if (failedHosts == null) {
+                if (failedHosts.isEmpty()) {
                     return;
                 }
 

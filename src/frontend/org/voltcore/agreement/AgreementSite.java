@@ -620,9 +620,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     null);
         }
 
-        // Don't try to go through agreement process for a rejoining node.
-        // Check out if the current host is rejoining, if so shut itself down.
-        m_failedHostsCallback.disconnect(null);
+        m_failedHostsCallback.disconnectWithoutMeshDetermination();
 
         Set<Long> unknownFaultedHosts = new TreeSet<>();
 
