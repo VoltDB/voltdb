@@ -57,6 +57,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.RateLimitedLogger;
+
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 /*
@@ -619,9 +620,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     false,
                     null);
         }
-
         m_failedHostsCallback.disconnectWithoutMeshDetermination();
-
         Set<Long> unknownFaultedHosts = new TreeSet<>();
 
         // This one line is a biggie. Gets agreement on what the post-fault cluster will be.

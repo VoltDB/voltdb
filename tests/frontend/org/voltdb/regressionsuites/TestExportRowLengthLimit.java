@@ -34,6 +34,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.CatalogUtil;
 
@@ -69,7 +70,7 @@ public class TestExportRowLengthLimit extends RegressionSuite {
         Properties props = new Properties();
         props.put("skipinternals", "true");
         props.put(CatalogUtil.ROW_LENGTH_LIMIT, "16");
-        project.addExport(true, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
 
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
@@ -104,7 +105,7 @@ public class TestExportRowLengthLimit extends RegressionSuite {
         Properties props = new Properties();
         props.put("skipinternals", "true");
         props.put(CatalogUtil.ROW_LENGTH_LIMIT, "8");
-        project.addExport(true, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
 
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);

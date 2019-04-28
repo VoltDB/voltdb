@@ -1315,13 +1315,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
 
         // wait for the last callback to finish
-        byte[] lastPayload = lastCallback.getData();
+        byte[] lastPayload = lastCallback.get();
         final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
         hostInfoMap.put(parseHostId(lastChild), lastOne);
 
         // now all previous callbacks should have finished
         for (int i = 0; i < children.size() - 1; i++) {
-            byte[] payload = callbacks.poll().getData();
+            byte[] payload = callbacks.poll().get();
             final HostInfo info = HostInfo.fromBytes(payload);
             hostInfoMap.put(parseHostId(children.get(i)), info);
         }

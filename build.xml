@@ -373,8 +373,8 @@
     <include name='org/voltdb/jdbc/Test*.class' />
     <include name='org/voltdb/jni/TestExecutionEngine.class' />
     <include name='org/voltdb/jni/TestFragmentProgressUpdate.class' />
-    <include name='org/voltdb/join/TestDataMigrationSnapshotPlanner.class' />
-    <include name='org/voltdb/join/TestElasticJoinUtils.class' />
+    <include name='org/voltdb/elastic/TestDataMigrationSnapshotPlanner.class' />
+    <include name='org/voltdb/elastic/TestElasticJoinUtils.class' />
     <include name='org/voltdb/messaging/TestVoltMessageSerialization.class' />
     <include name='org/voltdb/planner/TestAdHocPlans.class' />
     <include name='org/voltdb/planner/TestDeterminism.class' />

@@ -45,8 +45,6 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     public static class Stream {
         // src -> (dest1, dest2,...)
         public final Multimap<Long, Long> streamPairs;
-        // the partition the ranges associate to
-        public final Integer newPartition;
 
         public final Long lowestSiteSinkHSId;
 
@@ -55,10 +53,9 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
          * @param newPartition    New partition for this stream, if not null, will create a
          *                        post-snapshot task to increment the partition count
          */
-        public Stream(Multimap<Long, Long> streamPairs, Integer newPartition, Long lowestSiteSinkHSId)
+        public Stream(Multimap<Long, Long> streamPairs, Long lowestSiteSinkHSId)
         {
             this.streamPairs = ImmutableMultimap.copyOf(streamPairs);
-            this.newPartition = newPartition;
             this.lowestSiteSinkHSId = lowestSiteSinkHSId;
         }
     }
@@ -83,6 +80,14 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         this.shouldTruncate = shouldTruncate;
     }
 
+    public StreamSnapshotRequestConfig(List<Table> tables, int newPartitionCount, List<Stream> streams,
+            boolean shouldTruncate) {
+        super(tables, newPartitionCount);
+
+        this.streams = ImmutableList.copyOf(streams);
+        this.shouldTruncate = shouldTruncate;
+    }
+
     public StreamSnapshotRequestConfig(JSONObject jsData,
                                        Database catalogDatabase)
     {
@@ -102,13 +107,9 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             for (int i = 0; i < streamArray.length(); i++) {
                 JSONObject streamObj = streamArray.getJSONObject(i);
 
-                Integer newPartition = null;
-                if (!streamObj.isNull("newPartition")) {
-                    newPartition = Integer.parseInt(streamObj.getString("newPartition"));
-                }
                 Long lowestSiteSinkHSId = Long.parseLong(streamObj.getString("lowestSiteSinkHSId"));
 
-                Stream config = new Stream(parseStreamPairs(streamObj), newPartition, lowestSiteSinkHSId);
+                Stream config = new Stream(parseStreamPairs(streamObj), lowestSiteSinkHSId);
 
                 builder.add(config);
             }
@@ -154,9 +155,6 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
 
         for (Stream stream : streams) {
             stringer.object();
-
-            stringer.keySymbolValuePair("newPartition", stream.newPartition == null ?
-                                                    null : Integer.toString(stream.newPartition));
 
             stringer.keySymbolValuePair("lowestSiteSinkHSId", stream.lowestSiteSinkHSId);
             stringer.key("streamPairs").object();

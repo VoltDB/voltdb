@@ -32,9 +32,11 @@ import org.junit.Test;
 import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.TestExportBase;
+import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.MiscUtils;
@@ -47,7 +49,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     @Rule
     public FlakyTestRule ftRule = new FlakyTestRule();
 
-    private static ServerListener m_serverSocket;
+    private static SocketExportTestServer m_serverSocket;
     private static LocalCluster config;
 
     @Override
@@ -57,7 +59,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         m_password = "password";
         ExportLocalClusterBase.resetDir();
         super.setUp();
-        m_serverSocket = new ServerListener(5001);
+        m_serverSocket = new SocketExportTestServer(5001);
         m_serverSocket.start();
 
     }
@@ -66,7 +68,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     public void tearDown() throws Exception {
         super.tearDown();
         try {
-            m_serverSocket.close();
+            m_serverSocket.shutdown();
             m_serverSocket = null;
         } catch (Exception e) {}
     }
@@ -92,7 +94,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        verifyExportedTuples(1000);
+        m_serverSocket.verifyExportedTuples(1000);
         client.close();
         config.overrideStartCommandVerb("recover");
         if (MiscUtils.isPro()) {
@@ -111,7 +113,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        verifyExportedTuples(2000);
+        m_serverSocket.verifyExportedTuples(2000);
     }
 
     public TestExportSuiteReplicatedSocketExportRecover(final String name) {
@@ -133,12 +135,11 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-
-        project.addExport(true /* enabled */, "custom", props, "default");
+        project.addExport(true, ServerExportEnum.CUSTOM, props, "default");
         /*
          * compile the catalog all tests start with
          */
-       config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 2,
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 2,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         if (MiscUtils.isPro()) {

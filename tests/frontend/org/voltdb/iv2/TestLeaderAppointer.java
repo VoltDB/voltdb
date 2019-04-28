@@ -106,8 +106,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         tearDownZK();
     }
 
-    void configure(int hostCount, int sitesPerHost, int replicationFactor,
-            boolean enablePPD) throws JSONException, Exception
+    void configure(int hostCount, int sitesPerHost, int replicationFactor) throws JSONException, Exception
     {
         m_hm = mock(HostMessenger.class);
         m_zk = getClient(0);
@@ -124,13 +123,13 @@ public class TestLeaderAppointer extends ZKTestBase {
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
         when(m_hm.getLiveHostIds()).thenReturn(hostInfos.keySet());
         m_mpi = mock(MpInitiator.class);
-        createAppointer(enablePPD);
+        createAppointer();
 
         m_cache = new LeaderCache(m_zk, "", VoltZK.iv2appointees, m_changeCallback);
         m_cache.start(true);
     }
 
-    void createAppointer(boolean enablePPD) throws JSONException
+    void createAppointer() throws JSONException
     {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
@@ -174,7 +173,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testBasicStartup() throws Exception
     {
-        configure(2, 2, 0, false);
+        configure(2, 2, 0);
 
         Thread dutthread = new Thread() {
             @Override
@@ -212,7 +211,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testStartupFailure() throws Exception
     {
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         // Write an appointee before we start to simulate a failure during startup
         m_cache.put(0, 0L);
         VoltDB.ignoreCrash = true;
@@ -232,7 +231,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testStartupFailure2() throws Exception
     {
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         // Write the appointees and one master before we start to simulate a failure during startup
         m_cache.put(0, 0L);
         m_cache.put(1, 1L);
@@ -255,7 +254,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testFailureDuringReplay() throws Exception
     {
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         Thread dutthread = new Thread() {
             @Override
             public void run() {
@@ -302,7 +301,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testWaitsForAllReplicasAndLeaders() throws Exception
     {
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         Thread dutthread = new Thread() {
             @Override
             public void run() {
@@ -343,7 +342,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void testPromotesOnReplicaDeathAndDiesOnKSafety() throws Exception
     {
         // run once to get to a startup state
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         VoltDB.ignoreCrash = true;
         Thread dutthread = new Thread() {
             @Override
@@ -384,7 +383,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void testAppointerPromotion() throws Exception
     {
         // run once to get to a startup state
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         VoltDB.ignoreCrash = true;
         Thread dutthread = new Thread() {
             @Override
@@ -411,7 +410,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         long expectedNewLeader = m_cache.pointInTimeCache().get(0).equals(0L) ? 1L : 0L;
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up
-        createAppointer(false);
+        createAppointer();
         m_newAppointee.set(false);
         m_dut.acceptPromotion();
         while (!m_newAppointee.get()) {
@@ -430,7 +429,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void testAddPartition() throws Exception
     {
         // run once to get to a startup state
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         VoltDB.ignoreCrash = true;
         Thread dutthread = new Thread() {
             @Override
@@ -500,7 +499,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         doReturn(ReplicationRole.REPLICA).when(mVolt).getReplicationRole();
         VoltDB.replaceVoltDBInstanceForTest(mVolt);
 
-        configure(2, 2, 1, false);
+        configure(2, 2, 1);
         Thread dutthread = new Thread() {
             @Override
             public void run() {

@@ -1551,4 +1551,24 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetVi
     engine->setViewsEnabled(viewNames, enabled);
 }
 
+/*
+ * Implemention of ExecutionEngineJNI.nativeDisableExternalStreams
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDisableExternalStreams
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    engine->disableExternalStreams();
+}
+
+/*
+ * Implemention of ExecutionEngineJNI.nativeExternalStreamsEnabled
+ */
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExternalStreamsEnabled
+  (JNIEnv *env, jobject object, jlong engine_ptr) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    return engine->externalStreamsEnabled();
+}
+
 /** @} */ // end of JNI doxygen group

@@ -15,11 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.join;
+package org.voltdb;
 
-import org.voltdb.CatalogContext;
-
-public interface ElasticJoinService {
-    void shutdown();
-    void updateConfig(CatalogContext context);
+/**
+ * Results returned by {@link InvocationDispatcher#createTransaction}
+ */
+public enum CreateTransactionResult {
+    /** The transaction was created successfully */
+    SUCCESS,
+    /** There is no client handler registered with that connection ID */
+    NO_CLIENT_HANDLER,
+    /** The partition which this transaction was sent was removed */
+    PARTITION_REMOVED;
 }

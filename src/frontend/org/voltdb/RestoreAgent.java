@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -63,6 +62,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.ProClass;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -260,6 +260,7 @@ SnapshotCompletionInterest, Promotable
         // Track the tables for which we found files on the node reporting this SnapshotInfo
         public final Set<String> fileTables = new HashSet<String>();
         public final SnapshotPathType pathType;
+        public final JSONObject elasticOperationMetadata;
 
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
@@ -269,7 +270,7 @@ SnapshotCompletionInterest, Promotable
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId,
-                            Set<String> digestTables, SnapshotPathType snaptype)
+                Set<String> digestTables, SnapshotPathType snaptype, JSONObject elasticOperationMetadata)
         {
             this.txnId = txnId;
             this.path = path;
@@ -281,6 +282,7 @@ SnapshotCompletionInterest, Promotable
             this.instanceId = instanceId;
             this.digestTables.addAll(digestTables);
             this.pathType = snaptype;
+            this.elasticOperationMetadata = elasticOperationMetadata;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -290,10 +292,11 @@ SnapshotCompletionInterest, Promotable
             pathType = SnapshotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
-            newPartitionCount = jo.getInt("newPartitionCount");
+            newPartitionCount = jo.getInt(SnapshotUtil.JSON_NEW_PARTITION_COUNT);
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
             instanceId = new InstanceId(jo.getJSONObject("instanceId"));
+            elasticOperationMetadata = jo.optJSONObject(SnapshotUtil.JSON_ELASTIC_OPERATION);
 
             JSONArray tables = jo.getJSONArray("tables");
             int cnt = tables.length();
@@ -310,7 +313,6 @@ SnapshotCompletionInterest, Promotable
                 partitions.put(name, partSet);
             }
             JSONObject jsonPtoTxnId = jo.getJSONObject("partitionToTxnId");
-            @SuppressWarnings("unchecked")
             Iterator<String> it = jsonPtoTxnId.keys();
             while (it.hasNext()) {
                  String key = it.next();
@@ -337,7 +339,7 @@ SnapshotCompletionInterest, Promotable
                 stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType.name());
                 stringer.keySymbolValuePair("nonce", nonce);
                 stringer.keySymbolValuePair("partitionCount", partitionCount);
-                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair(SnapshotUtil.JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.keySymbolValuePair("catalogCrc", catalogCrc);
                 stringer.keySymbolValuePair("hostId", hostId);
                 stringer.key("tables").array();
@@ -368,6 +370,7 @@ SnapshotCompletionInterest, Promotable
                     stringer.value(fileTable);
                 }
                 stringer.endArray();
+                stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(elasticOperationMetadata);
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -499,27 +502,11 @@ SnapshotCompletionInterest, Promotable
 
     private void initialize(StartAction startAction) {
         // Load command log reinitiator
-        try {
-            Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
-                                                          "Command log replay", true);
-            if (replayClass != null) {
-                Constructor<?> constructor =
-                    replayClass.getConstructor(int.class,
-                                               StartAction.class,
-                                               HostMessenger.class,
-                                               String.class,
-                                               Set.class);
-
-                m_replayAgent =
-                    (CommandLogReinitiator) constructor.newInstance(m_hostId,
-                                                                    startAction,
-                                                                    m_hostMessenger,
-                                                                    m_clPath,
-                                                                    m_liveHosts);
-            }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     true, e);
+        CommandLogReinitiator replayAgent = ProClass.newInstanceOf("org.voltdb.CommandLogReinitiatorImpl",
+                "Command log replay", ProClass.HANDLER_IGNORE, m_hostId, startAction, m_hostMessenger, m_clPath,
+                m_liveHosts);
+        if (replayAgent != null) {
+            m_replayAgent = replayAgent;
         }
         m_replayAgent.setCallback(this);
     }
@@ -736,7 +723,8 @@ SnapshotCompletionInterest, Promotable
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
                 m_replayAgent.generateReplayPlan(infoWithMinHostId.instanceId.getTimestamp(),
-                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader);
+                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader,
+                        infoWithMinHostId.elasticOperationMetadata);
             }
         }
 
@@ -790,10 +778,13 @@ SnapshotCompletionInterest, Promotable
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
         int newPartitionCount = -1;
+        JSONObject elasticOperationMetadata = null;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
-            if (digest_detail == null) throw new IOException();
+            if (digest_detail == null) {
+                throw new IOException();
+            }
             catalog_crc = digest_detail.getLong("catalogCRC");
 
             if (digest_detail.has("partitionTransactionIds")) {
@@ -810,8 +801,8 @@ SnapshotCompletionInterest, Promotable
                 instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
 
-            if (digest_detail.has("newPartitionCount")) {
-                newPartitionCount = digest_detail.getInt("newPartitionCount");
+            if (digest_detail.has(SnapshotUtil.JSON_NEW_PARTITION_COUNT)) {
+                newPartitionCount = digest_detail.getInt(SnapshotUtil.JSON_NEW_PARTITION_COUNT);
             }
 
             if (digest_detail.has("tables")) {
@@ -820,6 +811,8 @@ SnapshotCompletionInterest, Promotable
                     digestTableNames.add(tableObj.getString(i));
                 }
             }
+
+            elasticOperationMetadata = digest_detail.optJSONObject(SnapshotUtil.JSON_ELASTIC_OPERATION);
         }
         catch (IOException ioe)
         {
@@ -886,7 +879,7 @@ SnapshotCompletionInterest, Promotable
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
                     partitionCount, newPartitionCount, catalog_crc, m_hostId, instanceId,
-                    digestTableNames, s.m_stype);
+                    digestTableNames, s.m_stype, elasticOperationMetadata);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -1192,7 +1185,9 @@ SnapshotCompletionInterest, Promotable
             Long clStartTxnId = null;
             for (String node : children) {
                 //This might be created before we are done fetching the restore info
-                if (node.equals("snapshot_id")) continue;
+                if (node.equals("snapshot_id")) {
+                    continue;
+                }
 
                 byte[] data = null;
                 data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
@@ -1310,9 +1305,7 @@ SnapshotCompletionInterest, Promotable
 
             // Call balance partitions after enabling transactions on the node to shorten the recovery time
             if (m_isLeader) {
-                if (!m_replayAgent.checkAndBalancePartitions()) {
-                    VoltDB.crashLocalVoltDB("Failed to finish balancing partitions", false, null);
-                }
+                m_replayAgent.resumeElasticOperationIfNecessary();
             }
         }
     }

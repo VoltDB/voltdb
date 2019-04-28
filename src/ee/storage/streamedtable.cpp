@@ -138,6 +138,13 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
+bool StreamedTable::shouldStreamToExport() {
+    //TODO: See if we can set wrapper to null or similar trick when streams are disabled
+    // to avoid the extra if check
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
+    return m_wrapper && ec->externalStreamsEnabled();
+}
+
 bool StreamedTable::insertTuple(TableTuple &source)
 {
     // not null checks at first
@@ -146,7 +153,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
     }
 
     size_t mark = 0;
-    if (m_wrapper) {
+    if (shouldStreamToExport()) {
         // handle any materialized views
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
@@ -199,7 +206,7 @@ void StreamedTable::setGeneration(int64_t generation) {
 }
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
-    if (m_wrapper) {
+    if (shouldStreamToExport()) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples

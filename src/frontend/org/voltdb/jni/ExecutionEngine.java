@@ -874,13 +874,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract void setViewsEnabled(String viewNames, boolean enabled);
 
+    /**
+     * Use this to disable writing to all streams from EE like export and DR.
+     * Currently used by elastic shrink to stop a site from writing to export and DR streams
+     * once all its data has been migrated and it is ready to be shutdown.
+     * All streams are enabled by default.
+     */
+    public abstract void disableExternalStreams();
+
+    /**
+     * Return the EE state that indicates if external streams are enabled for this Site or not.
+     */
+    public abstract boolean externalStreamsEnabled();
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
      * jni_class instances in the execution engine. From the EE perspective, a single
      * JNI class is better.  So put this here with the backend->frontend api definition.
      */
-
     protected native byte[] nextDependencyTest(int dependencyId);
 
     /**
@@ -1177,6 +1189,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             byte mTableName[], long deletableTxnId, int maxRowCount, long undoToken);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
+
+    /**
+     * @see ExecutionEngine#disableExternalStreams()
+     */
+    protected native void nativeDisableExternalStreams(long pointer);
+
+    /**
+     * @see ExecutionEngine#externalStreamsEnabled()
+     */
+    protected native boolean nativeExternalStreamsEnabled(long pointer);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.

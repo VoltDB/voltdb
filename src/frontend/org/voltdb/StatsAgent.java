@@ -45,8 +45,8 @@ public class StatsAgent extends OpsAgent
     {
         super("StatsAgent");
         StatsSelector selectors[] = StatsSelector.values();
-        for (int ii = 0; ii < selectors.length; ii++) {
-            m_registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
+        for (StatsSelector selector : selectors) {
+            m_registeredStatsSources.put(selector, new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
         }
     }
 
@@ -685,13 +685,7 @@ public class StatsAgent extends OpsAgent
                 m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        //putIfAbsent idiom, may return existing map value from another thread
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
-        if (statsSources == null) {
-            statsSources = new NonBlockingHashSet<StatsSource>();
-            siteIdToStatsSources.putIfAbsent(siteId, statsSources);
-        }
-        statsSources.add(source);
+        siteIdToStatsSources.computeIfAbsent(siteId, s -> new NonBlockingHashSet<>()).add(source);
     }
 
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
