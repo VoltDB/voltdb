@@ -382,7 +382,10 @@ public class ExportCoordinator {
                         for (String memberId: removedMembers) {
                             Integer hostId = m_hosts.remove(memberId);
                             if (hostId == null) {
-                                throw new IllegalStateException("Unknown memberId: " + memberId);
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Ignore removal of unknown memberId: " + memberId);
+                                }
+                                continue;
                             }
                             ExportSequenceNumberTracker tracker = m_trackers.remove(hostId);
                             if (tracker == null) {
