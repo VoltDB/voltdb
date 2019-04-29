@@ -1186,7 +1186,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                     StreamBlock block = iter.next();
 
-                    // If the block is already acked list it to be disarded
+                    // If the block is already acked list it to be discarded
                     if (block.lastSequenceNumber() < m_firstUnpolledSeqNo) {
                         blocksToDelete.add(block);
                         iter.remove();

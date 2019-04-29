@@ -559,13 +559,13 @@ public class ExportCoordinator {
      */
     public boolean isSafePoint(long ackedSeqNo) {
 
+        // Always truncate the trackers to the acked seqNo
+        m_trackers.forEach((k, v) -> v.truncate(ackedSeqNo));
+
         if (m_safePoint == 0L || m_safePoint > ackedSeqNo) {
             // Not waiting for safe point or not reached safe point
             return false;
         }
-
-        // Truncate the trackers and reset the safe point
-        m_trackers.forEach((k, v) -> v.truncate(ackedSeqNo));
         resetSafePoint();
         return true;
     }
