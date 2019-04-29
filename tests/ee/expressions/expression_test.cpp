@@ -57,7 +57,7 @@
 #include <boost/scoped_array.hpp>
 
 #include "harness.h"
-#include "jsoncpp/jsoncpp.h"
+#include "json/json.h"
 
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
