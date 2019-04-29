@@ -60,6 +60,11 @@ public class DummyTransactionTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("Unexpected DummyTransactionTask");
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 

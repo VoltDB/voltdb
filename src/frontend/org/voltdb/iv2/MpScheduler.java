@@ -255,7 +255,7 @@ public class MpScheduler extends Scheduler
                 // leave empty to ignore it on purpose
             }
             else if (message instanceof DumpMessage) {
-                // leave empty to ignore it on purpose
+                handleDumpMessage((DumpMessage)message);
             }
             else {
                 throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -678,6 +678,13 @@ public class MpScheduler extends Scheduler
         StringBuilder sb = new StringBuilder();
         sb.append("[dump] current truncation handle: ").append(TxnEgo.txnIdToString(m_repairLogTruncationHandle)).append("\n");
         m_pendingTasks.toString(sb);
+        hostLog.warn(sb.toString());
+    }
+
+    private void handleDumpMessage(DumpMessage message)
+    {
+        StringBuilder sb = new StringBuilder();
+        dumpStackTraceOnFirstSiteThread(message, sb);
         hostLog.warn(sb.toString());
     }
 }

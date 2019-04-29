@@ -238,7 +238,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         MpTransactionState txnState = (MpTransactionState)m_runner.getTxnState();
         assert(txnState != null);
 
-        int fragmentIndex = 0;
         for (SynthesizedPlanFragment pf : pfs) {
             assert (pf.parameters != null);
 
@@ -258,11 +257,11 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
             //to determine how the follow-up fragments are processed.
-            task.setBatch(fragmentIndex++);
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
+                task.setBatch(txnState.getNextFragmentIndex());
                 txnState.createAllParticipatingFragmentWork(task);
             } else {
                 // create one workunit for the current site
