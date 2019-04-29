@@ -29,7 +29,7 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
  */
 public interface Generation {
 
-    public void acceptMastership(int partitionId);
+    public void becomeLeader(int partitionId);
     public void close();
 
     public List<ExportStatsRow> getStats(boolean interval);

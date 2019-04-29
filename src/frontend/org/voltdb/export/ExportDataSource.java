@@ -26,20 +26,15 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
@@ -56,7 +51,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
-import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
@@ -67,7 +61,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
@@ -135,14 +128,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     // End sequence number of most recently pushed export buffer
     private long m_lastPushedSeqNo = 0L;
-    // Relinquish export master after this sequence number
-    private long m_seqNoToDrain = Long.MAX_VALUE;
-    // This EDS is export master when the flag set to true
-    private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
-    // This is set when mastership is going to transfer to another node.
-    private Integer m_newLeaderHostId = null;
-    // Sender HSId to query response map
-    private Map<Long, QueryResponse> m_queryResponses = new HashMap<>();
 
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
@@ -183,7 +168,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
     private MigrateRowsDeleter m_migrateRowsDeleter;
 
-    // Export coordinator manages Export Mastership and gap correction.
+    // Export coordinator manages Export Leadership, Mastership, and gap correction.
     private ExportCoordinator m_coordinator;
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
@@ -482,8 +467,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     // Package private as only used for tests
+    // FIXME: replace by test on isLeader?
     boolean isMaster() {
-        return m_mastershipAccepted.get();
+        return m_coordinator.isMaster();
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -559,7 +545,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // an ACK from itself, only replica stream can do.
             exportLog.info("Export queue gap resolved by releasing bytes at seqNo: "
                     + releaseSeqNo + ", resuming export, tracker map = " + m_gapTracker.toString());
-            assert (!m_mastershipAccepted.get());
             clearGap(true);
         }
 
@@ -721,7 +706,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_runEveryWhere) {
                     exportingRole = "XDCR";
                 } else {
-                    exportingRole = (m_mastershipAccepted.get() ? "TRUE" : "FALSE");
+                    exportingRole = (m_coordinator.isMaster() ? "TRUE" : "FALSE");
                 }
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
                         exportingRole, m_tupleCount, m_tuplesPending.get(),
@@ -939,9 +924,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_closed = true;
         m_ackMailboxRefs.set(null);
 
-        // Export mastership should have been released: force it.
-        m_mastershipAccepted.set(false);
-
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -1012,12 +994,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Callback from {@code ExportCoordinator} to resume polling after trackers
      * were collected from the other nodes; will try to satisfy a pending poll.
+     * Note that this callback is invoked from a runnable on the executor service.
      */
     public void resumePolling() {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Resuming polling...");
+        if (m_pollTask != null) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Resuming polling...");
+            }
+            pollImpl(m_pollTask);
+
+        } else {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("No pending poll request...");
+            }
         }
-        pollImpl(m_pollTask);
     }
 
     /**
@@ -1126,26 +1116,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return true;
     }
 
-    private void startMastershipMigration(long nextSeqNo) {
-        Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-        assert (gap != null && nextSeqNo >= gap.getFirst() && nextSeqNo <= gap.getSecond());
-        // If an existing mastership migration is in progress and is before hitting gap,
-        // don't start new migration.
-        if (m_seqNoToDrain >= nextSeqNo) {
-            exportLog.info("Export data missing from current queue [" +
-                    gap.getFirst() + ", " + gap.getSecond() +
-                    "] from " + this.toString() + ". Searching other sites for missing data.");
-            m_seqNoToDrain = nextSeqNo - 1;
-            mastershipCheckpoint(nextSeqNo - 1);
-        } else {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Export data missing from current queue [" +
-                        gap.getFirst() + ", " + gap.getSecond() +
-                        "] from " + this.toString() + ", migration in progress.");
-            }
-        }
-    }
-
     private enum ContinuityCheckResult {
         NONE, // Failed to check, stop the poll
         OK,
@@ -1178,62 +1148,83 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
 
-            // Handle all obvious cases where we must defer responding to this poll
-            // Note that once m_pollTask is set we're called on each buffer push
-            if (!m_mastershipAccepted.get() || !m_readyForPolling) {
+            // If not ready for polling, memorize the outstanding poll
+            if (!m_readyForPolling) {
                 if (m_pollTask == null) {
-                    // Memorize the outstanding poll
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Memorize polling for " + m_firstUnpolledSeqNo);
+                        exportLog.debug("Not ready for polling, memorize polling for " + m_firstUnpolledSeqNo);
                     }
                     m_pollTask = pollTask;
                 }
                 return;
             }
 
-            // Poll pending container before polling m_committedBuffers
+            // Poll pending container before polling m_committedBuffers.
+            // If a pending container is present, this means we were export master so
+            // don't check the export coordinator for this buffer.
             if (pollPendingContainer(pollTask)) {
                 return;
             }
 
-            StreamBlock first_unpolled_block = null;
-            //Assemble a list of blocks to delete so that they can be deleted
-            //outside of the m_committedBuffers critical section
-            ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
-            long nextSeqNo = m_firstUnpolledSeqNo;
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("polling data from seqNo " + nextSeqNo);
+                exportLog.debug("polling data from seqNo " + m_firstUnpolledSeqNo);
             }
 
-            //Inside this critical section do the work to find out
-            //what block should be returned by the next poll.
-            //Copying and sending the data will take place outside the critical section
+            // Scan m_committedBuffers to determine the fist seqNo to poll.
+            StreamBlock first_unpolled_block = null;
+
+            // Assemble a list of blocks already acked so that they can be discarded
+            // outside of the m_committedBuffers critical section.
+            ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
+
+            // Inside this critical section do the work to find out what block should
+            // be returned by the next poll. Copying and sending the data will take place
+            // outside the critical section.
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
                 while (iter.hasNext()) {
-                    // Find first unpolled data or gap
-                    StreamBlock block = iter.next();
-                    ContinuityCheckResult result = checkBufferContinuity(
-                            block.startSequenceNumber(), block.lastSequenceNumber(), nextSeqNo);
 
-                    if (result == ContinuityCheckResult.OK) {
-                        first_unpolled_block = block;
-                        m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
-                        break;
-                    } else if (result == ContinuityCheckResult.ACKED) {
+                    StreamBlock block = iter.next();
+
+                    // If the block is already acked list it to be disarded
+                    if (block.lastSequenceNumber() < m_firstUnpolledSeqNo) {
                         blocksToDelete.add(block);
                         iter.remove();
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("pollImpl delete polled buffer [" + block.startSequenceNumber() + "," +
+                            exportLog.debug("Delete polled buffer [" + block.startSequenceNumber() + "," +
                                     block.lastSequenceNumber() + "]");
                         }
-                    } else {
-                        assert (result == ContinuityCheckResult.GAP);
-                        // Put the poll aside until the gap is resolved
+                        continue;
+                    }
+
+                    // Are we the Export Master for the unpolled sequence number?
+                    if (!m_coordinator.isExportMaster(m_firstUnpolledSeqNo)) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Not export master for seqNo " + m_firstUnpolledSeqNo);
+                        }
+                        // Put the poll aside until we become Export Master
                         m_pollTask = pollTask;
-                        startMastershipMigration(nextSeqNo);
                         return;
                     }
+
+                    // If the next block is not in sequence, and we were told we're Export Master,
+                    // we are BLOCKED.
+                    if (m_firstUnpolledSeqNo < block.startSequenceNumber()) {
+                        // Put the poll aside until the gap is resolved or released
+                        m_status = StreamStatus.BLOCKED;
+                        m_queueGap = block.startSequenceNumber() - m_firstUnpolledSeqNo;
+                        m_pollTask = pollTask;
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Blocked on " + m_firstUnpolledSeqNo
+                                    + ", until " + block.startSequenceNumber());
+                        }
+                        return;
+                    }
+
+                    // We have our next block
+                    first_unpolled_block = block;
+                    m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
+                    break;
                 }
             } catch (RuntimeException e) {
                 if (e.getCause() instanceof IOException) {
@@ -1242,7 +1233,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     throw e;
                 }
             } finally {
-                //Try hard not to leak memory
+                // Discard the blocks
                 for (StreamBlock sb : blocksToDelete) {
                     int tuplesDeleted = m_gapTracker.truncate(sb.lastSequenceNumber());
                     m_tuplesPending.addAndGet(-tuplesDeleted);
@@ -1250,14 +1241,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
 
-            //If there are no unpolled blocks return the firstUnpolledUSO with no data
             if (first_unpolled_block == null) {
+                //If there are no unpolled blocks, memorize the pending poll.
                 m_pollTask = pollTask;
             } else {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
-                    assert (m_mastershipAccepted.get()); // only master stream can resolve the data gap
+                    assert (m_coordinator.isMaster()); // only master stream can resolve the data gap
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     clearGap(true);
                 }
@@ -1324,7 +1315,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         ackImpl(lastSeqNo);
                     }
                     forwardAckToOtherReplicas();
-                    if (m_migrateRowsDeleter != null && m_mastershipAccepted.get()) {
+                    if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
                         m_migrateRowsDeleter.delete(commitSpHandle);
                     }
                 } catch (Exception e) {
@@ -1378,7 +1369,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // master stream resend the event when the export mailbox is aware of new streams.
     public void forwardAckToNewJoinedReplicas(Set<Long> newReplicas) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
-        if (!m_mastershipAccepted.get() || m_runEveryWhere) {
+        if (!m_coordinator.isMaster() || m_runEveryWhere) {
             return;
         }
 
@@ -1434,28 +1425,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void remoteAck(final long seq) {
 
-        //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    // ENG-12282: A race condition between export data source
-                    // master promotion and getting acks from the previous
-                    // failed master can occur. The failed master could have
-                    // sent out an ack with Long.MIN and fails immediately after
-                    // that, which causes a new master to be elected. The
-                    // election and the receiving of this ack message happens on
-                    // two different threads on the new master. If it's promoted
-                    // while processing the ack, the ack may call `m_onDrain`
-                    // while the other thread is polling buffers, which may
-                    // never get discarded.
-                    //
-                    // Now that we are on the same thread, check to see if we
-                    // are already promoted to be the master. If so, ignore the
-                    // ack.
-                    if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
-                        setCommittedSeqNo(seq);
-                        ackImpl(seq);
+                    if (m_es.isShutdown()) {
+                        return;
+                    }
+
+                    // Reflect the remote ack in our state
+                    setCommittedSeqNo(seq);
+                    ackImpl(seq);
+
+                    // If we passed a safe point, try satisfying a pending poll request
+                    if (m_coordinator.isSafePoint(seq)) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Passed safe point " + seq + ", resume polling.");
+                        }
+                        pollImpl(m_pollTask);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -1472,7 +1459,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 releaseExportBytes(seq);
                 handleDrainedSource();
-                mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
@@ -1504,153 +1490,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          return false;
      }
 
-     /**
-     * indicate the partition leader has been migrated away
-     * prepare to give up the mastership,
-     * has to drain existing PBD and then notify new leaders (through ack)
-     */
-    void prepareTransferMastership(int newLeaderHostId) {
-        if (!m_mastershipAccepted.get()) {
-            return;
-        }
-        m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                // memorize end sequence number of the most recently pushed buffer from EE
-                // but if we already wait to switch mastership, don't update the drain-to
-                // sequence number to a greater number
-                m_seqNoToDrain = Math.min(m_seqNoToDrain, m_lastPushedSeqNo);
-                m_newLeaderHostId = newLeaderHostId;
-                // if no new buffer to be drained, send the migrate event right away
-                mastershipCheckpoint(m_lastReleasedSeqNo);
-            }
-        });
-    }
-
-    private void sendGiveMastershipMessage(int newLeaderHostId) {
-        if (m_runEveryWhere) {
-            return;
-        }
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        if (p == null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending give mastership message.");
-            }
-            return;
-        }
-        Mailbox mbx = p.getFirst();
-        if (mbx != null && p.getSecond().size() > 0 ) {
-            // msg type(1) + partition:int(4) + length:int(4) +
-            // signaturesBytes.length + curSeq:long(8).
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.GIVE_MASTERSHIP);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(m_committedSeqNo);
-
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-
-            for(Long siteId: p.getSecond()) {
-                // Just send to the ack mailbox on the new master
-                if (CoreUtils.getHostIdFromHSId(siteId) == newLeaderHostId) {
-                    mbx.send(siteId, bpm);
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug(toString() + " send GIVE_MASTERSHIP message to " +
-                                CoreUtils.hsIdToString(siteId)
-                                + " with sequence number " + m_committedSeqNo);
-                    }
-                    break;
-                }
-            }
-        }
-        unacceptMastership();
-    }
-
-    private void sendTakeMastershipMessage() {
-        m_queryResponses.clear();
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        if (p == null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership message.");
-            }
-            return;
-        }
-        Mailbox mbx = p.getFirst();
-        m_currentRequestId = System.nanoTime();
-        if (mbx != null && p.getSecond().size() > 0) {
-            // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-            // requestId(8)
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.TAKE_MASTERSHIP);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(m_currentRequestId);
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-            for( Long siteId: p.getSecond()) {
-                mbx.send(siteId, bpm);
-            }
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send TAKE_MASTERSHIP message(" + m_currentRequestId +
-                        ") for partition " + m_partitionId + " source signature " + m_tableName +
-                        " from " + CoreUtils.hsIdToString(mbx.getHSId()) +
-                        " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
-            }
-        } else {
-            // There is no other replica, promote myself.
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("No replicas, accepting mastership");
-            }
-            acceptMastership();
-        }
-    }
-
-    private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        if (p == null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending query response message.");
-            }
-            return;
-        }
-        Mailbox mbx = p.getFirst();
-        if (mbx != null) {
-            // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-            // requestId(8) + lastSeq(8)
-            int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.QUERY_RESPONSE);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(requestId);
-            buf.putLong(lastSeq);
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-            mbx.send(senderHSId, bpm);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Partition " + m_partitionId + " mailbox hsid (" +
-                        CoreUtils.hsIdToString(mbx.getHSId()) + ") send QUERY_RESPONSE message(" +
-                        requestId + "," + lastSeq + ") to " + CoreUtils.hsIdToString(senderHSId));
-            }
-        }
-    }
-
-    /**
-     * Release mastership, always executed synchronously.
-     * Note: package private for invocation by JUnit test cases.
-     */
-    public void unacceptMastership() {
-
-        exportLog.info("Releasing mastership for " + this);
-        m_mastershipAccepted.set(false);
-    }
-
     /**
      * On processor shutdown, clear pending poll and expect to be reactivated by new
-     * {@code GuestProcessor} instance; preserve masterhip and status information.
+     * {@code GuestProcessor} instance.
      */
     public void onProcessorShutdown() {
         m_es.execute(new Runnable() {
@@ -1658,8 +1500,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 exportLog.info("Handling processor shutdown for " + this);
 
-                m_seqNoToDrain = Long.MAX_VALUE;
-                m_newLeaderHostId = null;
                 m_pollTask = null;
                 m_readyForPolling = false;
             }
@@ -1667,35 +1507,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
-     * Accept mastership and run a pending polling task.
+     * Become partition leader.
      */
-    public void acceptMastership() {
+    public void becomeLeader() {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (m_mastershipAccepted.get()) {
+                if (m_coordinator.isLeader()) {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+                        exportLog.debug("Already the leader of stream " + m_tableName + ", partition " + getPartitionId());
                     }
                     return;
                 }
                 try {
-                    m_coordinator.becomeLeader();
                     if (!m_es.isShutdown() || !m_closed) {
-                        exportLog.info("Accepting mastership");
-                        if (m_mastershipAccepted.compareAndSet(false, true)) {
-                            // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
-                            m_queryResponses.clear();
-                            if (m_pollTask != null) {
-                                if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("New master executes pending poll");
-                                }
-                                pollImpl(m_pollTask);
-                            }
-                        }
+                        exportLog.debug("Becoming the leader of stream " + m_tableName + ", partition " + getPartitionId());
+                        m_coordinator.becomeLeader();
                     }
                 } catch (Exception e) {
-                    exportLog.error("Error in accepting mastership", e);
+                    exportLog.error("Error in becoming leader", e);
                 }
             }
         });
@@ -1721,255 +1551,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_es;
     }
 
-    private void sendGapQuery() {
-
-        // jump over a gap for run everywhere
-        if (m_runEveryWhere) {
-            // It's unlikely but thinking switch regular stream to replicated stream on the fly.
-            if (m_gapTracker.getFirstGap() != null) {
-                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                exportLog.info(toString() + " skipped stream gap because it's a replicated stream, " +
-                        "setting next poll sequence number to " + m_firstUnpolledSeqNo);
-            }
-            clearGap(false);
-            return;
-        }
-
-        if (m_mastershipAccepted.get() &&  /* active stream */
-                !m_gapTracker.isEmpty() &&  /* finish initialization */
-                m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
-            m_queryResponses.clear();
-            Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-            if (p == null) {
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug(ExportDataSource.this.toString() + ": Skip sending gap query.");
-                }
-                return;
-            }
-            Mailbox mbx = p.getFirst();
-            m_currentRequestId = System.nanoTime();
-            if (mbx != null && p.getSecond().size() > 0) {
-                // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-                // requestId(8) + gapStart(8)
-                final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
-                ByteBuffer buf = ByteBuffer.allocate(msgLen);
-                buf.put(ExportManager.GAP_QUERY);
-                buf.putInt(m_partitionId);
-                buf.putInt(m_signatureBytes.length);
-                buf.put(m_signatureBytes);
-                buf.putLong(m_currentRequestId);
-                buf.putLong(m_gapTracker.getSafePoint() + 1);
-                BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-                for( Long siteId: p.getSecond()) {
-                    mbx.send(siteId, bpm);
-                }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
-                            ") from " + CoreUtils.hsIdToString(mbx.getHSId()) +
-                            " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
-                }
-            } else {
-                setStatus(StreamStatus.BLOCKED);
-                Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
-            }
-        }
-    }
-
-    public void queryForBestCandidate() {
-        if (m_runEveryWhere) {
-            return;
-        }
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                sendGapQuery();
-            }
-        });
-    }
-
-    void takeMastership() {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                // Skip current master or in run everywhere mode
-                if (m_mastershipAccepted.get() || m_runEveryWhere) {
-                    return;
-                }
-                if (m_status == StreamStatus.BLOCKED) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug(ExportDataSource.this.toString() + " skips taking mastership.");
-                    }
-                    return;
-                }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug(ExportDataSource.this.toString() + " is going to export data because partition leader is on current node.");
-                }
-                // Query export membership if current stream is not the master
-                sendTakeMastershipMessage();
-            }
-        });
-    }
-
-    // Query whether a master exists for the given partition, if not try to promote the local data source.
-    public void handleQueryMessage(final long senderHSId, long requestId, long gapStart) {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    long lastSeq = Long.MIN_VALUE;
-                    Pair<Long, Long> range = m_gapTracker.getRangeContaining(gapStart);
-                    if (range != null) {
-                        lastSeq = range.getSecond();
-                    }
-                    sendQueryResponse(senderHSId, requestId, lastSeq);
-                }
-            });
-    }
-
-    public void handleQueryResponse(long sendHsId, long requestId, long lastSeq) {
-        if (m_currentRequestId == requestId && m_mastershipAccepted.get()) {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    m_queryResponses.put(sendHsId, new QueryResponse(lastSeq));
-                    Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-                    if (p == null) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore query response.");
-                        }
-                        return;
-                    }
-                    if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
-                        List<Entry<Long, QueryResponse>> candidates =
-                                m_queryResponses.entrySet().stream()
-                                       .filter(s -> s.getValue().canCoverGap())
-                                       .collect(Collectors.toList());
-                        Entry<Long, QueryResponse> bestCandidate = null;
-                        for (Entry<Long, QueryResponse> candidate : candidates) {
-                            if (bestCandidate == null) {
-                                bestCandidate = candidate;
-                            } else if (candidate.getValue().lastSeq > bestCandidate.getValue().lastSeq) {
-                                bestCandidate = candidate;
-                            }
-                        }
-                        if (bestCandidate == null) {
-                            // if current stream doesn't hit gap, just leave it as is.
-                            Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                            if (gap == null || m_firstUnpolledSeqNo < gap.getFirst()) {
-                                return;
-                            }
-                            setStatus(StreamStatus.BLOCKED);
-                            m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
-                            if (voltdb.isClusterComplete()) {
-                                if (ENABLE_AUTO_GAP_RELEASE) {
-                                    processStreamControl(OperationMode.RELEASE);
-                                } else {
-                                    // Show warning only in full cluster.
-                                    String warnMsg = "Export is blocked, missing [" +
-                                            gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                                            ExportDataSource.this.toString() +
-                                            ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin export release' command to skip the missing data.";
-                                    exportLog.warn(warnMsg);
-                                    consoleLog.warn(warnMsg);
-                                    SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
-                                    if (snmp != null) {
-                                        try {
-                                            snmp.streamBlocked(warnMsg);
-                                        } catch (Throwable t) {
-                                            VoltLogger log = new VoltLogger("HOST");
-                                            log.warn("failed to issue a streamBlocked SNMP trap", t);
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            setStatus(StreamStatus.BLOCKED);
-                            // time to give up master and give it to the best candidate
-                            m_newLeaderHostId = CoreUtils.getHostIdFromHSId(bestCandidate.getKey());
-                            exportLog.info("Host " + m_newLeaderHostId + " has the missing export data for " + ExportDataSource.this.toString());
-                            // drainedTo sequence number should haven't been changed.
-                            mastershipCheckpoint(m_lastReleasedSeqNo);
-                        }
-                    }
-                }
-            });
-        }
-    }
-
-    public void handleTakeMastershipMessage(long senderHsId, long requestId) {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (m_mastershipAccepted.get()) {
-                    m_newLeaderHostId = CoreUtils.getHostIdFromHSId(senderHsId);
-                    // mark the trigger
-                    m_seqNoToDrain = Math.min(m_seqNoToDrain, m_lastPushedSeqNo);
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Delay mastership response to seqNo " + m_seqNoToDrain);
-                    }
-                    mastershipCheckpoint(m_lastReleasedSeqNo);
-                } else {
-                    sendTakeMastershipResponse(senderHsId, requestId);
-                }
-            }
-        });
-    }
-
-    public void sendTakeMastershipResponse(long senderHsId, long requestId) {
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        if (p == null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(ExportDataSource.this.toString() + ": Skip sending take mastership response message.");
-            }
-            return;
-        }
-        Mailbox mbx = p.getFirst();
-        if (mbx != null) {
-            // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-            // requestId(8)
-            int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.TAKE_MASTERSHIP_RESPONSE);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(requestId);
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-            mbx.send(senderHsId, bpm);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Partition " + m_partitionId + " mailbox hsid (" +
-                        CoreUtils.hsIdToString(mbx.getHSId()) +
-                        ") send TAKE_MASTERSHIP_RESPONSE message(" +
-                        requestId + ") to " + CoreUtils.hsIdToString(senderHsId));
-            }
-        }
-    }
-
-    public void handleTakeMastershipResponse(long sendHsId, long requestId) {
-        if (m_currentRequestId == requestId && !m_mastershipAccepted.get()) {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    m_queryResponses.put(sendHsId, null);
-                    Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-                    if (p == null) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(ExportDataSource.this.toString() + ": Ignore take mastership response.");
-                        }
-                        return;
-                    }
-                    if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
-                        acceptMastership();
-                    }
-                }
-            });
-        }
-    }
-
     public byte[] getTableSignature() {
         return m_signatureBytes;
     }
@@ -1988,28 +1569,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     @Override
     public String toString() {
-        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
-           + " (" + m_status + ", " + (m_mastershipAccepted.get() ? "Master":"Replica") + ")";
-    }
-
-    private void mastershipCheckpoint(long seq) {
-        if (m_runEveryWhere || !m_mastershipAccepted.get()) {
-            return;
-        }
-        if (exportLog.isTraceEnabled()) {
-            exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
-                    " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
-                    " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_committedSeqNo " + m_committedSeqNo +
-                    " m_lastPushedSeqNo " + m_lastPushedSeqNo);
-        }
-        // time to give away leadership
-        if (seq >= m_seqNoToDrain) {
-            if (m_newLeaderHostId != null) {
-                sendGiveMastershipMessage(m_newLeaderHostId);
-            } else {
-                sendGapQuery();
+        StringBuilder sb = new StringBuilder("ExportDataSource for table ")
+                .append(getTableName())
+                .append(" partition ")
+                .append(getPartitionId())
+                .append("(")
+                .append(m_status)
+                ;
+        if (m_coordinator != null) {
+            sb.append(", ");
+            sb.append((m_coordinator.isMaster() ? "Master":"Replica"));
+            if (m_coordinator.isLeader()) {
+                sb.append(", Leader");
             }
         }
+        sb.append(")");
+        return sb.toString();
     }
 
     // During rejoin it's possible that the stream is blocked by a gap before the export
@@ -2029,6 +1604,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedSeqNo = m_lastReleasedSeqNo;
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Reset state in " + (isRejoin ? "REJOIN" : "RECOVER")
+                    + ", initial seqNo " + initialSequenceNumber + "last released/committed " + m_lastReleasedSeqNo
+                    + ", first unpolled " + m_firstUnpolledSeqNo);
+        }
     }
 
     public String getTarget() {
@@ -2038,7 +1618,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public synchronized boolean processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
-            if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
+            if (m_status == StreamStatus.BLOCKED && m_gapTracker.getFirstGap() != null) {
                 long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
                 exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
                         "] and cluster is complete. Skipping to next available transaction for " + this.toString());
@@ -2049,9 +1629,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        if (!m_mastershipAccepted.get() || m_pollTask == null) {
-                            return;
-                        }
                         try {
                             pollImpl(m_pollTask);
                         } catch (Exception e) {
@@ -2072,7 +1649,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void clearGap(boolean setActive) {
         m_queueGap = 0;
-        m_seqNoToDrain = Long.MAX_VALUE;
         if (setActive) {
             setStatus(StreamStatus.ACTIVE);
         }

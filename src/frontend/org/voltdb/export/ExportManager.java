@@ -102,37 +102,6 @@ public class ExportManager
     public static final byte RELEASE_BUFFER = 1;
 
     /**
-     * Master sends GIVE_MASTERSHIP to one replica to transfer leadership.
-     */
-    public static final byte GIVE_MASTERSHIP = 2;
-
-    /**
-     * Master sends GAP_QUERY to all nodes to know: can you cover the next sequence number?
-     *
-     * This is called when master hits gap in the stream.
-     */
-    public static final byte GAP_QUERY = 3;
-
-    /**
-     * Node that receives GAP_QUERY sends back QUERY_RESPONSE with the information that whether
-     * it has data for the next sequence number.
-     */
-    public static final byte QUERY_RESPONSE = 4;
-
-    /**
-     * Data sources under new SPI or SPI who receives failed host notification
-     * sends TASK_MASTERSHIP to all nodes to ask master to transfer leadership back.
-     * If master doesn't exist promote itself to be master.
-     */
-    public static final byte TAKE_MASTERSHIP = 5;
-
-    /**
-     * Node that receives TAKE_MASTERSHIP sends back TAKE_MASTERSHIP_RESPONSE to indicate
-     * it's not master.
-     */
-    public static final byte TAKE_MASTERSHIP_RESPONSE = 6;
-
-    /**
      * Thrown if the initial setup of the loader fails
      */
     public static class SetupException extends Exception {
@@ -271,51 +240,16 @@ public class ExportManager
 
     /**
      * Indicate to associated {@link ExportGeneration}s to become
-     * masters for the given partition id
+     * leaders for the given partition id
      * @param partitionId
      */
-    synchronized public void takeMastership(int partitionId) {
+    synchronized public void becomeLeader(int partitionId) {
         m_masterOfPartitions.add(partitionId);
         ExportGeneration generation = m_generation.get();
         if (generation == null) {
             return;
         }
-        generation.takeMastership(partitionId);
-    }
-
-    /**
-     * Indicate local partition became the SPI Leader
-     * still waiting for old leader (ack) to trigger take over mastership
-     * @param partitionId
-     */
-    synchronized public void prepareAcceptMastership(int partitionId) {
-        // can't acquire mastership twice for the same partition id
-        if (!m_masterOfPartitions.add(partitionId)) {
-            return;
-        }
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export streams on local partition " + partitionId + " will become master.");
-        }
-    }
-
-    /**
-     * Indicate to associated {@link ExportGeneration}s to
-     * prepare give up mastership for the given partition id to hostId
-     * @param partitionId
-     */
-    synchronized public void prepareTransferMastership(int partitionId, int hostId) {
-        // remove mastership for partition id, so when failure happen during the mastership transfer
-        // this node can be elected as new master again.
-        m_masterOfPartitions.remove(partitionId);
-
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export stream masters on " + partitionId + " are going to migrate away");
-        }
-        ExportGeneration generation = m_generation.get();
-        if (generation == null) {
-            return;
-        }
-        generation.prepareTransferMastership(partitionId, hostId);
+        generation.becomeLeader(partitionId);
     }
 
     /**
@@ -557,17 +491,17 @@ public class ExportManager
                 newProcessor.readyForData();
 
                 /*
-                 * When it isn't startup, it is necessary to kick things off with the mastership
+                 * When it isn't startup, it is necessary to kick things off with the leadership
                  * settings that already exist
                  *
                  * This strategy is the one that piggy backs on
-                 * regular partition mastership distribution to determine
+                 * regular partition leadership distribution to determine
                  * who will process export data for different partitions.
-                 * We stashed away all the ones we have mastership of
+                 * We stashed away all the ones we have leadershipof
                  * in m_masterOfPartitions
                  */
                 for (Integer partitionId: m_masterOfPartitions) {
-                    generation.acceptMastership(partitionId);
+                    generation.becomeLeader(partitionId);
                 }
             }
             catch (final ClassNotFoundException e) {
@@ -627,9 +561,7 @@ public class ExportManager
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Set mastership on partition " + partitionId);
             }
-            // Request mastership instead of unilaterally grabbing it,
-            // because a replica may be filling a gap right now.
-            generation.takeMastership(partitionId);
+            generation.becomeLeader(partitionId);
         }
     }
 

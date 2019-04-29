@@ -491,7 +491,7 @@ public class ExportCoordinator {
             task.setInitialState(initialState);
             task.registerStateMachineWithManager(initialState);
 
-            exportLog.info("Created ssm for topic " + topicName + ", and hostId " + m_hostId
+            exportLog.info("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
 
         } catch (Exception e) {
@@ -509,7 +509,7 @@ public class ExportCoordinator {
      */
     public void shutdown() throws InterruptedException {
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Shutting down...");
+            exportLog.debug("Export coordinator shutting down...");
         }
         m_ssm.ShutdownSynchronizedStatesManager();
     }
@@ -520,6 +520,7 @@ public class ExportCoordinator {
     public void becomeLeader() {
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
+            return;
         }
 
         m_task.invoke(new Runnable() {

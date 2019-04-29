@@ -237,7 +237,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
 
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.acceptMastership(m_part);
+        m_exportGeneration.becomeLeader(m_part);
 
         int retries = 4000;
         long seqNo = 1L;

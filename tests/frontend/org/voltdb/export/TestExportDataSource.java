@@ -102,7 +102,7 @@ public class TestExportDataSource extends TestCase {
     class TestGeneration implements Generation {
 
         @Override
-        public void acceptMastership(int partitionId) {
+        public void becomeLeader(int partitionId) {
         }
 
         @Override
@@ -240,7 +240,7 @@ public class TestExportDataSource extends TestCase {
                 TEST_DIR.getAbsolutePath());
         try {
             s.setReadyForPolling(true);
-            s.acceptMastership();
+            s.becomeLeader();
             waitForMaster(s);
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
@@ -330,7 +330,7 @@ public class TestExportDataSource extends TestCase {
                 TEST_DIR.getAbsolutePath());
         try {
             s.setReadyForPolling(true);
-            s.acceptMastership();
+            s.becomeLeader();
             waitForMaster(s);
 
             // Set ready for polling to enable satisfying fut on push
@@ -412,7 +412,7 @@ public class TestExportDataSource extends TestCase {
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
         s.setReadyForPolling(true);
-        s.acceptMastership();
+        s.becomeLeader();
         waitForMaster(s);
 
         ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
@@ -536,7 +536,7 @@ public class TestExportDataSource extends TestCase {
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
-            s.acceptMastership();
+            s.becomeLeader();
             waitForMaster(s);
 
             //Poll and check before and after discard segment files.
@@ -547,8 +547,6 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
-
-            s.unacceptMastership();
 
             //Last segment is always kept.
             s.remoteAck(2000);
@@ -576,7 +574,7 @@ public class TestExportDataSource extends TestCase {
                 TEST_DIR.getAbsolutePath());
         try {
             s.setReadyForPolling(true);
-            s.acceptMastership();
+            s.becomeLeader();
             waitForMaster(s);
 
             // Push 2 buffers with contiguous sequence numbers
@@ -652,7 +650,7 @@ public class TestExportDataSource extends TestCase {
                 TEST_DIR.getAbsolutePath());
         try {
             s.setReadyForPolling(true);
-            s.acceptMastership();
+            s.becomeLeader();
             waitForMaster(s);
 
             // Push 4 buffers with contiguous sequence numbers
