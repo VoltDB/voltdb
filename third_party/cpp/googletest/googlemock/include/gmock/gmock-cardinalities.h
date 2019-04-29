@@ -26,8 +26,7 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Author: wan@google.com (Zhanyong Wan)
+
 
 // Google Mock - a framework for writing C++ mock classes.
 //
@@ -35,13 +34,19 @@
 // cardinalities can be defined by the user implementing the
 // CardinalityInterface interface if necessary.
 
+// GOOGLETEST_CM0002 DO NOT DELETE
+
 #ifndef GMOCK_INCLUDE_GMOCK_GMOCK_CARDINALITIES_H_
 #define GMOCK_INCLUDE_GMOCK_GMOCK_CARDINALITIES_H_
 
 #include <limits.h>
+#include <memory>
 #include <ostream>  // NOLINT
 #include "gmock/internal/gmock-port.h"
 #include "gtest/gtest.h"
+
+GTEST_DISABLE_MSC_WARNINGS_PUSH_(4251 \
+/* class A needs to have dll-interface to be used by clients of class B */)
 
 namespace testing {
 
@@ -77,9 +82,8 @@ class CardinalityInterface {
 
 // A Cardinality is a copyable and IMMUTABLE (except by assignment)
 // object that specifies how many times a mock function is expected to
-// be called.  The implementation of Cardinality is just a linked_ptr
-// to const CardinalityInterface, so copying is fairly cheap.
-// Don't inherit from Cardinality!
+// be called.  The implementation of Cardinality is just a std::shared_ptr
+// to const CardinalityInterface. Don't inherit from Cardinality!
 class GTEST_API_ Cardinality {
  public:
   // Constructs a null cardinality.  Needed for storing Cardinality
@@ -119,7 +123,7 @@ class GTEST_API_ Cardinality {
                                         ::std::ostream* os);
 
  private:
-  internal::linked_ptr<const CardinalityInterface> impl_;
+  std::shared_ptr<const CardinalityInterface> impl_;
 };
 
 // Creates a cardinality that allows at least n calls.
@@ -143,5 +147,7 @@ inline Cardinality MakeCardinality(const CardinalityInterface* c) {
 }
 
 }  // namespace testing
+
+GTEST_DISABLE_MSC_WARNINGS_POP_()  //  4251
 
 #endif  // GMOCK_INCLUDE_GMOCK_GMOCK_CARDINALITIES_H_
