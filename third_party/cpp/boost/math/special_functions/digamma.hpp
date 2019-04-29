@@ -8,14 +8,28 @@
 
 #ifdef _MSC_VER
 #pragma once
+#pragma warning(push)
+#pragma warning(disable:4702) // Unreachable code (release mode only warning)
 #endif
 
+#include <boost/math/special_functions/math_fwd.hpp>
 #include <boost/math/tools/rational.hpp>
+#include <boost/math/tools/series.hpp>
 #include <boost/math/tools/promotion.hpp>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/mpl/comparison.hpp>
 #include <boost/math/tools/big_constant.hpp>
+
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
 
 namespace boost{
 namespace math{
@@ -26,7 +40,8 @@ namespace detail{
 //
 inline unsigned digamma_large_lim(const mpl::int_<0>*)
 {  return 20;  }
-
+inline unsigned digamma_large_lim(const mpl::int_<113>*)
+{  return 20;  }
 inline unsigned digamma_large_lim(const void*)
 {  return 10;  }
 //
@@ -40,7 +55,7 @@ inline unsigned digamma_large_lim(const void*)
 // This first one gives 34-digit precision for x >= 20:
 //
 template <class T>
-inline T digamma_imp_large(T x, const mpl::int_<0>*)
+inline T digamma_imp_large(T x, const mpl::int_<113>*)
 {
    BOOST_MATH_STD_USING // ADL of std functions.
    static const T P[] = {
@@ -140,12 +155,47 @@ inline T digamma_imp_large(T x, const mpl::int_<24>*)
    return result;
 }
 //
+// Fully generic asymptotic expansion in terms of Bernoulli numbers, see:
+// http://functions.wolfram.com/06.14.06.0012.01
+//
+template <class T>
+struct digamma_series_func
+{
+private:
+   int k;
+   T xx;
+   T term;
+public:
+   digamma_series_func(T x) : k(1), xx(x * x), term(1 / (x * x)) {}
+   T operator()()
+   {
+      T result = term * boost::math::bernoulli_b2n<T>(k) / (2 * k);
+      term /= xx;
+      ++k;
+      return result;
+   }
+   typedef T result_type;
+};
+
+template <class T, class Policy>
+inline T digamma_imp_large(T x, const Policy& pol, const mpl::int_<0>*)
+{
+   BOOST_MATH_STD_USING
+   digamma_series_func<T> s(x);
+   T result = log(x) - 1 / (2 * x);
+   boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
+   result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, -result);
+   result = -result;
+   policies::check_series_iterations<T>("boost::math::digamma<%1%>(%1%)", max_iter, pol);
+   return result;
+}
+//
 // Now follow rational approximations over the range [1,2].
 //
 // 35-digit precision:
 //
 template <class T>
-T digamma_imp_1_2(T x, const mpl::int_<0>*)
+T digamma_imp_1_2(T x, const mpl::int_<113>*)
 {
    //
    // Now the approximation, we use the form:
@@ -180,7 +230,7 @@ T digamma_imp_1_2(T x, const mpl::int_<0>*)
       BOOST_MATH_BIG_CONSTANT(T, 113, -0.20327832297631728077731148515093164955e-6)
    };
    static const T Q[] = {    
-      1,
+      BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
       BOOST_MATH_BIG_CONSTANT(T, 113, 2.6210924610812025425088411043163287646),
       BOOST_MATH_BIG_CONSTANT(T, 113, 2.6850757078559596612621337395886392594),
       BOOST_MATH_BIG_CONSTANT(T, 113, 1.4320913706209965531250495490639289418),
@@ -236,7 +286,7 @@ T digamma_imp_1_2(T x, const mpl::int_<64>*)
       BOOST_MATH_BIG_CONSTANT(T, 64, -0.00289268368333918761452)
    };
    static const T Q[] = {    
-      1,
+      BOOST_MATH_BIG_CONSTANT(T, 64, 1.0),
       BOOST_MATH_BIG_CONSTANT(T, 64, 2.1195759927055347547),
       BOOST_MATH_BIG_CONSTANT(T, 64, 1.54350554664961128724),
       BOOST_MATH_BIG_CONSTANT(T, 64, 0.486986018231042975162),
@@ -286,7 +336,7 @@ T digamma_imp_1_2(T x, const mpl::int_<53>*)
       BOOST_MATH_BIG_CONSTANT(T, 53, -0.0020713321167745952)
    };
    static const T Q[] = {    
-      BOOST_MATH_BIG_CONSTANT(T, 53, 1),
+      BOOST_MATH_BIG_CONSTANT(T, 53, 1.0),
       BOOST_MATH_BIG_CONSTANT(T, 53, 2.0767117023730469),
       BOOST_MATH_BIG_CONSTANT(T, 53, 1.4606242909763515),
       BOOST_MATH_BIG_CONSTANT(T, 53, 0.43593529692665969),
@@ -324,16 +374,16 @@ inline T digamma_imp_1_2(T x, const mpl::int_<24>*)
    static const T root = 1532632.0f / 1048576;
    static const T root_minor = static_cast<T>(0.3700660185912626595423257213284682051735604e-6L);
    static const T P[] = {    
-      0.25479851023250261e0,
-      -0.44981331915268368e0,
-      -0.43916936919946835e0,
-      -0.61041765350579073e-1
+      0.25479851023250261e0f,
+      -0.44981331915268368e0f,
+      -0.43916936919946835e0f,
+      -0.61041765350579073e-1f
    };
    static const T Q[] = {    
       0.1e1,
-      0.15890202430554952e1,
-      0.65341249856146947e0,
-      0.63851690523355715e-1
+      0.15890202430554952e1f,
+      0.65341249856146947e0f,
+      0.63851690523355715e-1f
    };
    T g = x - root;
    g -= root_minor;
@@ -356,7 +406,7 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
    //
    // Check for negative arguments and use reflection:
    //
-   if(x < 0)
+   if(x <= -1)
    {
       // Reflect:
       x = 1 - x;
@@ -376,6 +426,8 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
       }
       result = constants::pi<T>() / tan(constants::pi<T>() * remainder);
    }
+   if(x == 0)
+      return policies::raise_pole_error<T>("boost::math::digamma<%1%>(%1%)", 0, x, pol);
    //
    // If we're above the lower-limit for the
    // asymptotic expansion then use it:
@@ -397,9 +449,9 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
       //
       // If x < 1 use recurrance to shift to > 1:
       //
-      if(x < 1)
+      while(x < 1)
       {
-         result = -1/x;
+         result -= 1/x;
          x += 1;
       }
       result += digamma_imp_1_2(x, t);
@@ -407,6 +459,98 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
    return result;
 }
 
+template <class T, class Policy>
+T digamma_imp(T x, const mpl::int_<0>* t, const Policy& pol)
+{
+   //
+   // This handles reflection of negative arguments, and all our
+   // error handling, then forwards to the T-specific approximation.
+   //
+   BOOST_MATH_STD_USING // ADL of std functions.
+
+   T result = 0;
+   //
+   // Check for negative arguments and use reflection:
+   //
+   if(x <= -1)
+   {
+      // Reflect:
+      x = 1 - x;
+      // Argument reduction for tan:
+      T remainder = x - floor(x);
+      // Shift to negative if > 0.5:
+      if(remainder > 0.5)
+      {
+         remainder -= 1;
+      }
+      //
+      // check for evaluation at a negative pole:
+      //
+      if(remainder == 0)
+      {
+         return policies::raise_pole_error<T>("boost::math::digamma<%1%>(%1%)", 0, (1 - x), pol);
+      }
+      result = constants::pi<T>() / tan(constants::pi<T>() * remainder);
+   }
+   if(x == 0)
+      return policies::raise_pole_error<T>("boost::math::digamma<%1%>(%1%)", 0, x, pol);
+   //
+   // If we're above the lower-limit for the
+   // asymptotic expansion then use it, the
+   // limit is a linear interpolation with
+   // limit = 10 at 50 bit precision and
+   // limit = 250 at 1000 bit precision.
+   //
+   int lim = 10 + ((tools::digits<T>() - 50) * 240L) / 950;
+   T two_x = ldexp(x, 1);
+   if(x >= lim)
+   {
+      result += digamma_imp_large(x, pol, t);
+   }
+   else if(floor(x) == x)
+   {
+      //
+      // Special case for integer arguments, see
+      // http://functions.wolfram.com/06.14.03.0001.01
+      //
+      result = -constants::euler<T, Policy>();
+      T val = 1;
+      while(val < x)
+      {
+         result += 1 / val;
+         val += 1;
+      }
+   }
+   else if(floor(two_x) == two_x)
+   {
+      //
+      // Special case for half integer arguments, see:
+      // http://functions.wolfram.com/06.14.03.0007.01
+      //
+      result = -2 * constants::ln_two<T, Policy>() - constants::euler<T, Policy>();
+      int n = itrunc(x);
+      if(n)
+      {
+         for(int k = 1; k < n; ++k)
+            result += 1 / T(k);
+         for(int k = n; k <= 2 * n - 1; ++k)
+            result += 2 / T(k);
+      }
+   }
+   else
+   {
+      //
+      // Rescale so we can use the asymptotic expansion:
+      //
+      while(x < lim)
+      {
+         result -= 1 / x;
+         x += 1;
+      }
+      result += digamma_imp_large(x, pol, t);
+   }
+   return result;
+}
 //
 // Initializer: ensure all our constants are initialized prior to the first call of main:
 //
@@ -417,9 +561,15 @@ struct digamma_initializer
    {
       init()
       {
+         typedef typename policies::precision<T, Policy>::type precision_type;
+         do_init(mpl::bool_<precision_type::value && (precision_type::value <= 113)>());
+      }
+      void do_init(const mpl::true_&)
+      {
          boost::math::digamma(T(1.5), Policy());
          boost::math::digamma(T(500), Policy());
       }
+      void do_init(const mpl::false_&){}
       void force_instantiate()const{}
    };
    static const init initializer;
@@ -436,7 +586,7 @@ const typename digamma_initializer<T, Policy>::init digamma_initializer<T, Polic
 
 template <class T, class Policy>
 inline typename tools::promote_args<T>::type 
-   digamma(T x, const Policy& pol)
+   digamma(T x, const Policy&)
 {
    typedef typename tools::promote_args<T>::type result_type;
    typedef typename policies::evaluation<result_type, Policy>::type value_type;
@@ -444,7 +594,7 @@ inline typename tools::promote_args<T>::type
    typedef typename mpl::if_<
       mpl::or_<
          mpl::less_equal<precision_type, mpl::int_<0> >,
-         mpl::greater<precision_type, mpl::int_<64> >
+         mpl::greater<precision_type, mpl::int_<114> >
       >,
       mpl::int_<0>,
       typename mpl::if_<
@@ -453,17 +603,28 @@ inline typename tools::promote_args<T>::type
          typename mpl::if_<
             mpl::less<precision_type, mpl::int_<54> >,
             mpl::int_<53>,
-            mpl::int_<64>
+            typename mpl::if_<
+               mpl::less<precision_type, mpl::int_<65> >,
+               mpl::int_<64>,
+               mpl::int_<113>
+            >::type
          >::type
       >::type
    >::type tag_type;
 
+   typedef typename policies::normalise<
+      Policy,
+      policies::promote_float<false>,
+      policies::promote_double<false>,
+      policies::discrete_quantile<>,
+      policies::assert_undefined<> >::type forwarding_policy;
+
    // Force initialization of constants:
-   detail::digamma_initializer<result_type, Policy>::force_instantiate();
+   detail::digamma_initializer<value_type, forwarding_policy>::force_instantiate();
 
    return policies::checked_narrowing_cast<result_type, Policy>(detail::digamma_imp(
       static_cast<value_type>(x),
-      static_cast<const tag_type*>(0), pol), "boost::math::digamma<%1%>(%1%)");
+      static_cast<const tag_type*>(0), forwarding_policy()), "boost::math::digamma<%1%>(%1%)");
 }
 
 template <class T>
@@ -475,5 +636,10 @@ inline typename tools::promote_args<T>::type
 
 } // namespace math
 } // namespace boost
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #endif
 

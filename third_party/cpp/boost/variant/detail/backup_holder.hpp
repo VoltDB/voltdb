@@ -13,8 +13,8 @@
 #ifndef BOOST_VARIANT_DETAIL_BACKUP_HOLDER_HPP
 #define BOOST_VARIANT_DETAIL_BACKUP_HOLDER_HPP
 
-#include "boost/config.hpp"
-#include "boost/assert.hpp"
+#include <boost/config.hpp>
+#include <boost/assert.hpp>
 
 namespace boost {
 namespace detail { namespace variant {
@@ -28,7 +28,7 @@ private: // representation
 
 public: // structors
 
-    ~backup_holder()
+    ~backup_holder() BOOST_NOEXCEPT
     {
         delete backup_;
     }
@@ -63,12 +63,12 @@ public: // modifiers
 
 public: // queries
 
-    T& get()
+    T& get() BOOST_NOEXCEPT
     {
         return *backup_;
     }
 
-    const T& get() const
+    const T& get() const BOOST_NOEXCEPT
     {
         return *backup_;
     }

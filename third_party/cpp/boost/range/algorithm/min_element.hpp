@@ -9,12 +9,12 @@
 #ifndef BOOST_RANGE_ALGORITHM_MIN_ELEMENT_HPP_INCLUDED
 #define BOOST_RANGE_ALGORITHM_MIN_ELEMENT_HPP_INCLUDED
 
+#include <boost/algorithm/minmax_element.hpp>
 #include <boost/concept_check.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/range/concepts.hpp>
 #include <boost/range/detail/range_return.hpp>
-#include <algorithm>
 
 namespace boost
 {
@@ -32,7 +32,7 @@ inline BOOST_DEDUCED_TYPENAME range_iterator<ForwardRange>::type
 min_element(ForwardRange& rng)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<ForwardRange> ));
-    return std::min_element(boost::begin(rng), boost::end(rng));
+    return boost::first_min_element(boost::begin(rng), boost::end(rng));
 }
 
 /// \overload
@@ -41,7 +41,7 @@ inline BOOST_DEDUCED_TYPENAME range_iterator<const ForwardRange>::type
 min_element(const ForwardRange& rng)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<const ForwardRange> ));
-    return std::min_element(boost::begin(rng), boost::end(rng));
+    return boost::first_min_element(boost::begin(rng), boost::end(rng));
 }
 
 /// \overload
@@ -50,7 +50,7 @@ inline BOOST_DEDUCED_TYPENAME range_iterator<ForwardRange>::type
 min_element(ForwardRange& rng, BinaryPredicate pred)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<ForwardRange> ));
-    return std::min_element(boost::begin(rng), boost::end(rng), pred);
+    return boost::first_min_element(boost::begin(rng), boost::end(rng), pred);
 }
 
 /// \overload
@@ -59,7 +59,7 @@ inline BOOST_DEDUCED_TYPENAME range_iterator<const ForwardRange>::type
 min_element(const ForwardRange& rng, BinaryPredicate pred)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<const ForwardRange> ));
-    return std::min_element(boost::begin(rng), boost::end(rng), pred);
+    return boost::first_min_element(boost::begin(rng), boost::end(rng), pred);
 }
 
 // range_return overloads
@@ -71,7 +71,7 @@ min_element(ForwardRange& rng)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<ForwardRange> ));
     return range_return<ForwardRange,re>::pack(
-        std::min_element(boost::begin(rng), boost::end(rng)),
+        boost::first_min_element(boost::begin(rng), boost::end(rng)),
         rng);
 }
 
@@ -82,7 +82,7 @@ min_element(const ForwardRange& rng)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<const ForwardRange> ));
     return range_return<const ForwardRange,re>::pack(
-        std::min_element(boost::begin(rng), boost::end(rng)),
+        boost::first_min_element(boost::begin(rng), boost::end(rng)),
         rng);
 }
 
@@ -93,7 +93,7 @@ min_element(ForwardRange& rng, BinaryPredicate pred)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<ForwardRange> ));
     return range_return<ForwardRange,re>::pack(
-        std::min_element(boost::begin(rng), boost::end(rng), pred),
+        boost::first_min_element(boost::begin(rng), boost::end(rng), pred),
         rng);
 }
 
@@ -104,7 +104,7 @@ min_element(const ForwardRange& rng, BinaryPredicate pred)
 {
     BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<const ForwardRange> ));
     return range_return<const ForwardRange,re>::pack(
-        std::min_element(boost::begin(rng), boost::end(rng), pred),
+        boost::first_min_element(boost::begin(rng), boost::end(rng), pred),
         rng);
 }
 

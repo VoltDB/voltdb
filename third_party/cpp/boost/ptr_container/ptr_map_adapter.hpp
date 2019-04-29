@@ -19,8 +19,14 @@
 #include <boost/ptr_container/detail/map_iterator.hpp>
 #include <boost/ptr_container/detail/associative_ptr_container.hpp>
 #include <boost/ptr_container/detail/meta_functions.hpp>
+#include <boost/ptr_container/detail/ptr_container_disable_deprecated.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/range/iterator_range.hpp>
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 namespace boost
 {
@@ -170,12 +176,10 @@ namespace ptr_container_detail
         const_mapped_reference lookup( const key_type& key ) const
         {
            const_iterator i = this->find( key );
-           if( i != this->end() )
-               return *i->second;
-           else                                           
-               BOOST_PTR_CONTAINER_THROW_EXCEPTION( true, bad_ptr_container_operation,
-                                                    "'ptr_map/multimap::at()' could"
-                                                    " not find key" );
+           BOOST_PTR_CONTAINER_THROW_EXCEPTION( i == this->end(), bad_ptr_container_operation,
+                                                "'ptr_map/multimap::at()' could"
+                                                " not find key" );
+           return *i->second;
         }
 
         struct eraser // scope guard
@@ -261,17 +265,32 @@ namespace ptr_container_detail
          : base_type( first, last, hash, pred, a )
         { }
                 
+#ifndef BOOST_NO_AUTO_PTR
         template< class PtrContainer >
-        explicit ptr_map_adapter_base( std::auto_ptr<PtrContainer> clone ) 
+        explicit ptr_map_adapter_base( std::auto_ptr<PtrContainer> clone )
         : base_type( clone )
         { }
-        
+
         template< typename PtrContainer >
-        ptr_map_adapter_base& operator=( std::auto_ptr<PtrContainer> clone )    
+        ptr_map_adapter_base& operator=( std::auto_ptr<PtrContainer> clone )
         {
             base_type::operator=( clone );
             return *this;
         }        
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class PtrContainer >
+        explicit ptr_map_adapter_base( std::unique_ptr<PtrContainer> clone )
+        : base_type( std::move( clone ) )
+        { }
+
+        template< typename PtrContainer >
+        ptr_map_adapter_base& operator=( std::unique_ptr<PtrContainer> clone )
+        {
+            base_type::operator=( std::move( clone ) );
+            return *this;
+        }
+#endif
 
         iterator find( const key_type& x )                                                
         {                                                                            
@@ -343,25 +362,32 @@ namespace ptr_container_detail
         auto_type replace( iterator where, mapped_type x ) // strong  
         { 
             BOOST_ASSERT( where != this->end() );
-
             this->enforce_null_policy( x, "Null pointer in 'replace()'" );
 
-            auto_type ptr( x );
-
+            auto_type ptr( x, *this );
             BOOST_PTR_CONTAINER_THROW_EXCEPTION( this->empty(),
                                                  bad_ptr_container_operation,
                                                  "'replace()' on empty container" );
 
-            auto_type old( where->second );       // nothrow
-            where.base()->second = ptr.release(); // nothrow, commit
+            auto_type old( where->second, *this ); // nothrow
+            where.base()->second = ptr.release();  // nothrow, commit
             return boost::ptr_container::move( old );
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         auto_type replace( iterator where, std::auto_ptr<U> x )
         {
             return replace( where, x.release() );
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        auto_type replace( iterator where, std::unique_ptr<U> x )
+        {
+            return replace( where, x.release() );
+        }
+#endif
 
     protected:
         size_type bucket( const key_type& key ) const
@@ -425,7 +451,7 @@ namespace ptr_container_detail
                 if( this->find( first->first ) == this->end() )
                 {
                     const_reference p = *first.base();     // nothrow                    
-                    auto_type ptr( this->null_policy_allocate_clone( p.second ) ); 
+                    auto_type ptr( this->null_policy_allocate_clone(p.second), *this ); 
                                                            // strong 
                     this->safe_insert( p.first, 
                                        boost::ptr_container::move( ptr ) );
@@ -443,6 +469,11 @@ namespace ptr_container_detail
         explicit ptr_map_adapter( const Comp& comp,
                                   const allocator_type& a ) 
           : base_type( comp, a ) { }
+
+        template< class SizeType >
+        explicit ptr_map_adapter( SizeType n,
+            ptr_container_detail::unordered_associative_container_tag tag ) 
+          : base_type( n, tag ) { }
 
         template< class Hash, class Pred, class Allocator >
         ptr_map_adapter( const Hash& hash,
@@ -487,9 +518,16 @@ namespace ptr_container_detail
             map_basic_clone_and_insert( r.begin(), r.end() );      
         }
         
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         ptr_map_adapter( std::auto_ptr<U> r ) : base_type( r )
         { }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        ptr_map_adapter( std::unique_ptr<U> r ) : base_type( std::move( r ) )
+        { }
+#endif
 
         ptr_map_adapter& operator=( ptr_map_adapter r )
         {
@@ -497,12 +535,22 @@ namespace ptr_container_detail
             return *this;
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         ptr_map_adapter& operator=( std::auto_ptr<U> r )
-        {  
+        {
             base_type::operator=( r );
             return *this;
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        ptr_map_adapter& operator=( std::unique_ptr<U> r )
+        {
+            base_type::operator=( std::move( r ) );
+            return *this;
+        }
+#endif
 
         using base_type::release;
 
@@ -522,8 +570,8 @@ namespace ptr_container_detail
         std::pair<iterator,bool> insert_impl( const key_type& key, mapped_type x ) // strong
         {
             this->enforce_null_policy( x, "Null pointer in ptr_map_adapter::insert()" );
-            auto_type ptr( x );                                         // nothrow
 
+            auto_type ptr( x, *this );                                  // nothrow
             std::pair<BOOST_DEDUCED_TYPENAME base_type::ptr_iterator,bool>
                  res = this->base().insert( std::make_pair( key, x ) ); // strong, commit      
             if( res.second )                                            // nothrow     
@@ -535,7 +583,8 @@ namespace ptr_container_detail
         {
             this->enforce_null_policy( x, 
                   "Null pointer in 'ptr_map_adapter::insert()'" );
-            auto_type ptr( x );         // nothrow
+            
+            auto_type ptr( x, *this );  // nothrow
             BOOST_DEDUCED_TYPENAME base_type::ptr_iterator
                 res = this->base().insert( before.base(), std::make_pair( key, x ) );
                                         // strong, commit        
@@ -550,11 +599,20 @@ namespace ptr_container_detail
             return insert_impl( key, x );
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         std::pair<iterator,bool> insert( const key_type& key, std::auto_ptr<U> x )
         {
             return insert_impl( key, x.release() );
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        std::pair<iterator,bool> insert( const key_type& key, std::unique_ptr<U> x )
+        {
+            return insert_impl( key, x.release() );
+        }
+#endif
 
         template< class F, class S >
         iterator insert( iterator before, ptr_container_detail::ref_pair<F,S> p ) // strong
@@ -562,7 +620,7 @@ namespace ptr_container_detail
             this->enforce_null_policy( p.second, 
                   "Null pointer in 'ptr_map_adapter::insert()'" );
  
-            auto_type ptr( this->null_policy_allocate_clone( p.second ) ); 
+            auto_type ptr( this->null_policy_allocate_clone(p.second), *this ); 
             BOOST_DEDUCED_TYPENAME base_type::ptr_iterator
                 result = this->base().insert( before.base(), 
                                      std::make_pair(p.first,ptr.get()) ); // strong
@@ -577,11 +635,20 @@ namespace ptr_container_detail
             return insert_impl( before, key, x );
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         iterator insert( iterator before, const key_type& key, std::auto_ptr<U> x ) // strong
         {
             return insert_impl( before, key, x.release() );
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        iterator insert( iterator before, const key_type& key, std::unique_ptr<U> x ) // strong
+        {
+            return insert_impl( before, key, x.release() );
+        }
+#endif
         
         template< class PtrMapAdapter >
         bool transfer( BOOST_DEDUCED_TYPENAME PtrMapAdapter::iterator object, 
@@ -668,7 +735,7 @@ namespace ptr_container_detail
             while( first != last )                                            
             {                                            
                 const_reference pair = *first.base();     // nothrow                     
-                auto_type ptr( this->null_policy_allocate_clone( pair.second ) );    
+                auto_type ptr( this->null_policy_allocate_clone(pair.second), *this );    
                                                           // strong
                 safe_insert( pair.first, 
                              boost::ptr_container::move( ptr ) );
@@ -736,9 +803,16 @@ namespace ptr_container_detail
             map_basic_clone_and_insert( r.begin(), r.end() );      
         }
         
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         explicit ptr_multimap_adapter( std::auto_ptr<U> r ) : base_type( r )
         { }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        explicit ptr_multimap_adapter( std::unique_ptr<U> r ) : base_type( std::move( r ) )
+        { }
+#endif
 
         ptr_multimap_adapter& operator=( ptr_multimap_adapter r )
         {
@@ -746,12 +820,22 @@ namespace ptr_container_detail
             return *this;
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         ptr_multimap_adapter& operator=( std::auto_ptr<U> r )
         {  
             base_type::operator=( r );
             return *this;
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        ptr_multimap_adapter& operator=( std::unique_ptr<U> r )
+        {  
+            base_type::operator=( std::move( r ) );
+            return *this;
+        }
+#endif
 
         using base_type::release;
 
@@ -760,7 +844,8 @@ namespace ptr_container_detail
         {
             this->enforce_null_policy( x, 
                   "Null pointer in 'ptr_multimap_adapter::insert()'" );
-            auto_type ptr( x );         // nothrow
+
+            auto_type ptr( x, *this );  // nothrow
             BOOST_DEDUCED_TYPENAME base_type::ptr_iterator
                 res = this->base().insert( std::make_pair( key, x ) );
                                         // strong, commit        
@@ -772,7 +857,8 @@ namespace ptr_container_detail
         {
             this->enforce_null_policy( x, 
                   "Null pointer in 'ptr_multimap_adapter::insert()'" );
-            auto_type ptr( x );         // nothrow
+            
+            auto_type ptr( x, *this );  // nothrow
             BOOST_DEDUCED_TYPENAME base_type::ptr_iterator
                 res = this->base().insert( before.base(), 
                                            std::make_pair( key, x ) );
@@ -799,11 +885,20 @@ namespace ptr_container_detail
             return insert_impl( key, x );
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         iterator insert( const key_type& key, std::auto_ptr<U> x )
         {
             return insert_impl( key, x.release() );
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        iterator insert( const key_type& key, std::unique_ptr<U> x )
+        {
+            return insert_impl( key, x.release() );
+        }
+#endif
 
         template< class F, class S >
         iterator insert( iterator before, ptr_container_detail::ref_pair<F,S> p ) // strong
@@ -820,11 +915,20 @@ namespace ptr_container_detail
             return insert_impl( before, key, x );
         }
 
+#ifndef BOOST_NO_AUTO_PTR
         template< class U >
         iterator insert( iterator before, const key_type& key, std::auto_ptr<U> x ) // strong
         {
             return insert_impl( before, key, x.release() );
         }
+#endif
+#ifndef BOOST_NO_CXX11_SMART_PTR
+        template< class U >
+        iterator insert( iterator before, const key_type& key, std::unique_ptr<U> x ) // strong
+        {
+            return insert_impl( before, key, x.release() );
+        }
+#endif
         
         template< class PtrMapAdapter >
         void transfer( BOOST_DEDUCED_TYPENAME PtrMapAdapter::iterator object, 
@@ -870,5 +974,9 @@ namespace ptr_container_detail
     }
     
 } // namespace 'boost'  
+
+#if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
+#pragma GCC diagnostic pop
+#endif
 
 #endif

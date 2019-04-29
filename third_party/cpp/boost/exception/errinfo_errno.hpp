@@ -5,16 +5,18 @@
 
 #ifndef UUID_F0EE17BE6C1211DE87FF459155D89593
 #define UUID_F0EE17BE6C1211DE87FF459155D89593
-#if defined(__GNUC__) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
+
+#include <boost/exception/info.hpp>
+#include <errno.h>
+#include <string.h>
+
+#if (__GNUC__*100+__GNUC_MINOR__>301) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
 #pragma GCC system_header
 #endif
 #if defined(_MSC_VER) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
 #pragma warning(push,1)
+#pragma warning(disable:4996)
 #endif
-
-#include "boost/exception/info.hpp"
-#include <errno.h>
-#include <string.h>
 
 namespace
 boost
@@ -33,7 +35,7 @@ boost
         {
         std::ostringstream tmp;
         int v=e.value();
-        tmp << v << ", \"" << strerror(v) << "\"";
+        tmp  << '[' << error_info_name(e) << "] = " << v << ", \"" << strerror(v) << "\"\n";
         return tmp.str();
         }
     }

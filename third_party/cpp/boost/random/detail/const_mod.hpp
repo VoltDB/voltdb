@@ -7,7 +7,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: const_mod.hpp 71018 2011-04-05 21:27:52Z steven_watanabe $
+ * $Id$
  *
  * Revision history
  *  2001-02-18  moved to individual header files
@@ -36,9 +36,9 @@ public:
     if(((unsigned_m() - 1) & unsigned_m()) == 0)
       return (unsigned_type(x)) & (unsigned_m() - 1);
     else {
-      IntType supress_warnings = (m == 0);
-      BOOST_ASSERT(supress_warnings == 0);
-      return x % (m + supress_warnings);
+      IntType suppress_warnings = (m == 0);
+      BOOST_ASSERT(suppress_warnings == 0);
+      return x % (m + suppress_warnings);
     }
   }
 
@@ -77,9 +77,9 @@ public:
     else if(a == 0)
       return c;
     else if(m <= (traits::const_max-c)/a) {  // i.e. a*m+c <= max
-      IntType supress_warnings = (m == 0);
-      BOOST_ASSERT(supress_warnings == 0);
-      return (a*x+c) % (m + supress_warnings);
+      IntType suppress_warnings = (m == 0);
+      BOOST_ASSERT(suppress_warnings == 0);
+      return (a*x+c) % (m + suppress_warnings);
     } else
       return add(mult(a, x), c);
   }
@@ -108,9 +108,9 @@ private:
 
   static IntType mult_small(IntType a, IntType x)
   {
-    IntType supress_warnings = (m == 0);
-    BOOST_ASSERT(supress_warnings == 0);
-    return a*x % (m + supress_warnings);
+    IntType suppress_warnings = (m == 0);
+    BOOST_ASSERT(suppress_warnings == 0);
+    return a*x % (m + suppress_warnings);
   }
 
   static IntType mult_schrage(IntType a, IntType value)

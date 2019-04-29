@@ -10,9 +10,9 @@
 //
 // See http://www.boost.org/libs/mpl for documentation.
 
-// $Id: assert.hpp 49267 2008-10-11 06:19:02Z agurtovoy $
-// $Date: 2008-10-10 23:19:02 -0700 (Fri, 10 Oct 2008) $
-// $Revision: 49267 $
+// $Id$
+// $Date$
+// $Revision$
 
 #include <boost/mpl/not.hpp>
 #include <boost/mpl/aux_/value_wknd.hpp>
@@ -25,6 +25,7 @@
 #include <boost/mpl/aux_/config/dtp.hpp>
 #include <boost/mpl/aux_/config/gcc.hpp>
 #include <boost/mpl/aux_/config/msvc.hpp>
+#include <boost/mpl/aux_/config/gpu.hpp>
 #include <boost/mpl/aux_/config/static_constant.hpp>
 #include <boost/mpl/aux_/config/pp_counter.hpp>
 #include <boost/mpl/aux_/config/workaround.hpp>
@@ -34,6 +35,9 @@
 #include <boost/config.hpp> // make sure 'size_t' is placed into 'std'
 #include <cstddef>
 
+#if BOOST_WORKAROUND(BOOST_MSVC, == 1700)
+#include <boost/mpl/if.hpp>
+#endif
 
 #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x610)) \
     || (BOOST_MPL_CFG_GCC != 0) \
@@ -52,7 +56,7 @@
 // and GCC (which issues "unused variable" warnings when static constants are used 
 // at a function scope)
 #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x610)) \
-    || (BOOST_MPL_CFG_GCC != 0)
+    || (BOOST_MPL_CFG_GCC != 0) || (BOOST_MPL_CFG_GPU != 0) || defined(__PGI)
 #   define BOOST_MPL_AUX_ASSERT_CONSTANT(T, expr) enum { expr }
 #else
 #   define BOOST_MPL_AUX_ASSERT_CONSTANT(T, expr) BOOST_STATIC_CONSTANT(T, expr)
@@ -131,8 +135,38 @@ template< assert_::relations r, long x, long y > struct assert_relation {};
 
 #endif 
 
+#if BOOST_WORKAROUND(BOOST_MSVC, == 1700)
 
-#if !defined(BOOST_MPL_CFG_ASSERT_BROKEN_POINTER_TO_POINTER_TO_MEMBER)
+template<class Pred>
+struct extract_assert_pred;
+
+template<class Pred>
+struct extract_assert_pred<void(Pred)> { typedef Pred type; };
+
+template<class Pred>
+struct eval_assert {
+    typedef typename extract_assert_pred<Pred>::type P;
+    typedef typename P::type p_type;
+    typedef typename ::boost::mpl::if_c<p_type::value,
+        AUX778076_ASSERT_ARG(assert<false>),
+        failed ************ P::************
+    >::type type;
+};
+
+template<class Pred>
+struct eval_assert_not {
+    typedef typename extract_assert_pred<Pred>::type P;
+    typedef typename P::type p_type;
+    typedef typename ::boost::mpl::if_c<!p_type::value,
+        AUX778076_ASSERT_ARG(assert<false>),
+        failed ************ ::boost::mpl::not_<P>::************
+    >::type type;
+};
+
+template< typename T >
+T make_assert_arg();
+
+#elif !defined(BOOST_MPL_CFG_ASSERT_BROKEN_POINTER_TO_POINTER_TO_MEMBER)
 
 template< bool > struct assert_arg_pred_impl { typedef int type; };
 template<> struct assert_arg_pred_impl<true> { typedef void* type; };
@@ -150,15 +184,26 @@ template< typename P > struct assert_arg_pred_not
     typedef typename assert_arg_pred_impl<p>::type type;
 };
 
+#if defined(BOOST_GCC) && BOOST_GCC >= 80000
+#define BOOST_MPL_IGNORE_PARENTHESES_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 template< typename Pred >
-failed ************ (Pred::************ 
+failed ************ (Pred::************
       assert_arg( void (*)(Pred), typename assert_arg_pred<Pred>::type )
     );
 
 template< typename Pred >
-failed ************ (boost::mpl::not_<Pred>::************ 
+failed ************ (boost::mpl::not_<Pred>::************
       assert_not_arg( void (*)(Pred), typename assert_arg_pred_not<Pred>::type )
     );
+
+#ifdef BOOST_MPL_IGNORE_PARENTHESES_WARNING
+#undef BOOST_MPL_IGNORE_PARENTHESES_WARNING
+#pragma GCC diagnostic pop
+#endif
 
 template< typename Pred >
 AUX778076_ASSERT_ARG(assert<false>)
@@ -211,6 +256,39 @@ assert_rel_arg( assert_relation<r,x,y> );
 
 BOOST_MPL_AUX_ADL_BARRIER_NAMESPACE_CLOSE
 
+#if BOOST_WORKAROUND(BOOST_MSVC, == 1700)
+
+// BOOST_MPL_ASSERT((pred<x,...>))
+
+#define BOOST_MPL_ASSERT(pred) \
+BOOST_MPL_AUX_ASSERT_CONSTANT( \
+      std::size_t \
+    , BOOST_PP_CAT(mpl_assertion_in_line_,BOOST_MPL_AUX_PP_COUNTER()) = sizeof( \
+          boost::mpl::assertion_failed<false>( \
+              boost::mpl::make_assert_arg< \
+                  typename boost::mpl::eval_assert<void pred>::type \
+                >() \
+            ) \
+        ) \
+    ) \
+/**/
+
+// BOOST_MPL_ASSERT_NOT((pred<x,...>))
+
+#define BOOST_MPL_ASSERT_NOT(pred) \
+BOOST_MPL_AUX_ASSERT_CONSTANT( \
+      std::size_t \
+    , BOOST_PP_CAT(mpl_assertion_in_line_,BOOST_MPL_AUX_PP_COUNTER()) = sizeof( \
+          boost::mpl::assertion_failed<false>( \
+              boost::mpl::make_assert_arg< \
+                  typename boost::mpl::eval_assert_not<void pred>::type \
+                >() \
+            ) \
+        ) \
+    ) \
+/**/
+
+#else
 
 // BOOST_MPL_ASSERT((pred<x,...>))
 
@@ -248,6 +326,8 @@ BOOST_MPL_AUX_ASSERT_CONSTANT( \
         ) \
    ) \
 /**/
+#endif
+
 #endif
 
 // BOOST_MPL_ASSERT_RELATION(x, ==|!=|<=|<|>=|>, y)
@@ -363,8 +443,17 @@ BOOST_MPL_AUX_ASSERT_CONSTANT( \
 /**/
 #endif
 
-#define BOOST_MPL_ASSERT_MSG( c, msg, types_ ) \
+#if 0
+// Work around BOOST_MPL_ASSERT_MSG_IMPL generating multiple definition linker errors on VC++8.
+// #if defined(BOOST_MSVC) && BOOST_MSVC < 1500
+#   include <boost/static_assert.hpp>
+#   define BOOST_MPL_ASSERT_MSG( c, msg, types_ ) \
+BOOST_STATIC_ASSERT_MSG( c, #msg ) \
+/**/
+#else
+#   define BOOST_MPL_ASSERT_MSG( c, msg, types_ ) \
 BOOST_MPL_ASSERT_MSG_IMPL( BOOST_MPL_AUX_PP_COUNTER(), c, msg, types_ ) \
 /**/
+#endif
 
 #endif // BOOST_MPL_ASSERT_HPP_INCLUDED

@@ -122,6 +122,14 @@ inline T constant_root_two_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC
 
 template <class T>
 template<int N>
+inline T constant_log_root_two_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
+{
+   BOOST_MATH_STD_USING
+   return log(root_two_pi<T, policies::policy<policies::digits2<N> > >());
+}
+
+template <class T>
+template<int N>
 inline T constant_root_ln_four<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
 {
    BOOST_MATH_STD_USING
@@ -161,7 +169,7 @@ inline T constant_euler<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::
    // See equation 17 with p = 2.
    //
    T n = 3 + (M ? (std::min)(M, tools::digits<T>()) : tools::digits<T>()) / 4;
-   T lim = M ? ldexp(T(1), (std::min)(M, tools::digits<T>())) : tools::epsilon<T>();
+   T lim = M ? ldexp(T(1), 1 - (std::min)(M, tools::digits<T>())) : tools::epsilon<T>();
    T lnn = log(n);
    T term = 1;
    T N = -lnn;
@@ -290,6 +298,15 @@ inline T constant_three_quarters<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_S
 
 template <class T>
 template<int N>
+inline T constant_sixth<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
+{
+  BOOST_MATH_STD_USING
+  return static_cast<T>(1) / static_cast<T>(6);
+}
+
+// Pi and related constants.
+template <class T>
+template<int N>
 inline T constant_pi_minus_three<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
 {
    return pi<T, policies::policy<policies::digits2<N> > >() - static_cast<T>(3);
@@ -302,13 +319,13 @@ inline T constant_four_minus_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SP
    return static_cast<T>(4) - pi<T, policies::policy<policies::digits2<N> > >();
 }
 
-template <class T>
-template<int N>
-inline T constant_pow23_four_minus_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
-{
-   BOOST_MATH_STD_USING
-   return pow(four_minus_pi<T, policies::policy<policies::digits2<N> > >(), static_cast<T>(1.5));
-}
+//template <class T>
+//template<int N>
+//inline T constant_pow23_four_minus_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
+//{
+//   BOOST_MATH_STD_USING
+//   return pow(four_minus_pi<T, policies::policy<policies::digits2<N> > >(), static_cast<T>(1.5));
+//}
 
 template <class T>
 template<int N>
@@ -318,7 +335,14 @@ inline T constant_exp_minus_half<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_S
    return exp(static_cast<T>(-0.5));
 }
 
-// Pi
+template <class T>
+template<int N>
+inline T constant_exp_minus_one<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
+{
+  BOOST_MATH_STD_USING
+  return exp(static_cast<T>(-1.));
+}
+
 template <class T>
 template<int N>
 inline T constant_one_div_root_two<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(mpl::int_<N>))
@@ -347,7 +371,6 @@ inline T constant_root_one_div_pi<T>::compute(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_
    BOOST_MATH_STD_USING
    return sqrt(static_cast<T>(1) / pi<T, policies::policy<policies::digits2<N> > >());
 }
-
 
 template <class T>
 template<int N>

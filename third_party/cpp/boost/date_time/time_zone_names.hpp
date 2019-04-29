@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland
- * $Date: 2008-02-27 12:00:24 -0800 (Wed, 27 Feb 2008) $
+ * $Date$
  */
 
 #include <string>
@@ -43,7 +43,7 @@ namespace date_time {
    *  name: Pacific Standard Time and the abbreviated name: PST.
    *  During daylight savings there are additional names:
    *  Pacific Daylight Time and PDT. 
-   *@parm CharT Allows class to support different character types
+   *@tparam CharT Allows class to support different character types
    */
   template<class CharT>
   class time_zone_names_base
