@@ -338,6 +338,13 @@ public class ExportGeneration implements Generation {
                             return;
                         }
                         final ExportDataSource eds = partitionSources.get(tableName);
+                        if (eds == null) {
+                            exportLog.warn("Received export message " + msgType + " for partition " +
+                                    partition + " source " + tableName +
+                                    " which does not exist on this node, sources = " + partitionSources);
+                            return;
+                        }
+
                         if (msgType == ExportManager.RELEASE_BUFFER) {
                             final long seqNo = buf.getLong();
                             final long catalogVersion = buf.getInt();
