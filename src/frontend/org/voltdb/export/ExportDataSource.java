@@ -441,7 +441,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
-                    if (m_readyForPolling && isMaster() && m_pollTask != null) {
+                    if (!m_readyForPolling) {
+                        return;
+                    }
+                    if (!m_coordinator.isInitialized()) {
+                        m_coordinator.initialize();
+                        // FIXME: do we need to ask generation whether we're leader
+                    }
+                    if (isMaster() && m_pollTask != null) {
                         exportLog.info("Newly ready for polling master executes pending poll");
                         pollImpl(m_pollTask);
                     }

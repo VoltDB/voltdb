@@ -484,11 +484,14 @@ public class ExportCoordinator {
     // Long.MAX_VALUE throws IllegalStateException in Range.java.
     private static final long INFINITE_SEQNO = Long.MAX_VALUE - 1;
 
+    private final ZooKeeper m_zk;
+    private final String m_rootPath;
     private final Integer m_hostId;
     private final ExportDataSource m_eds;
 
-    private final SynchronizedStatesManager m_ssm;
-    private final ExportCoordinationTask m_task;
+    // State machine will only be instantiated on initialize()
+    private SynchronizedStatesManager m_ssm;
+    private ExportCoordinationTask m_task;
 
     private Integer m_leaderHostId = NO_HOST_ID;
     private static final int NO_HOST_ID =  Integer.MIN_VALUE;
@@ -499,6 +502,7 @@ public class ExportCoordinator {
     // Map of hostId to ExportSequenceNumberTracker
     private TreeMap<Integer, ExportSequenceNumberTracker> m_trackers = new TreeMap<>();
 
+    private boolean m_initialized = false;
     private boolean m_isMaster = false;
     private long m_safePoint = 0L;
 
@@ -521,7 +525,9 @@ public class ExportCoordinator {
         m_safePoint = 0L;
     }
 
-    // This constructor only for JUnit tests
+    /**
+     * JUnit test constructor
+     */
     ExportCoordinator(ZooKeeper zk, String rootPath, Integer hostId, ExportDataSource eds, boolean setTestReady) {
         this(zk, rootPath, hostId, eds);
         m_testReady = new AtomicBoolean(false);
@@ -532,40 +538,64 @@ public class ExportCoordinator {
         return m_testReady != null && m_testReady.get();
     }
 
+    /**
+     * Constructor - note that it does not initialize the state machine...
+     *
+     * @param zk
+     * @param rootPath
+     * @param hostId
+     * @param eds
+     */
     public ExportCoordinator(ZooKeeper zk, String rootPath, Integer hostId, ExportDataSource eds) {
 
+        m_zk = zk;
+        m_rootPath = rootPath;
         m_hostId = hostId;
         m_eds = eds;
+    }
 
-        SynchronizedStatesManager ssm = null;
-        ExportCoordinationTask task = null;
+    /**
+     * @return true if coordinator is initialized
+     */
+    public boolean isInitialized() {
+        return m_initialized;
+    }
+
+    /**
+     * Called by EDS when notified it is ready for polling.
+     */
+    public void initialize() {
+
+        if (m_initialized) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Export coordinator already initialized for " + m_eds);
+            }
+            return;
+        }
         try {
-            ZKUtil.addIfMissing(zk, rootPath, CreateMode.PERSISTENT, null);
+            ZKUtil.addIfMissing(m_zk, m_rootPath, CreateMode.PERSISTENT, null);
 
             // Set up a SynchronizedStateManager for the topic/partition
             String topicName = m_eds.getTableName() + "_" + m_eds.getPartitionId();
-            ssm = new SynchronizedStatesManager(
-                    zk,
-                    rootPath,
+            m_ssm = new SynchronizedStatesManager(
+                    m_zk,
+                    m_rootPath,
                     topicName,
                     m_hostId.toString(),
                     1);
 
-            task = new ExportCoordinationTask(ssm);
+            m_task = new ExportCoordinationTask(m_ssm);
             ByteBuffer initialState = ByteBuffer.allocate(4);
             initialState.putInt(m_leaderHostId);
             initialState.flip();
-            task.setInitialState(initialState);
-            task.registerStateMachineWithManager(initialState);
-
-            exportLog.info("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
+            m_task.setInitialState(initialState);
+            m_task.registerStateMachineWithManager(initialState);
+            m_initialized = true;
+            exportLog.info("Initialized export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
 
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to create ExportCoordinator state machine", true, e);
-        } finally {
-            m_ssm = ssm;
-            m_task = task;
+            VoltDB.crashLocalVoltDB("Failed to initialize ExportCoordinator state machine", true, e);
         }
     }
 
@@ -575,6 +605,9 @@ public class ExportCoordinator {
      * @throws InterruptedException
      */
     public void shutdown() throws InterruptedException {
+        if (!m_initialized) {
+            return;
+        }
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export coordinator shutting down...");
         }
@@ -585,6 +618,10 @@ public class ExportCoordinator {
      * Initiate a state change to make this host the partition leader.
      */
     public void becomeLeader() {
+        if (!m_initialized) {
+            exportLog.warn("Uninitialized, skip becoming leader");
+            return;
+        }
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
             return;
@@ -623,6 +660,13 @@ public class ExportCoordinator {
      */
     public boolean isSafePoint(long ackedSeqNo) {
 
+        if (!m_initialized) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Uninitialized, skip checking safe point at " + ackedSeqNo);
+            }
+            return false;
+        }
+
         // Always truncate the trackers to the acked seqNo
         m_trackers.forEach((k, v) -> v.truncate(ackedSeqNo));
 
@@ -641,6 +685,13 @@ public class ExportCoordinator {
      * @return if we are the Export Master
      */
     public boolean isExportMaster(long exportSeqNo) {
+
+        if (!m_initialized) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Uninitialized, not export master at " + exportSeqNo);
+            }
+            return false;
+        }
 
         // No leader, no master.
         if (m_leaderHostId == NO_HOST_ID) {
