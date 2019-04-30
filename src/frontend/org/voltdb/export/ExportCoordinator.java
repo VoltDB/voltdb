@@ -89,6 +89,7 @@ public class ExportCoordinator {
         // A queue of invocation runnables: each invocation needs the distributed lock
         private ConcurrentLinkedQueue<Runnable> m_invocations = new ConcurrentLinkedQueue<>();
         private AtomicBoolean m_pending = new AtomicBoolean(false);
+        private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
         public ExportCoordinationTask(SynchronizedStatesManager ssm) {
             ssm.super(s_coordinatorTaskName, exportLog);
@@ -120,6 +121,10 @@ public class ExportCoordinator {
             return "ExportCoordinationTask";
         }
 
+        void shutdown() {
+            m_shutdown.set(true);
+        }
+
         /**
          * Queue a new invocation
          * @param runnable
@@ -133,6 +138,13 @@ public class ExportCoordinator {
          * Request lock for next queued invocation.
          */
         private void invokeNext() {
+
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore invocation on " + m_eds);
+                }
+                return;
+            }
             if (m_invocations.isEmpty()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("No invocations pending on " + m_eds);
@@ -169,6 +181,12 @@ public class ExportCoordinator {
         @Override
         protected void lockRequestCompleted()
         {
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore lock request on " + m_eds);
+                }
+                return;
+            }
             Runnable runnable = m_invocations.poll();
             if (runnable == null) {
                 exportLog.warn("No runnable to invoke, canceling lock");
@@ -193,6 +211,12 @@ public class ExportCoordinator {
 
         @Override
         protected void proposeStateChange(ByteBuffer proposedState) {
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore proposing state change on " + m_eds);
+                }
+                return;
+            }
             super.proposeStateChange(proposedState);
         }
 
@@ -202,6 +226,12 @@ public class ExportCoordinator {
          */
         @Override
         public void stateChangeProposed(ByteBuffer newState) {
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, proposed state change on " + m_eds);
+                }
+                return;
+            }
             requestedStateChangeAcceptable(true);
         }
 
@@ -213,6 +243,12 @@ public class ExportCoordinator {
         @Override
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
 
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore proposed state resolved on " + m_eds);
+                }
+                return;
+            }
             m_eds.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
@@ -266,6 +302,12 @@ public class ExportCoordinator {
         @Override
         protected void taskRequested(ByteBuffer proposedTask) {
 
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore task requested on " + m_eds);
+                }
+                return;
+            }
             m_eds.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
@@ -307,6 +349,12 @@ public class ExportCoordinator {
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest,
                 Map<String, ByteBuffer> results) {
 
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore task completed on " + m_eds);
+                }
+                return;
+            }
             m_eds.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
@@ -368,6 +416,12 @@ public class ExportCoordinator {
         @Override
         protected void membershipChanged(Set<String> addedMembers, Set<String> removedMembers) {
 
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore membership changed on " + m_eds);
+                }
+                return;
+            }
             m_eds.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
