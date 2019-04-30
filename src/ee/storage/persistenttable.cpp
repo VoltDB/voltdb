@@ -902,6 +902,10 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
+            if (isTableWithExportInserts(m_tableType)) {
+                assert(m_shadowStream != nullptr);
+                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+            }
         }
     }
 
@@ -1015,10 +1019,10 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
            // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
            if (isTableWithExportUpdateOld(m_tableType)) {
-
+               m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
            }
            if (isTableWithExportUpdateNew(m_tableType)) {
-
+               m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW);
            }
         }
     }
@@ -1135,7 +1139,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        m_shadowStream->insertTuple(sourceTupleWithNewValues);
+        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE);
     }
 
     if (uq) {
@@ -1309,6 +1313,10 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), &m_surgeon);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
+        if (isTableWithExportDeletes(m_tableType)) {
+            assert(m_shadowStream != nullptr);
+            m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE);
+        }
     }
 
     // handle any materialized views, insert the tuple into delta table,
