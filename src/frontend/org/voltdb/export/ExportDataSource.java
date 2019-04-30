@@ -169,7 +169,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private MigrateRowsDeleter m_migrateRowsDeleter;
 
     // Export coordinator manages Export Leadership, Mastership, and gap correction.
-    private ExportCoordinator m_coordinator;
+    // Made package private for JUnit test support
+    ExportCoordinator m_coordinator;
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 

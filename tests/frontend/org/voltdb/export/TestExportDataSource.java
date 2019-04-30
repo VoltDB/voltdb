@@ -24,10 +24,13 @@
 package org.voltdb.export;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
@@ -59,6 +62,8 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.processors.GuestProcessor;
@@ -147,6 +152,28 @@ public class TestExportDataSource extends TestCase {
         }
     }
 
+    // Define a class derived from {@code ExportDataSource} allowing mocking
+    // the {@code ExportCoordinator}
+    class MockExportDataSource extends ExportDataSource {
+
+        public MockExportDataSource(Generation generation, ExportDataProcessor processor, String db, String tableName,
+                int partitionId, int siteId, long genId, CatalogMap<Column> catalogMap, Column partitionColumn,
+                String overflowPath) throws IOException {
+            super(generation, processor, db, tableName, partitionId, siteId, genId, catalogMap, partitionColumn, overflowPath);
+            setMockCoordination();
+        }
+
+        void setMockCoordination() {
+            m_coordinator = mock(ExportCoordinator.class);
+            when(m_coordinator.isInitialized()).thenReturn(true);
+            when(m_coordinator.isLeader()).thenReturn(true);
+            when(m_coordinator.isMaster()).thenReturn(true);
+            when(m_coordinator.isSafePoint(anyLong())).thenReturn(true);
+            when(m_coordinator.isExportMaster(anyLong())).thenReturn(true);
+        }
+
+    }
+
     @Override
     public void setUp() throws IOException {
         m_mockVoltDB = new MockVoltDB();
@@ -209,7 +236,7 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+            ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
@@ -230,7 +257,7 @@ public class TestExportDataSource extends TestCase {
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -320,7 +347,7 @@ public class TestExportDataSource extends TestCase {
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -390,7 +417,7 @@ public class TestExportDataSource extends TestCase {
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -488,7 +515,7 @@ public class TestExportDataSource extends TestCase {
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -564,7 +591,7 @@ public class TestExportDataSource extends TestCase {
     public void testGapRelease() throws Exception{
         System.out.println("Running testGapRelease");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -640,7 +667,7 @@ public class TestExportDataSource extends TestCase {
     public void testPendingContainer() throws Exception{
         System.out.println("Running testPendingContainer");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
