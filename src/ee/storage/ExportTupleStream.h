@@ -41,7 +41,7 @@ class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
     friend class StreamBlock;
 
 public:
-    enum Type { INSERT, DELETE };
+    enum Type { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW };
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
