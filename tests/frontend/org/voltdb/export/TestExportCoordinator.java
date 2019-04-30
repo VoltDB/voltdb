@@ -140,6 +140,7 @@ public class TestExportCoordinator extends ZKTestBase {
                     eds0,
                     true);
 
+            ec0.initialize();
             ec0.becomeLeader();
             while(!ec0.isTestReady()) {
                 Thread.yield();
@@ -180,6 +181,7 @@ public class TestExportCoordinator extends ZKTestBase {
                     eds0,
                     true);
 
+            ec0.initialize();
             ec0.becomeLeader();
             while(!ec0.isTestReady()) {
                 Thread.yield();
@@ -233,6 +235,9 @@ public class TestExportCoordinator extends ZKTestBase {
                     1,
                     eds1,
                     true);
+
+            ec0.initialize();
+            ec1.initialize();
 
             ec0.becomeLeader();
             while(!ec0.isTestReady() || !ec1.isTestReady()) {
@@ -318,6 +323,10 @@ public class TestExportCoordinator extends ZKTestBase {
                     2,
                     eds2,
                     true);
+
+            ec0.initialize();
+            ec1.initialize();
+            ec2.initialize();
 
             ec0.becomeLeader();
             while(!ec0.isTestReady() || !ec1.isTestReady() || !ec2.isTestReady()) {
