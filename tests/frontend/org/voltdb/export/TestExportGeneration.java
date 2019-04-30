@@ -27,6 +27,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -219,10 +222,24 @@ public class TestExportGeneration {
         }
 
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
+
+        // Assign a mock {@code ExportCoordinator}
+        m_expDs.m_coordinator = getMockCoordinator();
+
         // Make sure the test EDS is always ready for polling
         m_expDs.setReadyForPolling(true);
 
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
+    }
+
+    private ExportCoordinator getMockCoordinator() {
+        ExportCoordinator mock = mock(ExportCoordinator.class);
+        when(mock.isInitialized()).thenReturn(true);
+        when(mock.isLeader()).thenReturn(true);
+        when(mock.isMaster()).thenReturn(true);
+        when(mock.isSafePoint(anyLong())).thenReturn(true);
+        when(mock.isExportMaster(anyLong())).thenReturn(true);
+        return mock;
     }
 
     @After
