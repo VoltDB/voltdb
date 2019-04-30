@@ -239,8 +239,10 @@ public class ExportCoordinator {
                         if (isLeader() && m_trackers.isEmpty()) {
                             requestTrackers();
                         }
+
                     } catch (Exception e) {
                         exportLog.error("Failed to change to new leader: " + e);
+
                     } finally {
                         // End the current invocation and do the next
                         if (ourProposal) {
@@ -287,8 +289,8 @@ public class ExportCoordinator {
                     } catch (Exception e) {
                         exportLog.error("Failed to serialize coordination tracker: " + e);
                         response = ByteBuffer.allocate(0);
-                    }
-                    finally {
+
+                    } finally {
                         requestedTaskComplete(response);
                     }
                 }
@@ -343,14 +345,10 @@ public class ExportCoordinator {
 
                         m_eds.resumePolling();
 
-                        // End the current invocation and do the next
-                        if (ourTask) {
-                            endInvocation();
-                        }
-
                     } catch (Exception e) {
                         exportLog.error("Failed to handle coordination trackers: " + e);
                         resetCoordinator(false, true);
+
                     } finally {
                         // End the current invocation and do the next
                         if (ourTask) {
