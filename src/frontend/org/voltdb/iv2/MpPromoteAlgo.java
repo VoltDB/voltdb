@@ -58,7 +58,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
-    private long m_repairTruncationHandle = Long.MIN_VALUE;
+    private long m_repairTruncationHandle = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
     long getRequestId()
     {
         return m_requestId;

@@ -31,6 +31,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
@@ -83,11 +84,11 @@ public class MpScheduler extends Scheduler
     private final int m_leaderNodeId;
 
     // the current not-needed-any-more point of the repair log.
-    long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    long m_repairLogTruncationHandle =TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
     // We need to lag the current MP execution point by at least two committed TXN ids
     // since that's the first point we can be sure is safely agreed on by all nodes.
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
-    long m_repairLogAwaitingCommit = Long.MIN_VALUE;
+    long m_repairLogAwaitingTruncate = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
 
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderNodeId)
     {
@@ -172,11 +173,7 @@ public class MpScheduler extends Scheduler
                 VoltMessage resp = counter.getLastResponse();
                 if (resp != null && resp instanceof InitiateResponseMessage) {
                     InitiateResponseMessage msg = (InitiateResponseMessage)resp;
-                    if (msg.haveSentMpFragment()) {
-                        m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
-                        m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
-                        m_repairLogAwaitingCommit = msg.getTxnId();
-                    }
+                    advanceRepairTruncationHanlde(msg);
                     m_outstandingTxns.remove(msg.getTxnId());
                     m_mailbox.send(counter.m_destinationId, resp);
                 }
@@ -519,15 +516,8 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                // Only advance the truncation point on completed transactions that sent fragments to SPIs.
-                // See ENG-4211 & ENG-14563
-                if (message.haveSentMpFragment()) {
-                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
-                    m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
-                    m_repairLogAwaitingCommit = message.getTxnId();
-                }
+                advanceRepairTruncationHanlde(message);
                 m_outstandingTxns.remove(message.getTxnId());
-
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -538,12 +528,7 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // Only advance the truncation point on completed transactions that sent fragments to SPIs.
-            if (message.haveSentMpFragment()) {
-                m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
-                m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
-                m_repairLogAwaitingCommit = message.getTxnId();
-            }
+            advanceRepairTruncationHanlde(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
             assert(txn != null);
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
@@ -559,6 +544,16 @@ public class MpScheduler extends Scheduler
             // dump it in the repair log
             // hacky castage
             ((MpInitiatorMailbox)m_mailbox).deliverToRepairLog(ctm);
+        }
+    }
+
+    private void advanceRepairTruncationHanlde(InitiateResponseMessage msg) {
+        // Only advance the truncation point on completed transactions that sent fragments to SPIs.
+        // See ENG-4211 & ENG-14563
+        if(msg.shouldCommit() && msg.haveSentMpFragment()) {
+            m_repairLogTruncationHandle = m_repairLogAwaitingTruncate;
+            m_pendingTasks.setRepairLogTruncationHandle(m_repairLogTruncationHandle);
+            m_repairLogAwaitingTruncate = msg.getTxnId();
         }
     }
 

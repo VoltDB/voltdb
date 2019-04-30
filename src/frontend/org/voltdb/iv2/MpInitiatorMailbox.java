@@ -119,7 +119,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 try {
                     setLeaderStateInternal(maxSeenTxnId);
                     ((MpScheduler)m_scheduler).m_repairLogTruncationHandle = repairTruncationHandle;
-                    ((MpScheduler)m_scheduler).m_repairLogAwaitingCommit = repairTruncationHandle;
+                    ((MpScheduler)m_scheduler).m_repairLogAwaitingTruncate = repairTruncationHandle;
                 } finally {
                     cdl.countDown();
                 }
