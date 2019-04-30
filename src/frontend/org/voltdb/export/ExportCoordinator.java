@@ -233,19 +233,22 @@ public class ExportCoordinator {
                             exportLog.debug(sb.toString());
                         }
 
+                        // If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
+                        // Note: cannot initiate a coordinator task directly from here, must go
+                        // through another runnable and the invocation path.
+                        if (isLeader() && m_trackers.isEmpty()) {
+                            requestTrackers();
+                        }
                     } catch (Exception e) {
                         exportLog.error("Failed to change to new leader: " + e);
-                    }
-
-                    // If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
-                    // Note: cannot initiate a coordinator task directly from here, must go
-                    // through another runnable and the invocation path.
-                    if (isLeader() && m_trackers.isEmpty()) {
-                        requestTrackers();
+                    } finally {
+                        // End the current invocation and do the next
+                        if (ourProposal) {
+                            endInvocation();
+                        }
                     }
                 }
             });
-            endInvocation();
         }
 
         @Override
@@ -340,13 +343,22 @@ public class ExportCoordinator {
 
                         m_eds.resumePolling();
 
+                        // End the current invocation and do the next
+                        if (ourTask) {
+                            endInvocation();
+                        }
+
                     } catch (Exception e) {
                         exportLog.error("Failed to handle coordination trackers: " + e);
                         resetCoordinator(false, true);
+                    } finally {
+                        // End the current invocation and do the next
+                        if (ourTask) {
+                            endInvocation();
+                        }
                     }
                 }
             });
-            endInvocation();
         }
 
         /**
