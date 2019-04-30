@@ -106,6 +106,25 @@ public class ExportCoordinator {
         @Override
         protected void setInitialState(ByteBuffer initialState) {
             m_startingState = initialState;
+            m_eds.getExecutorService().execute(new Runnable() {
+                @Override
+                public void run() {
+                    // Handle initial partition leadership
+                    try {
+                        Integer newLeaderHostId = initialState.getInt();
+                        m_leaderHostId = newLeaderHostId;
+                        if (exportLog.isDebugEnabled()) {
+                            StringBuilder sb = new StringBuilder("Host ")
+                                    .append(m_leaderHostId)
+                                    .append(isLeader() ? " (localHost) " : " ")
+                                    .append("is the leader at initial state");
+                            exportLog.debug(sb.toString());
+                        }
+                    } catch (Exception e) {
+                        exportLog.error("Failed to change to initial state leader: " + e);
+                    }
+                }
+            });
         }
 
         @Override
@@ -494,7 +513,7 @@ public class ExportCoordinator {
     private ExportCoordinationTask m_task;
 
     private Integer m_leaderHostId = NO_HOST_ID;
-    private static final int NO_HOST_ID =  Integer.MIN_VALUE;
+    private static final int NO_HOST_ID =  -1;
 
     // Map of state machine id to hostId
     private Map<String, Integer> m_hosts = new HashMap<>();
