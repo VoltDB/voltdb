@@ -173,7 +173,7 @@ public class MpScheduler extends Scheduler
                 VoltMessage resp = counter.getLastResponse();
                 if (resp != null && resp instanceof InitiateResponseMessage) {
                     InitiateResponseMessage msg = (InitiateResponseMessage)resp;
-                    advanceRepairTruncationHanlde(msg);
+                    advanceRepairTruncationHandle(msg);
                     m_outstandingTxns.remove(msg.getTxnId());
                     m_mailbox.send(counter.m_destinationId, resp);
                 }
@@ -516,7 +516,7 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                advanceRepairTruncationHanlde(message);
+                advanceRepairTruncationHandle(message);
                 m_outstandingTxns.remove(message.getTxnId());
                 m_mailbox.send(counter.m_destinationId, message);
             }
@@ -528,7 +528,7 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            advanceRepairTruncationHanlde(message);
+            advanceRepairTruncationHandle(message);
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
             assert(txn != null);
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
@@ -547,7 +547,7 @@ public class MpScheduler extends Scheduler
         }
     }
 
-    private void advanceRepairTruncationHanlde(InitiateResponseMessage msg) {
+    private void advanceRepairTruncationHandle(InitiateResponseMessage msg) {
         // Only advance the truncation point on completed transactions that sent fragments to SPIs.
         // See ENG-4211 & ENG-14563
         if(msg.shouldCommit() && msg.haveSentMpFragment()) {
