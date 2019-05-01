@@ -1124,24 +1124,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return true;
     }
 
-    private enum ContinuityCheckResult {
-        NONE, // Failed to check, stop the poll
-        OK,
-        ACKED,
-        GAP,
-    }
-
-    // Check the continuity of an unpolled buffer
-    private ContinuityCheckResult checkBufferContinuity(long startSeqNo, long lastSeqNo, long nextSeqNo) {
-        if (nextSeqNo >= startSeqNo && nextSeqNo <= lastSeqNo) {
-            return ContinuityCheckResult.OK;
-        } else if (nextSeqNo > lastSeqNo) {
-            return ContinuityCheckResult.ACKED;
-        } else {
-            return ContinuityCheckResult.GAP;
-        }
-    }
-
     private synchronized void pollImpl(PollTask pollTask) {
 
         if (pollTask == null) {
