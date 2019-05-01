@@ -59,20 +59,17 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(VoltDBEng
     return fromJsonPlan(engine, jsonPlan, -1);
 }
 
-boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(VoltDBEngine* engine,
-                                                      const std::string& jsonPlan,
-                                                      int64_t fragId) {
+boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
+      VoltDBEngine* engine, const std::string& jsonPlan, int64_t fragId) {
     PlanNodeFragment *pnf = NULL;
     try {
         pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
-    }
-    catch (SerializableEEException &seee) {
+    } catch (SerializableEEException &seee) {
         throw;
-    }
-    catch (...) {
+    } catch (std::exception const& e) {
         char msg[1024 * 100];
-        snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
-                 (intmax_t)fragId, jsonPlan.c_str());
+        snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s: what(): %s",
+                 (intmax_t)fragId, jsonPlan.c_str(), e.what());
         VOLT_ERROR("%s", msg);
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }

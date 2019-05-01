@@ -136,6 +136,7 @@ SET (VOLTDB_SRC
   common/LargeTempTableBlockCache.cpp
   common/MiscUtil.cpp
   common/NValue.cpp
+  common/PlannerDomValue.cpp
   common/Pool.cpp
   common/RecoveryProtoMessage.cpp
   common/RecoveryProtoMessageBuilder.cpp

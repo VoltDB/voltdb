@@ -1115,8 +1115,10 @@ bool Value::isValidIndex(ArrayIndex index) const { return index < size(); }
 
 Value const* Value::find(char const* begin, char const* end) const {
   JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue,
-                      "in Json::Value::find(begin, end): requires "
-                      "objectValue or nullValue");
+                      std::string("in Json::Value::find(begin, end): requires "
+                      "objectValue or nullValue: got ")
+                      .append(asCString()).append(": ")
+                      .append(std::to_string(type())));
   if (type() == nullValue)
     return nullptr;
   CZString actualKey(begin, static_cast<unsigned>(end - begin),

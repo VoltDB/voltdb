@@ -299,7 +299,7 @@ AbstractExpression * convertToExpression(queue<AE*> &e) {
 
     PlannerDomRoot domRoot(jsonText.c_str());
 
-    AbstractExpression * exp = AbstractExpression::buildExpressionTree(domRoot.rootObject());
+    AbstractExpression * exp = AbstractExpression::buildExpressionTree(domRoot());
     delete tree;
     return exp;
 }
@@ -428,7 +428,7 @@ TEST_F(ExpressionTest, HashRange) {
     Json::FastWriter writer;
     std::string jsonText = writer.write(json);
     PlannerDomRoot domRoot(jsonText.c_str());
-    boost::scoped_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot.rootObject()));
+    boost::scoped_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot()));
 
     vector<std::string> columnNames;
     columnNames.push_back("foo");

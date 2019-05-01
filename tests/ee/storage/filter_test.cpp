@@ -119,7 +119,7 @@ public:
     }
 
     PlannerDomValue emptyDom() {
-        return PlannerDomRoot("{}").rootObject();
+        return PlannerDomRoot("{}")();
     }
 };
 
