@@ -907,7 +907,7 @@ inline TBMap& PersistentTableSurgeon::getData() const {
 inline PersistentTable& PersistentTableSurgeon::getTable() {
     return m_table;
 }
-tableType
+
 inline void PersistentTableSurgeon::insertTupleForUndo(char* tuple) {
     m_table.insertTupleForUndo(tuple);
 }
