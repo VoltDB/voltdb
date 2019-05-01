@@ -591,6 +591,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
         }
+
+        @Override
+        public void disconnectWithoutMeshDetermination() {
+            synchronized(HostMessenger.this) {
+                if (m_hostWatcher != null && !m_shuttingDown) {
+                    m_hostWatcher.hostsFailed(Sets.newHashSet());
+                }
+            }
+        }
     };
 
     private final void addFailedHosts(Set<Integer> rip) {

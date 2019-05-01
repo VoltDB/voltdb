@@ -255,4 +255,8 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
 
         return sb.toString();
     }
+
+    @Override
+    public void disconnectWithoutMeshDetermination() {
+    }
 }
