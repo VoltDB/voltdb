@@ -228,6 +228,7 @@ public class ExportCoordinator {
                 if (runnable == null) {
                     exportLog.warn("No runnable to invoke, canceling lock");
                     cancelLockRequest();
+                    m_pending.set(false);
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
@@ -239,10 +240,10 @@ public class ExportCoordinator {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Execution rejected (shutdown?) on " + m_eds);
                 }
+                m_pending.set(false);
             } catch (Exception ex) {
                 // FIXME: should we crash voltdb
                 exportLog.error("Failed to execute runnable: " + ex);
-            } finally {
                 m_pending.set(false);
             }
 
