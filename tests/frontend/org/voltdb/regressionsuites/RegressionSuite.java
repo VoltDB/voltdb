@@ -1097,8 +1097,8 @@ public class RegressionSuite extends TestCase {
                     assertEquals(fullMsg, expectedValue, actualValue);
                 }
                 else {
-                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
-                                                         Math.abs(expectedValue - actualValue), epsilon);
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e: expected %f, got %f",
+                            Math.abs(expectedValue - actualValue), epsilon, expectedValue, actualValue);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
             }
