@@ -445,7 +445,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (!m_readyForPolling) {
                         return;
                     }
-                    if (!m_coordinator.isInitialized()) {
+                    if (!m_coordinator.isCoordinatorInitialized()) {
                         m_coordinator.initialize();
                         // FIXME: do we need to ask generation whether we're leader
                     }

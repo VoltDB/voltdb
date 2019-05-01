@@ -234,7 +234,7 @@ public class TestExportGeneration {
 
     private ExportCoordinator getMockCoordinator() {
         ExportCoordinator mock = mock(ExportCoordinator.class);
-        when(mock.isInitialized()).thenReturn(true);
+        when(mock.isCoordinatorInitialized()).thenReturn(true);
         when(mock.isLeader()).thenReturn(true);
         when(mock.isMaster()).thenReturn(true);
         when(mock.isSafePoint(anyLong())).thenReturn(true);

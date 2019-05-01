@@ -108,6 +108,9 @@ public class ExportCoordinator {
                 public void run() {
                     // Handle initial partition leadership
                     try {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Set initial state on host: " + m_hostId);
+                        }
                         Integer newLeaderHostId = initialState.getInt();
                         m_leaderHostId = newLeaderHostId;
                         if (exportLog.isDebugEnabled()) {
@@ -117,7 +120,7 @@ public class ExportCoordinator {
                                     .append("is the leader at initial state");
                             exportLog.debug(sb.toString());
                         }
-                        setInitialized(true);
+                        setCoordinatorInitialized(true);
                         invokeNext();
 
                     } catch (Exception e) {
@@ -149,6 +152,9 @@ public class ExportCoordinator {
          * @param runnable
          */
         void invoke(Runnable runnable) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Queue invocation: " + runnable);
+            }
             m_invocations.add(runnable);
             invokeNext();
         }
@@ -158,7 +164,7 @@ public class ExportCoordinator {
          */
         private void invokeNext() {
 
-            if (!isInitialized()) {
+            if (!isCoordinatorInitialized()) {
                 exportLog.warn("Uninitialized, skip invocation");
                 return;
             }
@@ -181,7 +187,13 @@ public class ExportCoordinator {
                 }
                 return;
             }
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Request lock for: " + m_invocations.peek());
+            }
             if (requestLock()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Execute immediate : " + m_invocations.peek());
+                }
                 m_eds.getExecutorService().execute(m_invocations.poll());
             }
         }
@@ -205,32 +217,35 @@ public class ExportCoordinator {
         @Override
         protected void lockRequestCompleted()
         {
-            if (m_shutdown.get()) {
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Shutdown, ignore lock request on " + m_eds);
-                }
-                return;
-            }
-            Runnable runnable = m_invocations.poll();
-            if (runnable == null) {
-                exportLog.warn("No runnable to invoke, canceling lock");
-                cancelLockRequest();
-                m_pending.set(false);
-                return;
-            }
             try {
+                if (m_shutdown.get()) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Shutdown, ignore lock request on " + m_eds);
+                    }
+                    return;
+                }
+                Runnable runnable = m_invocations.poll();
+                if (runnable == null) {
+                    exportLog.warn("No runnable to invoke, canceling lock");
+                    cancelLockRequest();
+                    return;
+                }
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Execute deferred: " + runnable);
+                }
                 m_eds.getExecutorService().execute(runnable);
 
             } catch (RejectedExecutionException ex) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Execution rejected (shutdown?) on " + m_eds);
-                    m_pending.set(false);
                 }
             } catch (Exception ex) {
                 // FIXME: should we crash voltdb
                 exportLog.error("Failed to execute runnable: " + ex);
+            } finally {
                 m_pending.set(false);
             }
+
         }
 
         @Override
@@ -580,12 +595,14 @@ public class ExportCoordinator {
 
     /**
      * @return true if coordinator is initialized
+     *
+     * Note: avoid conflicting with "isInitialized" in {
      */
-    public boolean isInitialized() {
+    public boolean isCoordinatorInitialized() {
         return m_initialized;
     }
 
-    private void setInitialized(boolean initialized) {
+    private void setCoordinatorInitialized(boolean initialized) {
         m_initialized = initialized;
     }
 
@@ -661,7 +678,12 @@ public class ExportCoordinator {
                 changeState.putInt(m_hostId);
                 changeState.flip();
                 m_task.proposeStateChange(changeState);
-            }});
+            }
+            @Override
+            public String toString() {
+                return "becomeLeader request for host:" + m_hostId;
+            }
+        });
     }
 
     /**
@@ -835,7 +857,12 @@ public class ExportCoordinator {
                 } catch (Exception e) {
                     exportLog.error("Failed to initiate a request for trackers: " + e);
                 }
-            }});
+            }
+            @Override
+            public String toString() {
+                return "requestTrackers for host:" + m_hostId + ", leader: " + m_leaderHostId;
+            }
+        });
     }
 
     /**
