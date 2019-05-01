@@ -568,6 +568,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return &m_oldestExportStreamWithPendingRows;
         }
 
+        void disableExternalStreams();
+
+        bool externalStreamsEnabled();
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 

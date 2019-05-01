@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.Map;
 
+import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.dtxn.TransactionCreator;
 
@@ -70,10 +71,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public boolean checkAndBalancePartitions()
-    {
-        return true;
-    }
+    public void resumeElasticOperationIfNecessary() {}
 
     @Override
     public boolean hasReplayedTxns() {
@@ -82,7 +80,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public void generateReplayPlan(long snapshotTimeStamp, long snapshotTxnId,
-            int newPartitionCount, boolean isMpiNode) {
+            int newPartitionCount, boolean isMpiNode, JSONObject elasticOperationMetadata) {
     }
 
     @Override

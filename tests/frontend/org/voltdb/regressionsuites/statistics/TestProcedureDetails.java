@@ -28,8 +28,10 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
@@ -208,7 +210,8 @@ public class TestProcedureDetails extends RegressionSuite {
         }
     }
 
-    private void verifyProcedureDetailResult(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
+    private void verifyProcedureDetailResult(Client client, ProcedureDetailTestConfig testConfig,
+            VoltTable procedureDetail) throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(procedureDetail);
         procedureDetail.resetRowPosition();
 
@@ -227,7 +230,8 @@ public class TestProcedureDetails extends RegressionSuite {
         else {
             assertEquals("org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP",
                     procedureDetail.getString("PROCEDURE"));
-            assertEquals(0, hostId);
+
+            assertEquals(getHostIdForMpI(client), hostId);
             assertEquals(2, siteId);
             assertEquals(16383, partitionId);
         }
@@ -279,7 +283,7 @@ public class TestProcedureDetails extends RegressionSuite {
                 // Note that pass 1 as the second parameter to get incremental statistics.
                 VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 1).getResults()[0];
                 System.out.println(procedureDetail.toFormattedString());
-                verifyProcedureDetailResult(testConfig, procedureDetail);
+                verifyProcedureDetailResult(client, testConfig, procedureDetail);
             }
             // The test configuration says an exception is expected, but we did not get it.
             if (testConfig.expectsException() && ! caughtException) {
@@ -288,6 +292,18 @@ public class TestProcedureDetails extends RegressionSuite {
                         configValue, testConfig.getArgumentString()));
             }
         }
+    }
+
+    private int getHostIdForMpI(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable topo = client.callProcedure("@Statistics", "TOPO", 0).getResults()[0];
+        while (topo.advanceRow()) {
+            if (topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
+                String leader = topo.getString("Leader");
+                return Integer.parseInt(leader.substring(0, leader.indexOf(':')));
+            }
+        }
+        fail("No leader for MP");
+        return -1;
     }
 
     /**

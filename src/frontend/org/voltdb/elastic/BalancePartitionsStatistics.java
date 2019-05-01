@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.join;
+package org.voltdb.elastic;
 
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.HOURS;
@@ -40,7 +40,7 @@ import org.voltdb.utils.MiscUtils;
 import com.google_voltpatches.common.collect.Maps;
 
 public class BalancePartitionsStatistics extends StatsSource {
-    private static final VoltLogger log = new VoltLogger("JOIN");
+    private static final VoltLogger log = new VoltLogger("ELASTIC");
 
     private static long logIntervalNanos = TimeUnit.SECONDS.toNanos(120);
 

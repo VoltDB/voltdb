@@ -27,8 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 
 import org.junit.After;
@@ -38,6 +36,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
@@ -74,20 +73,15 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder.setDeadHostTimeout(30);
         // Each stream needs an exporter configuration
         builder.addExport(true /* enabled */,
-                         "custom", /* custom exporter:  org.voltdb.exportclient.SocketExporter*/
+                         ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                          createSocketExportProperties("t_1", false /* is replicated stream? */),
                          "export_target_a");
         builder.addExport(true /* enabled */,
-                "custom", /* custom exporter:  org.voltdb.exportclient.SocketExporter*/
+                ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                 createSocketExportProperties("t_2", false /* is replicated stream? */),
                 "export_target_b");
         // Start socket exporter client
         startListener();
-
-        // A test hack to use socket exporter
-        Map<String, String> additionalEnv = new HashMap<String, String>();
-        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
 
         m_cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setNewCli(true);

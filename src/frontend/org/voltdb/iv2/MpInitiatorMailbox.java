@@ -201,7 +201,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
         m_restartSeqGenerator = new MpRestartSequenceGenerator(
-                ((MpScheduler)m_scheduler).getLeaderNodeId(), false);
+                ((MpScheduler)m_scheduler).getHostId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }

@@ -18,8 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +32,7 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.CachedByteBufferAllocator;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.ProClass;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -147,20 +145,8 @@ public abstract class JoinProducerBase extends SiteTasker {
     {
         // Construct task log and start logging task messages
         File overflowDir = new File(voltroot, "join_overflow");
-        Class<?> taskLogKlass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Join", false);
-        if (taskLogKlass != null) {
-            Constructor<?> taskLogConstructor;
-            try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir);
-            } catch (InvocationTargetException e) {
-                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e.getCause());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e);
-            }
-        }
-        return null;
+        return ProClass.newInstanceOf("org.voltdb.rejoin.TaskLogImpl", "Join", ProClass.HANDLER_LOG, pid,
+                overflowDir);
     }
 
     // Received a datablock. Reset the watchdog timer and hand the block to the Site.

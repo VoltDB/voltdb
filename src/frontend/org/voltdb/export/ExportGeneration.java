@@ -535,7 +535,7 @@ public class ExportGeneration implements Generation {
                     final Integer partition = p.getFirst();
                     List<String> children = null;
                     try {
-                        children = p.getSecond().getChildren();
+                        children = p.getSecond().get();
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     } catch (KeeperException e) {

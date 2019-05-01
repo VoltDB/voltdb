@@ -264,4 +264,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     public void setViewsEnabled(String viewNames, boolean enabled) {
         return;
     }
+
+    @Override
+    public void disableExternalStreams() {
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return true;
+    }
 }
