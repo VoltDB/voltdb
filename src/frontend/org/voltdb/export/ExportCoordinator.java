@@ -83,9 +83,6 @@ public class ExportCoordinator {
      */
     private class ExportCoordinationTask extends SynchronizedStatesManager.StateMachineInstance {
 
-        private ByteBuffer m_startingState;
-        private ByteBuffer m_currentState;
-
         // A queue of invocation runnables: each invocation needs the distributed lock
         private ConcurrentLinkedQueue<Runnable> m_invocations = new ConcurrentLinkedQueue<>();
         private AtomicBoolean m_pending = new AtomicBoolean(false);
@@ -105,7 +102,6 @@ public class ExportCoordinator {
 
         @Override
         protected void setInitialState(ByteBuffer initialState) {
-            m_startingState = initialState;
             m_eds.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
@@ -120,6 +116,8 @@ public class ExportCoordinator {
                                     .append("is the leader at initial state");
                             exportLog.debug(sb.toString());
                         }
+                        m_initialized = true;
+
                     } catch (Exception e) {
                         exportLog.error("Failed to change to initial state leader: " + e);
                     }
@@ -607,7 +605,6 @@ public class ExportCoordinator {
             ByteBuffer initialState = ByteBuffer.allocate(4);
             initialState.putInt(m_leaderHostId);
             initialState.flip();
-            m_task.setInitialState(initialState);
             m_task.registerStateMachineWithManager(initialState);
             m_initialized = true;
             exportLog.info("Initialized export coordinator for topic " + topicName + ", and hostId " + m_hostId
@@ -630,6 +627,7 @@ public class ExportCoordinator {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export coordinator shutting down...");
         }
+        m_task.shutdown();
         m_ssm.ShutdownSynchronizedStatesManager();
     }
 
