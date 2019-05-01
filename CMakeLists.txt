@@ -285,15 +285,15 @@ SET (VOLTDB_3PTY_BUILD_PREFIX ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj)
 # we do at build time.
 #
 ########################################################################
-SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
+SET (VOLTDB_OPENSSL_VERSION 1.1.1b)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
 # Again, we unpack the tarball in the binary directory.  See pcre2 above.
-SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
+SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tar.gz)
 # VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
 # VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_OPENSSL_BUILD_PREFIX:     /openssl
-# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2.d/ ... unpacked source
-# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.2.0.d/ ... generated binaries
+# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.1.1b/ ... unpacked source
+# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.1.1b/ ... generated binaries
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/openssl)
@@ -318,7 +318,7 @@ ExternalProject_Add(crypto
   CONFIGURE_COMMAND ${VOLTDB_OPENSSL_SRC}/Configure --prefix=${VOLTDB_3PTY_INSTALL_PREFIX} ${VOLTDB_OPENSSL_TOKEN}
   BUILD_COMMAND $(MAKE)
   BUILD_IN_SOURCE 1
-  INSTALL_COMMAND $(MAKE) install
+  INSTALL_COMMAND $(MAKE) install_sw
   )
 ExternalProject_get_property(crypto INSTALL_DIR)
 SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
@@ -331,18 +331,18 @@ SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
 # to do this with a CMake build, but we don't use it.
 #
 ########################################################################
-SET (VOLTDB_PCRE2_VERSION 10.10)
+SET (VOLTDB_PCRE2_VERSION 10.33)
 SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
 # We unpack the tarball in the binary directory.  It saves us
 # checking it all in to github.  That's why this is
 # ${PROJECT_NAME}_BINARY_DIR.
-SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tar.gz)
 #
 # VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
 # VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_PCRE2_BUILD_PREFIX:      /pcre2
-# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.10/ ... unpacked source
-# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.10/ ... generated binaries
+# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.33/ ... unpacked source
+# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.33/ ... generated binaries
 SET (VOLTDB_PCRE2_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/pcre2)
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_BUILD_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_BUILD_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
@@ -377,7 +377,7 @@ SET (VOLTDB_S2GEO_OBJ ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
   -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
-  -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}
+  -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}/
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/google-s2-geometry)
 
@@ -412,3 +412,4 @@ ADD_SUBDIRECTORY(src/ee ee)
 ########################################################################
 ENABLE_TESTING()
 ADD_SUBDIRECTORY(tests/ee tests)
+
