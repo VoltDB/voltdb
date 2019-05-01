@@ -85,6 +85,7 @@ public class ExportCoordinator {
 
         // A queue of invocation runnables: each invocation needs the distributed lock
         private ConcurrentLinkedQueue<Runnable> m_invocations = new ConcurrentLinkedQueue<>();
+
         private AtomicBoolean m_pending = new AtomicBoolean(false);
         private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
@@ -116,7 +117,8 @@ public class ExportCoordinator {
                                     .append("is the leader at initial state");
                             exportLog.debug(sb.toString());
                         }
-                        m_initialized = true;
+                        setInitialized(true);
+                        invokeNext();
 
                     } catch (Exception e) {
                         exportLog.error("Failed to change to initial state leader: " + e);
@@ -155,6 +157,11 @@ public class ExportCoordinator {
          * Request lock for next queued invocation.
          */
         private void invokeNext() {
+
+            if (!isInitialized()) {
+                exportLog.warn("Uninitialized, skip invocation");
+                return;
+            }
 
             if (m_shutdown.get()) {
                 if (exportLog.isDebugEnabled()) {
@@ -578,6 +585,10 @@ public class ExportCoordinator {
         return m_initialized;
     }
 
+    private void setInitialized(boolean initialized) {
+        m_initialized = initialized;
+    }
+
     /**
      * Called by EDS when notified it is ready for polling.
      */
@@ -606,7 +617,7 @@ public class ExportCoordinator {
             initialState.putInt(m_leaderHostId);
             initialState.flip();
             m_task.registerStateMachineWithManager(initialState);
-            m_initialized = true;
+
             exportLog.info("Initialized export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
 
@@ -633,12 +644,11 @@ public class ExportCoordinator {
 
     /**
      * Initiate a state change to make this host the partition leader.
+     *
+     * NOTE: we accept this invocation even if not initialized yet
      */
     public void becomeLeader() {
-        if (!m_initialized) {
-            exportLog.warn("Uninitialized, skip becoming leader");
-            return;
-        }
+
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
             return;
