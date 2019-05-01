@@ -613,4 +613,18 @@ public class VoltZK {
         } catch (KeeperException | InterruptedException e) {
         }
     }
+
+    /**
+     * @param zk ZooKeeper
+     * @return true if any hosts work on snapshot
+     */
+    public static boolean hasHostsSnapshotting(ZooKeeper zk) {
+        try {
+            List<String> nodesSnapshotting = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
+            return (!nodesSnapshotting.isEmpty());
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to read snapshotting hosts.", true, e);
+        }
+        return false;
+    }
 }

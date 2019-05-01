@@ -444,6 +444,11 @@ public class UpdateCore extends VoltSystemProcedure {
         if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticJoinInProgress)) {
             throw new VoltAbortException("Can't do a catalog update while an elastic join is active. Please retry catalog update later.");
         }
+
+        if (requiresSnapshotIsolation == 1 && VoltZK.hasHostsSnapshotting(zk)) {
+            throw new VoltAbortException("Snapshot in progress. Please retry catalog update later.");
+        }
+
         final CatalogContext context = VoltDB.instance().getCatalogContext();
         if (context.catalogVersion == expectedCatalogVersion) {
             if (context.checkMismatchedPreparedCatalog(catalogHash, deploymentHash)) {
