@@ -632,6 +632,7 @@ public class ExportCoordinator {
             return;
         }
         try {
+            m_state = State.INITIALIZING;
             ZKUtil.addIfMissing(m_zk, m_rootPath, CreateMode.PERSISTENT, null);
 
             // Set up a SynchronizedStateManager for the topic/partition
