@@ -90,6 +90,17 @@ public class TestVoltCompiler extends TestCase {
         File tjar = new File(testout_jar);
         tjar.delete();
     }
+    public void testExportTarget() throws Exception {
+        String ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE_OLD,UPDATE_NEW);\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+    }
 
     /*public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +

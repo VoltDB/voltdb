@@ -36,12 +36,15 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.PersistentExport;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
@@ -969,6 +972,14 @@ public class DDLCompiler {
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
                 }
+
+                for (VoltXMLElement subNode : e.children) {
+                    if (subNode.name.equals(PersistentExport.PERSISTENT_EXPORT)) {
+                        String streamTarget = subNode.attributes.get("target");
+                        m_tracker.addExportedTable(tableName, streamTarget, false);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -1318,7 +1329,7 @@ public class DDLCompiler {
         }
         final boolean isStream = node.attributes.get("stream") != null
                 && node.attributes.get("stream").equalsIgnoreCase("true");
-        final String streamTarget = node.attributes.get("export");
+        String streamTarget = node.attributes.get("export");
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
 
         // all tables start replicated
@@ -1343,6 +1354,14 @@ public class DDLCompiler {
         VoltXMLElement ttlNode = null;
         for (VoltXMLElement subNode : node.children) {
 
+            if (subNode.name.equals(PersistentExport.PERSISTENT_EXPORT)) {
+                streamTarget = subNode.attributes.get("target");
+                List<String> items= Stream.of(subNode.attributes.get("triggers").split(","))
+                        .map(String::trim)
+                        .collect(Collectors.toList());
+                int tblType = TableType.getPeristentExportTrigger(items);
+                table.setTabletype(tblType);
+            }
             if (subNode.name.equals("columns")) {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {

@@ -111,6 +111,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.ALTER_TABLE :
             case StatementTypes.ALTER_TRANSFORM :
             case StatementTypes.ALTER_TTL :
+            case StatementTypes.ALTER_EXPORT :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -451,6 +452,9 @@ public class StatementSchema extends Statement {
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);
                 }
+            }
+            case StatementTypes.ALTER_EXPORT : {
+
             }
             case StatementTypes.DROP_ASSERTION :
             case StatementTypes.DROP_CHARACTER_SET :
