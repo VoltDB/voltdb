@@ -120,7 +120,7 @@ public class ExportCoordinator {
                                     .append("is the leader at initial state");
                             exportLog.debug(sb.toString());
                         }
-                        setCoordinatorInitialized(true);
+                        setCoordinatorInitialized();
                         invokeNext();
 
                     } catch (Exception e) {
@@ -541,7 +541,12 @@ public class ExportCoordinator {
     // Map of hostId to ExportSequenceNumberTracker
     private TreeMap<Integer, ExportSequenceNumberTracker> m_trackers = new TreeMap<>();
 
-    private boolean m_initialized = false;
+    enum State {
+        CREATED,
+        INITIALIZING,
+        INITIALIZED
+    }
+    private State m_state = State.CREATED;
     private boolean m_isMaster = false;
     private long m_safePoint = 0L;
 
@@ -599,19 +604,27 @@ public class ExportCoordinator {
      * Note: avoid conflicting with "isInitialized" in {
      */
     public boolean isCoordinatorInitialized() {
-        return m_initialized;
+        return m_state == State.INITIALIZED;
     }
 
-    private void setCoordinatorInitialized(boolean initialized) {
-        m_initialized = initialized;
+    private void setCoordinatorInitialized() {
+        m_state = State.INITIALIZED;
     }
 
     /**
      * Called by EDS when notified it is ready for polling.
+     *
+     * Note: we appear to be called repeatedly.
      */
     public void initialize() {
 
-        if (m_initialized) {
+        if (m_state == State.INITIALIZING) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Export coordinator initializing for " + m_eds);
+            }
+            return;
+        }
+        else if (m_state == State.INITIALIZED) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Export coordinator already initialized for " + m_eds);
             }
@@ -649,7 +662,9 @@ public class ExportCoordinator {
      * @throws InterruptedException
      */
     public void shutdown() throws InterruptedException {
-        if (!m_initialized) {
+
+        if (!isCoordinatorInitialized()) {
+            // Nothing to shut down
             return;
         }
         if (exportLog.isDebugEnabled()) {
@@ -709,7 +724,7 @@ public class ExportCoordinator {
      */
     public boolean isSafePoint(long ackedSeqNo) {
 
-        if (!m_initialized) {
+        if (!isCoordinatorInitialized()) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Uninitialized, skip checking safe point at " + ackedSeqNo);
             }
@@ -735,7 +750,7 @@ public class ExportCoordinator {
      */
     public boolean isExportMaster(long exportSeqNo) {
 
-        if (!m_initialized) {
+        if (!isCoordinatorInitialized()) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Uninitialized, not export master at " + exportSeqNo);
             }
