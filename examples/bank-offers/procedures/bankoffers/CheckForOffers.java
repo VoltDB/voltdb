@@ -54,6 +54,8 @@ public class CheckForOffers extends VoltProcedure {
 
     public final SQLStmt insertOffer = new SQLStmt(
         "INSERT INTO offers_given VALUES (?,?,NOW,?);");
+    public final SQLStmt insertOffer_export = new SQLStmt(
+            "INSERT INTO offers_given_export VALUES (?,?,NOW,?);");
 
     public long run(long txnId,
                     long acctNo,
@@ -75,6 +77,7 @@ public class CheckForOffers extends VoltProcedure {
         if (results0[1].getRowCount() > 0) {
             String offerText = results0[1].fetchRow(0).getString(0);
             voltQueueSQL(insertOffer, acctNo, vendorId, offerText);
+            voltQueueSQL(insertOffer_export, acctNo, vendorId, offerText);
             voltExecuteSQL();
         }
 
