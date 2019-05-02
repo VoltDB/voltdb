@@ -801,6 +801,8 @@ public class SynchronizedStatesManager {
                         if (m_log.isDebugEnabled()) {
                             m_log.debug(m_stateMachineId + ":    " + memberId + " did not supply a Task Result");
                         }
+                        // Signal the caller that a member didn't answer
+                        results.put(memberId, null);
                     }
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter

@@ -398,13 +398,19 @@ public class ExportCoordinator {
                 public void run() {
 
                     try {
+                        boolean requestAgain = false;
                         resetCoordinator(false, true);
                         for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
-                            if (!entry.getValue().hasRemaining()) {
+                            ByteBuffer buf = entry.getValue();
+                            if ((buf == null) && ourTask) {
+                                exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
+                                requestAgain = true;
+                                break;
+                            }
+                            else if (!buf.hasRemaining()) {
                                 exportLog.warn("Received empty response from: " + entry.getKey());
                             }
                             else {
-                                ByteBuffer buf = entry.getValue();
                                 int host = buf.getInt();
                                 try {
                                     ExportSequenceNumberTracker tracker = ExportSequenceNumberTracker.deserialize(buf);
@@ -421,15 +427,20 @@ public class ExportCoordinator {
                                 }
                             }
                         }
-                        normalizeTrackers();
-                        dumpTrackers();
+                        if (requestAgain) {
+                            requestTrackers();
 
-                        // JUnit test synchronization
-                        if (m_testReady != null) {
-                            m_testReady.set(true);
+                        } else {
+                            normalizeTrackers();
+                            dumpTrackers();
+
+                            // JUnit test synchronization
+                            if (m_testReady != null) {
+                                m_testReady.set(true);
+                            }
+
+                            m_eds.resumePolling();
                         }
-
-                        m_eds.resumePolling();
 
                     } catch (Exception e) {
                         exportLog.error("Failed to handle coordination trackers: " + e);
