@@ -530,8 +530,8 @@ public class ExportCoordinator {
     private final ExportDataSource m_eds;
 
     // State machine will only be instantiated on initialize()
-    private SynchronizedStatesManager m_ssm;
-    private ExportCoordinationTask m_task;
+    private final SynchronizedStatesManager m_ssm;
+    private final ExportCoordinationTask m_task;
 
     private Integer m_leaderHostId = NO_HOST_ID;
     private static final int NO_HOST_ID =  -1;
@@ -597,8 +597,38 @@ public class ExportCoordinator {
         m_rootPath = rootPath;
         m_hostId = hostId;
         m_eds = eds;
+
+        SynchronizedStatesManager ssm = null;
+        ExportCoordinationTask task = null;
+        try {
+            ZKUtil.addIfMissing(m_zk, m_rootPath, CreateMode.PERSISTENT, null);
+
+            // Set up a SynchronizedStateManager for the topic/partition
+            String topicName = getTopicName(m_eds.getTableName(), m_eds.getPartitionId());
+            ssm = new SynchronizedStatesManager(
+                    m_zk,
+                    m_rootPath,
+                    topicName,
+                    m_hostId.toString(),
+                    1);
+
+            task = new ExportCoordinationTask(ssm);
+
+            exportLog.info("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
+                    + ", leaderHostId: " + m_leaderHostId);
+
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to initialize ExportCoordinator state machine", true, e);
+        } finally {
+            m_ssm = ssm;
+            m_task = task;
+        }
     }
 
+    private String getTopicName(String tableName, int partitionId) {
+        return tableName + "_" + partitionId;
+
+    }
     /**
      * @return true if coordinator is initialized
      *
@@ -633,23 +663,12 @@ public class ExportCoordinator {
         }
         try {
             m_state = State.INITIALIZING;
-            ZKUtil.addIfMissing(m_zk, m_rootPath, CreateMode.PERSISTENT, null);
-
-            // Set up a SynchronizedStateManager for the topic/partition
-            String topicName = m_eds.getTableName() + "_" + m_eds.getPartitionId();
-            m_ssm = new SynchronizedStatesManager(
-                    m_zk,
-                    m_rootPath,
-                    topicName,
-                    m_hostId.toString(),
-                    1);
-
-            m_task = new ExportCoordinationTask(m_ssm);
             ByteBuffer initialState = ByteBuffer.allocate(4);
             initialState.putInt(m_leaderHostId);
             initialState.flip();
             m_task.registerStateMachineWithManager(initialState);
 
+            String topicName = getTopicName(m_eds.getTableName(), m_eds.getPartitionId());
             exportLog.info("Initialized export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
 
@@ -682,6 +701,7 @@ public class ExportCoordinator {
      * NOTE: we accept this invocation even if not initialized yet
      */
     public void becomeLeader() {
+
 
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");

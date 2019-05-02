@@ -1890,6 +1890,8 @@ public class SynchronizedStatesManager {
                 // lost the full connection. some test cases do this...
                 // means shutdown without the elector being
                 // shutdown; ignore.
+            } catch (KeeperException.NoNodeException e) {
+                // FIXME: need to investigate why this happens on multinode shutdown
             } catch (InterruptedException e) {
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
