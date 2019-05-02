@@ -255,8 +255,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     txnState.isNPartTxn(),
                     txnState.getTimetamp());
 
-            //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
-            //to determine how the follow-up fragments are processed.
             task.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_SITE);
 
             if (pf.multipartition) {
