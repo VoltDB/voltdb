@@ -834,7 +834,7 @@ public class ExportCoordinator {
                     + "], look for candidate replicas");
         }
 
-        Integer replicaId = Integer.MIN_VALUE;
+        Integer replicaId = NO_HOST_ID;
         long leaderNextSafePoint = gap.getSecond() + 1;
         long  replicaSafePoint = 0L;
 
