@@ -87,7 +87,13 @@ CREATE TABLE offers_given(
 );
 PARTITION TABLE offers_given ON COLUMN acc_no;
 CREATE INDEX idx_offers_given ON offers_given (offer_ts);
-EXPORT TABLE offers_given TO TARGET table_test;
+
+CREATE STREAM offers_given_export PARTITION ON COLUMN acc_no EXPORT TO TARGET table_test (
+  acc_no BIGINT NOT NULL,
+  vendor_id INTEGER,
+  offer_ts TIMESTAMP NOT NULL,
+  offer_text VARCHAR(200)
+);
 
 --------- VIEWS ---------------------------
 
@@ -103,7 +109,7 @@ GROUP BY acc_no, vendor_id;
 
 CREATE VIEW total_offers AS
 SELECT TRUNCATE(SECOND,offer_ts) AS offer_ts, acc_no, COUNT(*) as total_offers
-FROM offers_given
+FROM offers_given_export
 GROUP BY TRUNCATE(SECOND,offer_ts), acc_no;
 
 --------- PROCEDURES ----------------------
