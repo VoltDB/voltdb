@@ -286,6 +286,74 @@ public class TestExportCoordinator extends ZKTestBase {
     }
 
     @Test
+    public void test2NodesWithLeaderInitialGap() {
+
+        try {
+            tracker0.truncateAfter(0L);
+            tracker0.append(200L, 300L);
+            eds0 = mockDataSource(0, tracker0);
+
+            tracker1.truncateAfter(0L);
+            tracker1.append(1L, 300L);
+            eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ec0.initialize();
+            ec1.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isLeader());
+
+            // Check the leader is export master only after
+            // the initial gap
+            assertFalse(ec0.isExportMaster(1L));
+            assertTrue(ec1.isExportMaster(1L));
+
+            assertFalse(ec0.isExportMaster(10L));
+            assertTrue(ec1.isExportMaster(10L));
+
+            assertFalse(ec0.isExportMaster(200L));
+            assertTrue(ec1.isExportMaster(200L));
+
+            assertTrue(ec0.isExportMaster(201L));
+            assertFalse(ec1.isExportMaster(201L));
+
+            assertTrue(ec0.isExportMaster(300L));
+            assertFalse(ec1.isExportMaster(300L));
+
+            assertTrue(ec0.isExportMaster(301L));
+            assertFalse(ec1.isExportMaster(301L));
+
+            assertTrue(ec0.isExportMaster(1000L));
+            assertFalse(ec1.isExportMaster(1000L));
+
+            ec0.shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    @Test
     public void test3NodesWithGapLowestHostIdWins() {
 
         try {
