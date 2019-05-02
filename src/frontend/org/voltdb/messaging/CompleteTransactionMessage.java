@@ -213,6 +213,35 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("COMPLETION: ");
+        if (isRestart()) {
+            assert(!isAbortDuringRepair());
+            assert(isRollback());
+            sb.append("RESTARTABLE Rollback ");
+            if (m_timestamp != INITIAL_TIMESTAMP) {
+                MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
+            }
+        }
+        else
+        if (isAbortDuringRepair()) {
+            assert(!isRestart());
+            assert(isRollback());
+            sb.append("ABORT Rollback ");
+            if (m_timestamp != INITIAL_TIMESTAMP) {
+                MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
+            }
+        }
+        else
+        if (isRollback()) {
+            sb.append("ROLLBACK");
+        }
+        else {
+            sb.append("COMMIT");
+        }
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 

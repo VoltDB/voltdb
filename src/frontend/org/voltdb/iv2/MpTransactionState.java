@@ -95,6 +95,7 @@ public class MpTransactionState extends TransactionState
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
+    int m_fragmentIndex = 0;
     final boolean m_nPartTxn;
     boolean m_haveSentfragment = false;
 
@@ -212,6 +213,7 @@ public class MpTransactionState extends TransactionState
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
         m_isRestart = true;
+        m_fragmentIndex = 0;
         m_haveSentfragment = false;
         m_drBufferChangedAgg = 0;
     }
@@ -709,6 +711,10 @@ public class MpTransactionState extends TransactionState
 
     public boolean isNPartTxn() {
         return m_nPartTxn;
+    }
+
+    public int getNextFragmentIndex() {
+        return m_fragmentIndex++;
     }
 
     // Have MPI sent out at least one round of fragment to leaders?

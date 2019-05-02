@@ -93,4 +93,8 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
         buf.limit(buf.position());
     }
 
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("Unexpected Coalesced Heartbeat");
+    }
 }
