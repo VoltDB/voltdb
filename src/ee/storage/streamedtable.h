@@ -153,6 +153,10 @@ private:
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
+
+    // Used to prevent migrate transaction from generating >50MB DR binary log
+    // Pair: <undoToken, txnSize>
+    std::pair<int64_t, int32_t> m_migrateTxnSizeGuard;
 };
 
 }

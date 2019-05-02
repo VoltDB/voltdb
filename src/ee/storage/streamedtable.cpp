@@ -105,6 +105,12 @@ StreamedTable::~StreamedTable() {
 // Stream writes were done so commit all the writes
 void StreamedTable::notifyQuantumRelease() {
     if (m_wrapper) {
+        std::cout << "notifyQuantumRelease m_lastSeenUndoToken=" << getLastSeenUndoToken() << std::endl;
+        if (m_migrateTxnSizeGuard.first == getLastSeenUndoToken()) {
+            m_migrateTxnSizeGuard.first = 0L;
+            m_migrateTxnSizeGuard.second = 0;
+            std::cout << "notifyQuantumRelease clear migrateTxnSize" << std::endl;
+        }
         m_wrapper->commit(m_executorContext->getContextEngine(),
                 m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
     }
@@ -155,6 +161,19 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             // With no active UndoLog, there is no undo support.
             return;
         }
+        if (type == ExportTupleStream::MIGRATE) {
+            if (m_migrateTxnSizeGuard.first == uq->getUndoToken()) {
+                if (m_wrapper->getUso() - m_migrateTxnSizeGuard.second >= 5000) {
+                    std::cout << "Exceeds max DR Buffer size." << std::endl;
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                      "Exceeds max DR Buffer size.");
+                }
+            } else {
+                m_migrateTxnSizeGuard.first = uq->getUndoToken();
+                m_migrateTxnSizeGuard.second = mark;
+            }
+        }
+        std::cout << "streamTuple append mark=" << mark << " undo token = " << uq->getUndoToken() << std::endl;
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
     }
 }
@@ -202,6 +221,7 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
+        std::cout << "undo rollbackTo mark=" << mark << " seqNo=" << seqNo << std::endl;
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
