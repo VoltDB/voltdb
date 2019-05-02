@@ -61,24 +61,6 @@ public class TestExportCoordinator extends ZKTestBase {
     private final String TEST_TABLE = "TEST_TABLE";
     private final int TEST_PARTITION = 7;
 
-    // Mocked EDS
-    ExportDataSource eds0 = null;
-    ExportDataSource eds1 = null;
-    ExportDataSource eds2 = null;
-    ExportDataSource eds3 = null;
-
-    // ExecutorServices
-    ListeningExecutorService m_es0 = null;
-    ListeningExecutorService m_es1 = null;
-    ListeningExecutorService m_es2 = null;
-    ListeningExecutorService m_es3 = null;
-
-    // Handles to set mocked trackers on each EDS
-    ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
-    ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
-    ExportSequenceNumberTracker tracker2 = new ExportSequenceNumberTracker();
-    ExportSequenceNumberTracker tracker3 = new ExportSequenceNumberTracker();
-
     @Before
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
@@ -110,27 +92,15 @@ public class TestExportCoordinator extends ZKTestBase {
     @After
     public void tearDown() throws Exception {
         tearDownZK();
-        if (m_es0 != null) {
-            m_es0.shutdown();
-        }
-        if (m_es1 != null) {
-            m_es1.shutdown();
-        }
-        if (m_es2 != null) {
-            m_es2.shutdown();
-        }
-        if (m_es3 != null) {
-            m_es3.shutdown();
-        }
     }
 
     @Test
     public void testSingleNodeNoGaps() {
 
         try {
-            tracker0.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
             tracker0.append(1L, 100L);
-            eds0 = mockDataSource(0, tracker0);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
 
             // Note: use the special constructor for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
@@ -158,6 +128,7 @@ public class TestExportCoordinator extends ZKTestBase {
             assertTrue(ec0.isExportMaster(1000L));
 
             ec0.shutdown();
+            eds0.getExecutorService().shutdown();
         }
         catch (InterruptedException e) {
             fail();
@@ -168,10 +139,10 @@ public class TestExportCoordinator extends ZKTestBase {
     public void testSingleNodeWithGap() {
 
         try {
-            tracker0.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
             tracker0.append(1L, 100L);
             tracker0.append(200L, 300L);
-            eds0 = mockDataSource(0, tracker0);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
 
             // Note: use the special constructor for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
@@ -202,6 +173,7 @@ public class TestExportCoordinator extends ZKTestBase {
             assertTrue(ec0.isExportMaster(1000L));
 
             ec0.shutdown();
+            eds0.getExecutorService().shutdown();
         }
         catch (InterruptedException e) {
             fail();
@@ -212,14 +184,14 @@ public class TestExportCoordinator extends ZKTestBase {
     public void test2NodesWithGap() {
 
         try {
-            tracker0.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
             tracker0.append(1L, 100L);
             tracker0.append(200L, 300L);
-            eds0 = mockDataSource(0, tracker0);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
 
-            tracker1.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
             tracker1.append(1L, 300L);
-            eds1 = mockDataSource(0, tracker1);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
 
             // Note: use the special constructors for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
@@ -279,6 +251,10 @@ public class TestExportCoordinator extends ZKTestBase {
             assertFalse(ec1.isExportMaster(1000L));
 
             ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
         }
         catch (InterruptedException e) {
             fail();
@@ -289,13 +265,13 @@ public class TestExportCoordinator extends ZKTestBase {
     public void test2NodesWithLeaderInitialGap() {
 
         try {
-            tracker0.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
             tracker0.append(200L, 300L);
-            eds0 = mockDataSource(0, tracker0);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
 
-            tracker1.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
             tracker1.append(1L, 300L);
-            eds1 = mockDataSource(0, tracker1);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
 
             // Note: use the special constructors for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
@@ -347,6 +323,10 @@ public class TestExportCoordinator extends ZKTestBase {
             assertFalse(ec1.isExportMaster(1000L));
 
             ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
         }
         catch (InterruptedException e) {
             fail();
@@ -357,18 +337,19 @@ public class TestExportCoordinator extends ZKTestBase {
     public void test3NodesWithGapLowestHostIdWins() {
 
         try {
-            tracker0.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
             tracker0.append(1L, 100L);
             tracker0.append(200L, 300L);
-            eds0 = mockDataSource(0, tracker0);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
 
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
             tracker1.truncateAfter(0L);
             tracker1.append(1L, 300L);
-            eds1 = mockDataSource(0, tracker1);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
 
-            tracker2.truncateAfter(0L);
+            ExportSequenceNumberTracker tracker2 = new ExportSequenceNumberTracker();
             tracker2.append(1L, 300L);
-            eds2 = mockDataSource(0, tracker2);
+            ExportDataSource eds2 = mockDataSource(0, tracker2);
 
             // Note: use the special constructors for JUnit
             ExportCoordinator ec0 = new ExportCoordinator(
@@ -446,6 +427,12 @@ public class TestExportCoordinator extends ZKTestBase {
             assertFalse(ec2.isExportMaster(1000L));
 
             ec0.shutdown();
+            ec1.shutdown();
+            ec2.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+            eds2.getExecutorService().shutdown();
         }
         catch (InterruptedException e) {
             fail();

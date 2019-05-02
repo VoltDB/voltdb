@@ -914,6 +914,8 @@ public class ExportCoordinator {
     /**
      * Normalize the trackers to account for any host having a gap at the end; one
      * of the other hosts will have a higher sequence number.
+     *
+     * Normalize the trackers for gaps at the beginning.
      */
     private void normalizeTrackers() {
 
@@ -935,10 +937,12 @@ public class ExportCoordinator {
                 tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
                 tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                if (tracker.getFirstSeqNo() > lowestSeqNo) {
+                    tracker.addRange(lowestSeqNo, lowestSeqNo);
+                }
             }
         }
     }
-
 
     private void dumpTrackers() {
         if (!exportLog.isDebugEnabled()) {
