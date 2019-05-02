@@ -1054,7 +1054,7 @@ public class ParserDDL extends ParserRoutine {
                     break;
                 }
             }
-            if (hasUpdate && (triggers.contains("UPDATEOLD") || triggers.contains("UPDATENEW"))){
+            if (hasUpdate && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
                 throw unexpectedToken();
             }
             if (token.tokenType != Tokens.CLOSEBRACKET) {
