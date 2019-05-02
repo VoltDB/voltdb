@@ -113,13 +113,11 @@ public class ExportCoordinator {
                         }
                         Integer newLeaderHostId = initialState.getInt();
                         m_leaderHostId = newLeaderHostId;
-                        if (exportLog.isDebugEnabled()) {
-                            StringBuilder sb = new StringBuilder("Host ")
-                                    .append(m_leaderHostId)
-                                    .append(isLeader() ? " (localHost) " : " ")
-                                    .append("is the leader at initial state");
-                            exportLog.debug(sb.toString());
-                        }
+                        StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
+                                .append(m_leaderHostId)
+                                .append(isLeader() ? " (localHost) " : " ")
+                                .append("is the leader at initial state");
+                        exportLog.info(sb.toString());
                         setCoordinatorInitialized();
                         invokeNext();
 
@@ -165,7 +163,9 @@ public class ExportCoordinator {
         private void invokeNext() {
 
             if (!isCoordinatorInitialized()) {
-                exportLog.warn("Uninitialized, skip invocation");
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Uninitialized, skip invocation");
+                }
                 return;
             }
 
@@ -192,7 +192,7 @@ public class ExportCoordinator {
             }
             if (requestLock()) {
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Execute immediate : " + m_invocations.peek());
+                    exportLog.debug("Immediate execution of: " + m_invocations.peek());
                 }
                 m_eds.getExecutorService().execute(m_invocations.poll());
             }
@@ -232,7 +232,7 @@ public class ExportCoordinator {
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Execute deferred: " + runnable);
+                    exportLog.debug("Deferred execution of: " + runnable);
                 }
                 m_eds.getExecutorService().execute(runnable);
 
@@ -301,15 +301,13 @@ public class ExportCoordinator {
                             return;
                         }
                         m_leaderHostId = newLeaderHostId;
-                        if (exportLog.isDebugEnabled()) {
-                            StringBuilder sb = new StringBuilder("Host ")
-                                    .append(m_leaderHostId)
-                                    .append(isLeader() ? " (localHost) " : " ")
-                                    .append("is the new leader");
-                            exportLog.debug(sb.toString());
-                        }
+                        StringBuilder sb = new StringBuilder("Host ")
+                                .append(m_leaderHostId)
+                                .append(isLeader() ? " (localHost) " : " ")
+                                .append("is the new leader");
+                        exportLog.info(sb.toString());
 
-                        // If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
+                        //If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
                         // Note: cannot initiate a coordinator task directly from here, must go
                         // through another runnable and the invocation path.
                         if (isLeader() && m_trackers.isEmpty()) {
@@ -473,11 +471,11 @@ public class ExportCoordinator {
                     // from one host. Note also that the request goes through another EDS runnable.
                     if (!addedMembers.isEmpty()) {
                         if (isLeader()) {
-                            exportLog.info("Leader requests trackers, added members: " + addedMembers);
+                            exportLog.info("Leader requests trackers for added members: " + addedMembers);
                             requestTrackers();
 
                         } else if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Expecting new trackers, for added members: " + addedMembers);
+                            exportLog.debug("Expecting new trackers for added members: " + addedMembers);
                         }
 
                     } else if (!removedMembers.isEmpty()){
@@ -669,7 +667,7 @@ public class ExportCoordinator {
             m_task.registerStateMachineWithManager(initialState);
 
             String topicName = getTopicName(m_eds.getTableName(), m_eds.getPartitionId());
-            exportLog.info("Initialized export coordinator for topic " + topicName + ", and hostId " + m_hostId
+            exportLog.info("Initializing export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
 
         } catch (Exception e) {
