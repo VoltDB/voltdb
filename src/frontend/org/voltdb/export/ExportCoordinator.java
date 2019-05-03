@@ -80,6 +80,14 @@ public class ExportCoordinator {
      *
      *  - Request a state change to a new partition leader
      *  - Start a task to collect the {@code ExportSequenceNumberTracker} from all the nodes
+     *
+     *  Notes:
+     *
+     *  - the {@code ExportDataSource} may be shut down asynchronously to the callbacks
+     *    invoked by the SSM daemon thread
+     *
+     *  - we want to catch any exceptions occurring in the SSM daemon callbacks in order
+     *    to preserve the integrity of the SSM.
      */
     private class ExportCoordinationTask extends SynchronizedStatesManager.StateMachineInstance {
 
@@ -103,29 +111,44 @@ public class ExportCoordinator {
 
         @Override
         protected void setInitialState(ByteBuffer initialState) {
-            m_eds.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
-                    // Handle initial partition leadership
-                    try {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Set initial state on host: " + m_hostId);
-                        }
-                        Integer newLeaderHostId = initialState.getInt();
-                        m_leaderHostId = newLeaderHostId;
-                        StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
-                                .append(m_leaderHostId)
-                                .append(isLeader() ? " (localHost) " : " ")
-                                .append("is the leader at initial state");
-                        exportLog.info(sb.toString());
-                        setCoordinatorInitialized();
-                        invokeNext();
-
-                    } catch (Exception e) {
-                        exportLog.error("Failed to change to initial state leader: " + e);
-                    }
+            if (m_shutdown.get()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Shutdown, ignore initial state proposed on " + m_eds);
                 }
-            });
+                return;
+            }
+            try {
+                m_eds.getExecutorService().execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Handle initial partition leadership
+                        try {
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Set initial state on host: " + m_hostId);
+                            }
+                            Integer newLeaderHostId = initialState.getInt();
+                            m_leaderHostId = newLeaderHostId;
+                            StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
+                                    .append(m_leaderHostId)
+                                    .append(isLeader() ? " (localHost) " : " ")
+                                    .append("is the leader at initial state");
+                            exportLog.info(sb.toString());
+                            setCoordinatorInitialized();
+                            invokeNext();
+
+                        } catch (Exception e) {
+                            exportLog.error("Failed to change to initial state leader: " + e);
+                        }
+                    }
+                });
+            } catch (RejectedExecutionException rej) {
+                // This callback may be racing with a shut down EDS
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Initial state rejected by: " + m_eds);
+                }
+            } catch (Exception e) {
+                exportLog.error("Failed to handle initial state: " + e);
+            }
         }
 
         @Override
@@ -289,42 +312,51 @@ public class ExportCoordinator {
                 }
                 return;
             }
-            m_eds.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
+            try {
+                m_eds.getExecutorService().execute(new Runnable() {
+                    @Override
+                    public void run() {
 
-                    // Process change of partition leadership
-                    try {
-                        Integer newLeaderHostId = proposedState.getInt();
-                        if (!success) {
-                            exportLog.warn("Rejected change to new leader host: " + newLeaderHostId);
-                            return;
-                        }
-                        m_leaderHostId = newLeaderHostId;
-                        StringBuilder sb = new StringBuilder("Host ")
-                                .append(m_leaderHostId)
-                                .append(isLeader() ? " (localHost) " : " ")
-                                .append("is the new leader");
-                        exportLog.info(sb.toString());
+                        // Process change of partition leadership
+                        try {
+                            Integer newLeaderHostId = proposedState.getInt();
+                            if (!success) {
+                                exportLog.warn("Rejected change to new leader host: " + newLeaderHostId);
+                                return;
+                            }
+                            m_leaderHostId = newLeaderHostId;
+                            StringBuilder sb = new StringBuilder("Host ")
+                                    .append(m_leaderHostId)
+                                    .append(isLeader() ? " (localHost) " : " ")
+                                    .append("is the new leader");
+                            exportLog.info(sb.toString());
 
-                        //If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
-                        // Note: cannot initiate a coordinator task directly from here, must go
-                        // through another runnable and the invocation path.
-                        if (isLeader() && m_trackers.isEmpty()) {
-                            requestTrackers();
-                        }
+                            //If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
+                            // Note: cannot initiate a coordinator task directly from here, must go
+                            // through another runnable and the invocation path.
+                            if (isLeader() && m_trackers.isEmpty()) {
+                                requestTrackers();
+                            }
 
-                    } catch (Exception e) {
-                        exportLog.error("Failed to change to new leader: " + e);
+                        } catch (Exception e) {
+                            exportLog.error("Failed to change to new leader: " + e);
 
-                    } finally {
-                        // End the current invocation and do the next
-                        if (ourProposal) {
-                            endInvocation();
+                        } finally {
+                            // End the current invocation and do the next
+                            if (ourProposal) {
+                                endInvocation();
+                            }
                         }
                     }
+                });
+            } catch (RejectedExecutionException rej) {
+                // This callback may be racing with a shut down EDS
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("State resolution rejected by: " + m_eds);
                 }
-            });
+            } catch (Exception e) {
+                exportLog.error("Failed to handle state resolution: " + e);
+            }
         }
 
         @Override
@@ -346,35 +378,44 @@ public class ExportCoordinator {
                 }
                 return;
             }
-            m_eds.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
-                    ByteBuffer response = null;
-                    try {
-                        // Get the EDS tracker (note, this is a duplicate)
-                        ExportSequenceNumberTracker tracker = m_eds.getTracker();
-                        long lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
-                        if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
-                            if (exportLog.isDebugEnabled()) {
-                                exportLog.debug("Truncating coordination tracker: " + tracker
-                                        + ", to seqNo: " + lastReleasedSeqNo);
+            try {
+                m_eds.getExecutorService().execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        ByteBuffer response = null;
+                        try {
+                            // Get the EDS tracker (note, this is a duplicate)
+                            ExportSequenceNumberTracker tracker = m_eds.getTracker();
+                            long lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
+                            if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Truncating coordination tracker: " + tracker
+                                            + ", to seqNo: " + lastReleasedSeqNo);
+                                }
+                                tracker.truncate(lastReleasedSeqNo);
                             }
-                            tracker.truncate(lastReleasedSeqNo);
+                            int bufSize = tracker.getSerializedSize() + 4;
+                            response = ByteBuffer.allocate(bufSize);
+                            response.putInt(m_hostId);
+                            tracker.serialize(response);
+
+                        } catch (Exception e) {
+                            exportLog.error("Failed to serialize coordination tracker: " + e);
+                            response = ByteBuffer.allocate(0);
+
+                        } finally {
+                            requestedTaskComplete(response);
                         }
-                        int bufSize = tracker.getSerializedSize() + 4;
-                        response = ByteBuffer.allocate(bufSize);
-                        response.putInt(m_hostId);
-                        tracker.serialize(response);
-
-                    } catch (Exception e) {
-                        exportLog.error("Failed to serialize coordination tracker: " + e);
-                        response = ByteBuffer.allocate(0);
-
-                    } finally {
-                        requestedTaskComplete(response);
                     }
+                });
+            } catch (RejectedExecutionException rej) {
+                // This callback may be racing with a shut down EDS
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Task request rejected by: " + m_eds);
                 }
-            });
+            } catch (Exception e) {
+                exportLog.error("Failed to handle task request: " + e);
+            }
         }
 
         /**
@@ -393,67 +434,76 @@ public class ExportCoordinator {
                 }
                 return;
             }
-            m_eds.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
+            try {
+                m_eds.getExecutorService().execute(new Runnable() {
+                    @Override
+                    public void run() {
 
-                    try {
-                        boolean requestAgain = false;
-                        resetCoordinator(false, true);
-                        for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
-                            ByteBuffer buf = entry.getValue();
-                            if ((buf == null) && ourTask) {
-                                exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
-                                requestAgain = true;
-                                break;
-                            }
-                            else if (!buf.hasRemaining()) {
-                                exportLog.warn("Received empty response from: " + entry.getKey());
-                            }
-                            else {
-                                int host = buf.getInt();
-                                try {
-                                    ExportSequenceNumberTracker tracker = ExportSequenceNumberTracker.deserialize(buf);
-                                    if (exportLog.isDebugEnabled()) {
-                                        exportLog.debug("Received tracker from " + host + ": " + tracker);
+                        try {
+                            boolean requestAgain = false;
+                            resetCoordinator(false, true);
+                            for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
+                                ByteBuffer buf = entry.getValue();
+                                if ((buf == null) && ourTask) {
+                                    exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
+                                    requestAgain = true;
+                                    break;
+                                }
+                                else if (!buf.hasRemaining()) {
+                                    exportLog.warn("Received empty response from: " + entry.getKey());
+                                }
+                                else {
+                                    int host = buf.getInt();
+                                    try {
+                                        ExportSequenceNumberTracker tracker = ExportSequenceNumberTracker.deserialize(buf);
+                                        if (exportLog.isDebugEnabled()) {
+                                            exportLog.debug("Received tracker from " + host + ": " + tracker);
+                                        }
+
+                                        m_hosts.put(entry.getKey(), host);
+                                        m_trackers.put(host, tracker);
+
+                                    } catch (Exception e) {
+                                        exportLog.error("Failed to deserialize coordination tracker from : "
+                                                + host + ", got: " + e);
                                     }
-
-                                    m_hosts.put(entry.getKey(), host);
-                                    m_trackers.put(host, tracker);
-
-                                } catch (Exception e) {
-                                    exportLog.error("Failed to deserialize coordination tracker from : "
-                                            + host + ", got: " + e);
                                 }
                             }
-                        }
-                        if (requestAgain) {
-                            requestTrackers();
+                            if (requestAgain) {
+                                requestTrackers();
 
-                        } else {
-                            normalizeTrackers();
-                            dumpTrackers();
+                            } else {
+                                normalizeTrackers();
+                                dumpTrackers();
 
-                            // JUnit test synchronization
-                            if (m_testReady != null) {
-                                m_testReady.set(true);
+                                // JUnit test synchronization
+                                if (m_testReady != null) {
+                                    m_testReady.set(true);
+                                }
+
+                                m_eds.resumePolling();
                             }
 
-                            m_eds.resumePolling();
-                        }
+                        } catch (Exception e) {
+                            exportLog.error("Failed to handle coordination trackers: " + e);
+                            resetCoordinator(false, true);
 
-                    } catch (Exception e) {
-                        exportLog.error("Failed to handle coordination trackers: " + e);
-                        resetCoordinator(false, true);
-
-                    } finally {
-                        // End the current invocation and do the next
-                        if (ourTask) {
-                            endInvocation();
+                        } finally {
+                            // End the current invocation and do the next
+                            if (ourTask) {
+                                endInvocation();
+                            }
                         }
                     }
+                });
+            } catch (RejectedExecutionException rej) {
+                // This callback may be racing with a shut down EDS
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Task completion rejected by: " + m_eds);
                 }
-            });
+            } catch (Exception e) {
+                exportLog.error("Failed to handle task completion: " + e);
+            }
         }
 
         /**
@@ -471,58 +521,67 @@ public class ExportCoordinator {
                 }
                 return;
             }
-            m_eds.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
+            try {
+                m_eds.getExecutorService().execute(new Runnable() {
+                    @Override
+                    public void run() {
 
-                    try {
-                    // Added members require collecting the trackers: this is only initiated by the leader.
-                    // Note that by the time the distributed lock is acquired for this invocation, this host
-                    // may have lost leadership. But this is not important as the goal is to start the task
-                    // from one host. Note also that the request goes through another EDS runnable.
-                    if (!addedMembers.isEmpty()) {
-                        if (isLeader()) {
-                            exportLog.info("Leader requests trackers for added members: " + addedMembers);
-                            requestTrackers();
+                        try {
+                            // Added members require collecting the trackers: this is only initiated by the leader.
+                            // Note that by the time the distributed lock is acquired for this invocation, this host
+                            // may have lost leadership. But this is not important as the goal is to start the task
+                            // from one host. Note also that the request goes through another EDS runnable.
+                            if (!addedMembers.isEmpty()) {
+                                if (isLeader()) {
+                                    exportLog.info("Leader requests trackers for added members: " + addedMembers);
+                                    requestTrackers();
 
-                        } else if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Expecting new trackers for added members: " + addedMembers);
-                        }
-
-                    } else if (!removedMembers.isEmpty()){
-                        exportLog.info("Removing members: " + removedMembers);
-
-                        for (String memberId: removedMembers) {
-                            Integer hostId = m_hosts.remove(memberId);
-                            if (hostId == null) {
-                                if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Ignore removal of unknown memberId: " + memberId);
+                                } else if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Expecting new trackers for added members: " + addedMembers);
                                 }
-                                continue;
-                            }
-                            ExportSequenceNumberTracker tracker = m_trackers.remove(hostId);
-                            if (tracker == null) {
-                                throw new IllegalStateException("Unmapped tracker for memberId: " + memberId
-                                        + ", hostId: " + hostId);
-                            }
-                            tracker = null;
-                            if (m_leaderHostId == hostId) {
-                                // If the leader went away, wait for the next leader
-                                exportLog.warn("Lost leader host " + hostId + " reset coordinator");
-                                resetCoordinator(true, true);
-                                return;
-                            }
-                        }
 
-                        // After removing members, we want to reevaluate Export Mastership
-                        resetSafePoint();
+                            } else if (!removedMembers.isEmpty()){
+                                exportLog.info("Removing members: " + removedMembers);
+
+                                for (String memberId: removedMembers) {
+                                    Integer hostId = m_hosts.remove(memberId);
+                                    if (hostId == null) {
+                                        if (exportLog.isDebugEnabled()) {
+                                            exportLog.debug("Ignore removal of unknown memberId: " + memberId);
+                                        }
+                                        continue;
+                                    }
+                                    ExportSequenceNumberTracker tracker = m_trackers.remove(hostId);
+                                    if (tracker == null) {
+                                        throw new IllegalStateException("Unmapped tracker for memberId: " + memberId
+                                                + ", hostId: " + hostId);
+                                    }
+                                    tracker = null;
+                                    if (m_leaderHostId == hostId) {
+                                        // If the leader went away, wait for the next leader
+                                        exportLog.warn("Lost leader host " + hostId + " reset coordinator");
+                                        resetCoordinator(true, true);
+                                        return;
+                                    }
+                                }
+
+                                // After removing members, we want to reevaluate Export Mastership
+                                resetSafePoint();
+                            }
+                        } catch (Exception e) {
+                            exportLog.error("Failed to handle membership change (added: " + addedMembers
+                                    + ", removed: " + removedMembers + "), got: " + e);
+                        }
                     }
-                    } catch (Exception e) {
-                        exportLog.error("Failed to handle membership change (added: " + addedMembers
-                                + ", removed: " + removedMembers + "), got: " + e);
-                    }
+                });
+            } catch (RejectedExecutionException rej) {
+                // This callback may be racing with a shut down EDS
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Membership change rejected by: " + m_eds);
                 }
-            });
+            } catch (Exception e) {
+                exportLog.error("Failed to handle membership change: " + e);
+            }
         }
     }
 
