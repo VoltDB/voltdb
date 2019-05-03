@@ -43,6 +43,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportManager;
+import org.voltdb.exportclient.ExportRow.ROW_OPERATION;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
@@ -80,6 +81,7 @@ public class JDBCExportClient extends ExportClientBase {
         ,SQLSERVER
         ,TERADATA
         ,VERTICA
+        ,VOLTDB
         ,UNRECOGNIZED;
     }
     private final Set<DatabaseType> supportsIfNotExists =
@@ -149,11 +151,14 @@ public class JDBCExportClient extends ExportClientBase {
         //If the column value is longer than the limit, truncate the value to avoid flushing too much data to log.
         private static final int MAX_COLUMN_PRINT_SIZE = 1024;
 
-        private Connection conn = null;
+        private Connection m_conn = null;
         private PreparedStatement pstmt = null;
         private final ListeningExecutorService m_es;
-        private String pstmtString = null;
-        private boolean supportsBatchUpdates;
+        private String m_preparedStmtStr = null;
+        private boolean m_supportsUpsert = false;
+        private boolean m_warnedOfUnsupportedOperation = false;
+        private boolean m_supportsBatchUpdates;
+        private boolean m_enableAutoCommits = true;
 
         private final RefCountedDS m_ds;
 
@@ -180,16 +185,20 @@ public class JDBCExportClient extends ExportClientBase {
 
         }
 
-        private void initialize(long generation, String stableName, List<String> columnNames, List<VoltType> columnTypes, List<Integer> columnLengths) throws SQLException {
+        private void initialize(long generation, String stableName, List<String> columnNames, List<VoltType> columnTypes,
+                    List<Integer> columnLengths) throws SQLException {
             boolean supportsBatchUpdatesTmp;
             String identifierQuoteTemp = "";
-            DatabaseMetaData md = conn.getMetaData();
+            DatabaseMetaData md = m_conn.getMetaData();
             supportsBatchUpdatesTmp = md.supportsBatchUpdates();
             String dbName = md.getDatabaseProductName();
+            boolean supportsDuplicateKey = false;
+            boolean supportsUpsert = false;
             DatabaseType dbType = null;
             if (dbName.equals("MySQL")) {
                 dbType = DatabaseType.MYSQL;
                 identifierQuoteTemp = "`";
+                supportsDuplicateKey = true;
             } else if (dbName.equals("PostgreSQL")) {
                 dbType = DatabaseType.POSTGRES;
                 identifierQuoteTemp = "\"";
@@ -208,13 +217,18 @@ public class JDBCExportClient extends ExportClientBase {
             } else if (dbName.equals("Teradata")) {
                 dbType = DatabaseType.TERADATA;
                 identifierQuoteTemp = "\"";
+            } else if (dbName.equals("VoltDB")) {
+                dbType = DatabaseType.VOLTDB;
+                identifierQuoteTemp = "";
+                supportsUpsert = true;
+                m_enableAutoCommits = false;
             } else if (dbType == null) {
                 dbType = DatabaseType.UNRECOGNIZED;
                 identifierQuoteTemp = "\"";
             }
 
             String identifierQuote = identifierQuoteTemp;
-            supportsBatchUpdates = supportsBatchUpdatesTmp;
+            m_supportsBatchUpdates = supportsBatchUpdatesTmp;
 
             final String tableName = m_lowercaseNames ? stableName.toLowerCase() : stableName;
 
@@ -228,13 +242,16 @@ public class JDBCExportClient extends ExportClientBase {
             }
 
             String pstmtStringTmp = "INSERT INTO " + schemaAndTable + " (";
+            String updateFields = new String();
             for (int i = firstField; i < columnNames.size(); i++) {
                 if (i != firstField) {
                     pstmtStringTmp += ", ";
+                    updateFields += ", ";
                 }
 
                 String columnName = m_lowercaseNames ? columnNames.get(i).toLowerCase() : columnNames.get(i);
                 pstmtStringTmp += identifierQuote + columnName + identifierQuote;
+                updateFields += identifierQuote + columnName + identifierQuote + "=?";
             }
             pstmtStringTmp += ") VALUES (";
             for (int i = firstField; i < columnNames.size(); i++) {
@@ -245,19 +262,29 @@ public class JDBCExportClient extends ExportClientBase {
                 pstmtStringTmp += "?";
             }
             pstmtStringTmp += ")";
-            pstmtString = pstmtStringTmp;
+            if (supportsUpsert) {
+                m_preparedStmtStr = "UP" + pstmtStringTmp.substring(2);
+                m_supportsUpsert = true;
+            }
+            else if (supportsDuplicateKey) {
+                m_preparedStmtStr = pstmtStringTmp + " ON DUPLICATE KEY UPDATE " + updateFields;
+                m_supportsUpsert = true;
+            }
+            else {
+                m_preparedStmtStr = pstmtStringTmp;
+            }
             if (m_logger.isDebugEnabled()) {
-                m_logger.debug(pstmtString);
+                m_logger.debug(m_preparedStmtStr);
             }
         }
 
-        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote, List<String> columnNames, List<Integer> columnLengths, List<VoltType> columnTypes){
-
+        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote,
+                List<String> columnNames, List<Integer> columnLengths, List<VoltType> columnTypes) {
             Statement stmt = null;
             try {
-                stmt = conn.createStatement();
+                stmt = m_conn.createStatement();
             } catch (SQLException e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
             int totalRowSize = 0;
             for (int ii = firstField; ii < columnLengths.size(); ii++) {
@@ -307,6 +334,7 @@ public class JDBCExportClient extends ExportClientBase {
                             break;
                         case VERTICA:
                         case MYSQL:
+                        case VOLTDB:
                             createTableQuery.append("TINYINT");
                             break;
                         case TERADATA:
@@ -374,6 +402,9 @@ public class JDBCExportClient extends ExportClientBase {
                         case TERADATA:
                             createTableQuery.append("VARBYTE(" + columnLength + ")");
                             break;
+                        case VOLTDB:
+                            createTableQuery.append("VARBINARY(" + columnLength + ")");
+                            break;
                         default:
                             //Seems like most systems don't support VARBINARY beyond 64000, and there are m_row limits
                             //beyond that as well
@@ -409,28 +440,33 @@ public class JDBCExportClient extends ExportClientBase {
                 m_logger.info("Creating table with statement: " + createTableQuery);
                 stmt.execute(createTableQuery.toString());
                 createTableQuery = null;
-                conn.commit();
+                if (m_enableAutoCommits) {
+                    m_conn.commit();
+                }
             } catch (SQLException e) {
                 m_logger.warn("SQL Exception when creating table.",e);
                 try {
-                    conn.rollback();
+                    if (m_enableAutoCommits) {
+                        m_conn.rollback();
+                    }
                 } catch (SQLException e1) {
-                    Throwables.propagate(e1);
+                    throw new RuntimeException(e1);
                 }
                 if (!e.getSQLState().equals(SQLSTATE_UNIQUE_VIOLATION) &&
                         //Todo, this predicate is broken, the regex doesn't work
                         !(dbType == DatabaseType.NETEZZA && !e.getMessage().matches(".+Relation\\s+'[^']+'\\s+already\\s+exists.+")) &&
                         (dbType == DatabaseType.ORACLE && !e.getMessage().contains("ORA-00955"))) {
                     //Crappy hack around the fact that create if not exists is racy in postgres
-                    Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }
             try {
                 stmt.close();
             } catch (SQLException e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
         }
+
         private void appendStringColumn(DatabaseType dbType, StringBuilder createTableQuery, int columnLength, boolean jumboRow) {
             // JDBC's TEXT type is unlimited in size
             // and should be suitable for most use cases.
@@ -474,7 +510,10 @@ public class JDBCExportClient extends ExportClientBase {
                     createTableQuery.append("VARCHAR(max)");
                 }
                 break;
-             default:
+            case VOLTDB:
+                createTableQuery.append("VARCHAR(" + columnLength + " BYTES)");
+                break;
+            default:
                 //Seems like most systems don't support VARCHAR beyond 64000, and there are m_row limits
                 //beyond that as well
                  if (jumboRow) {
@@ -489,7 +528,7 @@ public class JDBCExportClient extends ExportClientBase {
         @Override
         public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
-            if (conn == null) {
+            if (m_conn == null) {
                 if (pstmt != null) {
                     try {
                         pstmt.close();
@@ -499,8 +538,7 @@ public class JDBCExportClient extends ExportClientBase {
                     }
                 }
                 try {
-                    conn = m_ds.getDataSource().getConnection();
-                    conn.setAutoCommit(false);
+                    m_conn = m_ds.getDataSource().getConnection();
                 } catch (Exception e) {
                     m_logger.warn("JDBC export unable to connect", e);
                     closeConnection();
@@ -512,10 +550,12 @@ public class JDBCExportClient extends ExportClientBase {
         @Override
         public void onBlockCompletion(ExportRow row) throws RestartBlockException {
             try {
-                if (supportsBatchUpdates) {
+                if (m_supportsBatchUpdates) {
                     pstmt.executeBatch();
                 }
-                conn.commit();
+                if (m_enableAutoCommits) {
+                    m_conn.commit();
+                }
             } catch(BatchUpdateException e){
                 logBatchErrors(e);
                 throw new RestartBlockException(true);
@@ -579,7 +619,7 @@ public class JDBCExportClient extends ExportClientBase {
 
         @Override
         public boolean processRow(ExportRow rowinst) throws RestartBlockException {
-            if (pstmtString == null) {
+            if (m_preparedStmtStr == null) {
                 try {
                     initialize(rowinst.generation, rowinst.tableName, rowinst.names, rowinst.types, rowinst.lengths);
                 } catch (Exception e) {
@@ -588,19 +628,31 @@ public class JDBCExportClient extends ExportClientBase {
                 }
             }
             //We could not initialize this JDBCDecoder others may be done...
-            if (pstmtString == null) {
+            if (m_preparedStmtStr == null) {
                 throw new RestartBlockException(true);
             }
             if (pstmt == null) {
                 try {
                     if (m_logger.isDebugEnabled()) {
-                        m_logger.debug(pstmtString);
+                        m_logger.debug(m_preparedStmtStr);
                     }
-                    pstmt = conn.prepareStatement(pstmtString);
+                    if (m_enableAutoCommits) {
+                        m_conn.setAutoCommit(false);
+                    }
+                    pstmt = m_conn.prepareStatement(m_preparedStmtStr);
                 } catch (Exception e) {
                     m_logger.warn("JDBC export unable to prepare insert statement", e);
                     closeConnection();
                     throw new RestartBlockException(true);
+                }
+            }
+            if (rowinst.getOperation() != ROW_OPERATION.INSERT) {
+                if (rowinst.getOperation() != ROW_OPERATION.UPDATE_NEW || !m_supportsUpsert) {
+                    if (!m_warnedOfUnsupportedOperation) {
+                        m_logger.warn("JDBC export skipped past a row with an operation type " +
+                                rowinst.getOperation().name() + " from stream " + rowinst.tableName);
+                    }
+                    return true;
                 }
             }
 
@@ -642,7 +694,7 @@ public class JDBCExportClient extends ExportClientBase {
                 }
 
                 try {
-                    if (supportsBatchUpdates) {
+                    if (m_supportsBatchUpdates) {
                         pstmt.addBatch();
                         m_dataRows.add(new BatchRow(rowinst));
                     } else {
@@ -679,14 +731,14 @@ public class JDBCExportClient extends ExportClientBase {
                     m_logger.warn("Exception closing pstmt for reset for table ", e);
                 }
                 try {
-                    if (conn != null) {
-                        conn.close();
+                    if (m_conn != null) {
+                        m_conn.close();
                     }
                 } catch (Exception e) {
                     m_logger.warn("Exception closing conn for reset for table ", e);
                 }
             } finally {
-                conn = null;
+                m_conn = null;
                 pstmt = null;
             }
         }
@@ -697,7 +749,7 @@ public class JDBCExportClient extends ExportClientBase {
             try {
                 m_es.awaitTermination(356, TimeUnit.DAYS);
             } catch (InterruptedException e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
             closeConnection();
         }
@@ -810,6 +862,8 @@ public class JDBCExportClient extends ExportClientBase {
                 jdbcdriver = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
             } else if (url.startsWith("jdbc:teradata")) {
                 jdbcdriver = "com.teradata.jdbc.TeraDriver";
+            } else if (url.startsWith("jdbc:voltdb")) {
+                jdbcdriver = "org.voltdb.jdbc.Driver";
             }
         }
 
@@ -822,7 +876,7 @@ public class JDBCExportClient extends ExportClientBase {
             Class.forName(jdbcdriver);
         } catch (ClassNotFoundException e) {
             m_logger.warn("Exception attempting to load JDBC driver \"" + jdbcdriver + "\"", e);
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
 
         //Dont do actual config in check mode.
