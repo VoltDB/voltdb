@@ -52,6 +52,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
@@ -61,6 +62,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
@@ -126,9 +128,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // See {@code ExportStreamBlock} in EE code.
     public static long NULL_COMMITTED_SEQNO = -1L;
 
-    // End sequence number of most recently pushed export buffer
-    private long m_lastPushedSeqNo = 0L;
-
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
@@ -152,8 +151,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // This flag is specifically added for XDCR conflicts stream, which export conflict logs
     // on every host. Every data source with this flag set to true is an export master.
     private boolean m_runEveryWhere = false;
-    // It is used to filter stale message responses
-    private long m_currentRequestId = 0L;
     // *Generation Id* is actually a timestamp generated during catalog update(UpdateApplicationBase.java)
     // genId in this class represents the genId of the most recent pushed buffer. If a new buffer contains
     // different genId than the previous value, the new buffer needs to be written to new PBD segment.
@@ -222,11 +219,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public void setException(Throwable t) {
             m_pollFuture.setException(t);
-        }
-
-        public void clear() {
-            m_pollFuture.set(null);
-            m_forcePollSchema = false;
         }
     }
 
@@ -803,7 +795,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
 
                 m_lastQueuedTimestamp = sb.getTimestamp();
-                m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += newTuples;
                 m_tuplesPending.addAndGet((int)newTuples);
 
@@ -1200,14 +1191,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // If the next block is not in sequence, and we were told we're Export Master,
                     // we are BLOCKED.
                     if (m_firstUnpolledSeqNo < block.startSequenceNumber()) {
-                        // Put the poll aside until the gap is resolved or released
-                        m_status = StreamStatus.BLOCKED;
-                        m_queueGap = block.startSequenceNumber() - m_firstUnpolledSeqNo;
+                        // Block on the gap and put the poll aside until gap resolved or released
+                        blockOnGap(m_firstUnpolledSeqNo, block.startSequenceNumber());
                         m_pollTask = pollTask;
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Blocked on " + m_firstUnpolledSeqNo
-                                    + ", until " + block.startSequenceNumber());
-                        }
                         return;
                     }
 
@@ -1603,6 +1589,42 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public String getTarget() {
         return m_exportTargetName;
+    }
+
+    private void blockOnGap(long start, long end) {
+
+        // Set ourselves as blocked
+        m_status = StreamStatus.BLOCKED;
+        m_queueGap = end - start;
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Blocked on " + start + ", until " + end);
+        }
+
+        // Check whether we can auto-release
+        VoltDBInterface voltdb = VoltDB.instance();
+        if (voltdb.isClusterComplete()) {
+            if (ENABLE_AUTO_GAP_RELEASE) {
+                processStreamControl(OperationMode.RELEASE);
+            } else {
+                // Show warning only in full cluster.
+                String warnMsg = "Export is blocked, missing [" +
+                        start + ", " + end + "] from " +
+                        ExportDataSource.this.toString() +
+                        ". Please rejoin a node with the missing export queue data or " +
+                        "use 'voltadmin export release' command to skip the missing data.";
+                exportLog.warn(warnMsg);
+                consoleLog.warn(warnMsg);
+                SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
+                if (snmp != null) {
+                    try {
+                        snmp.streamBlocked(warnMsg);
+                    } catch (Throwable t) {
+                        VoltLogger log = new VoltLogger("HOST");
+                        log.warn("failed to issue a streamBlocked SNMP trap", t);
+                    }
+                }
+            }
+        }
     }
 
     public synchronized boolean processStreamControl(OperationMode operation) {

@@ -897,4 +897,9 @@ public class MockVoltDB implements VoltDBInterface
     public ElasticService getElasticService() {
         return null;
     }
+
+    @Override
+    public boolean isClusterComplete() {
+        return true;
+    }
 }
