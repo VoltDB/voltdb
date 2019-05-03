@@ -67,7 +67,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil.StringCallback;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
@@ -75,9 +74,9 @@ import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StartAction;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableCompressor;
+import org.voltdb.TableType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -111,6 +110,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.primitives.Longs;
 
 public class SnapshotRestore extends VoltSystemProcedure {
@@ -298,6 +298,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         (Map<String, Map<Integer, Pair<Long, Long>>>)ois.readObject();
 
                 @SuppressWarnings("unchecked")
+                Set<Integer> disabledStreams = (Set<Integer>) ois.readObject();
+
+                @SuppressWarnings("unchecked")
                 Map<Integer, Long> drSequenceNumbers = (Map<Integer, Long>)ois.readObject();
 
                 //Last seen unique ids from remote data centers, load each local site
@@ -309,7 +312,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
                 if (isRecover) {
                     performRecoverDigestState(context, clusterCreateTime, drVersion, drSequenceNumbers,
-                            drMixedClusterSizeConsumerState);
+                            drMixedClusterSizeConsumerState, disabledStreams);
                 }
             } catch (Exception e) {
                 e.printStackTrace();//l4j doesn't print the stack trace
@@ -484,10 +487,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     VoltFile outputPath = new VoltFile(dupPath);
                     String errorMsg = null;
                     if (!outputPath.exists()) {
-                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" does not exist";
-                    }
-                    if (!outputPath.canExecute()) {
-                        errorMsg = "Output path for Json duplicatesPath \"" + outputPath + "\" is not executable";
+                        errorMsg = "Path \"" + outputPath + "\" does not exist";
+                    } else if (!outputPath.canExecute()) {
+                        errorMsg = "Path \"" + outputPath + "\" is not executable";
                     }
                     // error check and early return
                     if (errorMsg != null) {
@@ -809,6 +811,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         DrRoleType.XDCR.value().equals(m_cluster.getDrrole())
                         && new_catalog_table.getIsdred();
                 final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
+                final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
 
                 Boolean needsConversion = null;
                 while (savefile.hasMoreChunks()) {
@@ -824,7 +827,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                             needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                                   preserveDRHiddenColumn,
-                                                                                  preserveViewHiddenColumn);
+                                                                                  preserveViewHiddenColumn,
+                                                                                  preserveMigrateHiddenColumn,
+                                                                                  isRecover);
                         }
 
                         if (needsConversion) {
@@ -832,7 +837,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b() , true);
                             table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                      preserveDRHiddenColumn,
-                                                                     preserveViewHiddenColumn);
+                                                                     preserveViewHiddenColumn,
+                                                                     preserveMigrateHiddenColumn,
+                                                                     isRecover);
                         } else {
                             ByteBuffer copy = ByteBuffer.allocate(c.b().remaining());
                             copy.put(c.b());
@@ -1052,6 +1059,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         List<String> includeList = tableOptParser(tableNames);
         List<String> excludeList = tableOptParser(skiptableNames);
 
+        List<String> warnings = Lists.newArrayList();
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
             // empty error messages indicate SUCCESS
@@ -1059,45 +1067,30 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Long hostId = savefile_data[0].getLong("CURRENT_HOST_ID");
                 String hostName = savefile_data[0].getString("CURRENT_HOSTNAME");
                 // hack to store the error messages without changing API
-                String errorMsg = savefile_data[0].getString("ORIGINAL_HOSTNAME");
-                throw new VoltAbortException("Error scanning restore work from host id " + hostId + " hostname "
-                        + hostName + ":" + errorMsg);
+                String warningMsg = savefile_data[0].getString("ORIGINAL_HOSTNAME");
+                warnings.add("Skip scanning snapshot file on host id " + hostId + " hostname " + hostName + ", " + warningMsg);
             }
         }
         savefile_data[0].resetRowPosition();
 
-        List<JSONObject> digests;
-        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
-        Map<Integer, Long> drSequenceNumbers;
-        long perPartitionTxnIds[];
-        Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
-        long clusterCreateTime;
-        long drVersion;
+        DigestScanResult digestScanResult = null;
         try {
             // Digest scan.
-            DigestScanResult digestScanResult =
-                    performRestoreDigestScanWork(isRecover);
-            digests = digestScanResult.digests;
-            exportSequenceNumbers = digestScanResult.exportSequenceNumbers;
-            drSequenceNumbers = digestScanResult.drSequenceNumbers;
-            perPartitionTxnIds = digestScanResult.perPartitionTxnIds;
-            remoteDCLastSeenIds = digestScanResult.remoteDCLastSeenIds;
-            clusterCreateTime = digestScanResult.clusterCreateTime;
-            drVersion = digestScanResult.drVersion;
+            digestScanResult = performRestoreDigestScanWork(isRecover);
 
-            if (!isRecover || perPartitionTxnIds.length == 0) {
-                perPartitionTxnIds = new long[] {
+            if (!isRecover || digestScanResult.perPartitionTxnIds.length == 0) {
+                digestScanResult.perPartitionTxnIds = new long[] {
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                 };
             }
 
             // Hashinator scan and distribution.
             // Missing digests will be officially handled later.
-            if (useHashinatorData && !digests.isEmpty()) {
+            if (useHashinatorData && !digestScanResult.digests.isEmpty()) {
                 // Need the instance ID for sanity checks.
                 InstanceId iid = null;
-                if (digests.get(0).has("instanceId")) {
-                    iid = new InstanceId(digests.get(0).getJSONObject("instanceId"));
+                if (digestScanResult.digests.get(0).has("instanceId")) {
+                    iid = new InstanceId(digestScanResult.digests.get(0).getJSONObject("instanceId"));
                 }
                 byte[] hashConfig = performRestoreHashinatorScanWork(iid);
                 if (hashConfig != null) {
@@ -1110,43 +1103,32 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
             }
         } catch (VoltAbortException e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         ClusterSaveFileState savefile_state = null;
         try {
             savefile_state = new ClusterSaveFileState(savefile_data[0]);
         } catch (IOException e) {
-            throw new VoltAbortException(e);
+            noteOperationalFailure(RESTORE_FAILED);
+            return getFailureResult(e.toString(), warnings);
         }
 
         HashSet<String> relevantTableNames = new HashSet<String>();
         try {
-            if (digests.isEmpty()) {
+            if (digestScanResult.digests.isEmpty()) {
                 throw new Exception("No snapshot related digests files found");
             }
-            for (JSONObject obj : digests) {
+            for (JSONObject obj : digestScanResult.digests) {
                 JSONArray tables = obj.getJSONArray("tables");
                 for (int ii = 0; ii < tables.length(); ii++) {
                     relevantTableNames.add(tables.getString(ii));
                 }
             }
         } catch (Exception e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
         assert(relevantTableNames != null);
 
@@ -1159,11 +1141,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         for (String tableName : relevantTableNames) {
             if (!savefile_state.getSavedTableNames().contains(tableName)) {
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow("FAILURE", "Save data contains no information for table " + tableName);
                 break;
@@ -1174,11 +1152,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow( "FAILURE", "Save data contains no information for table " + tableName);
             }
@@ -1186,11 +1160,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 // Also pretty sure this is unreachable
                 // See ENG-1078
                 if (results == null) {
-                    ColumnInfo[] result_columns = new ColumnInfo[2];
-                    int ii = 0;
-                    result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-                    result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-                    results = new VoltTable[] { new VoltTable(result_columns) };
+                    results = constructFailureResultsTable();
                 }
                 results[0].addRow( "FAILURE", saveFileState.getConsistencyResult());
             } else if (TRACE_LOG.isTraceEnabled()) {
@@ -1199,6 +1169,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         if (results != null) {
             noteOperationalFailure(RESTORE_FAILED);
+            for (String warning : warnings) {
+                results[0].addRow("WARNING", warning);
+            }
             return results;
         }
 
@@ -1218,16 +1191,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
          * partitions that are no longer present
          */
         try {
-            updatePerPartitionTxnIdsToZK(perPartitionTxnIds);
+            updatePerPartitionTxnIdsToZK(digestScanResult.perPartitionTxnIds);
         } catch (Exception e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int i = 0;
-            result_columns[i++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[i++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            results = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
             noteOperationalFailure(RESTORE_FAILED);
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         // if this is a truncation snapshot that is on the boundary of partition count change
@@ -1235,7 +1202,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // that touch the new partitions will be in the command log and we need to truncate
         // the DR log for the new partitions completely before replaying the command log.
         for (int i = partitionCount; i < newPartitionCount; ++i) {
-            drSequenceNumbers.put(i, -1L);
+            digestScanResult.drSequenceNumbers.put(i, -1L);
         }
 
         /*
@@ -1250,9 +1217,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(baos);
-            oos.writeObject(exportSequenceNumbers);
-            oos.writeObject(drSequenceNumbers);
-            oos.writeObject(remoteDCLastSeenIds);
+            oos.writeObject(digestScanResult.exportSequenceNumbers);
+            oos.writeObject(digestScanResult.disabledStreams);
+            oos.writeObject(digestScanResult.drSequenceNumbers);
+            oos.writeObject(digestScanResult.remoteDCLastSeenIds);
             oos.flush();
             byte exportSequenceNumberBytes[] = baos.toByteArray();
             oos.close();
@@ -1261,14 +1229,14 @@ public class SnapshotRestore extends VoltSystemProcedure {
              * Also set the perPartitionTxnIds locally at the multi-part coordinator.
              * The coord will have to forward this value to all the idle coordinators.
              */
-            ctx.getSiteProcedureConnection().setPerPartitionTxnIds(perPartitionTxnIds, false);
+            ctx.getSiteProcedureConnection().setPerPartitionTxnIds(digestScanResult.perPartitionTxnIds, false);
 
             results =
                     performDistributeDigestState(
                             exportSequenceNumberBytes,
-                            digests.get(0).getLong("txnId"),
-                            perPartitionTxnIds,
-                            clusterCreateTime, drVersion, isRecover);
+                            digestScanResult.digests.get(0).getLong("txnId"),
+                            digestScanResult.perPartitionTxnIds,
+                            digestScanResult.clusterCreateTime, digestScanResult.drVersion, isRecover);
         } catch (IOException e) {
             throw new VoltAbortException(e);
         } catch (JSONException e) {
@@ -1284,13 +1252,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         try {
             validateIncludeTables(savefile_state, includeList);
         } catch (VoltAbortException e) {
-            ColumnInfo[] result_columns = new ColumnInfo[2];
-            int ii = 0;
-            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-            results = new VoltTable[] { new VoltTable(result_columns) };
-            results[0].addRow("FAILURE", e.toString());
-            return results;
+            return getFailureResult(e.toString(), warnings);
         }
 
         results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, includeList, excludeList);
@@ -1359,6 +1321,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             }
                         }},
                     null);
+        }
+        for (String warning : warnings) {
+            results[0].addRow(-1, "", -1, "", -1, "WARNING", warning);
         }
         return results;
     }
@@ -1439,7 +1404,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            String signature = t.getSignature();
             String name = t.getTypeName();
 
             //Sequence numbers for this table for every partition
@@ -1473,9 +1437,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     uso,
                     sequenceNumber,
                     myPartitionId,
-                    signature);
+                    name);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
-            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, name,
                     isRecover, false, sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }
@@ -1485,7 +1449,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long clusterCreateTime,
             long drVersion,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState) {
+            Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState,
+            Set<Integer> disabledStreams) {
         // If this is a truncation snapshot restored during recover, try to set DR protocol version
         if (drVersion != 0) {
             context.getSiteProcedureConnection().setDRProtocolVersion((int)drVersion);
@@ -1511,6 +1476,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
         if (VoltDB.instance().getNodeDRGateway() != null && context.isLowestSiteId()) {
             VoltDB.instance().getNodeDRGateway().cacheSnapshotRestoreTruncationPoint(drSequenceNumbers);
         }
+
+        if (disabledStreams.contains(myPartitionId)) {
+            context.getSiteProcedureConnection().disableExternalStreams();
+        }
     }
 
     private VoltTable constructResultsTable()
@@ -1525,6 +1494,23 @@ public class SnapshotRestore extends VoltSystemProcedure {
         result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
         return new VoltTable(result_columns);
+    }
+
+    private VoltTable[] constructFailureResultsTable() {
+        ColumnInfo[] result_columns = new ColumnInfo[2];
+        int ii = 0;
+        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+        return new VoltTable[] { new VoltTable(result_columns) };
+    }
+
+    private VoltTable[] getFailureResult(String failure, List<String> warnings) {
+        VoltTable results[] = constructFailureResultsTable();
+        results[0].addRow("FAILURE", failure);
+        for (String warning : warnings) {
+            results[0].addRow("WARNING", warning);
+        }
+        return results;
     }
 
     private File getSaveFileForReplicatedTable(String tableName)
@@ -1625,6 +1611,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private static class DigestScanResult {
         List<JSONObject> digests;
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
+        Set<Integer> disabledStreams;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
         Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
@@ -1639,8 +1626,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDigestScan,
                 SysProcFragmentId.PF_restoreDigestScanResults);
 
-        HashMap<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers =
-                new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+        HashMap<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers = new HashMap<>();
+        Set<Integer> disabledStreams = new HashSet<>();
         Map<Integer, Long> drSequenceNumbers = new HashMap<>();
 
         Long digestTxnId = null;
@@ -1698,6 +1685,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 if (digest.has("drVersion")) {
                     drVersion = digest.getLong("drVersion");
                 }
+
+                externalStreamsStatesFromDigest(digest, disabledStreams);
 
                 /*
                  * Snapshots from pre 1.3 VoltDB won't have sequence numbers
@@ -1790,19 +1779,30 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     }
                 }
             }
+
+            DigestScanResult result = new DigestScanResult();
+            result.digests = digests;
+            result.exportSequenceNumbers = exportSequenceNumbers;
+            result.disabledStreams = disabledStreams;
+            result.drSequenceNumbers = drSequenceNumbers;
+            result.perPartitionTxnIds = Longs.toArray(perPartitionTxnIds);
+            result.remoteDCLastSeenIds = remoteDCLastSeenIds;
+            result.clusterCreateTime = clusterCreateTime;
+            result.drVersion = drVersion;
+            return result;
         } catch (JSONException e) {
             throw new VoltAbortException(e);
         }
+    }
 
-        DigestScanResult result = new DigestScanResult();
-        result.digests = digests;
-        result.exportSequenceNumbers = exportSequenceNumbers;
-        result.drSequenceNumbers = drSequenceNumbers;
-        result.perPartitionTxnIds = Longs.toArray(perPartitionTxnIds);
-        result.remoteDCLastSeenIds = remoteDCLastSeenIds;
-        result.clusterCreateTime = clusterCreateTime;
-        result.drVersion = drVersion;
-        return result;
+    private void externalStreamsStatesFromDigest(JSONObject digest, Set<Integer> disabledStreams)
+            throws JSONException {
+        if (digest.has(ExtensibleSnapshotDigestData.DISABLED_EXTERNAL_STREAMS)) {
+            JSONArray disabledStreamsJson = digest.getJSONArray(ExtensibleSnapshotDigestData.DISABLED_EXTERNAL_STREAMS);
+            for (int i=0; i<disabledStreamsJson.length(); i++) {
+                disabledStreams.add(disabledStreamsJson.getInt(i));
+            }
+        }
     }
 
     private final byte[] performRestoreHashinatorScanWork(InstanceId iid)
@@ -1905,6 +1905,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     // If the table is a snapshotted persistent table view, we will try to
                     // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
+                } else if (table.getMaterializer() != null
+                        && !CatalogUtil.isSnapshotableStreamedTableView(m_database, table)) {
+                    SNAP_LOG.info("Skipping restore of " + table.getTypeName()
+                            + " which normally would not be in a snapshot for the current schema");
+                    /*
+                     * This is a table which would have been excluded by SnapshotUtil.getTablesToSave(). This can happen
+                     * if the schema of the current cluster is different from the snapshot so that a previously
+                     * replicated view is now a randomly partitioned view
+                     */
+                    continue;
                 }
                 tables_to_restore.add(table);
             }
@@ -2158,6 +2168,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final boolean preserveDRHiddenColumn =
             DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && newCatalogTable.getIsdred();
         final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(newCatalogTable);
+        final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(newCatalogTable.getTabletype());
+
         Boolean needsConversion = null;
         Map<Long, Integer> sitesToPartitions = null;
         int partitionCount = ctx.getNumberOfPartitions();
@@ -2195,14 +2207,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(oldTable, newCatalogTable,
                                                                               preserveDRHiddenColumn,
-                                                                              preserveViewHiddenColumn);
+                                                                              preserveViewHiddenColumn,
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
                     final VoltTable oldTable = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(oldTable, newCatalogTable,
                                                                  preserveDRHiddenColumn,
-                                                                 preserveViewHiddenColumn);
+                                                                 preserveViewHiddenColumn,
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = oldTable;
                     }
@@ -2373,6 +2389,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final boolean preserveDRHiddenColumn =
                 DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
             final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
+            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
             while (hasMoreChunks()) {
                 VoltTable table = null;
 
@@ -2392,14 +2409,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
                                                                               preserveDRHiddenColumn,
-                                                                              preserveViewHiddenColumn);
+                                                                              preserveViewHiddenColumn,
+                                                                              preserveMigrateHiddenColumn,
+                                                                              isRecover);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
                                                                  preserveDRHiddenColumn,
-                                                                 preserveViewHiddenColumn);
+                                                                 preserveViewHiddenColumn,
+                                                                 preserveMigrateHiddenColumn,
+                                                                 isRecover);
                     } else {
                         table = old_table;
                     }
@@ -2600,59 +2621,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private Table getCatalogTable(String tableName)
     {
         return m_database.getTables().get(tableName);
-    }
-
-    /*
-     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
-     */
-    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
-        if (params.length == 1) {
-            return null;
-        } else if (params.length == 2) {
-            if (params[0] == null) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore parameter 0 was null",
-                        task.getClientHandle());
-            }
-            if (params[1] == null) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore parameter 1 was null",
-                        task.getClientHandle());
-            }
-            if (!(params[0] instanceof String)) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore param 0 (path) needs to be a string, but was type "
-                        + params[0].getClass().getSimpleName(),
-                        task.getClientHandle());
-            }
-            if (!(params[1] instanceof String)) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
-                        + params[1].getClass().getSimpleName(),
-                        task.getClientHandle());
-            }
-            JSONObject jsObj = new JSONObject();
-            try {
-                jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
-                jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH);
-                jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
-            }
-            task.setParams( jsObj.toString() );
-            return null;
-        } else {
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0],
-                    "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
-                    params.length + " parameters provided",
-                    task.getClientHandle());
-        }
     }
 
     /*

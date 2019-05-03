@@ -29,8 +29,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -38,6 +38,7 @@ import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
+import org.voltdb.TableType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.compiler.MaterializedViewProcessor;
@@ -125,7 +126,7 @@ public class CatalogDiffEngine {
     private boolean m_inStrictMatViewDiffMode = false;
 
     // contains the text of the difference
-    private final StringBuilder m_sb = new StringBuilder();
+    private final CatalogSerializer m_serializer = new CatalogSerializer();
 
     // true if the difference is allowed in a running system
     private boolean m_supported;
@@ -142,13 +143,7 @@ public class CatalogDiffEngine {
 
     // Track all new tables.  We use this to know which
     // tables do not need to be checked for emptiness.
-    // This may be redundant with m_newTablesForExport,
-    // at least in use.  That is to say, we might be able
-    // to keep only one of them.
     private final SortedSet<String> m_newTables = new TreeSet<>();
-    //Track new tables to help determine which export table is new or
-    //modified
-    private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
@@ -217,7 +212,7 @@ public class CatalogDiffEngine {
     }
 
     public String commands() {
-        return m_sb.toString();
+        return m_serializer.getResult();
     }
 
     public boolean supported() {
@@ -267,7 +262,7 @@ public class CatalogDiffEngine {
         for (Map.Entry<CatalogType, TypeChanges> entry : ccg.groupChanges.entrySet()) {
             Set<String> fields = new HashSet<>();
             fields.addAll(entry.getValue().typeChanges.changedFields);
-            fields.remove(ignoredFields);
+            fields.removeAll(ignoredFields);
             if (fields.isEmpty()) {
                 groupModifications.remove(entry.getKey());
             }
@@ -528,26 +523,19 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
+            if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
+                m_requiresNewExportGeneration = true;
+            }
+            // No special guard against dropping a table or view
+            // (although some procedures may fail to plan)
             if (ChangeType.DELETION == changeType) {
-                Table tbl = (Table)suspect;
-                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
-                    m_requiresNewExportGeneration = true;
-                }
-                // No special guard against dropping a table or view
-                // (although some procedures may fail to plan)
                 return null;
             }
-
-            Table tbl = (Table)suspect;
             String tableName = tbl.getTypeName();
 
             // Remember the name of the new table.
             m_newTables.add(tableName.toUpperCase());
-            if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
-                // Remember that it's a new export table.
-                m_newTablesForExport.add(tbl.getTypeName());
-                m_requiresNewExportGeneration = true;
-            }
 
             String viewName = null;
             String sourceTableName = null;
@@ -573,7 +561,8 @@ public class CatalogDiffEngine {
                     sourceTableName = tbl.getMaterializer().getTypeName();
                 }
             }
-            if (viewName != null) {
+            // Skip guard for view on stream, given the fact that stream table is always empty
+            if (viewName != null && !TableType.isStream(tbl.getMaterializer().getTabletype())) {
                 return createViewDisallowedMessage(viewName, sourceTableName);
             }
             // Otherwise, support add/drop of the top level object.
@@ -624,12 +613,14 @@ public class CatalogDiffEngine {
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
             }
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+            boolean isStreamOrStreamView = CatalogUtil.isTableExportOnly((Database)table.getParent(), table);
+            if (isStreamOrStreamView) {
                 m_requiresNewExportGeneration = true;
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
-                if ((! col.getNullable()) && (col.getDefaultvalue() == null)) {
+                // Skip guard for view on stream, given the fact that stream table is always empty
+                if ((! col.getNullable()) && (col.getDefaultvalue() == null) && !isStreamOrStreamView) {
                     return "May not dynamically add non-nullable column without default value.";
                 }
             }
@@ -796,6 +787,9 @@ public class CatalogDiffEngine {
                         return retval;
                     }
                 }
+            }
+            if (TableType.isPersistentMigrate(tbl.getTabletype())) {
+                m_requiresNewExportGeneration = true;
             }
         }
         return null;
@@ -979,9 +973,11 @@ public class CatalogDiffEngine {
             return null;
         }
         if (suspect instanceof Connector && "enabled".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         if (suspect instanceof Connector && "loaderclass".equals(field)) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
         // ENG-6511 Allow materialized views to change the index they use dynamically.
@@ -1322,7 +1318,7 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        newType.writeCommandForField(m_sb, field, true);
+        m_serializer.writeCommandForField(newType, field, true);
 
         // record the field change for later generation of descriptive text
         // though skip the schema field of database because it changes all the time
@@ -1460,16 +1456,11 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        m_sb.append(getDeleteDiffStatement(prevType, mapName));
+        m_serializer.writeDeleteDiffStatement(prevType, mapName);
 
         // add it to the set of deletions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(prevType));
         cgrp.processDeletion(prevType, newlyChildlessParent);
-    }
-
-    public static String getDeleteDiffStatement(CatalogType toDelete, String parentName) {
-        return "delete " + toDelete.getParent().getCatalogPath() + " " +
-            parentName + " " + toDelete.getTypeName() + "\n";
     }
 
     /**
@@ -1500,9 +1491,7 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        newType.writeCreationCommand(m_sb);
-        newType.writeFieldCommands(m_sb, null);
-        newType.writeChildCommands(m_sb);
+        newType.accept(m_serializer);
 
         // add it to the set of additions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
@@ -1900,5 +1889,4 @@ public class CatalogDiffEngine {
 
         return sb.toString();
     }
-
 }

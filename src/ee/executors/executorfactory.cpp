@@ -51,6 +51,7 @@
 #include "executors/abstractexecutor.h"
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
+#include "executors/migrateexecutor.h"
 #include "executors/indexscanexecutor.h"
 #include "executors/indexcountexecutor.h"
 #include "executors/tablecountexecutor.h"
@@ -76,49 +77,73 @@
 
 namespace voltdb {
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
-                                 AbstractPlanNode* abstract_node,
-                                 bool isLargeQuery) {
-    PlanNodeType type = abstract_node->getPlanNodeType();
-    switch (type) {
-    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_PARTIALAGGREGATE: return new AggregatePartialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INVALID:
-        VOLT_ERROR("INVALID plan node type %d", (int) type);
-        return NULL;
-    case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MERGERECEIVE: return new MergeReceiveExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_ORDERBY:
-        if (isLargeQuery) {
+AbstractExecutor* getNewExecutor(
+      VoltDBEngine *engine, AbstractPlanNode* abstract_node, bool isLargeQuery) {
+   PlanNodeType type = abstract_node->getPlanNodeType();
+   switch (type) {
+      case PLAN_NODE_TYPE_AGGREGATE:
+         return new AggregateSerialExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_DELETE:
+         return new DeleteExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_HASHAGGREGATE:
+         return new AggregateHashExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_PARTIALAGGREGATE:
+         return new AggregatePartialExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_INDEXSCAN:
+         return new IndexScanExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_INDEXCOUNT:
+         return new IndexCountExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_INSERT:
+         return new InsertExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_MIGRATE:
+         return new MigrateExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_LIMIT:
+         return new LimitExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_MATERIALIZE:
+         return new MaterializeExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_MATERIALIZEDSCAN:
+         return new MaterializedScanExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_MERGERECEIVE:
+         return new MergeReceiveExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_NESTLOOP:
+         return new NestLoopExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_NESTLOOPINDEX:
+         return new NestLoopIndexExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_ORDERBY:
+         if (isLargeQuery) {
             return new LargeOrderByExecutor(engine, abstract_node);
-        }
-        else {
+         } else {
             return new OrderByExecutor(engine, abstract_node);
-        }
-    case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_COMMONTABLE: return new CommonTableExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SWAPTABLES: return new SwapTablesExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TUPLESCAN: return new TupleScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_WINDOWFUNCTION: return new WindowFunctionExecutor(engine, abstract_node);
-    // default: Don't provide a default, let the compiler enforce complete coverage.
-    }
-    VOLT_ERROR("Undefined plan node type %d", (int) type);
-    return NULL;
+         }
+      case PLAN_NODE_TYPE_PROJECTION:
+         return new ProjectionExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_RECEIVE:
+         return new ReceiveExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_COMMONTABLE:
+         return new CommonTableExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_SEND:
+         return new SendExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_SEQSCAN:
+         return new SeqScanExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_SWAPTABLES:
+         return new SwapTablesExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_TABLECOUNT:
+         return new TableCountExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_TUPLESCAN:
+         return new TupleScanExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_UNION:
+         return new UnionExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_UPDATE:
+         return new UpdateExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_WINDOWFUNCTION:
+         return new WindowFunctionExecutor(engine, abstract_node);
+      case PLAN_NODE_TYPE_INVALID:
+         VOLT_ERROR("INVALID plan node type %d", (int) PLAN_NODE_TYPE_INVALID);
+         return NULL;
+         // default: Don't provide a default, let the compiler enforce complete coverage.
+   }
+   VOLT_ERROR("Undefined plan node type %d", (int) type);
+   return NULL;
 }
 
 }

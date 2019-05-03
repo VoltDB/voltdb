@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -214,18 +213,6 @@ public class UpdateCore extends VoltSystemProcedure {
         }
     }
 
-    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
-    static {
-        m_versionMap.put(45, "Java 1.1");
-        m_versionMap.put(46, "Java 1.2");
-        m_versionMap.put(47, "Java 1.3");
-        m_versionMap.put(48, "Java 1.4");
-        m_versionMap.put(49, "Java 5");
-        m_versionMap.put(50, "Java 6");
-        m_versionMap.put(51, "Java 7");
-        m_versionMap.put(52, "Java 8");
-    }
-
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -281,6 +268,9 @@ public class UpdateCore extends VoltSystemProcedure {
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
+
+                // Bring the DR and Export buffer update to date.
+                context.getSiteProcedureConnection().quiesce();
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
@@ -392,8 +382,11 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
-        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticJoinInProgress)) {
+        if (worksWithElastic == 0 && VoltZK.zkNodeExists(zk, VoltZK.elasticOperationInProgress)) {
             throw new VoltAbortException("Can't do a catalog update while an elastic join is active. Please retry catalog update later.");
+        }
+        if (requiresSnapshotIsolation == 1 && VoltZK.hasHostsSnapshotting(zk)) {
+            throw new VoltAbortException("Snapshot in progress. Please retry catalog update later.");
         }
         final CatalogContext context = VoltDB.instance().getCatalogContext();
         if (context.catalogVersion == expectedCatalogVersion) {
@@ -418,14 +411,6 @@ public class UpdateCore extends VoltSystemProcedure {
             }
         }
 
-        try {
-            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
-                    catalogBytes, catalogHash, deploymentBytes);
-        } catch (KeeperException | InterruptedException e) {
-            log.error("error writing catalog bytes on ZK during @UpdateCore");
-            throw e;
-        }
-
         // log the start of UpdateCore
         log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
         log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
@@ -440,18 +425,15 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         catch (VoltAbortException vae) {
             log.info("Catalog verification failed: " + vae.getMessage());
-            // revert the catalog node on ZK
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
-                assert(data != null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytes, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
-                throw e;
-            }
             throw vae;
+        }
+
+        try {
+            CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                    catalogBytes, catalogHash, deploymentBytes);
+        } catch (KeeperException | InterruptedException e) {
+            log.error("error writing catalog bytes on ZK during @UpdateCore");
+            throw e;
         }
 
         performCatalogUpdateWork(

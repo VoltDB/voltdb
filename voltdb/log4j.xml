@@ -88,9 +88,9 @@
         <level value="INFO"/>
     </logger -->
 
-	<!-- logger name="JOIN">
-		<level value="INFO"/>
-	</logger -->
+    <!-- logger name="ELASTIC">
+        <level value="INFO"/>
+    </logger -->
 
     <!-- logger name="SNAPSHOT">
         <level value="INFO"/>

@@ -90,7 +90,7 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+    virtual void generateDREvent(DREventType type, int64_t spHandle,
                                  int64_t uniqueId, ByteArray catalogCommands);
 
     static int32_t getTestDRBuffer(uint8_t drProtocolVersion,

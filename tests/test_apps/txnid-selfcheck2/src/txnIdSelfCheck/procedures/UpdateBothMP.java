@@ -34,8 +34,8 @@ public class UpdateBothMP extends ReplicatedUpdateBaseProc {
         VoltTable[] results2 = doWork(r_getCIDData, r_cleanUp, r_insert, r_update, r_export, r_getAdhocData, r_getViewData,
                 cid, rid, value, rollback, false);
 
-        assert(results1.length == 3);
-        assert(results2.length == 3);
+        assert(results1.length == 6);
+        assert(results2.length == 6);
 
         // make sure the partitioned and local results are the same
 

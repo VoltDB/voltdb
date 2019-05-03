@@ -49,7 +49,7 @@ public:
             int32_t partitionId,
             std::string signature,
             ExportStreamBlock *block,
-            bool sync);
+            int64_t generationId);
     void pushEndOfStream(
             int32_t partitionId,
             std::string signature);

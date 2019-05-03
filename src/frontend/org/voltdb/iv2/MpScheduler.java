@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +51,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.ProClass;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -63,7 +63,7 @@ public class MpScheduler extends Scheduler
     static final VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     // null if running community, fallback to MpProcedureTask
-    private static final Constructor<?> NpProcedureTaskConstructor = loadNpProcedureTaskClass();
+    private static final ProClass<MpProcedureTask> NP_PROCEDURE_CLASS = loadNpProcedureTaskClass();
 
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -80,7 +80,7 @@ public class MpScheduler extends Scheduler
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
     final private MpTransactionTaskQueue m_pendingTasks;
-    private final int m_leaderNodeId;
+    private final int m_hostId;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -89,7 +89,7 @@ public class MpScheduler extends Scheduler
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
     long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
-    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderNodeId)
+    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int hostId)
     {
         super(partitionId, taskQueue);
         m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
@@ -97,7 +97,7 @@ public class MpScheduler extends Scheduler
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
-        m_leaderNodeId = leaderNodeId;
+        m_hostId = hostId;
         m_leaderMigrationMap = Maps.newHashMap();
     }
 
@@ -129,7 +129,8 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long mpTxnId)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState)
     {
         return updateReplicas(replicas, partitionMasters, false);
     }
@@ -254,7 +255,7 @@ public class MpScheduler extends Scheduler
                 // leave empty to ignore it on purpose
             }
             else if (message instanceof DumpMessage) {
-                // leave empty to ignore it on purpose
+                handleDumpMessage((DumpMessage)message);
             }
             else {
                 throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -352,7 +353,7 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
@@ -360,7 +361,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
+                        m_buddyHSIds.get(m_nextBuddy), false, m_hostId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -375,14 +376,14 @@ public class MpScheduler extends Scheduler
 
             task = instantiateNpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, involvedPartitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_hostId);
         }
 
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId, false);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_hostId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -453,7 +454,7 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
@@ -461,7 +462,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId);
+                        m_buddyHSIds.get(m_nextBuddy), true, m_hostId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -470,7 +471,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId, false);
+                    m_buddyHSIds.get(m_nextBuddy), true, m_hostId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -505,10 +506,10 @@ public class MpScheduler extends Scheduler
                 m_leaderMigrationMap.remove(message.m_sourceHSId);
 
                 // Leader migration has updated the leader, send the request to the new leader
-                m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+                m_mailbox.send(newLeader, counter.getOpenMessage());
             } else {
                 // Leader migration not done yet.
-                m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+                m_mailbox.send(message.m_sourceHSId, counter.getOpenMessage());
             }
             return;
         }
@@ -623,20 +624,14 @@ public class MpScheduler extends Scheduler
      * Load the pro class for n-partition transactions.
      * @return null if running in community or failed to load the class
      */
-    private static Constructor<?> loadNpProcedureTaskClass()
+    private static ProClass<MpProcedureTask> loadNpProcedureTaskClass()
     {
-        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", !MiscUtils.isPro());
-        if (klass != null) {
-            try {
-                return klass.getConstructor(Mailbox.class, String.class, TransactionTaskQueue.class,
+        return ProClass
+                .<MpProcedureTask>load("org.voltdb.iv2.NpProcedureTask", "N-Partition",
+                        MiscUtils.isPro() ? ProClass.HANDLER_LOG : ProClass.HANDLER_IGNORE)
+                .errorHandler(tmLog::error)
+                .useConstructorFor(Mailbox.class, String.class, TransactionTaskQueue.class,
                         Iv2InitiateTaskMessage.class, Map.class, long.class, boolean.class, int.class);
-            } catch (NoSuchMethodException e) {
-                hostLog.error("Unabled to get the constructor for pro class NpProcedureTask", e);
-                return null;
-            }
-        } else {
-            return null;
-        }
     }
 
     /**
@@ -657,18 +652,11 @@ public class MpScheduler extends Scheduler
 
     private static MpProcedureTask instantiateNpProcedureTask(Object...params)
     {
-        if (NpProcedureTaskConstructor != null) {
-            try {
-                return (MpProcedureTask) NpProcedureTaskConstructor.newInstance(params);
-            } catch (Exception e) {
-                tmLog.error("Unable to instantiate NpProcedureTask", e);
-            }
-        }
-        return null;
+        return NP_PROCEDURE_CLASS.newInstance(params);
     }
 
-    public int getLeaderNodeId() {
-        return m_leaderNodeId;
+    public int getHostId() {
+        return m_hostId;
     }
 
     @Override
@@ -677,6 +665,13 @@ public class MpScheduler extends Scheduler
         StringBuilder sb = new StringBuilder();
         sb.append("[dump] current truncation handle: ").append(TxnEgo.txnIdToString(m_repairLogTruncationHandle)).append("\n");
         m_pendingTasks.toString(sb);
+        hostLog.warn(sb.toString());
+    }
+
+    private void handleDumpMessage(DumpMessage message)
+    {
+        StringBuilder sb = new StringBuilder();
+        dumpStackTraceOnFirstSiteThread(message, sb);
         hostLog.warn(sb.toString());
     }
 }

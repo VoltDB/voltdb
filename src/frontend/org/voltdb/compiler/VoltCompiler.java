@@ -72,6 +72,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
@@ -1391,6 +1392,11 @@ public class VoltCompiler {
                     }
                 }
             }
+            // This is used to enforce default connectors assigned to streams through the Java Property
+            // for streams that don't have the Export To Target clause
+            if (TableType.isConnectorLessStream(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
+                tableref.setTabletype(TableType.STREAM.get());
+            }
         }
         if (tableref.getMaterializer() != null)
         {
@@ -1403,7 +1409,7 @@ public class VoltCompiler {
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
-        if (tableref.getIsreplicated()) {
+        if (tableref.getIsreplicated() && !TableType.isPersistentMigrate(tableref.getTabletype())) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)
             tableref.setIsreplicated(false);

@@ -79,10 +79,12 @@ public class TestCatalogDiffs extends TestCase {
         builder.addMultiPartitionProcedures(procList);
         builder.setSecurityEnabled(securityEnabled, true);
 
-        if (gi != null && gi.length > 0)
+        if (gi != null && gi.length > 0) {
             builder.addRoles(gi);
-        if (ui != null && ui.length > 0)
+        }
+        if (ui != null && ui.length > 0) {
             builder.addUsers(ui);
+        }
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String retval = testDir + File.separator + "tpcc-catalogcheck-" + name + ".jar";
@@ -438,10 +440,11 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
 
-        if (tableName.equals("A"))
+        if (tableName.equals("A")) {
             builder.addProcedure(org.voltdb.catalog.ProcedureA.class, PDATA_A);
-        else
+        } else {
             builder.addProcedure(org.voltdb.catalog.ProcedureB.class, PDATA_B);
+        }
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "test-" + catname + ".jar"));
@@ -474,10 +477,11 @@ public class TestCatalogDiffs extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT DEFAULT 0 NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
-        if (tableName.equals("A"))
+        if (tableName.equals("A")) {
             builder.addProcedure(org.voltdb.catalog.ProcedureA.class, PDATA_A);
-        else
+        } else {
             builder.addProcedure(org.voltdb.catalog.ProcedureB.class, PDATA_B);
+        }
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "test-" + catname + ".jar"));
         Catalog cat = catalogForJar(testDir + File.separator + "test-" + catname + ".jar");
@@ -756,7 +760,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated1 = catalogForJar(testDir + File.separator + "testAlterTableTTL21.jar");
         verifyDiff(catUpdated, catUpdated1, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL22.jar"));
         Catalog catUpdated2 = catalogForJar(testDir + File.separator + "testAlterTableTTL22.jar");
         verifyDiff(catUpdated1, catUpdated2, false, null, true, false, true);
@@ -766,7 +770,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
         verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 3 BATCH_SIZE 10 MIGRATION TO TARGET X;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATION TO TARGET X;");
         assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
     }
 
@@ -1640,18 +1644,20 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp4.jar"));
         Catalog catUpdatedWithDroppedTable = catalogForJar(testDir + File.separator + "exp4.jar");
 
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
-                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
-                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
-                + "\nCREATE STREAM C (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp5.jar"));
-        Catalog catUpdatedWithNewStream = catalogForJar(testDir + File.separator + "exp5.jar");
+        if (MiscUtils.isPro()) {
+            builder = new VoltProjectBuilder();
+            builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                    + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                    + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                    + "\nCREATE STREAM C (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+            assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp5.jar"));
+            Catalog catUpdatedWithNewStream = catalogForJar(testDir + File.separator + "exp5.jar");
 
-        verifyDiff(catOriginal, catUpdatedWithNewStream, null, null, true, true, false); // add stream and roll
-        verifyDiff(catOriginal, catUpdatedWithDropStream, null, null, true, true, false); // drop stream and roll
-        verifyDiff(catOriginal, catUpdatedWithNewTable, null, null, true, false, false); // add table and dont roll
-        verifyDiff(catOriginal, catUpdatedWithDroppedTable, null, null, true, false, false); // drop table and dont roll
+            verifyDiff(catOriginal, catUpdatedWithNewStream, null, null, true, true, false); // add stream and roll
+            verifyDiff(catOriginal, catUpdatedWithDropStream, null, null, true, true, false); // drop stream and roll
+            verifyDiff(catOriginal, catUpdatedWithNewTable, null, null, true, false, false); // add table and dont roll
+            verifyDiff(catOriginal, catUpdatedWithDroppedTable, null, null, true, false, false); // drop table and dont roll
+        }
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"

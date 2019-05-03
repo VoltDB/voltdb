@@ -90,11 +90,11 @@ public:
 
     virtual void extendBufferChain(size_t minLength) = 0;
     void commonExtendBufferChain(size_t blockSize, size_t startUso);
-    virtual void pushStreamBuffer(SB *block, bool sync) = 0;
+    virtual void pushStreamBuffer(SB *block) = 0;
     void pushPendingBlocks();
     void discardBlock(SB *sb);
 
-    const SB* getCurrBlockForTest() const {
+    const SB* getCurrBlock() const {
         return m_currBlock;
     }
 
@@ -217,7 +217,7 @@ void TupleStreamBase<SB>::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            pushStreamBuffer(block, false);
+            pushStreamBuffer(block);
             delete block;
             m_pendingBlocks.pop_front();
         }

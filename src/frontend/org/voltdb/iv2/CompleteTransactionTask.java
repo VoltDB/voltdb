@@ -267,7 +267,8 @@ public class CompleteTransactionTask extends TransactionTask
             sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
             sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
         }
-        sb.append("  MSG: ").append(m_completeMsg.toString());
+        sb.append("  MSG:\n    ");
+        m_completeMsg.indentedString(sb, 8);
         return sb.toString();
     }
 

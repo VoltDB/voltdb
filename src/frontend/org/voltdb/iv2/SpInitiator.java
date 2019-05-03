@@ -42,6 +42,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -56,7 +57,7 @@ import com.google_voltpatches.common.collect.Sets;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class SpInitiator extends BaseInitiator implements Promotable
+public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private final TickProducer m_tickProducer;
@@ -114,12 +115,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor,
                         startAction != StartAction.JOIN),
                 "SP", agent, startAction);
-        ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()),
-                m_initiatorMailbox);
+        m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
-        ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
+        m_scheduler.m_repairLog = m_repairLog;
     }
 
     @Override
@@ -337,7 +337,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
     public void resetMigratePartitionLeaderStatus(int failedHostId) {
         m_initiatorMailbox.resetMigratePartitionLeaderStatus();
-        ((SpScheduler)m_scheduler).updateReplicasFromMigrationLeaderFailedHost(failedHostId);
+        m_scheduler.updateReplicasFromMigrationLeaderFailedHost(failedHostId);
     }
 
     public Scheduler getScheduler() {
@@ -345,11 +345,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     //This will be called from Snapshot in elastic joining or rejoining cases.
-    public void updateReplicasForJoin(long snapshotSaveTxnId) {
+    public void updateReplicasForJoin(TransactionState snapshotTransactionState) {
         long[] replicasAdded = new long[0];
         if (m_term != null) {
-            replicasAdded = ((SpTerm)m_term).updateReplicas(snapshotSaveTxnId);
+            replicasAdded = ((SpTerm) m_term).updateReplicas(snapshotTransactionState);
         }
-        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotSaveTxnId);
+        m_scheduler.forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
     }
 }

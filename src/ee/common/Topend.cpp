@@ -61,7 +61,7 @@ namespace voltdb {
     void DummyTopend::crashVoltDB(voltdb::FatalException e) {
     }
 
-    int64_t DummyTopend::getFlushedExportBytes(int32_t partitionId, std::string signature) {
+    int64_t DummyTopend::getFlushedExportBytes(int32_t partitionId) {
         int64_t bytes = 0;
         for (int ii = 0; ii < exportBlocks.size(); ii++) {
             bytes += exportBlocks[ii]->rawLength();
@@ -69,12 +69,14 @@ namespace voltdb {
         return bytes;
     }
 
-    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block, bool sync) {
-        if (sync && !block) {
+    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature,
+            ExportStreamBlock *block, int64_t generationId) {
+        if (!block) {
             return;
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
+        generationIds.push(generationId);
         exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;

@@ -163,7 +163,9 @@ public class ParserDDL extends ParserRoutine {
         }
 
         // A VoltDB extension to support the assume unique attribute
+        boolean unique = false;
         boolean assumeUnique = false;
+        boolean migratingIndex = false;
         // End of VoltDB extension
         switch (token.tokenType) {
 
@@ -200,16 +202,21 @@ public class ParserDDL extends ParserRoutine {
 
             // index
             // A VoltDB extension to support the assume unique attribute
+            case Tokens.MIGRATING:
+                migratingIndex = true;
+                // $FALL-THROUGH$
             case Tokens.ASSUMEUNIQUE :
-                assumeUnique = true;
+                assumeUnique = token.tokenType == Tokens.ASSUMEUNIQUE;
                 // $FALL-THROUGH$
             // End of VoltDB extension
             case Tokens.UNIQUE :
+                unique = token.tokenType == Tokens.UNIQUE;
                 read();
                 checkIsThis(Tokens.INDEX);
-
+                assert ! migratingIndex || ! (unique || assumeUnique) :
+                        "MIGRATING index cannot be UNIQUE or ASSUMEUNIQUE";
                 // A VoltDB extension to support the assume unique attribute
-                return compileCreateIndex(true, assumeUnique);
+                return compileCreateIndex(unique, assumeUnique, migratingIndex);
                 /* disable 1 line ...
                 return compileCreateIndex(true);
                 ... disabled 1 line */
@@ -217,7 +224,7 @@ public class ParserDDL extends ParserRoutine {
 
             case Tokens.INDEX :
                 // A VoltDB extension to support the assume unique attribute
-                return compileCreateIndex(false, false);
+                return compileCreateIndex(false, false, migratingIndex);
                 /* disable 1 line ...
                 return compileCreateIndex(false);
                 ... disabled 1 line */
@@ -1003,7 +1010,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     private Statement readTimeToLive(Table table, boolean alter) {
-        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 MIGRATE TO TARGET <TAGRET NAME>
+        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TARGET NAME>
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
@@ -1054,32 +1061,63 @@ public class ParserDDL extends ParserRoutine {
         } else {
             throw unexpectedToken();
         }
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+        }
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                read();
+                if (token.tokenType != Tokens.X_VALUE) {
+                    throw unexpectedToken();
+                }
+                batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
+            } else {
+                read();
+                if (token.tokenType != Tokens.X_VALUE) {
+                    throw unexpectedToken();
+                }
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
+            }
+        }
+
+        if (token.tokenType == Tokens.MIGRATE) {
+            migrationTarget = readMigrateTarget();
+        }
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
         }
 
-        if (token.tokenType == Tokens.MAX_FREQUENCY) {
+        if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
             read();
             if (token.tokenType != Tokens.X_VALUE) {
                 throw unexpectedToken();
             }
-            maxFrequency = (Integer)(token.tokenValue);
-        }
-
-        read();
-        if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
-        }
-
-        if (token.tokenType == Tokens.BATCH_SIZE) {
-            read();
-            if (token.tokenType != Tokens.X_VALUE) {
-                throw unexpectedToken();
+            if (token.tokenType == Tokens.BATCH_SIZE) {
+                batchSize = (Integer)(token.tokenValue);
+                if (batchSize < 1) {
+                    throw unexpectedToken("BATCH_SIZE must be a positive integer");
+                }
+            } else {
+                maxFrequency = (Integer)(token.tokenValue);
+                if (maxFrequency < 1) {
+                    throw unexpectedToken("MAX_FREQUENCY must be a positive integer");
+                }
             }
-            batchSize = (Integer)(token.tokenValue);
         }
+
+        if (token.tokenType == Tokens.MIGRATE) {
+            migrationTarget = readMigrateTarget();
+        }
+
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
             return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
@@ -1123,11 +1161,9 @@ public class ParserDDL extends ParserRoutine {
                 if (StringUtil.isEmpty(oldTarget) && !StringUtil.isEmpty(migrationTargetName)) {
                     throw unexpectedToken("The migration target cannot be added.");
                 }
-
-                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equals(migrationTargetName)) {
-                    throw unexpectedToken("The migration target cannot be added.");
+                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equalsIgnoreCase(migrationTargetName)) {
+                    throw unexpectedToken("The migration target cannot be altered.");
                 }
-
             } else if (!StringUtil.isEmpty(migrationTargetName)) {
                 throw unexpectedToken("The migration target cannot be added.");
             }
@@ -1729,10 +1765,13 @@ public class ParserDDL extends ParserRoutine {
                     Index index = null;
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
+                        index = table.createAndAddExprIndexStructure(
+                                indexName, c.core.mainCols, c.indexExprs, true, false, true)
+                                .setAssumeUnique(c.assumeUnique);
                     } else {
-                        index = table.createAndAddIndexStructure(indexName,
-                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
+                        index = table.createAndAddIndexStructure(
+                                indexName, c.core.mainCols, null, null, true, false, true, false)
+                                .setAssumeUnique(c.assumeUnique);
                     }
 
                     Constraint newconstraint = new Constraint(c.getName(), c.getIsAutogeneratedName(),
@@ -1746,6 +1785,18 @@ public class ParserDDL extends ParserRoutine {
                         newconstraint);
 
                     break;
+                }
+                case Constraint.MIGRATING : {
+                    // TODO
+                    Index index = table.createAndAddIndexStructure(indexName,
+                            c.core.mainCols, null, null, true, true, false, false);
+                    Constraint newconstraint = new Constraint(c.getName(), c.getIsAutogeneratedName(),
+                            table, index, Constraint.MIGRATING)
+                            .setMigrating(c.migrating);
+
+                    table.addConstraint(newconstraint);
+                    session.database.schemaManager.addSchemaObject(
+                            newconstraint);
                 }
                 case Constraint.FOREIGN_KEY : {
                     addForeignKey(session, table, c, constraintList);
@@ -1831,7 +1882,7 @@ public class ParserDDL extends ParserRoutine {
         HsqlName refIndexName = session.database.nameManager.newAutoName("IDX",
             table.getSchemaName(), table.getName(), SchemaObject.INDEX);
         Index index = table.createAndAddIndexStructure(refIndexName,
-            c.core.refCols, null, null, false, true, isForward);
+            c.core.refCols, null, null, false, false, true, isForward);
         HsqlName mainName = session.database.nameManager.newAutoName("REF",
             c.getName().name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
@@ -3457,7 +3508,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     // A VoltDB extension to support indexed expressions and the assume unique attribute
-    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique) {
+    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique, boolean migrating) {
     /* disable 1 line ...
     StatementSchema compileCreateIndex(boolean unique) {
     ... disabled 1 line */
@@ -3489,7 +3540,7 @@ public class ParserDDL extends ParserRoutine {
         // A VoltDB extension to support indexed expressions and the assume unique attribute
         java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
         // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
-        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
+        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc, migrating);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] indexColumns = null;
         if (set == null) {
@@ -3512,9 +3563,7 @@ public class ParserDDL extends ParserRoutine {
         indexColumns = getColumnList(set, table);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
-            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs,
-            Boolean.valueOf(assumeUnique),
-            predicate
+            table, indexColumns, indexHsqlName, unique, migrating, indexExprs, assumeUnique, predicate
         /* disable 4 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();
@@ -4200,6 +4249,12 @@ public class ParserDDL extends ParserRoutine {
             throw Error.error(ErrorCode.X_42591);
         }
 
+        if (table.timeToLive != null) {
+            final String ttlColumn = table.timeToLive.ttlColumn.getNameString();
+            if (colName.equalsIgnoreCase(ttlColumn)) {
+                throw Error.error("Columns used by TTL cannot be dropped.");
+            }
+        }
         Object[] args = new Object[] {
             table.getColumn(colindex).getName(),
             Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(cascade),
@@ -5474,14 +5529,22 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
+    // Default disallow empty parenthesis
+    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+        return XreadExpressions(ascDesc, false);
+    }
+
     /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
     /// adding support for indexed expressions.
-    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc, boolean allowEmpty) {
         readThis(Tokens.OPENBRACKET);
 
-        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+        java.util.List<Expression> indexExprs = new java.util.ArrayList<>();
 
         while (true) {
+            if (allowEmpty && readIfThis(Tokens.CLOSEBRACKET)) {    // empty bracket
+                return indexExprs;
+            }
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 

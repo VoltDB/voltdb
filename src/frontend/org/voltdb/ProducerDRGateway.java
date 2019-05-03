@@ -63,7 +63,7 @@ public interface ProducerDRGateway {
             return new MeshMemberInfo(clusterId, creationTime, partitionCount, protocolVersion, hostAndPorts);
         }
 
-        public int getClusterId() { return (int)m_clusterId; }
+        public int getClusterId() { return m_clusterId; }
         public final byte m_clusterId;
         /**
          *  This is the persistent cluster create time. NOT THE CLUSTER RECOVERY TIME.
@@ -91,12 +91,16 @@ public interface ProducerDRGateway {
     public void startAndWaitForGlobalAgreement() throws IOException;
 
     /**
-     * Truncate the DR log using the snapshot restore truncation point cached
-     * earlier. This is called on recover before the command log replay starts
-     * to drop all binary logs generated after the snapshot. Command log replay
-     * will recreate those binary logs.
+     * Complete the initialization process for the producer.
+     * <p>
+     * If this is a recovery it will truncate the DR log using the snapshot restore truncation point cached earlier.
+     * This is called on recover before the command log replay starts to drop all binary logs generated after the
+     * snapshot. Command log replay will recreate those binary logs.
+     * <p>
+     * If this is a rejoin the persistent log will be checked for consistency and the cached DRIds set by
+     * {@link #cacheRejoinStartDRSNs(Map)} will be used to initialize the DRId
      */
-    public void truncateDRLog();
+    public void completeInitialization();
 
     /**
      * Binary Logs are encoded with Table Hash values that are Sha1 Hashes of the signature.
@@ -210,4 +214,11 @@ public interface ProducerDRGateway {
      * If DR producer is enabled and listening, this will log the current conversations.
      */
     public void logActiveConversations();
+
+    /**
+     * Enum to indicate which start mode the {@link ProducerDRGateway} instance is in
+     */
+    public enum Mode {
+        NEW, REJOIN, RECOVER, JOIN;
+    }
 }

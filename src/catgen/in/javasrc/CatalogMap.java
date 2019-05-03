@@ -23,7 +23,6 @@ package org.voltdb.catalog;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -61,20 +60,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (m_cachedPath != null) {
             return m_cachedPath;
         }
-        // if parent is the catalog root, don't add an extra slash to the existing one
-        return m_parent == m_catalog ? ("/" + m_name) : (m_parent.getCatalogPath() + "/" + m_name);
-    }
-
-    public void getPath(StringBuilder sb) {
-        if (m_cachedPath != null) {
-            sb.append(m_cachedPath);
-            return;
+        // If parent is the catalog root, don't add an extra slash to the existing one.
+        if (m_parent == m_catalog) {
+            return "/" + m_name;
+        } else {
+            return m_parent.getCatalogPath() + "/" + m_name;
         }
-        // if parent is the catalog root, don't add an extra slash to the existing one
-        if (m_parent != m_catalog) {
-            sb.append(m_parent.getCatalogPath()).append('/');
-        }
-        sb.append(m_name);
     }
 
     /**
@@ -83,12 +74,21 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T get(String name) {
-        if (m_items == null) return null;
+        if (m_items == null) {
+            return null;
+        }
         return m_items.get(name.toUpperCase());
     }
 
+    @SuppressWarnings("unused")
+    private Object _get(String name) {
+        return get(name);
+    }
+
     public T getExact(String name) {
-        if (m_items == null) return null;
+        if (m_items == null) {
+            return null;
+        }
         return m_items.get(name);
     }
 
@@ -98,7 +98,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T getIgnoreCase(String name) {
-        if (m_items == null) return null;
+        if (m_items == null) {
+            return null;
+        }
         return m_items.get(name.toUpperCase());
     }
 
@@ -107,7 +109,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The number of items in the map
      */
     public int size() {
-        if (m_items == null) return 0;
+        if (m_items == null) {
+            return 0;
+        }
         return m_items.size();
     }
 
@@ -116,7 +120,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return A boolean indicating whether the map is empty
      */
     public boolean isEmpty() {
-        if (m_items == null) return true;
+        if (m_items == null) {
+            return true;
+        }
         return (m_items.size() == 0);
     }
 
@@ -166,6 +172,11 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         }
     }
 
+    @SuppressWarnings("unused")
+    private void _add(String name) {
+        add(name);
+    }
+
     /**
      * Remove a {@link CatalogType} object from this collection.
      * @param name The name of the object to remove.
@@ -193,15 +204,15 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * Clear the contents of the map
      */
     public void clear() {
-        if (m_items == null) return;
+        if (m_items == null) {
+            return;
+        }
         m_items.clear();
     }
 
-    void writeCommandsForMembers(StringBuilder sb, Set<String> whiteListFields) {
-        for (T type : this) {
-            type.writeCreationCommand(sb);
-            type.writeFieldCommands(sb, whiteListFields);
-            type.writeChildCommands(sb);
+    void accept(CatalogVisitor visitor) {
+        for (T item : this) {
+            item.accept(visitor);
         }
     }
 
@@ -223,20 +234,24 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     @Override
     public boolean equals(Object obj) {
         // returning false if null isn't the convention, oh well
-        if (obj == null)
+        if (obj == null) {
             return false;
-        if (obj.getClass() != getClass())
+        }
+        if (obj.getClass() != getClass()) {
             return false;
+        }
 
         // Do the identity check
-        if (obj == this)
+        if (obj == this) {
             return true;
+        }
 
         @SuppressWarnings("unchecked")
         CatalogMap<T> other = (CatalogMap<T>) obj;
 
-        if (other.size() != size())
+        if (other.size() != size()) {
             return false;
+        }
 
         if (m_items == null) {
             return (other.m_items == null) || (other.m_items.size() == 0);
@@ -245,10 +260,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         for (Entry<String, T> e : m_items.entrySet()) {
             assert(e.getValue() != null);
             T type = other.get(e.getKey());
-            if (type == null)
+            if (type == null) {
                 return false;
-            if (type.equals(e.getValue()) == false)
+            }
+            if (type.equals(e.getValue()) == false) {
                 return false;
+            }
         }
 
         return true;
@@ -256,7 +273,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
     @Override
     public int hashCode() {
-        if (m_items == null) return 0;
+        if (m_items == null) {
+            return 0;
+        }
 
         // based on implementation of equals
         int result = size();
@@ -275,7 +294,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     }
 
     void recomputeRelativeIndexes() {
-        if (m_items == null) return;
+        if (m_items == null) {
+            return;
+        }
 
         // assign a relative index to every child item
         int index = 1;

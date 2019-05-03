@@ -37,6 +37,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -72,35 +73,41 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             long timestamp)
     {
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
-                jsData, context, result, extraSnapshotData, tracker, hashinatorData,
-                timestamp, context.getNumberOfPartitions());
+                new SnapshotRequestConfig(jsData, context.getDatabase()), context, result, extraSnapshotData, tracker,
+                hashinatorData, timestamp);
     }
 
     Callable<Boolean> createSetupInternal(String file_path, String pathType,
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
-                                                    JSONObject jsData,
+                                                    SnapshotRequestConfig config,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     ExtensibleSnapshotDigestData extraSnapshotData,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
-                                                    long timestamp,
-                                                    int newPartitionCount)
+                                                    long timestamp)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
         if (hashinatorData == null) {
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
-        final Table[] tableArray;
-        // TRAIL [SnapSave:5]  - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
-        if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
-            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
+        // TRAIL [SnapSave:5] - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
+        final Table[] tableArray = config.tables;
+
+        final int newPartitionCount;
+        final int partitionCount;
+        if (config.newPartitionCount != null) {
+            newPartitionCount = config.newPartitionCount;
+            partitionCount = Math.min(newPartitionCount, context.getNumberOfPartitions());
         } else {
-            tableArray = config.tables;
+            partitionCount = newPartitionCount = context.getNumberOfPartitions();
+        }
+
+        if (newPartitionCount != context.getNumberOfPartitions()) {
+            createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
         m_snapshotRecord =
@@ -148,15 +155,19 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
-        boolean isTruncationSnapshot = true;
-        if (jsData != null) {
-            isTruncationSnapshot = jsData.has("truncReqId");
-        }
+        /*
+         * Force this to act like a truncation snaphsot when there is no config or the data config has a partition
+         * count. This is primarily used by elastic join and remove for the truncation snapshots which they perform.
+         * This doesn't actually do a full truncation snapshot since that is a different request path which should be
+         * fixed at some point.
+         */
+        boolean isTruncationSnapshot = config.emptyConfig || config.newPartitionCount != null
+                || config.truncationRequestId != null;
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 context, extraSnapshotData, tracker, hashinatorData, timestamp,
-                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
+                partitionCount, newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
@@ -170,6 +181,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
+                                                  final int partitionCount,
                                                   final int newPartitionCount,
                                                   final Table[] tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
@@ -219,7 +231,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     @Override
                     public void run()
                     {
-                        ExportManager.sync(false);
+                        ExportManager.sync();
                     }
                 });
 
@@ -233,7 +245,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
                                                       context.getHostId(), context.getCluster().getTypeName(),
-                                                      context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                                                      context.getDatabase().getTypeName(), partitionCount,
                                                       DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()),
                                                       tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
@@ -270,6 +282,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 hostId);
 
         if (isActiveActiveDRed && table.getIsdred()) {
+            VoltTable tbl;
+            if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+            } else {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+            }
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
@@ -278,11 +296,18 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     partitionCount,
                     table.getIsreplicated(),
                     tracker.getPartitionsForHost(hostId),
-                    CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    tbl,
                     txnId,
                     timestamp);
         }
         else if (CatalogUtil.needsViewHiddenColumn(table)) {
+            VoltTable tbl;
+            if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
+            } else {
+                tbl = CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO);
+            }
+
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
@@ -291,11 +316,22 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     partitionCount,
                     table.getIsreplicated(),
                     tracker.getPartitionsForHost(hostId),
-                    CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO),
+                    tbl,
                     txnId,
                     timestamp);
-        }
-        else {
+        } else if (TableType.needsMigrateHiddenColumn(table.getTabletype())) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        } else {
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,

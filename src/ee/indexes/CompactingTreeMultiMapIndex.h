@@ -78,14 +78,12 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyEndIter);
     }
 
-    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
-    {
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple) {
         ++m_inserts;
         m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntryDo(const TableTuple *tuple)
-    {
+    bool deleteEntryDo(const TableTuple *tuple) {
         ++m_deletes;
         MapIterator iter = findTuple(*tuple);
         if (iter.isEnd()) {
@@ -391,8 +389,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return MapIterator();
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple) const
-    {
+    MapIterator findTuple(const TableTuple &originalTuple) const {
         // TODO: couldn't remove this, because of CompactingTreeMultiIndexTest in eecheck
         // code will force to use non-pointer-key.
         if (KeyType::keyDependsOnTupleAddress()) {

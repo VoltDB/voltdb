@@ -620,7 +620,7 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
     pushPendingBlocks();
 }
 
-void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE

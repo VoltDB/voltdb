@@ -45,7 +45,9 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.StartAction;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -105,28 +107,6 @@ public class MiscUtils {
      */
     public static byte[] fileToBytes(File path) throws IOException {
         return Files.readAllBytes(path.toPath());
-    }
-
-    /**
-     * Try to load a PRO class. If it's running the community edition, an error
-     * message will be logged and null will be returned.
-     *
-     * @param classname The class name of the PRO class
-     * @param feature The name of the feature
-     * @param suppress true to suppress the log message
-     * @return null if running the community edition
-     */
-    public static Class<?> loadProClass(String classname, String feature, boolean suppress) {
-        try {
-            Class<?> klass = Class.forName(classname);
-            return klass;
-        } catch (ClassNotFoundException e) {
-            if (!suppress) {
-                hostLog.warn("Cannot load " + classname + " in VoltDB community edition. " +
-                             feature + " will be disabled.");
-            }
-            return null;
-        }
     }
 
     /**
@@ -232,24 +212,10 @@ public class MiscUtils {
             };
         }
 
-        // boilerplate to create a license api interface
-        LicenseApi licenseApi = null;
-        Class<?> licApiKlass = MiscUtils.loadProClass("org.voltdb.licensetool.LicenseApiImpl",
-                                                      "License API", false);
-        if (licApiKlass != null) {
-            try {
-                licenseApi = (LicenseApi)licApiKlass.newInstance();
-            } catch (InstantiationException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return null;
-            } catch (IllegalAccessException e) {
-                hostLog.fatal("Unable to process license file: could not create license API.");
-                return null;
-            }
-        }
-
+        LicenseApi licenseApi = ProClass
+                .<LicenseApi>load("org.voltdb.licensetool.LicenseApiImpl", "License API", hostLog::fatal)
+                .errorHandler(hostLog::fatal).newInstance();
         if (licenseApi == null) {
-            hostLog.fatal("Unable to load license file: could not create License API.");
             return null;
         }
 
@@ -325,8 +291,8 @@ public class MiscUtils {
      * Validate the signature and business logic enforcement for a license.
      * @return true if the licensing constraints are met
      */
-    public static boolean validateLicense(LicenseApi licenseApi,
-                                          int numberOfNodes, DrRoleType replicationRole)
+    public static boolean validateLicense(LicenseApi licenseApi, int numberOfNodes, DrRoleType replicationRole,
+            StartAction startAction)
     {
         // Delay the handling of an invalid license file until here so
         // that the leader can terminate the full cluster.
@@ -382,18 +348,10 @@ public class MiscUtils {
 
         // check node count
         if (licenseApi.maxHostcount() < numberOfNodes) {
-            // Enterprise gets a pass on this one for now
-            if (licenseApi.isEnterprise()) {
-                hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
-                        " nodes, starting cluster with " + numberOfNodes + " nodes.");
-                valid = false;
-            }
-            // Trial, Pro & AWS licenses have a hard enforced limit
-            else {
-                hostLog.fatal("Warning, VoltDB license for a " + licenseApi.maxHostcount() + " node " +
-                        "attempted for use with a " + numberOfNodes + " node cluster.");
-                return false;
-            }
+            hostLog.fatal("Attempting to " + (startAction.doesJoin() ? "join" : "start") + " with too many nodes ("
+                    + numberOfNodes + "). " + "Current license only supports " + licenseApi.maxHostcount()
+                    + ". Please contact VoltDB at info@voltdb.com.");
+            return false;
         }
 
         // If this is a commercial license, and there is less than or equal to 30 days until expiration,
@@ -606,7 +564,8 @@ public class MiscUtils {
         if (m_isPro == null) {
             //Allow running pro kit as community.
             if (!Boolean.parseBoolean(System.getProperty("community", "false"))) {
-                m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+                m_isPro = ProClass.load("org.voltdb.CommandLogImpl", "Command logging", ProClass.HANDLER_IGNORE)
+                        .hasProClass();
             } else {
                 m_isPro = false;
             }
@@ -1084,5 +1043,25 @@ public class MiscUtils {
             }
         }
         return props;
+    }
+
+    /**
+     * Serialize the deferred serializer data into byte buffer
+     * @param mbuf ByteBuffer the buffer is written to
+     * @param ds DeferredSerialization data writes to the byte buffer
+     * @return size of data
+     * @throws IOException
+     */
+    public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
+    {
+        int written = 0;
+        try {
+            final int objStartPosition = mbuf.position();
+            ds.serialize(mbuf);
+            written = mbuf.position() - objStartPosition;
+        } finally {
+            ds.cancel();
+        }
+        return written;
     }
 }

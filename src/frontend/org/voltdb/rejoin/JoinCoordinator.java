@@ -17,20 +17,18 @@
 
 package org.voltdb.rejoin;
 
+import java.io.File;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.AbstractTopology;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.utils.VoltFile;
-
-import java.io.File;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Coordinates the sites to perform rejoin
@@ -43,8 +41,12 @@ public abstract class JoinCoordinator extends LocalMailbox {
         m_messenger = hostMessenger;
     }
 
-    public void initialize(int kfactor)
-        throws JSONException, KeeperException, InterruptedException, ExecutionException {}
+    public void initialize() throws JSONException, KeeperException, InterruptedException, ExecutionException {}
+
+    public int getHostsJoining() {
+        return 1;
+    }
+
     public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
     public AbstractTopology getTopology() {
         throw new UnsupportedOperationException("getTopology is only supported for elastic join");
@@ -73,25 +75,5 @@ public abstract class JoinCoordinator extends LocalMailbox {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Fail to clear join overflow directory", false, e);
         }
-    }
-
-    public static String makeSnapshotNonce(String type, long HSId)
-    {
-        return type + "_" + HSId + "_" + System.currentTimeMillis();
-    }
-
-    public static String makeSnapshotRequest(SnapshotRequestConfig config)
-    {
-        try {
-            JSONStringer jsStringer = new JSONStringer();
-            jsStringer.object();
-            config.toJSONString(jsStringer);
-            jsStringer.endObject();
-            return jsStringer.toString();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
-        }
-        // unreachable;
-        return null;
     }
 }

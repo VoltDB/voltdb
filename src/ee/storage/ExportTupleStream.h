@@ -43,14 +43,12 @@ class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation,
-                      std::string signature, const std::string &tableName,
-                      const std::vector<std::string> &columnNames);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
     virtual ~ExportTupleStream() {
     }
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setGeneration(int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -65,8 +63,9 @@ public:
     void setBytesUsed(int64_t seqNo, size_t count) {
         assert(m_uso == 0);
         m_uso = count;
-        // this is for start sequence number of stream block
+        // set start and committed sequence numbers of stream block
         m_nextSequenceNumber = seqNo + 1;
+        m_committedSequenceNumber = seqNo;
         //Extend the buffer chain to replace any existing stream blocks with a new one
         //with the correct sequence number
         extendBufferChain(0);
@@ -76,16 +75,13 @@ public:
         return value.length() + sizeof(int32_t);
     }
 
-    // compute # of bytes needed to serialize the meta data column names
-    inline size_t getMDColumnNamesSerializedSize() const { return s_mdSchemaSize; }
-
     int64_t testAllocatedBytesInEE() const {
         DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
-        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
+        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId);
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
-    void pushStreamBuffer(ExportStreamBlock *block, bool sync);
+    void pushStreamBuffer(ExportStreamBlock *block);
     void pushEndOfStream();
 
     /** write a tuple to the stream */
@@ -129,8 +125,6 @@ public:
     virtual void extendBufferChain(size_t minLength);
 
     virtual int partitionId() { return m_partitionId; }
-    void setNew() { m_new = true; }
-    bool isNew() { return m_new; }
 
     inline ExportTupleStream* getNextFlushStream() const {
         return m_nextFlushStream;
@@ -146,10 +140,6 @@ public:
 
 
 public:
-    // Computed size for metadata columns
-    static const size_t s_mdSchemaSize;
-    // Size of Fixed header (not including schema)
-    static const size_t s_FIXED_BUFFER_HEADER_SIZE;
     // Size of Fixed buffer header (rowCount + uniqueId)
     static const size_t s_EXPORT_BUFFER_HEADER_SIZE;
 
@@ -158,13 +148,8 @@ private:
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    // This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
-    bool m_new;
-    std::string m_signature;
     int64_t m_generation;
-    const std::string &m_tableName;
-    const std::vector<std::string> &m_columnNames;
-    const int32_t m_ddlSchemaSize;
+    const std::string m_tableName;
 
     int64_t m_nextSequenceNumber;
     int64_t m_committedSequenceNumber;

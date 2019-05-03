@@ -483,5 +483,4 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
     return getDecimalValueFromString(rv);
 }
 
-
 }

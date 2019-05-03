@@ -197,6 +197,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
     PLAN_NODE_TYPE_SWAPTABLES       = 34,
+    PLAN_NODE_TYPE_MIGRATE          = 35,
 
     //
     // Communication Nodes
@@ -603,6 +604,59 @@ enum DRConflictOnPK {
     NOT_CONFLICT_ON_PK,
     CONFLICT_ON_PK,
 };
+
+/*
+ * Keep it sync with frontend/org/voltdb/TableType.java
+ */
+enum TableType {
+     // This will be unset and hence 0 for pre-9.0 catalogs
+     INVALID = 0,
+
+      // Regular PersistentTable
+     PERSISTENT = 1,
+
+      // StreamTable without ExportTupleStream
+     CONNECTOR_LESS_STREAM = 2,
+
+     // StreamTable with ExportTupleStream
+     STREAM = 3,
+
+     // PersistentTable with associated Stream for migrating DELETES
+     PERSISTENT_MIGRATE  = 4,
+
+     // PersistentTable with associated Stream for linking INSERTS
+     PERSISTENT_EXPORT = 5,
+};
+
+inline bool tableTypeIsExportStream(TableType tableType) {
+    return tableType == STREAM;
+}
+
+inline bool tableTypeIsConnectorLessStream(TableType tableType) {
+    return tableType == CONNECTOR_LESS_STREAM;
+}
+
+inline bool tableTypeIsStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) ||
+            tableTypeIsConnectorLessStream(tableType);
+}
+
+inline bool isTableWithExport(TableType tableType) {
+    return tableType == PERSISTENT_EXPORT;
+}
+
+inline bool isTableWithStream(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+}
+
+inline bool tableTypeNeedsTupleStream(TableType tableType) {
+    return tableTypeIsExportStream(tableType) || isTableWithStream(tableType);
+}
+
+inline bool isTableWithMigrate(TableType tableType) {
+    return tableType == PERSISTENT_MIGRATE;
+}
+
 
 // ------------------------------------------------------------------
 // Utility functions.

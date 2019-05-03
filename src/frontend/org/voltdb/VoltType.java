@@ -852,7 +852,7 @@ public enum VoltType {
     public boolean isUniqueIndexable() { return isNumber(); }
 
     /** Most VoltTypes are not compatible with an array-typed value.
-     * @see VARBINARY
+     * @see #VARBINARY
      * @param arrayArgClass a java array class like byte[] or String[]
      * @return false, unless overridden to enable a specific VoltType
      * (like VARBINARY) to support certain specific array types (like byte[]). */

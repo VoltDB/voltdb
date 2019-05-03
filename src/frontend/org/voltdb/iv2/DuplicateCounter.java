@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -56,13 +57,13 @@ public class DuplicateCounter
     boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
-    final VoltMessage m_openMessage;
+    final TransactionInfoBaseMessage m_openMessage;
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
             List<Long> expectedHSIds,
-            VoltMessage openMessage)
+            TransactionInfoBaseMessage openMessage)
     {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
@@ -136,7 +137,7 @@ public class DuplicateCounter
         return null;
     }
 
-    public VoltMessage getOpenMessage() {
+    public TransactionInfoBaseMessage getOpenMessage() {
         return m_openMessage;
     }
 
@@ -233,6 +234,14 @@ public class DuplicateCounter
     VoltMessage getLastResponse()
     {
         return m_lastResponse;
+    }
+
+    public void dumpCounter(StringBuilder sb) {
+        sb.append("DuplicateCounter: [");
+        m_openMessage.toDuplicateCounterString(sb);
+        sb.append(" outstanding HSIds: ");
+        sb.append(CoreUtils.hsIdCollectionToString(m_expectedHSIds));
+        sb.append("]\n");
     }
 
     @Override

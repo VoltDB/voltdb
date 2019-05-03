@@ -52,7 +52,7 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0),
              m_skippedDirtyRows(0),
              m_skippedInactiveRows(0),
-             m_replicated(table.isCatalogTableReplicated())
+             m_replicated(table.isReplicatedTable())
 {
     if (m_replicated) {
         // There is a corner case where a replicated table is streamed from a thread other than the lowest
@@ -213,8 +213,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
             if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
 
-                char message[1024 * 16];
-                snprintf(message, 1024 * 16,
+                char message[1024 * 8];
+                snprintf(message, sizeof(message),
                          "serializeMore(): tuple count > 0 after streaming:\n"
                          "Table name: %s\n"
                          "Table type: %s\n"

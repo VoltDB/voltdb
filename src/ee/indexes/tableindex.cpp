@@ -45,7 +45,9 @@
 
 #include <iostream>
 #include "indexes/tableindex.h"
+#include "common/StackTrace.h"
 #include "expressions/expressionutil.h"
+#include "expressions/conjunctionexpression.h"
 #include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
@@ -58,6 +60,7 @@ TableIndexScheme::TableIndexScheme(
     AbstractExpression* a_predicate,
     bool a_unique,
     bool a_countable,
+    bool migrating,
     const std::string& a_expressionsAsText,
     const std::string& a_predicateAsText,
     const TupleSchema *a_tupleSchema) :
@@ -69,16 +72,38 @@ TableIndexScheme::TableIndexScheme(
       allColumnIndices(a_columnIndices),
       unique(a_unique),
       countable(a_countable),
+      migrating(migrating),
       expressionsAsText(a_expressionsAsText),
       predicateAsText(a_predicateAsText),
-      tupleSchema(a_tupleSchema)
-    {
-        if (predicate != NULL)
-        {
+      tupleSchema(a_tupleSchema) {
+        if (predicate != NULL) {
             // Collect predicate column indicies
             ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
         }
+        // Deprecating "CREATE MIGRATING INDEX ..." syntax, but
+        // retain the catalog flag. Do not modify the index.
     }
+
+void TableIndexScheme::setMigrate() {
+   size_t const hiddenColumnIndex = tupleSchema->totalColumnCount() - 1;
+   auto* hiddenColumnExpr = ExpressionUtil::columnIsNull(0, hiddenColumnIndex);
+   if (predicate == nullptr) {
+      predicate = hiddenColumnExpr;
+   } else {
+      predicate = ExpressionUtil::conjunctionFactory(ExpressionType::EXPRESSION_TYPE_CONJUNCTION_AND,
+            hiddenColumnExpr, predicate);
+   }
+   // NOTE: we are not updating JSON expressions for the predicate, which
+   // involves work on rapidjson (that we may deprecate soon), and serialization
+   // of expression.
+   if (allColumnIndices.empty()) {
+      // if no explicit columns are used, index on the
+      // hidden column (i.e. the transaction id as of
+      // INTEGER type).
+      allColumnIndices.emplace_back(hiddenColumnIndex);
+   }
+
+}
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
     m_scheme(scheme),
@@ -108,6 +133,7 @@ std::string TableIndex::debug() const
     std::ostringstream buffer;
     buffer << getTypeName() << "(" << getName() << ")";
     buffer << (isUniqueIndex() ? " UNIQUE " : " NON-UNIQUE ");
+    buffer << (isMigratingIndex() ? " MIGRATING " : " NON-MIGRATING ");
     //
     // Columns
     //

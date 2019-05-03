@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -40,6 +39,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.catalog.CatalogException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -126,7 +126,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Otherwise, deploymentString has the right contents, don't need to touch it
             }
             else if ("@UpdateClasses".equals(invocationName)) {
-                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes.");
+                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes. Current catalog version: " + context.catalogVersion);
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (operationBytes != null) {
@@ -210,7 +210,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.upgradedFromVersion = loadResults.getSecond();
 
             Catalog newCatalog = new Catalog();
-            newCatalog.execute(newCatalogCommands);
+            try {
+                newCatalog.execute(newCatalogCommands);
+            } catch (CatalogException e) {
+                retval.errorMsg = e.getLocalizedMessage();
+                return retval;
+            }
+
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
@@ -537,25 +543,18 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
         }
 
+        // catalog update will wait for snap shot to be completed, which will block site thread.
+        if (ccr.requiresSnapshotIsolation && VoltZK.hasHostsSnapshotting(zk)) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            errMsg = "Snapshot in progress. Please retry catalog update later.";
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+        }
+
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
         }
 
         // ENG-14511 on assertion failures in test environment, ensure removal of action blocker

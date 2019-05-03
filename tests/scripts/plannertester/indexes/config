@@ -110,4 +110,5 @@ select * from P3 T where T.NUM = 100 AND T.NUM2 <= 200;
 select * from P3 T where T.NUM = 100 AND T.NUM2 < 200;
 select * from P3 T where T.NUM IN (1, 2) AND T.NUM2 < 100 ORDER BY T.NUM, T.NUM2;
 select * from P3 T where T.NUM IN (1, 2) AND T.NUM2 < 100 ORDER BY T.NUM DESC, T.NUM2 DESC;
+select count(keyI) from TABLEY WHERE abs(keyA) > 0;
 

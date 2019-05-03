@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
-import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
 public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {

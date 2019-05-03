@@ -74,7 +74,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 100045, spi);
         InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltMessage(itask);
 
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
@@ -83,7 +83,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
-        assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
     }
 
     public void testIv2InitiateTask() throws IOException {
@@ -119,7 +118,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("elmerfudd");
         spi.setParams(57, "wrascallywabbit");
 
-        InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        InitiateTaskMessage itask = new InitiateTaskMessage(23, 100045, spi);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("foobar", VoltType.STRING)

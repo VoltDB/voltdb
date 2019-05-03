@@ -104,9 +104,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
@@ -123,9 +122,8 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
 
-        // Not supported in XDCR mode
         diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
-        assertFalse(diff.supported());
+        assertTrue(diff.supported());
     }
 
     @Test
@@ -812,7 +810,7 @@ public class TestDRCatalogDiffs {
 
         String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
         Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
-        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
+        return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog, (byte) 0);
     }
 
     private Catalog createCatalog(String schema) throws Exception {

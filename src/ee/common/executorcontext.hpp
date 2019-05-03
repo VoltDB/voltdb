@@ -234,6 +234,14 @@ class ExecutorContext {
         return m_traceOn;
     }
 
+    bool externalStreamsEnabled() {
+        return m_externalStreamsEnabled;
+    }
+
+    void disableExternalStreams() {
+        m_externalStreamsEnabled = false;
+    }
+
     VoltDBEngine* getContextEngine() {
         return m_engine;
     }
@@ -482,6 +490,11 @@ class ExecutorContext {
     int64_t m_currentDRTimestamp;
     LargeTempTableBlockCache m_lttBlockCache;
     bool m_traceOn;
+    // used by elastic shrink once all data has been migrated away
+    // from this partition. The site will continue to participate in MP txns
+    // until the site is removed fully from the system, but we want to disable
+    // all streaming (export, DR) because the sites are done at this point.
+    bool m_externalStreamsEnabled;
 
   public:
     int64_t m_lastCommittedSpHandle;

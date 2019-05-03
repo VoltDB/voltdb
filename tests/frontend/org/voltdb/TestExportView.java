@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -32,11 +31,12 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.TestExportBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Listens for connections from socket export and then counts expected rows.
@@ -51,9 +51,7 @@ public class TestExportView extends TestExportBase {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+        ExportLocalClusterBase.resetDir();
         super.setUp();
     }
 
@@ -168,7 +166,7 @@ public class TestExportView extends TestExportBase {
 
         Properties props = new Properties();
 
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
         /*
          * compile the catalog all tests start with
          */

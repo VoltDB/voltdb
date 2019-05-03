@@ -469,7 +469,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean undo)
+            boolean undo, boolean elastic)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -525,7 +525,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -565,6 +565,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                              long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public int deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -694,7 +705,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte[] logsData) {
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte[] logsData) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 
@@ -742,5 +753,21 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return null;
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        throw new RuntimeException("disableExternalStreams should not be called on MpRoSite");
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        throw new RuntimeException("externalStreamsEnabled should not be called on MpRoSite");
     }
 }

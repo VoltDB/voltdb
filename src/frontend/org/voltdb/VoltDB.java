@@ -334,9 +334,9 @@ public class VoltDB {
         public List<File> m_stagedClassesPaths = null;
 
         /** Best effort to recover previous partition layout*/
-        public boolean m_restorePlacement = !Boolean.valueOf(System.getenv("DISABLE_PLACEMENT_RESTORE") == null ?
-                     Boolean.toString(Boolean.getBoolean("DISABLE_PLACEMENT_RESTORE")) : System.getenv("DISABLE_PLACEMENT_RESTORE"));
-;
+        public final boolean m_restorePlacement = !Boolean.parseBoolean(
+                System.getProperty("DISABLE_PLACEMENT_RESTORE", System.getenv("DISABLE_PLACEMENT_RESTORE")));
+
         public String m_recoveredPartitions = "";
 
         public int getZKPort() {
@@ -1117,7 +1117,7 @@ public class VoltDB {
 
     /* helper functions to access current configuration values */
     public static boolean getLoadLibVOLTDB() {
-        return !(m_config.m_noLoadLibVOLTDB);
+        return ! m_config.m_noLoadLibVOLTDB;
     }
 
     public static BackendTarget getEEBackendType() {

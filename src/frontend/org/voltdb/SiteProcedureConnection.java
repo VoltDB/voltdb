@@ -108,7 +108,8 @@ public interface SiteProcedureConnection {
             VoltTable data,
             boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean undo);
+            boolean undo,
+            boolean elastic);
 
     /**
      * Execute a set of plan fragments.
@@ -198,6 +199,10 @@ public interface SiteProcedureConnection {
                                                      Column column,
                                                      ComparisonOperation op);
 
+    public ProcedureRunner getMigrateProcRunner(String procName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op);
     /**
      * @return SystemProcedureExecutionContext
      */
@@ -216,7 +221,7 @@ public interface SiteProcedureConnection {
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
-    public long[] getUSOForExportTable(String signature);
+    public long[] getUSOForExportTable(String streamName);
 
     public TupleStreamStateInfo getDRTupleStreamStateInfo();
 
@@ -234,6 +239,9 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount);
+
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
 
@@ -249,7 +257,7 @@ public interface SiteProcedureConnection {
 
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
 
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logsData[]);
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logsData[]);
     public void setDRProtocolVersion(int drVersion);
     /*
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of
@@ -262,4 +270,21 @@ public interface SiteProcedureConnection {
     public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
 
     public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
+
+    /**
+     * Use this to disable all external streams (DR, export) from this site.
+     * This is used by Elastic Shrink after all data from this site has been migrated.
+     * The site continues to participate in MP txns until the partition is fully removed from
+     * the cluster, but this will disable all external writes as well so that in effect the sites
+     * are not participating.
+     * <p> By default this is enabled in all sites.
+     */
+    public void disableExternalStreams();
+
+    /**
+     * Returns value showing whether external streams (DR and export) are enabled for this Site.
+     *
+     * @return true if external streams are enabled for this site, false otherwise.
+     */
+    public boolean externalStreamsEnabled();
 }

@@ -144,7 +144,7 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, bool sync);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, int64_t generationId);
     void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
@@ -221,6 +221,7 @@ private:
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
     void exportAction(struct ipc_command *cmd);
+    void deleteMigratedRows(struct ipc_command *cmd);
     void getUSOForExportTable(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
@@ -283,6 +284,7 @@ typedef struct {
     int64_t undoToken;
     int32_t returnUniqueViolations;
     int32_t shouldDRStream;
+    int32_t elastic;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -363,8 +365,20 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t tableSignatureLength;
-    char tableSignature[0];
+    int64_t txnId;
+    int64_t spHandle;
+    int64_t uniqueId;
+    int64_t deletableTxnId;
+    int64_t undoToken;
+    int32_t maxRowCount;
+    int32_t tableNameLength;
+    char tableName[0];
+}__attribute__((packed)) delete_migrated_rows;
+
+typedef struct {
+    struct ipc_command cmd;
+    int32_t streamNameLength;
+    char streamName[0];
 }__attribute__((packed)) get_uso;
 
 typedef struct {
@@ -566,6 +580,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 31:
           setViewsEnabled(cmd);
+          result = kErrorCode_None;
+          break;
+      case 32:
+          deleteMigratedRows(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -984,6 +1002,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
+    const bool elastic = loadTableCommand->elastic != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -992,7 +1011,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
 
         bool success = m_engine->loadTable(tableId, serialize_in,
                                            txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream, undoToken);
+                                           returnUniqueViolations, shouldDRStream, undoToken, elastic);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1499,25 +1518,42 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     int32_t tableSignatureLength = ntohl(action->tableSignatureLength);
     std::string tableSignature(action->tableSignature, tableSignatureLength);
     int64_t result = m_engine->exportAction(action->isSync,
-                                         static_cast<int64_t>(ntohll(action->offset)),
-                                         static_cast<int64_t>(ntohll(action->seqNo)),
-                                         tableSignature);
+                                            static_cast<int64_t>(ntohll(action->offset)),
+                                            static_cast<int64_t>(ntohll(action->seqNo)),
+                                            tableSignature);
 
     // write offset across bigendian.
     result = htonll(result);
     writeOrDie(m_fd, (unsigned char*)&result, sizeof(result));
 }
 
+void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
+    delete_migrated_rows *migrate_msg = (delete_migrated_rows *)cmd;
+    m_engine->resetReusedResultOutputBuffer();
+    int32_t tableNameLength = ntohl(migrate_msg->tableNameLength);
+    std::string tableName(migrate_msg->tableName, tableNameLength);
+    bool result = m_engine->deleteMigratedRows(static_cast<int64_t>(ntohll(migrate_msg->txnId)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->spHandle)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->uniqueId)),
+                                               tableName,
+                                               static_cast<int64_t>(ntohll(migrate_msg->deletableTxnId)),
+                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)),
+                                               static_cast<int64_t>(ntohll(migrate_msg->undoToken)));
+    char response[1];
+    response[0] = result ? 1 : 0;
+    writeOrDie(m_fd, (unsigned char*)response, sizeof(int8_t));
+}
+
 void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
     get_uso *get = (get_uso*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
-    int32_t tableSignatureLength = ntohl(get->tableSignatureLength);
-    std::string tableSignature(get->tableSignature, tableSignatureLength);
+    int32_t streamNameLength = ntohl(get->streamNameLength);
+    std::string streamNameStr(get->streamName, streamNameLength);
 
     size_t ackOffset;
     int64_t seqNo;
-    m_engine->getUSOForExportTable(ackOffset, seqNo, tableSignature);
+    m_engine->getUSOForExportTable(ackOffset, seqNo, streamNameStr);
 
     // write offset across bigendian.
     int64_t ackOffsetI64 = static_cast<int64_t>(ackOffset);
@@ -1606,7 +1642,7 @@ void VoltDBIPC::pushExportBuffer(
         int32_t partitionId,
         std::string signature,
         voltdb::ExportStreamBlock *block,
-        bool sync) {
+        int64_t generationId) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
@@ -1617,17 +1653,17 @@ void VoltDBIPC::pushExportBuffer(
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->startSequenceNumber());
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCount());
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = htonll(block->lastSpUniqueId());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getCommittedSequenceNumber());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = htonll(block->getRowCount());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = htonll(block->lastSpUniqueId());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = 0;
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+16]) = 0;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = 0;
     }
-    index += 24;
-    *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
-        sync ?
-            static_cast<int8_t>(1) : static_cast<int8_t>(0);
+    index += 32;
+    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonll(generationId);
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);

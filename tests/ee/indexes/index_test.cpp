@@ -172,7 +172,7 @@ public:
         TableIndexScheme pkeyScheme(name,
                                     BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, schema);
+                                    true, true, false, schema);
         vector<TableIndexScheme> indexes;
         indexes.push_back(pkeyScheme);
 
@@ -278,7 +278,7 @@ public:
         TupleSchema *initiallyNullTupleSchema = NULL;
         TableIndexScheme index(name, type,
                                ix_columnIndices, TableIndex::simplyIndexColumns(),
-                               unique, countable, initiallyNullTupleSchema);
+                               unique, countable, false, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
@@ -309,7 +309,7 @@ public:
 
         TableIndexScheme pkeyScheme("idx_pkey", BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, schema);
+                                    true, true, false, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);

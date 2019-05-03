@@ -46,7 +46,7 @@ namespace voltdb {
             , m_replicatedWrapper() {
         if (engine == NULL) return;  // Need this when this is an instance of ReplicatedMaterializedViewHandler
         install(mvHandlerInfo, engine);
-        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
@@ -62,9 +62,9 @@ namespace voltdb {
             return;
         }
 
-        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
         {
-            ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_destTable->isCatalogTableReplicated());
+            ConditionalExecuteOutsideMpMemory getOutOfMpMemory(m_destTable->isReplicatedTable());
             do {
                 dropSourceTable(viewHandlerPartitioned, m_sourceTables.begin());
             } while (!m_sourceTables.empty());
@@ -74,7 +74,7 @@ namespace voltdb {
     void MaterializedViewHandler::addSourceTable(bool viewHandlerPartitioned,
                 PersistentTable *sourceTable, int32_t relativeTableIndex, VoltDBEngine* engine) {
         VOLT_DEBUG("Adding source table %s (%p) for view %s (%p)", sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable);
-        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
             assert(viewHandlerPartitioned);
             // We are adding our (partitioned) ViewHandler to a Replicated Table
             if (!m_replicatedWrapper) {
@@ -104,8 +104,7 @@ namespace voltdb {
             std::map<PersistentTable*, int32_t>::iterator it) {
         assert(!m_sourceTables.empty());
         auto sourceTable = it->first;
-//        auto relativeTableIndex = it->second;
-        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
             assert(viewHandlerPartitioned);
 #ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
             VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
@@ -127,9 +126,9 @@ namespace voltdb {
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
         std::map<PersistentTable*, int32_t>::iterator it = m_sourceTables.find(sourceTable);
         assert(it != m_sourceTables.end());
-        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
         assert(!m_sourceTables.empty());
-        if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
+        if (viewHandlerPartitioned == sourceTable->isReplicatedTable()) {
             assert(viewHandlerPartitioned);
 #ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
             VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
@@ -164,13 +163,13 @@ namespace voltdb {
         // Delete the existing handler if exists. When the existing handler is destructed,
         // it will automatically removes itself from all the viewsToTrigger lists of its source tables.
         {
-            ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
+            ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
             delete m_destTable->m_mvHandler;
         }
 
         // The handler will not only be installed on the view table, but also the source tables.
         m_destTable->m_mvHandler = this;
-        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
+        bool viewHandlerPartitioned = !m_destTable->isReplicatedTable();
         BOOST_FOREACH (LabeledTableRef labeledTableRef, mvHandlerInfo->sourceTables()) {
             catalog::TableRef *sourceTableRef = labeledTableRef.second;
             TableCatalogDelegate *sourceTcd =  engine->getTableDelegate(sourceTableRef->table()->name());
@@ -251,7 +250,7 @@ namespace voltdb {
     //TODO: *non-grouped views could instead set up a hard-coded initial
     // row as they do in the single-table case to avoid querying empty tables.
     void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
-        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isCatalogTableReplicated());
+        ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(m_destTable->isReplicatedTable());
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         UniqueTempTableResult viewContent = ec->getEngine()->executePlanFragment(m_createQueryExecutorVector.get());
         TableIterator ti = viewContent->iterator();
