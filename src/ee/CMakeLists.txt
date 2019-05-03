@@ -323,21 +323,13 @@ ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 
-TARGET_INCLUDE_DIRECTORIES(voltdbobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
+FOREACH (obj voltdbobjs voltdbjniobjs voltdbipcobjs)
+   TARGET_INCLUDE_DIRECTORIES(${obj}
+     PUBLIC
+     ${CMAKE_SOURCE_DIR}/third_party/cpp
+     ${${PROJECT_NAME}_SOURCE_DIR}
+     ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
+ENDFOREACH()
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
   PUBLIC
   ${CMAKE_SOURCE_DIR}/third_party/cpp
@@ -358,6 +350,8 @@ VOLTDB_ADD_LIBRARY(${VOLTDB_LIBNAME}
   $<TARGET_OBJECTS:third_party_objs>
   )
 
+STRING(TOLOWER ${VOLTDB_BUILD_TYPE} obj_subdir)
+MESSAGE("??? -Lobj/${obj_subdir}${VOLTDB_3PTY_INSTALL_PREFIX}/lib ??? ${VOLTDB_LINK_FLAGS} ??? ")
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
   -lpcre2-8 -ls2geo -lcrypto
