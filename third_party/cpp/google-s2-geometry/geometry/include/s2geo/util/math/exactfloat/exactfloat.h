@@ -500,7 +500,7 @@ class ExactFloat {
   ///  - bn_exp_ is the base-2 exponent applied to bn_.
   int32 sign_;
   int32 bn_exp_;
-  BIGNUM* bn_;
+  BIGNUM bn_;
 
   /// A standard IEEE "double" has a 53-bit mantissa consisting of a 52-bit
   /// fraction plus an implicit leading "1" bit.
@@ -559,11 +559,12 @@ class ExactFloat {
 //////////////////////////////////////////////////////////////////////////
 /// Implementation details follow:
 
-inline ExactFloat::ExactFloat() : sign_(1), bn_exp_(kExpZero), bn_(BN_new()) {
+inline ExactFloat::ExactFloat() : sign_(1), bn_exp_(kExpZero) {
+  BN_init(&bn_);
 }
 
 inline ExactFloat::~ExactFloat() {
-  BN_free(bn_);
+  BN_free(&bn_);
 }
 
 inline bool ExactFloat::is_zero() const { return bn_exp_ == kExpZero; }

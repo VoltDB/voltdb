@@ -285,15 +285,15 @@ SET (VOLTDB_3PTY_BUILD_PREFIX ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj)
 # we do at build time.
 #
 ########################################################################
-SET (VOLTDB_OPENSSL_VERSION 1.1.1b)
+SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
 # Again, we unpack the tarball in the binary directory.  See pcre2 above.
-SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tar.gz)
+SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
 # VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
 # VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_OPENSSL_BUILD_PREFIX:     /openssl
-# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.1.1b/ ... unpacked source
-# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.1.1b/ ... generated binaries
+# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2d/ ... unpacked source
+# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.0.2d/ ... generated binaries
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/openssl)
@@ -316,7 +316,7 @@ ExternalProject_Add(crypto
   CONFIGURE_COMMAND ${VOLTDB_OPENSSL_SRC}/Configure --prefix=${VOLTDB_3PTY_INSTALL_PREFIX} -fpic ${VOLTDB_OPENSSL_TOKEN}
   BUILD_COMMAND $(MAKE)
   BUILD_IN_SOURCE 1
-  INSTALL_COMMAND $(MAKE) install_sw
+  INSTALL_COMMAND $(MAKE) install
   )
 ExternalProject_get_property(crypto INSTALL_DIR)
 SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
