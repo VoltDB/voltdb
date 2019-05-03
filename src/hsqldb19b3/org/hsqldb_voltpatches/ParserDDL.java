@@ -1055,7 +1055,12 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
             if (hasUpdate && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
-                throw unexpectedToken();
+                throw Error.error(ErrorCode.X_42581, "Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                        " or " + Tokens.T_UPDATENEW);
+            }
+            if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
+                throw Error.error(ErrorCode.X_42581, "Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                        " and " + Tokens.T_UPDATENEW);
             }
             if (token.tokenType != Tokens.CLOSEBRACKET) {
                 throw unexpectedToken();

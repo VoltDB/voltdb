@@ -91,7 +91,7 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
     public void testExportTarget() throws Exception {
-        String ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE_OLD,UPDATE_NEW);\n";
+        String ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE);\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
@@ -100,6 +100,16 @@ public class TestVoltCompiler extends TestCase {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
     }
 
     /*public void testDDLCompilerTTL() throws Exception {
