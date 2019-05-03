@@ -692,5 +692,39 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testInnerUsingJoinWithAmbiguousSelectColumn() {
+        m_tester.sql("select i from R1 join R2 using(i)")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testInnerUsingJoinWithAmbiguousSelectColumn1() {
+        m_tester.sql("select i from R1 full join R2 using(i) where i > 0")
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], expr#4=[0], expr#5=[>($t1, $t4)], expr#6=[>($t0, $t4)], expr#7=[CASE($t2, $t5, $t6)], I=[$t3], $condition=[$t7])\n" +
+                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    public void testInnerUsingJoinWithAmbiguousSelectColumn2() {
+        m_tester.sql("select i from R1 join R2 using(i) order by i")
+        .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
+                    "  VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3])\n" +
+                    "    VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R1]])\n" +
+                    "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                    "        VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
 
 }

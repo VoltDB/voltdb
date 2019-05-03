@@ -88,14 +88,24 @@ public class TestValidation extends Plannerv2TestCase {
         m_tester.sql("select i from R1 FUll JOIN R2 using(i)").pass();
     }
 
+    public void testInnerUsingJoinWithoutColumnScope() {
+        m_tester.sql("select i from R1 JOIN R2 using(i)").pass();
+    }
+
     public void testFullOnJoinWithoutColumnScope() {
         m_tester.sql("select ^i^ from R1 FUll JOIN R2 on R1.i = R2.i")
         .exception("Column 'I' is ambiguous")
         .pass();
     }
 
-    public void testAmbiguousUsing() {
+    public void testAmbiguousLeftUsing() {
         m_tester.sql("select ^I^ from R1 left join R2 using(I)")
+        .exception("Column 'I' is ambiguous")
+        .pass();
+    }
+
+    public void testAmbiguousRightUsing() {
+        m_tester.sql("select ^I^ from R1 right join R2 using(I)")
         .exception("Column 'I' is ambiguous")
         .pass();
     }
