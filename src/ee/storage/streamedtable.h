@@ -35,13 +35,25 @@ class ExecutorContext;
 class ExportTupleStream;
 class MaterializedViewTriggerForStreamInsert;
 
+class MigrateTxnSizeGuard {
+public:
+    inline void reset() {
+        undoToken = 0L;
+        uso = 0L;
+        estimatedDRLogSize = 0;
+    }
+    int64_t undoToken;
+    int64_t uso;
+    int32_t estimatedDRLogSize;
+
+};
+
 /**
  * A streamed table does not store data. It may not be read. It may
  * not be updated. Only new appended writes are permitted. All writes
  * are passed through a ExportTupleStream to Export. The table exists
  * only to support Export.
  */
-
 class StreamedTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class StreamedTableStats;
@@ -155,8 +167,7 @@ private:
     std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
 
     // Used to prevent migrate transaction from generating >50MB DR binary log
-    // Pair: <undoToken, txnSize>
-    std::pair<int64_t, int32_t> m_migrateTxnSizeGuard;
+    MigrateTxnSizeGuard m_migrateTxnSizeGuard;
 };
 
 }

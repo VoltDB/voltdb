@@ -108,6 +108,8 @@ public:
     size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
     void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
+    static size_t getEstimateDRLogSize(int64_t rawDataSize);
+
     inline void resetFlushLinkages() {
         m_nextFlushStream = NULL;
         m_prevFlushStream = NULL;

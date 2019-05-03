@@ -106,9 +106,8 @@ StreamedTable::~StreamedTable() {
 void StreamedTable::notifyQuantumRelease() {
     if (m_wrapper) {
         std::cout << "notifyQuantumRelease m_lastSeenUndoToken=" << getLastSeenUndoToken() << std::endl;
-        if (m_migrateTxnSizeGuard.first == getLastSeenUndoToken()) {
-            m_migrateTxnSizeGuard.first = 0L;
-            m_migrateTxnSizeGuard.second = 0;
+        if (m_migrateTxnSizeGuard.undoToken == getLastSeenUndoToken()) {
+            m_migrateTxnSizeGuard.reset();
             std::cout << "notifyQuantumRelease clear migrateTxnSize" << std::endl;
         }
         m_wrapper->commit(m_executorContext->getContextEngine(),
@@ -162,16 +161,22 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             return;
         }
         if (type == ExportTupleStream::MIGRATE) {
-            if (m_migrateTxnSizeGuard.first == uq->getUndoToken()) {
-                if (m_wrapper->getUso() - m_migrateTxnSizeGuard.second >= 5000) {
+            if (m_migrateTxnSizeGuard.undoToken == 0L) {
+                m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
+                m_migrateTxnSizeGuard.estimatedDRLogSize +=
+                        ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - mark);
+                std::cout << "streamTuple getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
+            } else {
+                m_migrateTxnSizeGuard.estimatedDRLogSize +=
+                        ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - m_migrateTxnSizeGuard.uso);
+                std::cout << "streamTuple getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
+                if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
                     std::cout << "Exceeds max DR Buffer size." << std::endl;
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                                       "Exceeds max DR Buffer size.");
                 }
-            } else {
-                m_migrateTxnSizeGuard.first = uq->getUndoToken();
-                m_migrateTxnSizeGuard.second = mark;
             }
+            m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
         }
         std::cout << "streamTuple append mark=" << mark << " undo token = " << uq->getUndoToken() << std::endl;
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
@@ -222,6 +227,9 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         std::cout << "undo rollbackTo mark=" << mark << " seqNo=" << seqNo << std::endl;
+        if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
+            m_migrateTxnSizeGuard.reset();
+        }
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
