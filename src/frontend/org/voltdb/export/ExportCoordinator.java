@@ -444,8 +444,12 @@ public class ExportCoordinator {
                             resetCoordinator(false, true);
                             for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
                                 ByteBuffer buf = entry.getValue();
-                                if ((buf == null) && ourTask) {
-                                    exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
+                                if ((buf == null)) {
+                                    if (ourTask) {
+                                        exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
+                                    } else if (exportLog.isDebugEnabled()) {
+                                        exportLog.warn("No response from: " + entry.getKey() + ", wait for complete trackers");
+                                    }
                                     requestAgain = true;
                                     break;
                                 }
@@ -470,8 +474,12 @@ public class ExportCoordinator {
                                 }
                             }
                             if (requestAgain) {
-                                requestTrackers();
-
+                                // On incomplete trackers make sure to avoid
+                                // deciding who is the export master
+                                resetCoordinator(false, true);
+                                if (ourTask) {
+                                    requestTrackers();
+                                }
                             } else {
                                 normalizeTrackers();
                                 dumpTrackers();
@@ -612,6 +620,7 @@ public class ExportCoordinator {
 
     enum State {
         CREATED,
+        REPLICATED,
         INITIALIZING,
         INITIALIZED
     }
@@ -710,14 +719,23 @@ public class ExportCoordinator {
         m_state = State.INITIALIZED;
     }
 
+    private boolean isReplicated() {
+        return m_state == State.REPLICATED;
+    }
+
     /**
      * Called by EDS when notified it is ready for polling.
      *
-     * Note: we appear to be called repeatedly.
+     * @param replicatedPartition true if the partition is replicated
      */
-    public void initialize() {
+    public void initialize(boolean replicatedPartition) {
 
-        if (m_state == State.INITIALIZING) {
+        if (replicatedPartition) {
+            exportLog.debug("Export coordinator initialized in replicated mode for " + m_eds);
+            m_state = State.REPLICATED;
+            return;
+        }
+        else if (m_state == State.INITIALIZING) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Export coordinator initializing for " + m_eds);
             }
@@ -745,6 +763,10 @@ public class ExportCoordinator {
         }
     }
 
+    public void initialize() {
+        initialize(false);
+    }
+
     /**
      * Shutdown this coordinator.
      *
@@ -770,7 +792,9 @@ public class ExportCoordinator {
      */
     public void becomeLeader() {
 
-
+        if (m_state == State.REPLICATED) {
+            return;
+        }
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
             return;
@@ -814,6 +838,12 @@ public class ExportCoordinator {
      */
     public boolean isSafePoint(long ackedSeqNo) {
 
+        if (isReplicated()) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Replicated table, skip checking safe point at " + ackedSeqNo);
+            }
+            return false;
+        }
         if (!isCoordinatorInitialized()) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Uninitialized, skip checking safe point at " + ackedSeqNo);
@@ -840,6 +870,10 @@ public class ExportCoordinator {
      */
     public boolean isExportMaster(long exportSeqNo) {
 
+        if (isReplicated()) {
+            // Always true for replicated tables
+            return true;
+        }
         if (!isCoordinatorInitialized()) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Uninitialized, not export master at " + exportSeqNo);
