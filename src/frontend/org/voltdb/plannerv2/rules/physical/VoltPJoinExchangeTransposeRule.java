@@ -31,13 +31,11 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSingletonExchange;
 
 /**
- * Transform Sort / Exchange rels into
- *  a) Singleton Merge Exchange / Sort if the original Exchange relation is a Union or Merge Exchanges
- *  b) Singleton Exchange / Sort if the original Exchange relation is a Singleton
+ * Transform Join / Exchange rels into Singleton Exchange / Join
  */
 public class VoltPJoinExchangeTransposeRule extends RelOptRule {
 
-    public static final RelOptRule INSTANCE= new VoltPJoinExchangeTransposeRule();
+    public static final RelOptRule INSTANCE = new VoltPJoinExchangeTransposeRule();
 
     private VoltPJoinExchangeTransposeRule() {
         super(operand(VoltPhysicalJoin.class, RelDistributions.ANY,
@@ -54,10 +52,6 @@ public class VoltPJoinExchangeTransposeRule extends RelOptRule {
         final VoltPhysicalExchange innerSingletonExchangeRel = call.rel(2);
 
         RelTraitSet joinTraits = joinRel.getTraitSet();
-        /*if (!outerSingletonExchangeRel.isTopExchange() && !innerSingletonExchangeRel.isTopExchange()) {
-            // Update Sort distribution's trait
-            joinTraits = joinTraits.replace(outerSingletonExchangeRel.getDistribution());
-        }*/
 
         final RelNode newJoinRel = joinRel.copy(
                 joinTraits, joinRel.getCondition(), outerSingletonExchangeRel.getInput(),

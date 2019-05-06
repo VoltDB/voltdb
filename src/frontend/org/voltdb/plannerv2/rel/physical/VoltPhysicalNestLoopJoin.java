@@ -19,6 +19,7 @@ package org.voltdb.plannerv2.rel.physical;
 
 import java.util.Set;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -71,11 +72,7 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
     @Override
     public AbstractPlanNode toPlanNode() {
         final NestLoopPlanNode nlpn = new NestLoopPlanNode();
-
-        // TODO: INNER join for now
-        if (joinType != JoinRelType.INNER) {
-            throw new PlannerFallbackException("Unsupported join type: " + joinType.name());
-        }
+        Preconditions.checkState(joinType == JoinRelType.INNER, "Should be inner join");
         nlpn.setJoinType(JoinType.INNER);
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         nlpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));

@@ -33,6 +33,7 @@ import org.apache.calcite.rex.RexNode;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 /**
  * Sub-class of {@link Join} targeted at the VoltDB logical calling convention.
@@ -77,6 +78,10 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+        if (joinType != JoinRelType.INNER) {        // We support inner join for now
+            // change/remove this when we support more join types
+            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
+        }
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }

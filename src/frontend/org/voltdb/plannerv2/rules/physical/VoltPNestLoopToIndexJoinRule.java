@@ -68,10 +68,10 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
      */
     private static final class RelExtractor {
         private final VoltPhysicalJoin m_join;
-        private RelNode m_outerScan;
-        private VoltPhysicalTableScan m_innerTableScan;
-        private Calc m_innerCalc;
-        private RexProgram m_innerProgram;
+        private final RelNode m_outerScan;
+        private final VoltPhysicalTableScan m_innerTableScan;
+        private final Calc m_innerCalc;
+        private final RexProgram m_innerProgram;
 
         RelExtractor(RelOptRuleCall call) {
             m_join = call.rel(0);
@@ -80,13 +80,6 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                 m_innerCalc = null;
                 m_innerTableScan = call.rel(2);
                 m_innerProgram = m_innerTableScan.getProgram();
-                // both are table scans: outer table contains matching index but inner doesn't:
-                // swap the 2 tables, since we are looking for matching index from inner table.
-                if (m_outerScan instanceof VoltPhysicalJoin &&
-                        ! containsIndex(m_innerTableScan) &&
-                        containsIndex((VoltPhysicalTableScan) m_outerScan)) {
-                    commute();
-                }
             } else {
                 m_innerCalc = call.rel(2);
                 m_innerTableScan = call.rel(3);
@@ -95,20 +88,6 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                         m_innerCalc.getProgram(), m_innerCalc.getCluster().getRexBuilder());
             }
             Preconditions.checkNotNull(m_innerProgram, "Inner relation missing Program");
-        }
-        private void commute() {       // swap member variables on outer <-> inner table
-            final VoltPhysicalTableScan scanTmp = (VoltPhysicalTableScan) m_outerScan;
-            m_outerScan = m_innerTableScan;
-            m_innerTableScan = scanTmp;
-            m_innerProgram = ((VoltPhysicalTableScan) m_outerScan).getProgram();
-        }
-        private boolean containsIndex(VoltPhysicalTableScan scan) {
-            final Table table = scan.getVoltTable().getCatalogTable();
-            return StreamSupport.stream(
-                    ((Iterable<Index>)() -> table.getIndexes().iterator()).spliterator(), false)
-                    .anyMatch(index -> getAccessPathFromInnerRel(
-                            table, m_join, m_innerProgram, index, m_outerScan.getRowType().getFieldCount())
-                            .isPresent());
         }
         VoltPhysicalJoin getJoin() {
             return m_join;

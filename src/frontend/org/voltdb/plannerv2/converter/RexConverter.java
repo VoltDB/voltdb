@@ -443,7 +443,6 @@ public class RexConverter {
                     Preconditions.checkState(exprInputIndx < m_program.getProjectList().size());
                     final RexLocalRef inputLocalRef = m_program.getProjectList().get(exprInputIndx);
                     inputIdx = inputLocalRef.getIndex();
-                    inputType = inputLocalRef.getType();
                     // It may be CAST expression that Calcite adds when types of join expressions on outer/inner sides do not
                     // match, and we need to remove it to match VoltDB.
                     RexNode expr = m_program.getExprList().get(inputIdx);

@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.utils.Cacheable;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -42,6 +43,12 @@ import java.util.Set;
 public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     private final boolean semiJoinDone;
     private final ImmutableList<RelDataTypeField> systemFieldList;
+    private final Cacheable<RelMetadataQuery, Double> ROW_COUNT_CACHE =
+            new Cacheable<RelMetadataQuery, Double>(64) {
+                @Override protected Double calculate(RelMetadataQuery key) {
+                    return estimateRowCountImpl(key);
+                }
+            };
 
     // Inline rels
     protected final RexNode m_offset;
@@ -90,8 +97,11 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
+        return ROW_COUNT_CACHE.cache_get(mq);
+    }
+
+    protected double estimateRowCountImpl(RelMetadataQuery mq) {
         // Give it a discount based on the number of equivalence expressions
-        // TODO: cache the computation. It is called every time any rule is triggered.
         return Math.min(getInput(0).estimateRowCount(mq), getInput(1).estimateRowCount(mq)) *
                 Math.pow(0.10, RelOptUtil.conjunctions(getCondition()).size());
     }

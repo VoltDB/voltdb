@@ -18,19 +18,7 @@
 package org.voltdb.plannerv2.rules;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.rel.rules.CalcMergeRule;
-import org.apache.calcite.rel.rules.FilterCalcMergeRule;
-import org.apache.calcite.rel.rules.FilterJoinRule;
-import org.apache.calcite.rel.rules.FilterMergeRule;
-import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
-import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
-import org.apache.calcite.rel.rules.FilterToCalcRule;
-import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectMergeRule;
-import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
-import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rel.rules.ReduceExpressionsRule;
-import org.apache.calcite.rel.rules.UnionMergeRule;
+import org.apache.calcite.rel.rules.*;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -116,7 +104,6 @@ public class PlannerRules {
             VoltLAggregateRule.INSTANCE,
             // Joins
             VoltLJoinRule.INSTANCE,
-            VoltLCalcJoinTransposeRule.INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
 
@@ -124,7 +111,8 @@ public class PlannerRules {
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,
-            VoltLValuesRule.INSTANCE
+            VoltLValuesRule.INSTANCE,
+            JoinCommuteRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter

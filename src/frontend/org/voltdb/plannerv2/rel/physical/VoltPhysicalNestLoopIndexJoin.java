@@ -23,6 +23,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -63,22 +64,16 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
     }
 
     @Override
-    protected String computeDigest() {
-        // Make inner Index to be part of the digest to disambiguate the node
-        return new StringBuilder(super.computeDigest())
-                .append("_index_")
-                .append(m_innerIndexName)
-                .toString();
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("innerIndex", m_innerIndexName);
+        return pw;
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
         final NestLoopIndexPlanNode nlipn = new NestLoopIndexPlanNode();
-
-        // TODO: INNER join for now
-        if (joinType != JoinRelType.INNER) {
-            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
-        }
+        Preconditions.checkState(joinType == JoinRelType.INNER, "Should be inner join");
         nlipn.setJoinType(JoinType.INNER);
 
         // Set children
