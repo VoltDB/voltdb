@@ -407,6 +407,14 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.getExporterGraphInformation = function (onInformationLoaded) {
+            var exporterDetails = {};
+            VoltDBService.GetExporterInformation(function (connection) {
+                getExporterDetails(connection, exporterDetails);
+                onInformationLoaded(exporterDetails);
+            });
+        };
+
         //Check if DR is enable or not
         this.GetDrStatusInformation = function (onInformationLoaded) {
             var drStatus = {};
@@ -1288,8 +1296,8 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_MEMORY' + suffix] == null) {
                 return;
             }
-            connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
 
+            connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME")
                     hostNameIndex = counter;
                 else if (columnInfo["name"] == "TUPLEDATA")
@@ -1308,7 +1316,6 @@ function alertNodeClicked(obj) {
                     javaMaxHeapIndex = counter;
                 counter++;
             });
-
 
             connection.Metadata['@Statistics_MEMORY' + suffix].data.forEach(function (memoryInfo) {
                 jQuery.each(hostNameList, function (id, val) {
@@ -1410,6 +1417,42 @@ function alertNodeClicked(obj) {
                     importerDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                     importerDetails["OUTSTANDING_REQUESTS"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
 
+                });
+            }
+        };
+
+        var getExporterDetails = function (connection, exporterDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_EXPORT'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "SOURCE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
+                var rowCount = connection.Metadata["@Statistics_EXPORT"].data.length
+                var tuple_count = 0;
+                var source = "";
+                var target = "";
+                connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
+                    if(target != info[colIndex["TARGET"]]){
+                        target = info[colIndex["TARGET"]];
+                        touple_count = 0;
+                    }
+                    if (!exporterDetails.hasOwnProperty("TUPLE_COUNT")) {
+                        exporterDetails["TUPLE_COUNT"] = {};
+                    }
+                    tuple_count += info[colIndex["TUPLE_COUNT"]];
+                    exporterDetails["TUPLE_COUNT"] = tuple_count;
+                    exporterDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
             }
         };

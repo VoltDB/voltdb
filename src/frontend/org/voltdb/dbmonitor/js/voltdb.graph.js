@@ -6,6 +6,7 @@
         var currentView = "Seconds";
         var currentViewDr = "Seconds";
         var currentViewImporter = "Seconds"
+        var currentViewExporter = "Seconds"
         var cpuSecCount = 0;
         var cpuMinCount = 0;
         var cmdLogSecCount = 0;
@@ -20,6 +21,8 @@
         var partitionMinCount = 0;
         var drSecCount = 0;
         var drMinCount = 0;
+        var tupleCountSecCount = 0;
+        var tupleCountMinCount = 0;
         var outTransSecCount = 0;
         var outTransMinCount = 0;
         var successRateSecCount = 0;
@@ -38,6 +41,7 @@
         var outTransChart;
         var successRateChart;
         var failureRateChart;
+        var tupleCountChart;
         var drReplicationCharts = {};
         var cmdLogChart;
         var cmdLogOverlay = [];
@@ -54,6 +58,7 @@
         var ChartOutTrans = nv.models.lineChart();
         var ChartSuccessRate =  nv.models.lineChart();
         var ChartFailureRate = nv.models.lineChart();
+        var ChartTupleCount = nv.models.lineChart();
         var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartProcessingTimeAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
@@ -71,6 +76,10 @@
         var dataMapperImporterSec = {};
         var dataMapperImporterMin = {};
         var dataMapperImporterDay = {};
+
+        var dataMapperExporterSec = {};
+        var dataMapperExporterMin = {};
+        var dataMapperExporterDay = {};
 
         var previousSuccessRate = {};
         var previousFailureRate = {};
@@ -96,6 +105,11 @@
         var dataImporterDetails = [];
         this.SetImporterData = function(importerDetails){
             dataImporterDetails= importerDetails;
+        }
+
+        var dataExporterDetails = [];
+        this.SetExporterData = function(exporterDetails){
+            dataExporterDetails= exporterDetails;
         }
 
         function getEmptyData() {
@@ -145,6 +159,27 @@
 
         this.getImportMapperData = function(){
             return dataMapperImporterSec;
+        }
+
+        this.getExportMapperData = function(){
+            return dataMapperExporterSec;
+        }
+
+        function getExportData(emptyData, dataMapper){
+            var count = 0;
+            var tuplecounts = [];
+            //var dataExporterSuccess = [];
+            //var dataExporterFailures = [];
+            if(dataExporterDetails != undefined){
+                $.each(dataExporterDetails, function(key, value){
+                    if(key == "TUPLE_COUNT"){
+                        tuplecounts.push({ key: key, values: value, color: colorList[colorIndex] })
+                        dataMapper[dataType] = count;
+                        count++;
+                    }
+                });
+            }
+            return {TUPLE_COUNT: tuplecounts}
         }
 
         function getImportData(emptyData, dataMapper){
@@ -302,6 +337,12 @@
             "values": getEmptyDataOptimized(),
             "color": "rgb(164, 136, 5)"
         }];
+
+        var dataTupleCount = [{
+            "key": "Tuple Count",
+            "values": getEmptyDataOptimized(),
+            "color": "rgb(164, 136, 5)"
+        }]
 
         var dataSuccessRate = [{
             "key": "Success Rate",
@@ -1072,6 +1113,38 @@
 
         nv.addGraph({
             generate: function () {
+                ChartTupleCount.xAxis
+                    .tickFormat(function (d) {
+                        return d3.time.format('%X')(new Date(d));
+                    });
+
+                ChartTupleCount.xAxis.rotateLabels(-20);
+
+                ChartTupleCount.yAxis
+                    .tickFormat(d3.format(',.2f'));
+
+                ChartTupleCount.yAxis
+                    .axisLabel('(Counts)')
+                    .axisLabelDistance(10);
+
+                ChartTupleCount.margin({ left: 100 });
+                ChartTupleCount.lines.forceY([0, 0.1]);
+
+                d3.select('#visualisationTupleCount')
+                    .datum([])
+                    .transition().duration(500)
+                    .call(ChartOutTrans);
+
+                nv.utils.windowResize(ChartTupleCount.update);
+            },
+            callback:function() {
+                ChartTupleCount.useInteractiveGuideline(true);
+                return ChartTupleCount;
+            }
+        });
+
+        nv.addGraph({
+            generate: function () {
                 ChartOutTrans.xAxis
                     .tickFormat(function (d) {
                         return d3.time.format('%X')(new Date(d));
@@ -1225,6 +1298,17 @@
             return getImportData(emptyData, dataMapperImporterSec);
         };
 
+        var getEmptyDataForExporterView = function (view) {
+            view = view != undefined ? view.toLowerCase() : "seconds";
+
+            if (view == "minutes")
+                return getExportData(emptyDataForMinutes, dataMapperExporterMin);
+            else if (view == "days")
+                return getExportData(emptyDataForDays, dataMapperExporterDay);
+
+            return getExportData(emptyData, dataMapperExporterSec);
+        };
+
         this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj, partitionChartObj, drReplicationCharObj, cmdLogChartObj) {
             cpuChart = cpuChartObj;
             ramChart = ramChartObj;
@@ -1342,6 +1426,37 @@
             changeImporterAxisTimeFormat(view);
         };
 
+        this.AddExporterGraph = function (view, tupleCountChartObj) {
+            tupleCountChart = tupleCountChartObj;
+            // successRateChart = successRateChartObj;
+            // failureRateChart = failureRateChartObj;
+            currentViewExporter = view;
+
+            Monitors['tupleCountData'] = getExportData(emptyData, dataMapperExporterSec)['TUPLE_COUNT'];
+            Monitors['tupleCountDataMin'] = getExportData(emptyDataForMinutes, dataMapperExporterMin)['TUPLE_COUNT'];
+            Monitors['tupleCountDataDay'] = getExportData(emptyDataForDays, dataMapperExporterDay)['TUPLE_COUNT'];
+            Monitors['tupleCountFirstData'] = true;
+            Monitors['tupleCountMaxTimeStamp'] = null;
+
+            // Monitors['successRateData'] = getImportData(emptyData, dataMapperImporterSec)['SUCCESSES'];
+            // Monitors['successRateDataMin'] = getImportData(emptyDataForMinutes, dataMapperImporterMin)['SUCCESSES'];
+            // Monitors['successRateDataDay'] = getImportData(emptyDataForDays, dataMapperImporterDay)['SUCCESSES'];
+            // Monitors['successRateFirstData'] = true;
+            // Monitors['successRateMaxTimeStamp'] = null;
+            //
+            // Monitors['failureRateData'] = getImportData(emptyData, dataMapperImporterSec)['FAILURES'];
+            // Monitors['failureRateDataMin'] = getImportData(emptyDataForMinutes, dataMapperImporterMin)['FAILURES'];
+            // Monitors['failureRateDataDay'] = getImportData(emptyDataForDays, dataMapperImporterDay)['FAILURES'];
+            // Monitors['failureRateFirstData'] = true;
+            // Monitors['failureRateMaxTimeStamp'] = null;
+
+            dataTupleCount = getEmptyDataForExporterView(view)['TUPLE_COUNT'];
+            // dataSuccessRate = getEmptyDataForExporterView(view)['SUCCESSES'];
+            // dataFailureRate = getEmptyDataForExporterView(view)['FAILURES'];
+
+            changeExporterAxisTimeFormat(view);
+        };
+
         this.RefreshGraph = function (view) {
             currentView = view;
             if (view == 'Days') {
@@ -1420,6 +1535,23 @@
                         .call(ChartOutTrans);
         };
 
+        this.RefreshExporterGraph = function (view) {
+            currentViewExporter = view;
+            if (view == 'Days') {
+                tupleCount = Monitors.tupleCountDataDay;
+            } else if (view == 'Minutes') {
+                tupleCount = Monitors.tupleCountDataMin;
+            } else {
+                tupleCount = Monitors.tupleCountData;
+            }
+            changeExporterAxisTimeFormat(view);
+
+            d3.select('#visualisationTupleCount')
+                .datum(dataTupleCount)
+                .transition().duration(500)
+                .call(ChartTupleCount);
+        };
+
         this.AddImporterGraphLine = function(dataType, keyValue, timeUnit, colorIndex){
             var arr = [];
             if(timeUnit == "second"){
@@ -1437,6 +1569,27 @@
                 dataMapperImporterSec[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperImporterSec);
                 dataMapperImporterMin[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperImporterMin);
                 dataMapperImporterDay[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperImporterDay);
+            }
+
+        }
+
+        this.AddExporterGraphLine = function(dataType, keyValue, timeUnit, colorIndex){
+            var arr = [];
+            if(timeUnit == "second"){
+                arr.push(emptyData[0]);
+                arr.push(emptyData[emptyData.length - 1]);
+            } else if(timeUnit == "minute"){
+                arr.push(emptyDataForMinutes[0]);
+                arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
+            } else if(timeUnit == "day"){
+                arr.push(emptyDataForDays[0]);
+                arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
+            }
+            Monitors[dataType].push({ key: keyValue, values: arr, color: colorList[colorIndex] })
+            if(dataType == "successRateData"){
+                dataMapperExporterSec[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterSec);
+                dataMapperExporterMin[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterMin);
+                dataMapperExporterDay[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterDay);
             }
 
         }
@@ -1480,6 +1633,11 @@
 
             if (failureRateChart.is(":visible"))
                 ChartFailureRate.update();
+        };
+
+        this.UpdateExporterCharts = function () {
+            if (tupleCountChart.is(":visible"))
+                ChartTupleCount.update();
         };
 
         this.UpdateDrCharts = function () {
@@ -1603,7 +1761,25 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
+        };
 
+        var changeExporterAxisTimeFormat = function (view) {
+            var dateFormat = '%X';
+            if (view == 'Days')
+                dateFormat = '%d %b %X';
+
+            ChartTupleCount.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            // ChartSuccessRate.xAxis
+            //     .tickFormat(function (d) {
+            //         return d3.time.format(dateFormat)(new Date(d));
+            //     });
+            // ChartFailureRate.xAxis
+            //     .tickFormat(function (d) {
+            //         return d3.time.format(dateFormat)(new Date(d));
+            //     });
         };
 
         var dataView = {
@@ -2355,87 +2531,87 @@
                 return;
 
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
-            if (timeStamp >= monitor.partitionMaxTimeStamp) {
-                $.each(partitionDetail["partitionDetail"], function(datatype, datavalue) {
-                    $.each(datavalue, function(partitionKey, partitionValue) {
-                        var keyValue = partitionKey;
-                        var percentValue = partitionValue;
-
-                        if (percentValue < 0)
-                            percentValue = 0;
-                        else if (percentValue > 100)
-                            percentValue = 100;
-                        if (partitionSecCount >= 6 || monitor.partitionFirstData) {
-                            if (!partitionDataMin.hasOwnProperty(keyValue)) {
-                                var keyIndex = dataMapperMin[keyValue];
-                                partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
-                                if (timeStamp == monitor.partitionMaxTimeStamp) {
-                                    partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
-                                    partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
-                                } else {
-                                    partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                    partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndex)
-                                }
-                                Monitors.partitionDataMin = partitionDataMin;
-                            }
-                        }
-
-                        if (partitionMinCount >= 60 || monitor.partitionFirstData) {
-                            var keyIndexDay = dataMapperDay[keyValue];
-                            partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
-                            if (timeStamp == monitor.partitionMaxTimeStamp) {
-                                partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
-                                partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
-                            } else {
-                                partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexDay)
-                            }
-                            Monitors.partitionDataDay = partitionDataDay;
-                        }
-
-                        var keyIndexSec = dataMapperSec[keyValue];
-
-                        partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
-                        if (timeStamp == monitor.partitionMaxTimeStamp) {
-                            partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
-                            partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
-                        } else {
-                            partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
-                            partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
-                        }
-                        Monitors.partitionData = partitionData;
-                    });
-                });
-
-                localStorage.partitionDetails = JSON.stringify(partitionDetailsArr)
-                localStorage.partitionDetailsMin = JSON.stringify(partitionDetailsArrMin)
-                localStorage.partitionDetailsDay = JSON.stringify(partitionDetailsArrDay)
-                if (monitor.partitionFirstData) {
-                    $(".legend").css("display", "block");
-                }
-                monitor.partitionFirstData = false;
-                if (partitionSecCount >= 6)
-                    partitionSecCount = 0;
-                if (partitionMinCount >= 60)
-                    partitionMinCount = 0;
-
-                if (graphView == 'Minutes')
-                    dataPartitionIdleTime = partitionDataMin;
-                else if (graphView == 'Days')
-                    dataPartitionIdleTime = partitionDataDay;
-                else {
-                    dataPartitionIdleTime = partitionData;
-                }
-
-                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && partitionChart.is(":visible")) {
-                    d3.select('#visualisationPartitionIdleTime')
-                        .datum(dataPartitionIdleTime)
-                        .transition().duration(500)
-                        .call(ChartPartitionIdleTime);
-                }
-            }
-            if (timeStamp > monitor.partitionMaxTimeStamp)
-                monitor.partitionMaxTimeStamp = timeStamp;
+            // if (timeStamp >= monitor.partitionMaxTimeStamp) {
+            //     $.each(partitionDetail["partitionDetail"], function(datatype, datavalue) {
+            //         $.each(datavalue, function(partitionKey, partitionValue) {
+            //             var keyValue = partitionKey;
+            //             var percentValue = partitionValue;
+            //
+            //             if (percentValue < 0)
+            //                 percentValue = 0;
+            //             else if (percentValue > 100)
+            //                 percentValue = 100;
+            //             if (partitionSecCount >= 6 || monitor.partitionFirstData) {
+            //                 if (!partitionDataMin.hasOwnProperty(keyValue)) {
+            //                     var keyIndex = dataMapperMin[keyValue];
+            //                     partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
+            //                     if (timeStamp == monitor.partitionMaxTimeStamp) {
+            //                         partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
+            //                         partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
+            //                     } else {
+            //                         partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
+            //                         partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndex)
+            //                     }
+            //                     Monitors.partitionDataMin = partitionDataMin;
+            //                 }
+            //             }
+            //
+            //             if (partitionMinCount >= 60 || monitor.partitionFirstData) {
+            //                 var keyIndexDay = dataMapperDay[keyValue];
+            //                 partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
+            //                 if (timeStamp == monitor.partitionMaxTimeStamp) {
+            //                     partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
+            //                     partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
+            //                 } else {
+            //                     partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
+            //                     partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexDay)
+            //                 }
+            //                 Monitors.partitionDataDay = partitionDataDay;
+            //             }
+            //
+            //             var keyIndexSec = dataMapperSec[keyValue];
+            //
+            //             partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
+            //             if (timeStamp == monitor.partitionMaxTimeStamp) {
+            //                 partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
+            //                 partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
+            //             } else {
+            //                 partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
+            //                 partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
+            //             }
+            //             Monitors.partitionData = partitionData;
+            //         });
+            //     });
+            //
+            //     localStorage.partitionDetails = JSON.stringify(partitionDetailsArr)
+            //     localStorage.partitionDetailsMin = JSON.stringify(partitionDetailsArrMin)
+            //     localStorage.partitionDetailsDay = JSON.stringify(partitionDetailsArrDay)
+            //     if (monitor.partitionFirstData) {
+            //         $(".legend").css("display", "block");
+            //     }
+            //     monitor.partitionFirstData = false;
+            //     if (partitionSecCount >= 6)
+            //         partitionSecCount = 0;
+            //     if (partitionMinCount >= 60)
+            //         partitionMinCount = 0;
+            //
+            //     if (graphView == 'Minutes')
+            //         dataPartitionIdleTime = partitionDataMin;
+            //     else if (graphView == 'Days')
+            //         dataPartitionIdleTime = partitionDataDay;
+            //     else {
+            //         dataPartitionIdleTime = partitionData;
+            //     }
+            //
+            //     if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && partitionChart.is(":visible")) {
+            //         d3.select('#visualisationPartitionIdleTime')
+            //             .datum(dataPartitionIdleTime)
+            //             .transition().duration(500)
+            //             .call(ChartPartitionIdleTime);
+            //     }
+            // }
+            // if (timeStamp > monitor.partitionMaxTimeStamp)
+            //     monitor.partitionMaxTimeStamp = timeStamp;
 
             partitionSecCount++;
             partitionMinCount++;
@@ -2885,6 +3061,173 @@
             }
         };
 
+        this.RefreshTupleCountGraph = function (tupleCountDetails, graphView, currentTab) {
+            var monitor = Monitors;
+
+            if (monitor.tupleCountData.length < 1 || monitor.tupleCountDataMin.length < 1 || monitor.tupleCountDataDay.length < 1) {
+                getTupleCountData();
+            }
+
+            if (dataMapperExporterSec == undefined || $.isEmptyObject(dataMapperExporterSec))
+                return
+
+            if (dataMapperExporterDay == undefined || $.isEmptyObject(dataMapperExporterDay))
+                return
+
+            if (dataMapperExporterMin == undefined || $.isEmptyObject(dataMapperExporterMin))
+                return
+
+            var tupleCountData = monitor.tupleCountData;
+            var tupleCountDataMin = monitor.tupleCountDataMin;
+            var tupleCountDataDay = monitor.tupleCountDataDay;
+            var tupleCountDetail = tupleCountDetails;
+            var tupleCountDetailsArr = [];
+            var tupleCountDetailsArrMin = [];
+            var tupleCountDetailsArrDay = [];
+
+            if(localStorage.tupleCountDetailsMin != undefined && JSON.parse(localStorage.tupleCountDetailsMin).length == tupleCountDataMin.length){
+                tupleCountDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.tupleCountDetailsMin))
+            } else {
+                tupleCountDetailsArrMin = JSON.stringify(convertDataFormatForPartition(tupleCountDataMin))
+                tupleCountDetailsArrMin = JSON.parse(tupleCountDetailsArrMin)
+            }
+
+            if(localStorage.tupleCountDetailsDay != undefined  && JSON.parse(localStorage.tupleCountDetailsDay).length == tupleCountDataDay.length){
+                tupleCountDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.tupleCountDetailsDay))
+            } else {
+                tupleCountDetailsArrDay = JSON.stringify(convertDataFormatForPartition(otupleCountDataDay))
+                tupleCountDetailsArrDay = JSON.parse(tupleCountDetailsArrDay)
+            }
+
+            if(localStorage.tupleCountDetails != undefined  && JSON.parse(localStorage.tupleCountDetails).length == tupleCountData.length){
+                tupleCountDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.tupleCountDetails))
+            } else {
+                tupleCountDetailsArr = JSON.stringify(convertDataFormatForPartition(tupleCountData))
+                tupleCountDetailsArr = JSON.parse(tupleCountDetailsArr)
+            }
+
+            if(monitor.tupleCountFirstData){
+                for(var i = 0; i< tupleCountDetailsArr.length; i++){
+                    var keyIndexSec =  i;
+                    if(tupleCountDetailsArr[i]["values"].length > 0 && !(currentTime.getTime() - (new Date(tupleCountDetailsArr[i]["values"][tupleCountDetailsArr[i]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                        tupleCountData[keyIndexSec]["values"] = []
+                        for(var b = 0; b < tupleCountDetailsArr[i]["values"].length; b++){
+                            tupleCountData[keyIndexSec]["values"] = sliceFirstData(tupleCountData[keyIndexSec]["values"], dataView.Seconds);
+                            tupleCountData[keyIndexSec]["values"].push({"x": new Date(tupleCountDetailsArr[i]["values"][b].x), "y": tupleCountDetailsArr[i]["values"][b].y})
+                        }
+                    }
+                }
+
+                for(var k = 0; k< tupleCountDetailsArrMin.length; k++){
+                    var keyIndexMin = k;
+                    if(tupleCountDetailsArrMin[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(tupleCountDetailsArrMin[k]["values"][tupleCountDetailsArrMin[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                        tupleCountDataDay[keyIndexMin]["values"] = []
+                        for(var c = 0; c < tupleCountDetailsArrMin[k]["values"].length; c++){
+                            tupleCountDataMin[keyIndexMin]["values"] = sliceFirstData(tupleCountDataMin[keyIndexMin]["values"], dataView.Days)
+                            tupleCountDataMin[keyIndexMin]["values"].push({"x": new Date(tupleCountDetailsArrMin[k]["values"][c].x), "y": tupleCountDetailsArrMin[k]["values"][c].y})
+                        }
+                    }
+                }
+
+                for(var k = 0; k< tupleCountDetailsArrDay.length; k++){
+                    var keyIndexDay = k;
+                    if(tupleCountDetailsArrDay[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(tupleCountDetailsArrDay[k]["values"][tupleCountDetailsArrDay[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                        tupleCountDataDay[keyIndexDay]["values"] = []
+                        for(var c = 0; c < tupleCountDetailsArrDay[k]["values"].length; c++){
+                            tupleCountDataDay[keyIndexDay]["values"] = sliceFirstData(tupleCountDataDay[keyIndexDay]["values"], dataView.Days)
+                            tupleCountDataDay[keyIndexDay]["values"].push({"x": new Date(tupleCountDetailsArrDay[k]["values"][c].x), "y": tupleCountDetailsArrDay[k]["values"][c].y})
+                        }
+                    }
+                }
+            }
+
+            if ($.isEmptyObject(tupleCountDetail) || tupleCountDetail == undefined || tupleCountDetail["TIMESTAMP"] == undefined)
+                return;
+
+            var timeStamp = tupleCountDetail["TIMESTAMP"];
+            if (timeStamp >= monitor.tupleCountMaxTimeStamp) {
+                $.each(tupleCountDetail, function(key, value) {
+                    if(key != "TIMESTAMP"){
+                        var keyValue = key;
+                        var newValue = value;
+
+                        if (tupleCountSecCount >= 6 || monitor.tupleCountFirstData) {
+                            if (!tupleCountDataMin.hasOwnProperty(keyValue)) {
+                                var keyIndex = dataMapperImporterMin[keyValue];
+                                tupleCountDataMin[keyIndex]["values"] = sliceFirstData(tupleCountDataMin[keyIndex]["values"], dataView.Minutes);
+                                if (timeStamp == monitor.tupleCountMaxTimeStamp) {
+                                    tupleCountDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": tupleCountDataMin[keyIndex]["values"][tupleCountDataMin[keyIndex]["values"].length - 1].y });
+                                    tupleCountDetailsArrMin = savePartitionDataToLocalStorage(tupleCountDetailsArrMin, {"x": new Date(timeStamp), "y": tupleCountDataMin[keyIndex]["values"][tupleCountDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
+                                } else {
+                                    tupleCountDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
+                                    tupleCountDetailsArrMin = savePartitionDataToLocalStorage(tupleCountDetailsArrMin, { 'x': new Date(timeStamp), 'y': newValue }, keyIndex)
+                                }
+                                Monitors.tupleCountDataMin = tupleCountDataMin;
+                            }
+                        }
+
+                        if (tupleCountMinCount >= 60 || monitor.tupleCountFirstData) {
+                            var keyIndexDay = dataMapperImporterDay[keyValue];
+                            tupleCountDataDay[keyIndexDay]["values"] = sliceFirstData(tupleCountDataDay[keyIndexDay]["values"], dataView.Days);
+                            if (timeStamp == monitor.tupleCountMaxTimeStamp) {
+                                tupleCountDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": tupleCountDataDay[keyIndexDay]["values"][tupleCountDataDay[keyIndexDay]["values"].length - 1].y });
+                                tupleCountDetailsArrDay = savePartitionDataToLocalStorage(tupleCountDetailsArrDay, { "x": new Date(timeStamp), "y": tupleCountDataDay[keyIndexDay]["values"][tupleCountDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
+                            } else {
+                                tupleCountDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': newValue });
+                                tupleCountDetailsArrDay = savePartitionDataToLocalStorage(tupleCountDetailsArrDay, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexDay)
+                            }
+                            Monitors.tupleCountDataDay = tupleCountDataDay;
+                        }
+
+                        var keyIndexSec = dataMapperImporterSec[keyValue];
+
+                        tupleCountData[keyIndexSec]["values"] = sliceFirstData(tupleCountData[keyIndexSec]["values"], dataView.Seconds);
+                        if (timeStamp == monitor.tupleCountMaxTimeStamp) {
+                            tupleCountData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": tupleCountData[keyIndexSec]["values"][tupleCountData[keyIndexSec]["values"].length - 1].y });
+                            tupleCountDetailsArr = savePartitionDataToLocalStorage(tupleCountDetailsArr, {"x": new Date(timeStamp), "y": tupleCountData[keyIndexSec]["values"][tupleCountData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
+                        } else {
+                            tupleCountData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': newValue });
+                            tupleCountDetailsArr = savePartitionDataToLocalStorage(tupleCountDetailsArr, { 'x': new Date(timeStamp), 'y': newValue }, keyIndexSec  )
+                        }
+                        Monitors.tupleCountData = tupleCountData;
+                    }
+
+                });
+
+                localStorage.tupleCountDetails = JSON.stringify(tupleCountDetailsArr)
+                localStorage.tupleCountDetailsMin = JSON.stringify(tupleCountDetailsArrMin)
+                localStorage.tupleCountDetailsDay = JSON.stringify(tupleCountDetailsArrDay)
+                if (monitor.tupleCountFirstData) {
+                    $(".legend").css("display", "block");
+                }
+                monitor.tupleCountFirstData = false;
+                if (tupleCountSecCount >= 6)
+                    tupleCountSecCount = 0;
+                if (tupleCountsMinCount >= 60)
+                    tupleCountMinCount = 0;
+                if (graphView == 'Minutes')
+                    dataTupleCount = tupleCountDataMin;
+                else if (graphView == 'Days')
+                    dataTupleCount = tupleCountDataDay;
+                else {
+                    dataTupleCount = tupleCountData;
+                }
+
+                if (currentTab == NavigationTabs.Exporter && currentViewExporter == graphView) {
+                    d3.select('#visualisationTupleCount')
+                        .datum(dataOutTrans)
+                        .transition().duration(500)
+                        .call(ChartOutTrans);
+                }
+            }
+
+            if (timeStamp > monitor.tupleCountMaxTimeStamp)
+                monitor.tupleCountMaxTimeStamp = timeStamp;
+
+            tupleCountSecCount++;
+            tupleCountMinCount++;
+        }
+
         this.RefreshOutTransGraph = function (outTransDetails, graphView, currentTab) {
             var monitor = Monitors;
 
@@ -2922,6 +3265,7 @@
                 outTransDetailsArrDay = JSON.stringify(convertDataFormatForPartition(outTransDataDay))
                 outTransDetailsArrDay = JSON.parse(outTransDetailsArrDay)
             }
+
             if(localStorage.outTransDetails != undefined  && JSON.parse(localStorage.outTransDetails).length == outTransData.length){
                 outTransDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.outTransDetails))
             } else {
@@ -3414,6 +3758,13 @@
             failureRateSecCount++;
             failureRateMinCount++;
         };
+
+        function getTupleCountData() {
+            var monitor = Monitors;
+            monitor.tupleCountData = getExportData(emptyData, dataMapperExporterSec);
+            monitor.tupleCountDataMin = getExportData(emptyDataForMinutes, dataMapperExporterMin);
+            monitor.tupleCountDataDay = getExportData(emptyDataForDays, dataMapperExporterDay);
+        }
 
         function getOutTransData() {
             var monitor = Monitors;

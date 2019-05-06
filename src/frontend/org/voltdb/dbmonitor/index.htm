@@ -72,6 +72,7 @@
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
                                 <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
+                                <li id="navExporter" style="display:none"><a href="#">Exporter</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -202,15 +203,15 @@
                     </div>
 
                     <div id="mainGraphBlock">
-                    <div class="errorMsgLocalStorageFull" style="display:none">
-                        <div class="errorMsgLocalWrapper">
-                        <img src="images/alert.png" alt="Alert"/>
+                        <div class="errorMsgLocalStorageFull" style="display:none">
+                            <div class="errorMsgLocalWrapper">
+                            <img src="images/alert.png" alt="Alert"/>
+                            </div>
+                            <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                            </div>
+                            <div class="clear"></div>
                         </div>
-                        <div class="textMsgLocalWrapper">
-                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
-                        </div>
-                        <div class="clear"></div>
-                    </div>
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
@@ -1361,6 +1362,52 @@
                                 </h1>
                             </div>
                             <svg id="visualisationFailureRate" width="100%" height="400"></svg>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                </div>
+            </div>
+            <!--Exporter-->
+            <div class="container contents" id="exporter" style="display: none;">
+                <div class="content displayPre" id="contentExport">
+                    <div class="leftShowhide">
+                        <div id="GraphBlock2" class="">
+                            <h1 class="headText1"><a href="#" id="showHideExporterGraphBlock" class="showhideExporterIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
+                        </div>
+                    </div>
+                    <div class="rightShowhide">
+                        <ul class="rightShowhideList" id="showHideRightExportList">
+                            <li class="viewSelect">
+                                <label>View</label>
+                                <select id="exporterGraphView">
+                                    <option selected="selected">Seconds</option>
+                                    <option>Minutes</option>
+                                    <option>Days</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div id="mainExporterGraphBlock">
+                    <div class="errorExporterMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                            <img src="images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="graphChart" id="graphChartExporter">
+                        <div id="chartTupleCountForExport" class="chart left">
+                            <div class="chartHeader" id="chartTupleCountHeaderForExport">
+                                <h1>Tuple Count<span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "tuple-count-data" }, "tupleCount");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationTupleCount" width="100%" height="400"></svg>
                         </div>
                         <div class="clear"></div>
                     </div>
