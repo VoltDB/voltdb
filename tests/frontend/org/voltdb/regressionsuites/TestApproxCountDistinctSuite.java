@@ -216,7 +216,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 vt = client.callProcedure("@AdHoc", approxStmtNoNulls).getResults()[0];
                 assertTrue(vt.advanceRow());
                 long actualEstimateNoNulls = vt.getLong(0);
-                assertEquals(actualEstimate, actualEstimateNoNulls);
+                assertEstimateWithin(col, actualEstimateNoNulls, actualEstimate);
                 assertFalse(vt.advanceRow());
 
                 // Compare with the exact distinct count
