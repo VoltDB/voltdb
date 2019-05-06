@@ -349,7 +349,8 @@ public class PlannerTool {
                                                  null);
                 m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
             }
-            return ahps;
+            //return ahps;
+            throw new PlannerFallbackException();
         } finally {
             if (m_plannerStats != null) {
                 m_plannerStats.endStatsCollection(m_calciteCache.getLiteralCacheSize(), m_calciteCache.getCoreCacheSize(), cacheUse, -1);
