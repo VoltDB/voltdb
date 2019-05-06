@@ -20,12 +20,14 @@ package org.voltdb.plannerv2.rel.physical;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -45,18 +47,15 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     protected final RexNode m_offset;
     protected final RexNode m_limit;
 
-    private final int m_splitCount;
-
     public VoltPhysicalJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, RexNode offset, RexNode limit) {
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION,
                 "PhysicalJoin node convention mismatch");
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
-        m_splitCount = splitCount;
         m_offset = offset;
         m_limit = limit;
     }
@@ -67,7 +66,7 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone)
-                .item("split", m_splitCount)
+                .item("split", 1)
                 .itemIf("offset", m_offset, m_offset != null)
                 .itemIf("limit", m_limit, m_limit != null);
     }
@@ -83,9 +82,18 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         return systemFieldList;
     }
 
+    // NOTE: we set this to 1 for SP queries.
     @Override
     public int getSplitCount() {
-        return m_splitCount;
+        return 1;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        // Give it a discount based on the number of equivalence expressions
+        // TODO: cache the computation. It is called every time any rule is triggered.
+        return Math.min(getInput(0).estimateRowCount(mq), getInput(1).estimateRowCount(mq)) *
+                Math.pow(0.10, RelOptUtil.conjunctions(getCondition()).size());
     }
 
     protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {

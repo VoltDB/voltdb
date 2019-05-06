@@ -54,10 +54,10 @@ public class VoltPJoinExchangeTransposeRule extends RelOptRule {
         final VoltPhysicalExchange innerSingletonExchangeRel = call.rel(2);
 
         RelTraitSet joinTraits = joinRel.getTraitSet();
-        if (!outerSingletonExchangeRel.isTopExchange() && !innerSingletonExchangeRel.isTopExchange()) {
+        /*if (!outerSingletonExchangeRel.isTopExchange() && !innerSingletonExchangeRel.isTopExchange()) {
             // Update Sort distribution's trait
             joinTraits = joinTraits.replace(outerSingletonExchangeRel.getDistribution());
-        }
+        }*/
 
         final RelNode newJoinRel = joinRel.copy(
                 joinTraits, joinRel.getCondition(), outerSingletonExchangeRel.getInput(),
@@ -65,7 +65,6 @@ public class VoltPJoinExchangeTransposeRule extends RelOptRule {
         call.transformTo(new VoltPhysicalSingletonExchange(
                 outerSingletonExchangeRel.getCluster(),
                 outerSingletonExchangeRel.getTraitSet(),
-                newJoinRel,
-                outerSingletonExchangeRel.isTopExchange()));
+                newJoinRel));
     }
 }

@@ -46,20 +46,18 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
     public VoltPhysicalNestLoopIndexJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, String innnerIndexName) {
+            ImmutableList<RelDataTypeField> systemFieldList, String innnerIndexName) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, innnerIndexName, null, null);
+                semiJoinDone, systemFieldList, innnerIndexName, null, null);
     }
 
-    private VoltPhysicalNestLoopIndexJoin(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode left, RelNode right, RexNode condition,
-            Set<CorrelationId> variablesSet, JoinRelType joinType,
-            boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount,
-            String innnerIndexName,
+    private VoltPhysicalNestLoopIndexJoin(
+            RelOptCluster cluster, RelTraitSet traitSet,
+            RelNode left, RelNode right, RexNode condition, Set<CorrelationId> variablesSet, JoinRelType joinType,
+            boolean semiJoinDone, ImmutableList<RelDataTypeField> systemFieldList, String innnerIndexName,
             RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, offset, limit);
+                semiJoinDone, systemFieldList, offset, limit);
         Preconditions.checkNotNull(innnerIndexName, "Inner index name is null");
         m_innerIndexName = innnerIndexName;
     }
@@ -113,15 +111,14 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         return new VoltPhysicalNestLoopIndexJoin(getCluster(),
                 getTraitSet(), left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()),
-                getSplitCount(), m_innerIndexName);
+                m_innerIndexName);
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
         ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(getSystemFieldList());
-        return new VoltPhysicalNestLoopIndexJoin(getCluster(),
-                traits, left, right, condition,
-                variablesSet, joinType, isSemiJoinDone(), systemFieldList, getSplitCount(), m_innerIndexName, offset, limit);
+        return new VoltPhysicalNestLoopIndexJoin(getCluster(), traits, left, right, condition,
+                variablesSet, joinType, isSemiJoinDone(), systemFieldList, m_innerIndexName, offset, limit);
     }
 
 }

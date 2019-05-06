@@ -26,16 +26,15 @@ import org.voltdb.plannodes.SendPlanNode;
 public class VoltPhysicalSingletonExchange extends VoltPhysicalExchange implements VoltPhysicalRel {
 
     public VoltPhysicalSingletonExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, boolean isTopExchange) {
-        super(cluster, traitSet, input, 1, isTopExchange);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input) {
+        super(cluster, traitSet, input);
     }
 
     @Override protected VoltPhysicalSingletonExchange copyInternal(
             RelTraitSet traitSet,
-            RelNode newInput,
-            boolean isTopExchange) {
+            RelNode newInput) {
         return new VoltPhysicalSingletonExchange(
-                getCluster(), traitSet, newInput, isTopExchange);
+                getCluster(), traitSet, newInput);
     }
 
     @Override

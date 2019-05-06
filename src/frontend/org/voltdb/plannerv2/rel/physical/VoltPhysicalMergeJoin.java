@@ -23,7 +23,6 @@ import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -49,18 +48,18 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
     public VoltPhysicalMergeJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, String outerIndex, String innerIndex) {
+            ImmutableList<RelDataTypeField> systemFieldList, String outerIndex, String innerIndex) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, outerIndex, innerIndex, null, null);
+                semiJoinDone, systemFieldList, outerIndex, innerIndex, null, null);
     }
 
     private VoltPhysicalMergeJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, String outerIndex,
+            ImmutableList<RelDataTypeField> systemFieldList, String outerIndex,
             String innerIndex, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, offset, limit);
+                semiJoinDone, systemFieldList, offset, limit);
         Preconditions.checkNotNull(outerIndex, "Outer index is null");
         Preconditions.checkNotNull(innerIndex, "Inner index is null");
         m_outerIndexName = outerIndex;
@@ -72,14 +71,14 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
                      RelNode right, JoinRelType joinType, boolean semiJoinDone) {
         return new VoltPhysicalMergeJoin(getCluster(), traitSet, left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()),
-                getSplitCount(), m_outerIndexName, m_innerIndexName);
+                m_outerIndexName, m_innerIndexName);
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
         return new VoltPhysicalMergeJoin(getCluster(), traits, left, right, condition,
                 variablesSet, joinType, isSemiJoinDone(), ImmutableList.copyOf(getSystemFieldList()),
-                getSplitCount(), m_outerIndexName, m_innerIndexName, offset, limit);
+                m_outerIndexName, m_innerIndexName, offset, limit);
     }
 
     @Override
@@ -88,13 +87,6 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         pw.item("outerIndex", m_outerIndexName);
         pw.item("innerIndex", m_innerIndexName);
         return pw;
-    }
-
-    @Override
-    public double estimateRowCount(RelMetadataQuery mq) {
-        // Give it a discount based on the number of equivalence expressions
-        return Math.min(getInput(0).estimateRowCount(mq), getInput(1).estimateRowCount(mq)) *
-                Math.pow(0.10, RelOptUtil.conjunctions(getCondition()).size());
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -107,7 +99,6 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        // @TODO MergeJoinPlanNode
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
         // TODO: INNER join for now
         if (joinType != JoinRelType.INNER) {

@@ -112,11 +112,11 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         final RelNode leftProjRel = pushProject.createProjectRefsAndExprs(
                 join.getLeft(), true, false);
         // Convert LogicalProject to a VoltDBLCalc
-        final Calc leftCalcRel = projectToVoltCalc(leftProjRel, false);
+        final Calc leftCalcRel = projectToVoltCalc(leftProjRel);
 
         final RelNode rightProjRel = pushProject.createProjectRefsAndExprs(
                 join.getRight(), true, true);
-        final Calc rightCalcRel = projectToVoltCalc(rightProjRel, false);
+        final Calc rightCalcRel = projectToVoltCalc(rightProjRel);
 
         // convert the join condition to reference the projected columns
         final RexNode newJoinFilter;
@@ -144,7 +144,7 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
         // There may be a case when all the projects were pushed down to children.
         // In this case the resultRel is a Join
         if (resultRel instanceof Project) {
-            resultRel = projectToVoltCalc(resultRel, true);
+            resultRel = projectToVoltCalc(resultRel);
         }
         call.transformTo(resultRel);
     }
@@ -153,11 +153,10 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
      * Convert LogicalProject to a VoltDBLCalc
      *
      * @param relNode LogicalProject
-     * @param isTopJoin TRUE is this Project is on top of a join. FALSE otherwise
      *
      * @return VoltDBLCalc
      */
-    private Calc projectToVoltCalc(RelNode relNode, boolean isTopJoin) {
+    private Calc projectToVoltCalc(RelNode relNode) {
         Preconditions.checkState(relNode instanceof Project, "RelNode is not a Project");
         final Project projectRel = (Project) relNode;
         final RexProgram program = RexProgram.create(
@@ -165,7 +164,7 @@ public class VoltLCalcJoinTransposeRule extends RelOptRule {
                 projectRel.getRowType(), projectRel.getCluster().getRexBuilder());
         return new VoltLogicalCalc(
                 projectRel.getCluster(), projectRel.getTraitSet().replace(VoltLogicalRel.CONVENTION),
-                projectRel.getInput(0), program, isTopJoin);
+                projectRel.getInput(0), program);
     }
 }
 

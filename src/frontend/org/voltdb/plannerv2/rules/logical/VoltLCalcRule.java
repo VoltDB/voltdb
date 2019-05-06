@@ -28,7 +28,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 public class VoltLCalcRule extends RelOptRule {
     public static final RelOptRule INSTANCE = new VoltLCalcRule();
 
-    VoltLCalcRule() {
+    private VoltLCalcRule() {
         super(operand(LogicalCalc.class, Convention.NONE, any()));
     }
 
@@ -39,6 +39,6 @@ public class VoltLCalcRule extends RelOptRule {
         call.transformTo(new VoltLogicalCalc(
                 calc.getCluster(), calc.getTraitSet().replace(VoltLogicalRel.CONVENTION),
                 convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION)),
-                calc.getProgram(), false));
+                calc.getProgram()));
     }
 }

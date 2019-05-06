@@ -30,39 +30,26 @@ public abstract class VoltPhysicalExchange extends Exchange implements VoltPhysi
 
     public static final int DISTRIBUTED_SPLIT_COUNT = 30;
 
-    // Exchange's split count equals the count of physical nodes its input runs on
-    protected final int m_splitCount;
-
-    // An indicator to be set to TRUE only for a top(coordinator) exchange for a multi-partitioned queries
-    // Other relations could take advantage of this flag during Exchange Transpose rules if a relation
-    // behavior depends whether it's part of the coordinator or fragment stack
-    protected final boolean m_topExchange;
-
     protected VoltPhysicalExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, int splitCount, boolean topExchange) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input) {
         super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
                 traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
-        m_splitCount = splitCount;
-        m_topExchange = topExchange;
     }
 
     @Override public int getSplitCount() {
-        return m_splitCount;
+        return 1;       // NOTE: we can add it back later
     }
 
     @Override public VoltPhysicalExchange copy(
             RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-        return copyInternal(traitSet, newInput, isTopExchange());
+        return copyInternal(traitSet, newInput);
     }
 
-    public VoltPhysicalExchange copy(
+    /*public VoltPhysicalExchange copy(
             RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution, boolean isTopExchange) {
-        return copyInternal(traitSet, newInput, isTopExchange);
-    }
+        return copyInternal(traitSet, newInput);
+    }*/
 
-    protected abstract VoltPhysicalExchange copyInternal(RelTraitSet traitSet, RelNode newInput, boolean isTopExchang);
-    public boolean isTopExchange() {
-        return m_topExchange;
-    }
+    protected abstract VoltPhysicalExchange copyInternal(RelTraitSet traitSet, RelNode newInput);
 }

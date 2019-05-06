@@ -53,10 +53,9 @@ public class VoltPJoinRule extends RelOptRule {
         final RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltPhysicalRel.CONVENTION));
         final ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(join.getSystemFieldList());
 
-        // TODO: How many number of concurrent processes that a Join will be executed in ?
-        // I use 1 for now.
+        // TODO: we may need to add splitCount attribute when we calculate/reduce the cost of a distribution node for MP query.
         call.transformTo(new VoltPhysicalNestLoopJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
                 join.getCondition(), join.getVariablesSet(), join.getJoinType(),
-                join.isSemiJoinDone(), systemFieldList, Constants.JOIN_SPLIT_COUNT));
+                join.isSemiJoinDone(), systemFieldList));
     }
 }

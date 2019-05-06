@@ -39,17 +39,17 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
     public VoltPhysicalNestLoopJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount) {
+            ImmutableList<RelDataTypeField> systemFieldList) {
         this(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, null, null);
+                semiJoinDone, systemFieldList, null, null);
     }
 
     private VoltPhysicalNestLoopJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList, int splitCount, RexNode offset, RexNode limit) {
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
-                semiJoinDone, systemFieldList, splitCount, offset, limit);
+                semiJoinDone, systemFieldList, offset, limit);
     }
 
     @Override
@@ -58,14 +58,14 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
             JoinRelType joinType, boolean semiJoinDone) {
         return new VoltPhysicalNestLoopJoin(getCluster(),
                 traitSet, left, right, conditionExpr,
-                variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()), getSplitCount());
+                variablesSet, joinType, semiJoinDone, ImmutableList.copyOf(getSystemFieldList()));
     }
 
     @Override
     public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit) {
         return new VoltPhysicalNestLoopJoin(
                 getCluster(), traits, left, right, condition, variablesSet, joinType, isSemiJoinDone(),
-                ImmutableList.copyOf(getSystemFieldList()), getSplitCount(), offset, limit);
+                ImmutableList.copyOf(getSystemFieldList()), offset, limit);
     }
 
     @Override
