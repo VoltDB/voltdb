@@ -1710,26 +1710,17 @@ public class TestJoinsSuite extends RegressionSuite {
 
         String query;
 
-        // ENG-15253
-        // Columns A is resolved as 'CASE WHEN R1.A IS NOT NULL THEN R1.A ELSE R2.A END AS A' expression
-        // The actual query results are
-        //        2,1
-        //        3,3
-        //        NULL,5
-        // What is really strange, is that at the moment Calcite only able to produce a plan but fails to
-        // convert it to a VoltDB plan (Joins are still not implemented). The planner in this case falls back on
-        // native VoltDB planner which should produce the correct result.
-//        query = "SELECT MAX(R1.C), A FROM R1 FULL JOIN R2 USING (A) " +
-//                "WHERE R2.A > 0 " +
-//                "GROUP BY A " +
-//                "ORDER BY A";
-//        validateTableOfLongs(client, query, new long[][]{
-//            {2, 1},
-//            {1, 2},
-//            {3, 3},
-//            {4, 4},
-//            {NULL_VALUE, 5}
-//        });
+        query = "SELECT MAX(R1.C), A FROM R1 FULL JOIN R2 USING (A) " +
+                "WHERE A > 0 " +
+                "GROUP BY A " +
+                "ORDER BY A";
+        validateTableOfLongs(client, query, new long[][]{
+            {2, 1},
+            {1, 2},
+            {3, 3},
+            {4, 4},
+            {NULL_VALUE, 5}
+        });
 
         // ENG-15253
         // Fails to resolve ambiguous SELECT column for a multi-joins
