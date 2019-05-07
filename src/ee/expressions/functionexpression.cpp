@@ -19,6 +19,7 @@
 #include "expressions/functionexpression.h"
 #include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
+#include <stdio.h>
 
 namespace voltdb {
 
@@ -286,6 +287,9 @@ AbstractExpression* functionFactory(int functionId, const std::vector<AbstractEx
             break;
          case FUNC_VOLT_MIGRATING:
             ret = new ConstantFunctionExpression<FUNC_VOLT_MIGRATING>();
+            break;
+         case FUNC_UNIQUE_ID:
+            ret = new ConstantFunctionExpression<FUNC_UNIQUE_ID>();
             break;
          default:
             return NULL;

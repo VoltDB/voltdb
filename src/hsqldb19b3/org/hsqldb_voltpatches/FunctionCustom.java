@@ -65,7 +65,7 @@ public class FunctionCustom extends FunctionSQL {
         "ABS", "ACOS", "ASIN", "ATAN", "ATAN2", "BITAND", "BITOR", "BITXOR",
         "CEILING", "COS", "COT", "DEGREES", "EXP", "FLOOR", "LOG", "LOG10",
         "MOD", "PI", "POWER", "RADIANS", "RAND", "ROUND", "ROUNDMAGIC", "SIGN",
-        "SIN", "SQRT", "TAN", "TRUNCATE"
+        "SIN", "SQRT", "TAN", "TRUNCATE", "GET_UNIQUE_ID"
     };
     public static final String[] openGroupStringFunctions = {
         "ASCII", "CHAR", "CONCAT", "DIFFERENCE", "HEXTORAW", "INSERT", "LCASE",
@@ -242,6 +242,7 @@ public class FunctionCustom extends FunctionSQL {
         customValueFuncMap.put(Tokens.SYSDATE, FUNC_SYSDATE);
         customValueFuncMap.put(Tokens.TODAY, FUNC_CURRENT_DATE);
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
+        //customValueFuncMap.put(Tokens.UNIQUE_ID, FUNC_UNIQUE_ID);
     }
 
     private int extractSpec;

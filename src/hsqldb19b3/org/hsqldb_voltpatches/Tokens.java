@@ -46,6 +46,7 @@ public class Tokens {
 
     //
     // SQL 200n reserved words full set
+    static final String        T_UNIQUE_ID        = "GET_UNIQUE_ID";
     static final String        T_ABS              = "ABS";
     public static final String T_ALL              = "ALL";
     static final String        T_ALLOCATE         = "ALLOCATE";
@@ -841,6 +842,7 @@ public class Tokens {
     //
     //
     //SQL 200n Standard reserved keywords - full set
+    public static final int UNIQUE_ID                        = 0;
     public static final int ABS                              = 1;
     public static final int ALL                              = 2;
     public static final int ALLOCATE                         = 3;
@@ -1648,6 +1650,7 @@ public class Tokens {
         new IntValueHashMap(351);
 
     static {
+        reservedKeys.put(Tokens.T_UNIQUE_ID, UNIQUE_ID);
         reservedKeys.put(Tokens.T_ABS, ABS);
         reservedKeys.put(Tokens.T_ALL, ALL);
         reservedKeys.put(Tokens.T_ALLOCATE, ALLOCATE);

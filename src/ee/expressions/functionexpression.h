@@ -82,6 +82,7 @@ namespace voltdb {
    static const int FUNC_SYSTEM_USER                      = 59;
    static const int FUNC_USER                             = 60;
    static const int FUNC_VALUE                            = 61;
+   static const int FUNC_UNIQUE_ID                        = 62;
 
    static const int FUNC_ISAUTOCOMMIT            = 71;
    static const int FUNC_ISREADONLYSESSION       = 72;

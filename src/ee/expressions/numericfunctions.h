@@ -483,4 +483,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
     return getDecimalValueFromString(rv);
 }
 
+template<> inline NValue NValue::callConstant<FUNC_UNIQUE_ID>() {
+    return getBigIntValue(0);
+}
 }

@@ -164,6 +164,7 @@
         "FORMAT",
         "FORMAT_CURRENCY()",
         "FROM_UNIXTIME()",
+        "GET_UNIQUE_ID()",
         "HEX()",
         "HOUR()",
         "INET6_ATON()",
