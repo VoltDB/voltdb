@@ -952,8 +952,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                 } catch(Exception e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
-                } finally {
-                    m_es.shutdown();
                 }
             }
         });
