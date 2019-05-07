@@ -25,6 +25,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -356,16 +357,9 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
 
     @Override
     public boolean matches(RelOptRuleCall call) {
-        VoltPhysicalNestLoopIndexJoin join = call.rel(0);
-
-        VoltPhysicalTableIndexScan innerIndexScan = m_matchType.getInnerIndexScan(call);
-        // An index must be scannable to produce sorted result
-        if (!IndexType.isScannable(innerIndexScan.getIndex().getType())) {
-            return false;
-        } else {
-            // the join must be an equi-join
-            return isEquijoin(join);
-        }
+        // An index must be scannable to produce sorted result; and the join must be an equi-join
+        return IndexType.isScannable(m_matchType.getInnerIndexScan(call).getIndex().getType()) &&
+                isEquijoin(call.rel(0));
     }
 
     @Override
@@ -396,7 +390,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         final List<RelNode> mergeJoins;
         if (MatchType.hasOuterChildMergeJoin(m_matchType)) {
             // Verify whether an outer child's collation is compatible with an order that required by the top join's condition
-            mergeJoins = nextOuterJoinCollation(call)
+            mergeJoins = Stream.of(nextOuterJoinCollation(call))
                     .filter(childJoinExpressionCollation ->
                         verifyOuterCildJoinCollation(childJoinExpressionCollation, outerProgram, joinExpressionCollation))
                     .map(__ -> {
@@ -539,16 +533,16 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
      * @return
      */
     private List<Pair<RelCollation, Index>> nextOuterIndexCollation(RelOptRuleCall call) {
-        RelNode outerNode = m_matchType.getOuterNode(call);
+        final RelNode outerNode = m_matchType.getOuterNode(call);
         assert(outerNode instanceof VoltPhysicalTableSequentialScan);
-        VoltPhysicalTableScan outerSeqScan = (VoltPhysicalTableSequentialScan) outerNode;
-        RexProgram outerProgram = m_matchType.getCombinedOuterProgram(call);
-        RexNode joinCondition = ((Join)call.rels[0]).getCondition();
+        final VoltPhysicalTableScan outerSeqScan = (VoltPhysicalTableSequentialScan) outerNode;
+        final RexProgram outerProgram = m_matchType.getCombinedOuterProgram(call);
+        final RexNode joinCondition = ((Join)call.rels[0]).getCondition();
         int numOuterFieldsForJoin = m_matchType.getNumOuterFieldsForJoin(call);
 
-        Table table = outerSeqScan.getVoltTable().getCatalogTable();
-        List<Column> columns = CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
-        Iterable<Index> iterable = () -> outerSeqScan.getVoltTable().getCatalogTable().getIndexes().iterator();
+        final Table table = outerSeqScan.getVoltTable().getCatalogTable();
+        final List<Column> columns = CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
+        final Iterable<Index> iterable = () -> outerSeqScan.getVoltTable().getCatalogTable().getIndexes().iterator();
         return StreamSupport.stream(iterable.spliterator(), false)
                 .map(index -> IndexUtil.getCalciteRelevantAccessPathForIndex(
                         table, columns, joinCondition, outerProgram,
@@ -568,20 +562,18 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
     }
 
     /**
-     * Return a stream of collations (only one) pairs for an outer Merge Join
+     * Return a collations pairs for an outer Merge Join
      *
      * @param call
      * @return
      */
-    private Stream<List<Pair<Integer, Integer>>> nextOuterJoinCollation(RelOptRuleCall call) {
-        RelNode outerNode = m_matchType.getOuterNode(call);
-        assert(outerNode instanceof VoltPhysicalMergeJoin);
-        VoltPhysicalMergeJoin outerChildJoin = (VoltPhysicalMergeJoin) outerNode;
-        assert(outerChildJoin.getInputs().size() == 2);
+    private List<Pair<Integer, Integer>> nextOuterJoinCollation(RelOptRuleCall call) {
+        final RelNode outerNode = m_matchType.getOuterNode(call);
+        Preconditions.checkState(outerNode instanceof VoltPhysicalMergeJoin);
+        final VoltPhysicalMergeJoin outerChildJoin = (VoltPhysicalMergeJoin) outerNode;
+        Preconditions.checkState(outerChildJoin.getInputs().size() == 2);
         // Extract (outer, inner) field indexes from the equi-join expression
-        List<Pair<Integer, Integer>> childJoinExpressionCollation =
-                VoltRexUtil.extractFieldIndexes(outerChildJoin.getCondition(),
-                        outerChildJoin.getInputs().get(0).getRowType().getFieldCount());
-        return Stream.of(childJoinExpressionCollation);
+        return VoltRexUtil.extractFieldIndexes(outerChildJoin.getCondition(),
+                outerChildJoin.getInputs().get(0).getRowType().getFieldCount());
     }
 }

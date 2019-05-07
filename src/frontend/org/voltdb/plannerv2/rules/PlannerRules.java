@@ -161,6 +161,7 @@ public class PlannerRules {
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_CALC_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_CALC_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_CALC_ISCAN,

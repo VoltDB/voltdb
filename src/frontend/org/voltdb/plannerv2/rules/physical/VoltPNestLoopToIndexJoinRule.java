@@ -139,9 +139,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         final RexProgram program = extractor.getInnerProgram();
 
         // INNER only at the moment
-        if (join.getJoinType() != JoinRelType.INNER) {
-            return;
-        }
+        Preconditions.checkState(join.getJoinType() == JoinRelType.INNER, "Must be inner join");
 
         final Table innerTable = innerScan.getVoltTable().getCatalogTable();
         final Map<RelNode, RelNode> equiv = new HashMap<>();
