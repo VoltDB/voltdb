@@ -49,7 +49,8 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             "CREATE TABLE T1 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO1 ON(INSERT, DELETE);" +
             " PARTITION table T1 ON COLUMN a;" +
             "CREATE TABLE T2 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO2 ON(UPDATE);" +
-            " PARTITION table T2 ON COLUMN a;";
+            " PARTITION table T2 ON COLUMN a;" +
+            "CREATE TABLE T3 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO3 ON(UPDATE);";
 
     @Before
     public void setUp() throws Exception
@@ -72,6 +73,11 @@ public class TestPersistentExport extends ExportLocalClusterBase {
                 createSocketExportProperties("T2", false /* is replicated stream? */),
                 "FOO2");
 
+        builder.addExport(true /* enabled */,
+                ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
+                createSocketExportProperties("T3", false /* is replicated stream? */),
+                "FOO3");
+
         // Start socket exporter client
         startListener();
 
@@ -84,6 +90,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         m_cluster.startUp(true);
         m_verifier = new ExportTestExpectedData(m_serverSockets, false /*is replicated stream? */, true, KFACTOR + 1);
         m_verifier.m_verifySequenceNumber = false;
+        m_verifier.m_verbose = false;
     }
 
     @After
@@ -115,7 +122,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
     }
 
     @Test
-    public void testUpdate() throws Exception {
+    public void testUpdateWithAlter() throws Exception {
         Client client = getClient(m_cluster);
 
         //add data to stream table
@@ -126,7 +133,36 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T2", 200);
+
+        // Change trigger to update_new
+        client.callProcedure("@AdHoc", "ALTER TABLE T2 EXPORT TO TARGET FOO2 ON (UPDATE_NEW)");
+        client.callProcedure("@AdHoc", "update T2 set b = 200 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T2", 300);
     }
+
+    @Test
+    public void testReplicaTableWithAlter() throws Exception {
+        Client client = getClient(m_cluster);
+
+        //add data to stream table
+        Object[] data = new Object[3];
+        Arrays.fill(data, 1);
+        insertToStream("T3", 0, 100, client, data);
+        client.callProcedure("@AdHoc", "update T3 set b = 100 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 200);
+
+        // Change trigger to update_new
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW)");
+        client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 300);
+    }
+
 
     private static void checkTupleCount(Client client, String tableName, long expectedCount){
 

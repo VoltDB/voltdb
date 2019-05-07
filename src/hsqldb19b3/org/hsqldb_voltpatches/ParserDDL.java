@@ -989,6 +989,9 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.USING : {
                 return readTimeToLive(t, true);
             }
+            case Tokens.EXPORT : {
+                return readPersistentExport(t, true);
+            }
             default : {
                 throw unexpectedToken();
             }
@@ -1012,14 +1015,17 @@ public class ParserDDL extends ParserRoutine {
                                    null, t.getName());
     }
 
-    private Statement readPersistentExport(Table table) {
+    private Statement readPersistentExport(Table table, boolean alter) {
 
-        // EXPORT TO TARGET FOO ON(INSERT, DELETE, UPDATEold, UPDATEnew);
+        // EXPORT TO TARGET FOO ON(INSERT, DELETE, UPDATE);
         if (token.tokenType != Tokens.EXPORT) {
             return null;
         }
         String target = readMigrateTarget();
-
+        if (alter && (table.getPersistentExport() == null ||
+                !target.equalsIgnoreCase(table.getPersistentExport().target))) {
+            throw unexpectedToken("Export target cann't be altered.");
+        }
         // read triggers
         List<String> triggers = new ArrayList<>();
         read();
@@ -1055,11 +1061,11 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
             if (hasUpdate && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
-                throw Error.error(ErrorCode.X_42581, "Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
                         " or " + Tokens.T_UPDATENEW);
             }
             if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
-                throw Error.error(ErrorCode.X_42581, "Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
                         " and " + Tokens.T_UPDATENEW);
             }
             if (token.tokenType != Tokens.CLOSEBRACKET) {
@@ -1404,7 +1410,7 @@ public class ParserDDL extends ParserRoutine {
 
                     // A VoltDB extension to support TTL
                     if(token.tokenType == Tokens.EXPORT) {
-                        readPersistentExport(table);
+                        readPersistentExport(table, false);
                     } else {
                         readTimeToLive(table, false);
                     }

@@ -479,7 +479,7 @@ public:
     void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }
 
     void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
-
+    void setTableType(TableType tableType) { m_tableType = tableType; }
     bool isPersistentTableEmpty() const {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".

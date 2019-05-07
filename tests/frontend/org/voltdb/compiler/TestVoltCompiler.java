@@ -110,6 +110,12 @@ public class TestVoltCompiler extends TestCase {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD);\n" +
+        "alter table foo EXPORT TO TARGET foo ON(UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
     }
 
     /*public void testDDLCompilerTTL() throws Exception {

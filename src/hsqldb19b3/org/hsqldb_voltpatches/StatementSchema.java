@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -435,6 +437,21 @@ public class StatementSchema extends Statement {
                     return Result.newErrorResult(e, sql);
                 }
             }
+            case StatementTypes.ALTER_EXPORT : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    String target = (String)arguments[1];
+                    @SuppressWarnings("unchecked")
+                    List<String> triggers = (List<String>)arguments[2];
+                    table.addPersistentExport(target, triggers);
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
             case StatementTypes.ALTER_TTL : {
                 try {
                     HsqlName name       = (HsqlName) arguments[0];
@@ -452,9 +469,6 @@ public class StatementSchema extends Statement {
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);
                 }
-            }
-            case StatementTypes.ALTER_EXPORT : {
-
             }
             case StatementTypes.DROP_ASSERTION :
             case StatementTypes.DROP_CHARACTER_SET :
