@@ -75,7 +75,7 @@ public class NonDdlBatchPlanner {
         for (final SqlTask task : m_batch) {
             try {
                 final AdHocPlannedStatement result = planTask(task);
-                // System.err.println(result.core.toString().replace("{\"ID\":", "\n{\"ID\":"));
+                System.err.println(result.core.toString().replace("{\"ID\":", "\n{\"ID\":"));
                 if (m_batch.inferPartitioning()) {
                     // The planning tool may have optimized for the single partition case
                     // and generated a partition parameter.
