@@ -130,7 +130,7 @@ public:
                                int64_t uniqueId,
                                const TableTuple &tuple,
                                int partitionColumn,
-                               ExportTupleStream::Type type) {
+                               ExportTupleStream::STREAM_ROW_TYPE type) {
         receivedTuples.push_back(tuple);
         return ExportTupleStream::appendTuple(m_engine, spHandle, seqNo,
                                               uniqueId, tuple, partitionColumn, type);
