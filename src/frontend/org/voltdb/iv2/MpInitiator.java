@@ -133,15 +133,17 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                long repairTruncationHandle = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
+                    repairTruncationHandle = res.m_repairTruncationHandle;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid);
+                    ((MpInitiatorMailbox)m_initiatorMailbox).setLeaderState(txnid, repairTruncationHandle);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn

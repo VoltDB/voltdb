@@ -199,7 +199,7 @@ public class SpPromoteAlgo implements RepairAlgo
 
                 //no repair needed for MigratePartitionLeader
                 if (m_isMigratePartitionLeader) {
-                    m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                    m_promotionResult.set(new RepairResult(m_maxSeenTxnId, Long.MIN_VALUE));
                 } else {
                     repairSurvivors();
                 }
@@ -261,6 +261,6 @@ public class SpPromoteAlgo implements RepairAlgo
             repairLogger.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
         }
 
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, Long.MIN_VALUE));
     }
 }
