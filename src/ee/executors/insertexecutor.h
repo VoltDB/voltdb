@@ -84,8 +84,8 @@ class InsertExecutor : public AbstractExecutor
         m_upsertTuple(),
         m_templateTuple(),
         m_tempPool(NULL)
-            {
-            }
+    {
+    }
 
     /**
      * Return false iff all the work is done in init.  Inserting

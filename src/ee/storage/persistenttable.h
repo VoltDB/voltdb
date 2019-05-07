@@ -479,7 +479,7 @@ public:
     void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }
 
     void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
-
+    void setTableType(TableType tableType) { m_tableType = tableType; }
     bool isPersistentTableEmpty() const {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
@@ -580,6 +580,10 @@ public:
                                 bool ignoreTupleLimit = true,
                                 bool elastic = false);
 
+    inline TableType getTableType() const {
+        return m_tableType;
+    }
+
     /**
      * IW-ENG14804
      * Set a companion streamed table to export tuples
@@ -605,7 +609,12 @@ public:
 
 private:
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
+    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
+            int tableAllocationTargetSize = 0,
+            int tuplelimit = INT_MAX,
+            bool drEnabled = false,
+            bool isReplicated = false,
+            TableType tableType = PERSISTENT);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -879,6 +888,7 @@ private:
     SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
 
     // Pointer to Shadow streamed table (For Migrate) or nullptr
+    TableType m_tableType;
     StreamedTable* m_shadowStream;
     typedef std::set<void*> MigratingBatch;
     typedef std::map<int64_t, MigratingBatch> MigratingRows;

@@ -32,6 +32,9 @@
 package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
@@ -986,6 +989,9 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.USING : {
                 return readTimeToLive(t, true);
             }
+            case Tokens.EXPORT : {
+                return readPersistentExport(t, true);
+            }
             default : {
                 throw unexpectedToken();
             }
@@ -1007,6 +1013,80 @@ public class ParserDDL extends ParserRoutine {
         };
         return new StatementSchema(null, StatementTypes.DROP_TTL, args,
                                    null, t.getName());
+    }
+
+    private Statement readPersistentExport(Table table, boolean alter) {
+
+        // EXPORT TO TARGET FOO ON(INSERT, DELETE, UPDATE);
+        if (token.tokenType != Tokens.EXPORT) {
+            return null;
+        }
+        String target = readMigrateTarget();
+        if (alter && (table.getPersistentExport() == null ||
+                !target.equalsIgnoreCase(table.getPersistentExport().target))) {
+            throw unexpectedToken("Export target cann't be altered.");
+        }
+        // read triggers
+        List<String> triggers = new ArrayList<>();
+        read();
+        if (token.tokenType == Tokens.ON) {
+            read();
+            if (Tokens.OPENBRACKET != token.tokenType) {
+                throw unexpectedToken();
+            }
+            read();
+            int tokenCount = 7;
+            boolean hasUpdate = false;
+            while (token.tokenType != Tokens.CLOSEBRACKET) {
+                if (token.tokenType == Tokens.DELETE) {
+                    triggers.add(Tokens.T_DELETE);
+                }
+                if (token.tokenType == Tokens.INSERT) {
+                    triggers.add(Tokens.T_INSERT);
+                }
+                if (token.tokenType == Tokens.UPDATE) {
+                    hasUpdate = true;
+                    triggers.add(Tokens.T_UPDATE);
+                }
+                if (token.tokenType == Tokens.UPDATEOLD) {
+                    triggers.add(Tokens.T_UPDATEOLD);
+                }
+                if (token.tokenType == Tokens.UPDATENEW) {
+                    triggers.add(Tokens.T_UPDATENEW);
+                }
+                read();
+                tokenCount--;
+                if (tokenCount < 0) {
+                    break;
+                }
+            }
+            if (hasUpdate && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
+                throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
+                        " or " + Tokens.T_UPDATENEW);
+            }
+            if (triggers.contains(Tokens.T_UPDATEOLD) && triggers.contains(Tokens.T_UPDATENEW)) {
+                throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
+                        " and " + Tokens.T_UPDATENEW);
+            }
+            if (token.tokenType != Tokens.CLOSEBRACKET) {
+                throw unexpectedToken();
+            }
+            read();
+        }
+        if (triggers.isEmpty()) {
+            triggers= Arrays.asList("DELETE","INSERT","UPDATE");
+        }
+
+        table.addPersistentExport(target, triggers);
+        Object[] args = new Object[] {
+                table.getName(),
+                target,
+                triggers,
+                Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+                Boolean.valueOf(false)
+            };
+        return new StatementSchema(null, StatementTypes.ALTER_EXPORT, args,
+                                       null, table.getName());
     }
 
     private Statement readTimeToLive(Table table, boolean alter) {
@@ -1329,7 +1409,11 @@ public class ParserDDL extends ParserRoutine {
                     read();
 
                     // A VoltDB extension to support TTL
-                    readTimeToLive(table, false);
+                    if(token.tokenType == Tokens.EXPORT) {
+                        readPersistentExport(table, false);
+                    } else {
+                        readTimeToLive(table, false);
+                    }
                     // End of VoltDB extension
                     end = true;
                     break;

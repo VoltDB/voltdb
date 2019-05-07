@@ -1032,6 +1032,9 @@ static bool haveDifferentSchema(catalog::Table* srcTable, voltdb::Table* targetT
         if (srcTable->isDRed() != persistentTable->isDREnabled()) {
             return true;
         }
+        if ((static_cast<TableType>(srcTable->tableType())) != persistentTable->getTableType()) {
+           return true;
+        }
     }
 
     // make sure each column has same metadata
@@ -1097,7 +1100,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
-
             if (catalogTable->isreplicated()) {
                 if (updateReplicated) {
                     assert(SynchronizedThreadLock::isLowestSiteContext());
@@ -1135,6 +1137,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 Table* table = tcd->getTable();
                 VOLT_TRACE("add a PARTITIONED completely new table or rebuild an empty table %s", table->name().c_str());
                 m_delegatesByName[table->name()] = tcd;
+
             }
             // set export info on the new table
             auto streamedTable = tcd->getStreamedTable();
@@ -1218,6 +1221,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                     VOLT_DEBUG("Updating companion stream for %s", persistentTable->name().c_str());
                 }
                 tableSchemaChanged = haveDifferentSchema(catalogTable, persistentTable, true);
+
+                // Update table type
+                persistentTable->setTableType(static_cast<TableType>(catalogTable->tableType()));
             }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
@@ -1303,14 +1309,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 // call above should rebuild them all anyway
                 continue;
             }
-
             //
             // Same schema, but TUPLE_LIMIT may change.
             // Because there is no table rebuilt work next, no special need to take care of
             // the new tuple limit.
             //
             persistentTable->setTupleLimit(catalogTable->tuplelimit());
-
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
