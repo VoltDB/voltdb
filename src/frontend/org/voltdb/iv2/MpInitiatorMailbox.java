@@ -108,8 +108,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         return ra;
     }
 
-    @Override
-    public void setLeaderState(final long maxSeenTxnId)
+    public void setLeaderState(final long maxSeenTxnId, final long repairTruncationHandle)
     {
         final CountDownLatch cdl = new CountDownLatch(1);
         m_taskQueue.offer(new Runnable() {
@@ -117,6 +116,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             public void run() {
                 try {
                     setLeaderStateInternal(maxSeenTxnId);
+                    ((MpScheduler)m_scheduler).m_repairLogTruncationHandle = repairTruncationHandle;
+                    ((MpScheduler)m_scheduler).m_repairLogAwaitingTruncate = repairTruncationHandle;
                 } finally {
                     cdl.countDown();
                 }

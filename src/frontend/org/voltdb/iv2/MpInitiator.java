@@ -133,14 +133,17 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                long repairTruncationHandle = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
+                    repairTruncationHandle = res.m_repairTruncationHandle;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
                 }
                 if (success) {
+                    ((MpInitiatorMailbox)m_initiatorMailbox).setLeaderState(txnid, repairTruncationHandle);
                     m_initiatorMailbox.setLeaderState(txnid);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
