@@ -971,11 +971,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                 } catch (Exception e) {
                     exportLog.error(e.getMessage(), e);
-                } finally {
-                    m_es.shutdown();
                 }
             }
         });
+    }
+
+    // Callback from {@code ExportCoordinator} when its shutdown is complete,
+    // this is called from a runnable invoked on this executor.
+    public void onCoordinatorShutdown() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Shutdown executor");
+        }
+        m_es.shutdown();
     }
 
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.

@@ -181,6 +181,13 @@ public class ExportCoordinator {
         }
 
         /**
+         * Clear the queued invocations (on shutdown).
+         */
+        void clearInvocations() {
+            m_invocations.clear();
+        }
+
+        /**
          * Request lock for next queued invocation.
          */
         private void invokeNext() {
@@ -778,11 +785,31 @@ public class ExportCoordinator {
             // Nothing to shut down
             return;
         }
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export coordinator shutting down...");
-        }
-        m_task.shutdown();
-        m_ssm.ShutdownSynchronizedStatesManager();
+        exportLog.info("Export coordinator requesting shutdown: clearing pending invocations");
+        m_task.clearInvocations();
+
+        // We want to shutdown after we get the lock
+        m_task.invoke(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Export coordinator shutting down...");
+                    }
+                    m_task.shutdown();
+                    m_ssm.ShutdownSynchronizedStatesManager();
+
+                } catch (Exception e) {
+                    exportLog.error("Failed to initiate a coordinator shutdown: " + e);
+                } finally {
+                    m_eds.onCoordinatorShutdown();;
+                }
+            }
+            @Override
+            public String toString() {
+                return "Coordinator shutdown for host:" + m_hostId;
+            }
+        });
     }
 
     /**
