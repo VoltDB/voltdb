@@ -53,7 +53,8 @@ import com.google.common.collect.ImmutableList;
 
 public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
 
-    // 8 permutations of child types: Outer / Inner Calc, Scan, Merge Join
+    // 8 permutations of child types: Outer / Inner Calc, Scan, Merge Join.
+    // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
     private enum MatchType {
         OUTER_SCAN_INNER_SCAN {
             @Override VoltPhysicalCalc getOuterCalc(RelOptRuleCall call) {
@@ -377,7 +378,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         final RexProgram outerProgram = m_matchType.getCombinedOuterProgram(call);
         int numOuterFieldsForJoin = m_matchType.getNumOuterFieldsForJoin(call);
 
-        // Inner CHild
+        // Inner Child
         VoltPhysicalTableIndexScan innerIndexScan = m_matchType.getInnerIndexScan(call);
         Calc innerCalc = m_matchType.getInnerCalc(call);
         RelCollation innerCollation = innerIndexScan.getIndexCollation();

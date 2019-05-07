@@ -45,8 +45,12 @@ import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ImmutableList;
 
+/**
+ * Matching rule sets from nest loop join to nest loop-index join
+ */
 public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
 
+    // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
     public static final RelOptRule INSTANCE_SSCAN = new VoltPNestLoopToIndexJoinRule(
             operand(VoltPhysicalNestLoopJoin.class,
                     some(operand(RelNode.class, any()), operand(VoltPhysicalTableSequentialScan.class, none()))),

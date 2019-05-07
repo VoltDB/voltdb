@@ -154,7 +154,7 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
-
+            // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
@@ -175,9 +175,7 @@ public class PlannerRules {
             VoltPSetOpsRule.INSTANCE_UNION,
             VoltPSetOpsRule.INSTANCE_INTERSECT,
             VoltPSetOpsRule.INSTANCE_EXCEPT,
-            VoltPValuesRule.INSTANCE,
-
-            VoltPJoinExchangeTransposeRule.INSTANCE
+            VoltPValuesRule.INSTANCE
     );
 
     private static final RuleSet INLINE = RuleSets.ofList(
