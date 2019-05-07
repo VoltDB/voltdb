@@ -338,7 +338,7 @@ public abstract class CatalogSchemaTools {
                     table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
                 }
             }
-            if (TableType.needsMigrateHiddenColumn(catalog_tbl.getTabletype())) {
+            else if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
                 table_sb.append(" EXPORT TO TARGET ");
                 table_sb.append(streamTarget);
                 table_sb.append(" ON (" + TableType.toPersistentExportString(catalog_tbl.getTabletype()));

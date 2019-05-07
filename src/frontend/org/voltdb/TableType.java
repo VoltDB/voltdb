@@ -68,8 +68,12 @@ public enum TableType {
         return (e == PERSISTENT_MIGRATE.get());
     }
 
-    public static boolean needsMigrateHiddenColumn(int e) {
-        return (e >=PERSISTENT_MIGRATE.get() && e <= PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get());
+    public static boolean needsShadowStream(int e) {
+        return (e >= PERSISTENT_MIGRATE.get() && e <= PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get());
+    }
+
+    public static boolean isPersistentExport(int e) {
+        return (e >= PERSISTENT_EXPORT_INSERT.get() && e <= PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get());
     }
 
     public static boolean isInvalidType(int e) {
