@@ -347,9 +347,12 @@ public class PlannerTool {
                                                  core,
                                                  ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
                                                  null);
-                m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
+                // disable cache save until calcite planner is completed
+                //m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
             }
             //return ahps;
+            throw new PlannerFallbackException();
+        } catch (Exception e){
             throw new PlannerFallbackException();
         } finally {
             if (m_plannerStats != null) {
