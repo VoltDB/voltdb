@@ -591,7 +591,7 @@ final class RelDistributionUtils {
                             return new JoinState(true, srcLitera, combinedPartColumns);
                         } else if (outerIsPartitioned && innerIsPartitioned) {
                             return new JoinState(
-                                    outerDist.getIsSP() && (! outerHasPartitionKey ||   // either outer is replicated (SINGLE); or partitioned with a key
+                                    outerDist.getIsSP() && innerDist.getIsSP() && (! outerHasPartitionKey ||   // either outer is replicated (SINGLE); or partitioned with a key
                                             outerDist.getPartitionEqualValue().equals(innerDist.getPartitionEqualValue())),
                                     srcLitera, combinedPartColumns);
                         } else {

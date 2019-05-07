@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.utils.Cacheable;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -61,6 +62,10 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION,
                 "PhysicalJoin node convention mismatch");
+        if (joinType != JoinRelType.INNER) {        // We support inner join for now
+            // change/remove this when we support more join types
+            throw new PlannerFallbackException("Join type not supported: " + joinType.name());
+        }
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
         m_offset = offset;
