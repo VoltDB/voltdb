@@ -23,22 +23,36 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A generic LRU cache
+ * A generic LRU cache. Client must ensure that the key type K must properly override hashCode() method.
  */
-public abstract class Cacheable<K, V> extends LinkedHashMap<K, V> {
-    private final Map<K, V> m_map;
+public abstract class Cacheable<K, V> {
+    private final Map<Integer, V> m_map;
     protected Cacheable(int cap) {
         m_map = new LinkedHashMap<>(cap);
     }
-    public synchronized V cache_get(K key) {
-        if (m_map.containsKey(key)) {
-            return m_map.get(key);
+    public synchronized V get(K key) {
+        final int hashedKey = hashCode(key);
+        if (m_map.containsKey(hashedKey)) {
+            return m_map.get(hashedKey);
         } else {
             final V value = calculate(key);
             Preconditions.checkNotNull(value, "Cached value cannot be null");
-            m_map.put(key, value);
+            m_map.put(hashedKey, value);
             return value;
         }
     }
+
+    /**
+     * K-V map
+     * @param key key of the cache entry
+     * @return value of the cache entry
+     */
     abstract protected V calculate(K key);
+
+    /**
+     * Hashes key object
+     * @param key key object
+     * @return hash code of the key object, that must ensure cache map functionality.
+     */
+    abstract protected int hashCode(K key);
 }

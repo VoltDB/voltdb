@@ -23,6 +23,9 @@ import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 
+/**
+ * We need this to plan send/recv pairs for MP queries.
+ */
 public class VoltPhysicalSingletonExchange extends VoltPhysicalExchange implements VoltPhysicalRel {
 
     public VoltPhysicalSingletonExchange(
@@ -30,9 +33,9 @@ public class VoltPhysicalSingletonExchange extends VoltPhysicalExchange implemen
         super(cluster, traitSet, input);
     }
 
-    @Override protected VoltPhysicalSingletonExchange copyInternal(
-            RelTraitSet traitSet,
-            RelNode newInput) {
+    @Override
+    protected VoltPhysicalSingletonExchange copyInternal(
+            RelTraitSet traitSet, RelNode newInput) {
         return new VoltPhysicalSingletonExchange(
                 getCluster(), traitSet, newInput);
     }
@@ -43,5 +46,4 @@ public class VoltPhysicalSingletonExchange extends VoltPhysicalExchange implemen
         spn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
         return spn;
     }
-
 }

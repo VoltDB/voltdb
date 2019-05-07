@@ -31,7 +31,7 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalJoin;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSingletonExchange;
 
 /**
- * Transform Join / Exchange rels into Singleton Exchange / Join
+ * Transform Join / Exchange rels into Singleton Exchange / Join. We need this to plan send/recv pairs for MP queries.
  */
 public class VoltPJoinExchangeTransposeRule extends RelOptRule {
 
