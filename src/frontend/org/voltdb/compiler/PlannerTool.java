@@ -311,6 +311,10 @@ public class PlannerTool {
             throws ValidationException, RelConversionException, PlannerFallbackException {
         CacheUse cacheUse = CacheUse.FAIL;
 
+        // make a copy because the following sql task visiter will change the sql node
+        SqlNode node = task.getParsedQuery();
+        SqlNode node0 = node.clone(node.getParserPosition());
+        //getCompiledPlanCalcite(m_schemaPlus, node);
         // start planner cache stats collection
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
@@ -339,8 +343,8 @@ public class PlannerTool {
                 //////////////////////
                 // PLAN THE STMT
                 //////////////////////
-                CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, ptask.getParsedQuery());
-                plan.sql = ptask.getParsedQuery().toString();
+                CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, node);
+                plan.sql = task.getSQL();
                 CorePlan core = new CorePlan(plan, m_catalogHash);
                 //throw new PlannerFallbackException();
                 ahps = new AdHocPlannedStatement(plan.sql.getBytes(Constants.UTF8ENCODING),
