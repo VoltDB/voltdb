@@ -107,7 +107,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
     }
 
     @Test
-    public void testInsertDelete() throws Exception {
+    public void testInsertDeleteUpdate() throws Exception {
         Client client = getClient(m_cluster);
 
         //add data to stream table
@@ -119,15 +119,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T1", 200, false);
         m_verifier.verifyRows();
-    }
 
-    @Test
-    public void testUpdateWithAlter() throws Exception {
-        Client client = getClient(m_cluster);
-
-        //add data to stream table
-        Object[] data = new Object[3];
-        Arrays.fill(data, 1);
         insertToStream("T2", 0, 100, client, data);
         client.callProcedure("@AdHoc", "update T2 set b = 100 where a < 10000;");
         client.drain();
@@ -140,15 +132,8 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T2", 300, false);
-    }
 
-    @Test
-    public void testReplicaTableWithAlter() throws Exception {
-        Client client = getClient(m_cluster);
-
-        //add data to stream table
-        Object[] data = new Object[3];
-        Arrays.fill(data, 1);
+        // On replicated table
         insertToStream("T3", 0, 100, client, data);
         client.callProcedure("@AdHoc", "update T3 set b = 100 where a < 10000;");
         client.drain();
@@ -162,7 +147,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T3", 300, true);
     }
-
 
     private static void checkTupleCount(Client client, String tableName, long expectedCount, boolean replicated){
 
