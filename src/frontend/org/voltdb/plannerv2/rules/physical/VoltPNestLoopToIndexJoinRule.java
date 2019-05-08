@@ -86,7 +86,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                 m_innerProgram = m_innerTableScan.getProgram();
                 // both are table scans: outer table contains matching index but inner doesn't:
                 // swap the 2 tables, since we are looking for matching index from inner table.
-                if (m_outerScan instanceof VoltPhysicalJoin &&
+                if (m_outerScan instanceof VoltPhysicalTableScan &&
                         ! containsIndex(m_innerTableScan) &&
                         containsIndex((VoltPhysicalTableScan) m_outerScan)) {
                     commute();
@@ -161,7 +161,9 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
         final RexProgram program = extractor.getInnerProgram();
 
         // INNER only at the moment
-        Preconditions.checkState(join.getJoinType() == JoinRelType.INNER, "Must be inner join");
+        if (join.getJoinType() != JoinRelType.INNER) {
+            return;
+        }
 
         final Table innerTable = innerScan.getVoltTable().getCatalogTable();
         final Map<RelNode, RelNode> equiv = new HashMap<>();

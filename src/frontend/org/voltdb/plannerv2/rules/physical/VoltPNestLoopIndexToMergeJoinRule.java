@@ -33,6 +33,7 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.util.Pair;
@@ -365,6 +366,10 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         final VoltPhysicalJoin join = call.rel(0);
+        // INNER only at the moment
+        if (join.getJoinType() != JoinRelType.INNER) {
+            return;
+        }
 
         // Outer Child
         final RelNode outerNode = m_matchType.getOuterNode(call);
