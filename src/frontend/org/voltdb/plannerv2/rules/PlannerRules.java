@@ -18,29 +18,12 @@
 package org.voltdb.plannerv2.rules;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.rel.rules.CalcMergeRule;
-import org.apache.calcite.rel.rules.FilterCalcMergeRule;
-import org.apache.calcite.rel.rules.FilterJoinRule;
-import org.apache.calcite.rel.rules.FilterMergeRule;
-import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
-import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
-import org.apache.calcite.rel.rules.FilterToCalcRule;
-import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectMergeRule;
-import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
-import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rel.rules.ReduceExpressionsRule;
-import org.apache.calcite.rel.rules.UnionMergeRule;
+import org.apache.calcite.rel.rules.*;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalAggregateScanMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcAggregateMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSerialAggregateMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
-import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.*;
 import org.voltdb.plannerv2.rules.logical.*;
 import org.voltdb.plannerv2.rules.physical.*;
 
@@ -119,11 +102,16 @@ public class PlannerRules {
             VoltLTableScanRule.INSTANCE,
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
+            // Joins
             VoltLJoinRule.INSTANCE,
+            FilterJoinRule.FILTER_ON_JOIN,
+            FilterJoinRule.JOIN,
+
+            // Setops
             VoltLSetOpsRule.INSTANCE_UNION,
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,
-            VoltLValuesRule.INSTANCE
+            VoltLValuesRule.INSTANCE,
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -147,7 +135,7 @@ public class PlannerRules {
 //            AggregateExpandDistinctAggregatesRule.INSTANCE,
 //            // See comments inside for examples.
 //            AggregateReduceFunctionsRule.INSTANCE,
-//            JoinCommuteRule.INSTANCE,
+              JoinCommuteRule.INSTANCE
 //            JoinPushThroughJoinRule.LEFT,
 //            JoinPushThroughJoinRule.RIGHT,
 //            SortProjectTransposeRule.INSTANCE,
@@ -165,7 +153,21 @@ public class PlannerRules {
             VoltPSortConvertRule.INSTANCE_VOLTDB,
             VoltPLimitRule.INSTANCE,
             VoltPAggregateRule.INSTANCE,
+            // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
+            JoinCommuteRule.INSTANCE,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
+            VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_SSCAN_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_MJ_CALC_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_ISCAN,
+            VoltPNestLoopIndexToMergeJoinRule.INSTANCE_CALC_MJ_CALC_ISCAN,
+
             VoltPSortScanToIndexRule.INSTANCE_SORT_SCAN,
             VoltPSortScanToIndexRule.INSTANCE_SORT_CALC_SEQSCAN,
             VoltPCalcScanToIndexRule.INSTANCE,
@@ -183,7 +185,9 @@ public class PlannerRules {
             VoltPhysicalLimitSerialAggregateMergeRule.INSTANCE,
             VoltPhysicalLimitSortMergeRule.INSTANCE_1,
             VoltPhysicalAggregateScanMergeRule.INSTANCE,
-            VoltPhysicalLimitScanMergeRule.INSTANCE_1
+            VoltPhysicalLimitScanMergeRule.INSTANCE_LIMIT_SCAN,
+            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_JOIN,
+            VoltPhysicalLimitJoinMergeRule.INSTANCE_LIMIT_CALC_JOIN
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(

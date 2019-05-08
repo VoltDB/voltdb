@@ -46,11 +46,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     private final int m_splitCount;
 
     public VoltPhysicalCalc(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexProgram program,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program, int splitCount) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
@@ -95,8 +91,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
         rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
 

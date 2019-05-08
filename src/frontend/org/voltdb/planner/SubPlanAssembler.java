@@ -315,13 +315,13 @@ public abstract class SubPlanAssembler {
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        scanNode.setEndExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.endExprs));
         scanNode.setPredicate(path.otherExprs);
         // Propagate the sorting information
         // into the scan node from the access path.
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
-        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
+        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         IndexUseForOrderBy indexUse = scanNode.indexUse();
@@ -1970,7 +1970,7 @@ public abstract class SubPlanAssembler {
             // create the IndexScanNode with all its metadata
             scanNode.setLookupType(path.lookupType);
             scanNode.setBindings(path.bindings);
-            scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+            scanNode.setEndExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.endExprs));
             if (! path.index.getPredicatejson().isEmpty()) {
                 try {
                     scanNode.setPartialIndexPredicate(
@@ -1984,7 +1984,7 @@ public abstract class SubPlanAssembler {
             // into the scan node from the access path.
             // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
             // iteration after it had to initially settle for starting at "greater than a prefix key".
-            scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
+            scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
             scanNode.setSkipNullPredicate();
             scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
             final IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();

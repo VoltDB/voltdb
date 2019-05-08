@@ -33,7 +33,7 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
  */
 public class VoltPhysicalLimitScanMergeRule extends RelOptRule {
 
-    public static final VoltPhysicalLimitScanMergeRule INSTANCE_1 =
+    public static final VoltPhysicalLimitScanMergeRule INSTANCE_LIMIT_SCAN =
             new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalTableScan.class, none())));
 

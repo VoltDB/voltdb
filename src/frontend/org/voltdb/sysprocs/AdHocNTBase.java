@@ -225,8 +225,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // for Error or Throwable on the same try block.
             throw new PlanningErrorException("Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.");
-        }
-        catch (AssertionError ae) {
+        } catch (AssertionError ae) {
             String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
                     + "Please contact VoltDB at support@voltdb.com with your log files.";
             StringWriter stringWriter = new StringWriter();

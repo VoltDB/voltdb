@@ -375,7 +375,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      * Append the provided schema to this schema and return the result
      * as a new schema. Columns order: [this][provided schema columns].
      */
-    NodeSchema join(NodeSchema schema) {
+    public NodeSchema join(NodeSchema schema) {
         NodeSchema copy = this.clone();
         for (SchemaColumn column: schema.getColumns()) {
             copy.addColumn(column.clone());

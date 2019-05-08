@@ -177,7 +177,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
         AggregatePlanNode apn = getAggregatePlanNode();
 
         // Generate output schema
-        NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getRowType());
+        NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getRowType(), 0);
         apn.setOutputSchema(schema);
 
         // The Aggregate's record layout seems to be
@@ -187,7 +187,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
         RelDataType aggrRowType = getRowType();
         List<RelDataTypeField> fields = inputRowType.getFieldList();
         // Aggreagte fields start right after the grouping ones in order of the aggregate calls
-        int aggrFieldIdx = 0 + getGroupCount();
+        int aggrFieldIdx = getGroupCount();
         for(AggregateCall aggrCall : getAggCallList()) {
             // Aggr type
             ExpressionType aggrType =

@@ -70,7 +70,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testSeqScanWithFilter() {
         m_tester.sql("select i from R1 where i = 5")
-                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[=($t0, $t6)], I=[$t0], $condition=[$t7])\n" +
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[5], expr#7=[=($t0, $t6)], I=[$t0], " +
+                        "$condition=[$t7])\n" +
                         "  VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
@@ -85,7 +86,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testSeqScanWithStringFilter() {
         m_tester.sql("select i from R1 where v = 'FOO1'")
-                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['FOO1'], expr#7=[=($t5, $t6)], I=[$t0], $condition=[$t7])\n" +
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['FOO1'], expr#7=[=($t5, $t6)], I=[$t0], " +
+                        "$condition=[$t7])\n" +
                         "  VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
@@ -139,7 +141,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
     public void testSeqScanWithFilterAndLimit() {
         m_tester.sql("select i from R1 where si > 3 limit 5")
                 .transform("VoltLogicalLimit(limit=[5])\n" +
-                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], I=[$t0], $condition=[$t7])\n" +
+                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], I=[$t0], " +
+                        "$condition=[$t7])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
@@ -148,7 +151,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select si, i from RI1 where I > 3 order by si limit 3")
                 .transform("VoltLogicalLimit(limit=[3])\n" +
                         "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                        "    VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5])\n" +
+                        "    VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], " +
+                        "I=[$t0], $condition=[$t5])\n" +
                         "      VoltLogicalTableScan(table=[[public, RI1]])\n")
                 .pass();
     }
@@ -181,7 +185,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
     public void testSeqScanWithOrderByAndFilter() {
         m_tester.sql("select * from R1 where si > 3 order by i")
                 .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
+                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t1, $t6)], " +
+                        "proj#0..5=[{exprs}], $condition=[$t7])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 
@@ -228,7 +233,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
     public void testIndexScanWithLimitOffset() {
         m_tester.sql("select si, i from RI1 where I > 3 limit 3 offset 4")
                 .transform("VoltLogicalLimit(limit=[3], offset=[4])\n" +
-                        "  VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], I=[$t0], $condition=[$t5])\n" +
+                        "  VoltLogicalCalc(expr#0..3=[{inputs}], expr#4=[3], expr#5=[>($t0, $t4)], SI=[$t1], " +
+                        "I=[$t0], $condition=[$t5])\n" +
                         "    VoltLogicalTableScan(table=[[public, RI1]])\n")
                 .pass();
     }
@@ -256,12 +262,14 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testConcatStringExpr() {
         m_tester.sql("select '55' || '22' from R1")
-                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['55'], expr#7=['22'], expr#8=[||($t6, $t7)], EXPR$0=[$t8])\n" +
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['55'], expr#7=['22'], expr#8=[||($t6, $t7)], " +
+                        "EXPR$0=[$t8])\n" +
                         "  VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 
         m_tester.sql("select v || '22' from R1")
-                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['22'], expr#7=[||($t5, $t6)], EXPR$0=[$t7])\n" +
+                .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['22'], expr#7=[||($t5, $t6)], " +
+                        "EXPR$0=[$t7])\n" +
                         "  VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
@@ -275,7 +283,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testBinaryDatetimeExpr() {
         m_tester.sql("select ts - INTERVAL '1' DAY from RTYPES")
-                .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[86400000], expr#10=[-($t6, $t9)], EXPR$0=[$t10])\n" +
+                .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[86400000], expr#10=[-($t6, $t9)], " +
+                        "EXPR$0=[$t10])\n" +
                         "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")
                 .pass();
     }
@@ -333,7 +342,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
         m_tester.sql("select count(i) from R1 where ti > 3")
                 .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
-                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t2, $t6)], I=[$t0], $condition=[$t7])\n" +
+                        "  VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[3], expr#7=[>($t2, $t6)], I=[$t0], " +
+                        "$condition=[$t7])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 
@@ -344,7 +354,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 .pass();
 
         m_tester.sql("select max(TI) from R1 group by SI having SI > 0")
-                .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t0, $t2)], EXPR$0=[$t1], $condition=[$t3])\n" +
+                .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t0, $t2)], EXPR$0=[$t1], " +
+                        "$condition=[$t3])\n" +
                         "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], TI=[$t2])\n" +
                         "      VoltLogicalTableScan(table=[[public, R1]])\n")
@@ -413,13 +424,13 @@ public class TestLogicalRules extends Plannerv2TestCase {
         // TODO: Calcite casting to INTEGER instead of BigInt.
         // We may fail some JUnit tests when we execute such Calcite plan.
         m_tester.sql("select R1.i, R2.v from R1, R2 where R2.si = R1.i and R2.v = 'foo'")
-                .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t0], V=[$t2])\n" +
-                        "  VoltLogicalJoin(condition=[=(CAST($1):INTEGER, $0)], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t2], V=[$t1])\n" +
+                        "  VoltLogicalJoin(condition=[=(CAST($0):INTEGER, $2)], joinType=[inner])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], SI=[$t1], " +
                         "V=[$t5], $condition=[$t7])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R2]])\n")
+                        "      VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 
         m_tester.sql("select R1.i, R2.v from R1 inner join R2 on R2.si = R1.i where R2.v = 'foo'")
@@ -434,24 +445,24 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
         m_tester.sql("select R2.si, R1.i from R1 inner join " +
                 "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i")
-                .transform("VoltLogicalCalc(expr#0..6=[{inputs}], SI=[$t5], I=[$t0])\n" +
-                        "  VoltLogicalJoin(condition=[AND(=($4, $3), >($2, $4))], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], " +
-                        "expr#8=[>($t1, $t7)], proj#0..2=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                .transform("VoltLogicalCalc(expr#0..6=[{inputs}], SI=[$t1], I=[$t3])\n" +
+                        "  VoltLogicalJoin(condition=[AND(=($0, $6), >($5, $0))], joinType=[inner])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], " +
                         "proj#0..1=[{exprs}], V=[$t5], $condition=[$t7])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R2]])\n")
+                        "      VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], " +
+                        "expr#8=[>($t1, $t7)], proj#0..2=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
 
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.si where R1.I + R2.ti = 5")
-                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t0])\n" +
-                        "  VoltLogicalJoin(condition=[AND(=($1, $2), =(+($0, $3), 5))], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t2])\n" +
+                        "  VoltLogicalJoin(condition=[AND(=($3, $0), =(+($2, $1), 5))], joinType=[inner])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], TI=[$t2])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R2]])\n")
+                        "      VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], proj#0..1=[{exprs}])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
 
@@ -459,18 +470,19 @@ public class TestLogicalRules extends Plannerv2TestCase {
         m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
                 "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'")
-                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t0])\n" +
-                        "  VoltLogicalJoin(condition=[=($2, $3)], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(256) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..1=[{exprs}], V00=[$t5])\n" +
-                        "      VoltLogicalJoin(condition=[=($2, $3)], joinType=[inner])\n" +
-                        "        VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], " +
-                        "expr#8=[>($t1, $t7)], proj#0..1=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
-                        "          VoltLogicalTableScan(table=[[public, R1]])\n" +
+                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t1])\n" +
+                        "  VoltLogicalJoin(condition=[=($3, $0)], joinType=[inner])\n" +
+                        "    VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], VC=[$t1], " +
+                        "$condition=[$t4])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R3]])\n" +
+                        "    VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t1):VARCHAR(256) CHARACTER SET " +
+                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5])\n" +
+                        "      VoltLogicalJoin(condition=[=($4, $0)], joinType=[inner])\n" +
                         "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], V=[$t5])\n" +
                         "          VoltLogicalTableScan(table=[[public, R2]])\n" +
-                        "    VoltLogicalCalc(expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], VC=[$t1], $condition=[$t4])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R3]])\n")
+                        "        VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[4], " +
+                        "expr#8=[>($t1, $t7)], proj#0..1=[{exprs}], SI0=[$t6], $condition=[$t8])\n" +
+                        "          VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
 
@@ -482,14 +494,14 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 + "  (select * from R2 where f = 30.3) as t2 "
                 + "on t1.i = t2.i "
                 + "where t1.i = 3")
-                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], V=[$t1], V0=[$t3])\n" +
-                        "  VoltLogicalJoin(condition=[=($0, $2)], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], " +
-                        "expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                .transform("VoltLogicalCalc(expr#0..3=[{inputs}], V=[$t3], V0=[$t1])\n" +
+                        "  VoltLogicalJoin(condition=[=($2, $0)], joinType=[inner])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], " +
                         "expr#8=[=($t6, $t7)], I=[$t0], V=[$t5], $condition=[$t8])\n" +
-                        "      VoltLogicalTableScan(table=[[public, R2]])\n")
+                        "      VoltLogicalTableScan(table=[[public, R2]])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], " +
+                        "expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
     }
 
@@ -541,12 +553,14 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testENG15245() {
         m_tester.sql("select CAST(border as VARCHAR) from R5")
-                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR(2048) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR(2048) CHARACTER SET " +
+                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .pass();
 
         m_tester.sql("select CAST(point as VARCHAR) from R5")
-                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(2048) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(2048) CHARACTER SET " +
+                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .pass();
     }

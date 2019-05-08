@@ -262,7 +262,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             else {
                 return null;
             }
-            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
+            skipNullPredicate = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
@@ -477,7 +477,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         if (newExpr != null) {
             List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add(newExpr.clone());
-            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, newEndExpressions);
         }
     }
 

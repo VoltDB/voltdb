@@ -20,49 +20,55 @@ package org.voltdb.plannerv2.rel.physical;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
+public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     private final boolean semiJoinDone;
     private final ImmutableList<RelDataTypeField> systemFieldList;
+    // NOTE: we cannot really cache computation of RelMetadataQuery -> estimateRowCount (double) computation, because
+    // RelMetadataQuery is abstract and not hash-able.
+//    private final Cacheable<RelMetadataQuery, Double> ROW_COUNT_CACHE =
+//            new Cacheable<RelMetadataQuery, Double>(64) {
+//                @Override protected Double calculate(RelMetadataQuery key) {
+//                    return estimateRowCountImpl(key);
+//                }
+//                @Override protected int hashCode(RelMetadataQuery meta) {
+//                    return meta.hashCode();
+//                }
+//            };
 
-    private final int m_splitCount;
+    // Inline rels
+    protected final RexNode m_offset;
+    protected final RexNode m_limit;
 
     public VoltPhysicalJoin(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode left,
-            RelNode right,
-            RexNode condition,
-            Set<CorrelationId> variablesSet,
-            JoinRelType joinType,
-            boolean semiJoinDone,
-            ImmutableList<RelDataTypeField> systemFieldList,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
+            ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION,
+                "PhysicalJoin node convention mismatch");
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
-        m_splitCount = splitCount;
-    }
-
-    @Override
-    public VoltPhysicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
-                                 RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
-        return new VoltPhysicalJoin(getCluster(),
-                traitSet, left, right, conditionExpr,
-                variablesSet, joinType, semiJoinDone, systemFieldList, m_splitCount);
+        m_offset = offset;
+        m_limit = limit;
     }
 
     @Override
@@ -71,8 +77,12 @@ public class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone)
-                .item("split", m_splitCount);
+                .item("split", 1)
+                .itemIf("offset", m_offset, m_offset != null)
+                .itemIf("limit", m_limit, m_limit != null);
     }
+
+    abstract public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit);
 
     @Override
     public boolean isSemiJoinDone() {
@@ -83,8 +93,43 @@ public class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         return systemFieldList;
     }
 
+    // NOTE: we set this to 1 for SP queries.
     @Override
     public int getSplitCount() {
-        return m_splitCount;
+        return 1;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return estimateRowCountImpl(mq);
+        // return ROW_COUNT_CACHE.get(mq);
+    }
+
+    protected double estimateRowCountImpl(RelMetadataQuery mq) {
+        // Give it a discount based on the number of equivalence expressions
+        return Math.min(getInput(0).estimateRowCount(mq), getInput(1).estimateRowCount(mq)) *
+                Math.pow(0.10, RelOptUtil.conjunctions(getCondition()).size());
+    }
+
+    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+        Preconditions.checkNotNull(node, "Plan node is null");
+        final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getInput(0).getRowType(), 0)
+                .join(RexConverter.convertToVoltDBNodeSchema(getInput(1).getRowType(), 0));
+        node.setOutputSchemaPreInlineAgg(schema);
+        node.setOutputSchema(schema);
+        node.setHaveSignificantOutputSchema(true);
+        return node;
+    }
+
+    /**
+     * Convert JOIN's LIMIT/OFFSET to an inline LimitPlanNode
+     * @param node join node
+     * @return possibly inlined join node
+     */
+    protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
+        if (m_limit != null || m_offset != null) {
+            node.addInlinePlanNode(VoltPhysicalLimit.toPlanNode(m_limit, m_offset));
+        }
+        return node;
     }
 }

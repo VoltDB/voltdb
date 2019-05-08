@@ -47,6 +47,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -146,7 +147,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         if (m_program == null) {
             return table.getRowType();
         } else {
-            RelDataType rowDataType = m_program.getOutputRowType();
+            final RelDataType rowDataType = m_program.getOutputRowType();
             if (rowDataType.getFieldCount() > 0) {
                 return rowDataType;
             } else {
@@ -309,14 +310,12 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      */
     protected AbstractPlanNode addPredicate(AbstractScanPlanNode scan) {
         // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
-        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        final RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
         Preconditions.checkNotNull(program);
 
-        RexLocalRef condition = program.getCondition();
+        final RexLocalRef condition = program.getCondition();
         if (condition != null) {
-            List<AbstractExpression> predList = new ArrayList<>();
-            predList.add(RexConverter.convert(program.expandLocalRef(condition)));
-            scan.setPredicate(predList);
+            scan.setPredicate(Collections.singletonList(RexConverter.convert(program.expandLocalRef(condition))));
         }
         return scan;
     }
@@ -329,8 +328,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      */
     protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
         if (hasLimitOffset()) {
-            LimitPlanNode limitPlanNode = VoltPhysicalLimit.toPlanNode(m_limit, m_offset);
-            node.addInlinePlanNode(limitPlanNode);
+            node.addInlinePlanNode(VoltPhysicalLimit.toPlanNode(m_limit, m_offset));
         }
         return node;
     }
@@ -343,10 +341,9 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      */
     protected AbstractPlanNode addProjection(AbstractPlanNode node) {
         // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
-        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
-        assert program != null;
-
-        ProjectionPlanNode ppn = new ProjectionPlanNode();
+        RexProgram program = m_aggregate == null ? m_program : m_preAggregateProgram;
+        Preconditions.checkNotNull(program, "Cannot add projection when program is null");
+        final ProjectionPlanNode ppn = new ProjectionPlanNode();
         ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program));
         node.addInlinePlanNode(ppn);
         return node;
@@ -361,7 +358,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
         if (m_aggregate != null) {
             Preconditions.checkNotNull(m_preAggregateRowType);
-            AbstractPlanNode aggr = ((AbstractVoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
+            final AbstractPlanNode aggr = ((AbstractVoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
             aggr.clearChildren();
             node.addInlinePlanNode(aggr);
             node.setOutputSchema(aggr.getOutputSchema());
@@ -369,7 +366,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltPhysicalLimitScanMergeRule.
             // The VoltPhysicalAggregateScanMergeRule should be triggered prior to the VoltPhysicalLimitScanMergeRule
             // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
-            Preconditions.checkArgument((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
+            Preconditions.checkState((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
                     aggr instanceof AggregatePlanNode);
             node = addLimitOffset(aggr);
         }

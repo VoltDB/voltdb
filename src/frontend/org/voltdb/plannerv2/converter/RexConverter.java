@@ -29,6 +29,7 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.IntervalSqlType;
@@ -51,6 +52,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 import java.math.BigDecimal;
+import java.sql.Ref;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -330,20 +332,22 @@ public class RexConverter {
     /**
      * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
      * a corresponding TVE. If the numLhsFieldsForJoin is set to something other than -1 it means
-     * that this table is an inner table of some join and its expression indexes must be adjusted
+     * that this table is an inner table of some join, or outer table of some join, and
+     * its expression indexes must be adjusted.
      *
      * @param rexNode RexNode to be converted
      * @param catTableName a catalog table name
      * @param catColumns column name list
      * @param program programs that is associated with this table
-     * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
-
+     * @param numOuterFieldsForJoin number of fields that come from outer table (-1 if not a join)
+     * @param isInnerTable
      * @return
      */
     public static AbstractExpression convertRefExpression(
-            RexNode rexNode, String catTableName, List<Column> catColumns, RexProgram program, int numOuterFieldsForJoin) {
+            RexNode rexNode, String catTableName, List<Column> catColumns, RexProgram program,
+            int numOuterFieldsForJoin, boolean isInnerTable) {
         final AbstractExpression ae = rexNode.accept(
-                new RefExpressionConvertingVisitor(catTableName, catColumns, program, numOuterFieldsForJoin));
+                new RefExpressionConvertingVisitor(catTableName, catColumns, program, numOuterFieldsForJoin, isInnerTable));
         Preconditions.checkNotNull(ae);
         return ae;
     }
@@ -370,7 +374,7 @@ public class RexConverter {
 
     /**
      * Resolve filter expression for a standalone table (numLhsFieldsForJoin = -1)
-     * or outer table from a join (possibly inline inner node for NLIJ).
+     * or table from a join (possibly inline inner node for NLIJ).
      * The resolved expression is used to identify a suitable index to access the data
      *
      */
@@ -379,24 +383,27 @@ public class RexConverter {
         final private RexProgram m_program;
         final private List<Column> m_catColumns;
         final private String m_catTableName;
+        final private boolean m_isInnerTable;
 
         RefExpressionConvertingVisitor(
-                String catTableName, List<Column> catColumns, RexProgram program, int numOuterFieldsForJoin) {
+                String catTableName, List<Column> catColumns, RexProgram program, int numOuterFieldsForJoin,
+                boolean isInnerTable) {
             super(numOuterFieldsForJoin);
             m_catTableName = catTableName;
             m_catColumns = catColumns;
             m_program = program;
+            m_isInnerTable = isInnerTable;
         }
 
         RefExpressionConvertingVisitor(RexProgram program) {
-            this(null, null, program, -1);
+            this(null, null, program, -1, false);
         }
 
         @Override
         public AbstractExpression visitLocalRef(RexLocalRef localRef) {
             Preconditions.checkNotNull(m_program);
             int exprIndx = localRef.getIndex();
-            if (isFromRHSTable(exprIndx)) {
+            if (isFromInnerTable(exprIndx)) {
                 exprIndx -= m_numOuterFieldsForJoin;
             }
 
@@ -406,28 +413,50 @@ public class RexConverter {
         }
 
         @Override
-        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
+        public AbstractExpression visitInputRef(RexInputRef inputRef) {
             int exprInputIndx = inputRef.getIndex();
 
             int inputIdx = exprInputIndx;
             RelDataType inputType = inputRef.getType();
 
-            final boolean rhsTable = isFromRHSTable(exprInputIndx);
+            // Input reference from an outer table of a join
+            final boolean isFromInnerTable = isFromInnerTable(exprInputIndx);
+            // resolving non-join references
+            final boolean resolvingNonJoinRef = m_numOuterFieldsForJoin < 0;
+            // resolving outer-table reference
+            final boolean resolvingOuter = ! isFromInnerTable && ! m_isInnerTable && m_numOuterFieldsForJoin > 0;
+            // resolving inner table reference
+            final boolean resolvingInner = isFromInnerTable && m_isInnerTable && m_numOuterFieldsForJoin > 0;
+
             String columnName = null;
             String tableName = null;
-            final int tableIndex = rhsTable ? 1 : 0;
-            // Resolve column name if it is not a join or it's inner table from a join
-            // To resolve the names of the outer table set  the numLhsFieldsForJoin = -1
-            if (rhsTable || m_numOuterFieldsForJoin < 0) {
-                exprInputIndx -= Integer.max(0, m_numOuterFieldsForJoin);
-                if (rhsTable && m_program.getProjectList()!= null) {
+            final int tableIndex = isFromInnerTable ? 1 : 0;
+            if (resolvingNonJoinRef || resolvingOuter || resolvingInner) {
+                // To resolve names of inner table, we need to decrement the original index by the outer table field count
+                if (resolvingInner) {
+                    exprInputIndx -= m_numOuterFieldsForJoin;
+                }
+                if (resolvingOuter || resolvingInner) {
                     // This input reference is part of a join expression that refers an expression
-                    // that comes from the inner node. To resolve it we need to find its index
+                    // that comes from either node. To resolve it we need to find its index
                     // in the inner node's expression list using the inner node projection
                     Preconditions.checkState(exprInputIndx < m_program.getProjectList().size());
                     final RexLocalRef inputLocalRef = m_program.getProjectList().get(exprInputIndx);
                     inputIdx = inputLocalRef.getIndex();
-                    inputType = inputLocalRef.getType();
+                    // It may be CAST expression that Calcite adds when types of join expressions on outer/inner sides do not
+                    // match, and we need to remove it to match VoltDB.
+                    RexNode expr = m_program.getExprList().get(inputIdx);
+                    if (expr.isA(SqlKind.CAST)) {
+                        expr = ((RexCall) expr).getOperands().get(0);
+                    }
+                    // Now that we narrowed down to an expression from either table, we need a new non-join
+                    // RefExpressionConvertingVisitor to resolve it.
+                    final AbstractExpression voltExpr =
+                            expr.accept(new RefExpressionConvertingVisitor(
+                            m_catTableName, m_catColumns, m_program, -1, false));
+                    voltExpr.findAllTupleValueSubexpressions()
+                            .forEach(tve -> tve.setTableIndex(tableIndex));
+                    return voltExpr;
                 }
                 if (m_catColumns != null && inputIdx < m_catColumns.size()) {
                     columnName = m_catColumns.get(inputIdx).getTypeName();
@@ -457,15 +486,11 @@ public class RexConverter {
             m_numOuterFieldsForJoin = numOuterFields;
         }
 
-        boolean isFromRHSTable(int columnIndex) {
-            return m_numOuterFieldsForJoin >= 0 && columnIndex >= m_numOuterFieldsForJoin;
-        }
-
         boolean isFromInnerTable(int columnIndex) {
             return m_numOuterFieldsForJoin >= 0 && columnIndex >= m_numOuterFieldsForJoin;
         }
 
-        TupleValueExpression visitInputRef(
+        AbstractExpression visitInputRef(
                 int tableIndex, int inputColumnIdx, RelDataType inputType, String tableName, String columnName) {
             // null if the column comes from RexInputRef
             if (tableName == null) {
@@ -484,7 +509,7 @@ public class RexConverter {
         }
 
         @Override
-        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
+        public AbstractExpression visitInputRef(RexInputRef inputRef) {
             int inputRefIdx = inputRef.getIndex();
             int tableIndex = 0;
 
@@ -555,14 +580,25 @@ public class RexConverter {
         return ae;
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType) {
+    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond) {
+        if (cond != null) {
+            final AbstractExpression expr = cond.accept(new ConvertingVisitor(numOuterFields));
+            Preconditions.checkNotNull(expr, "RexNode converted to null expression");
+            return expr;
+        } else {
+            return null;
+        }
+    }
+
+    public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType, int offset) {
         final NodeSchema nodeSchema = new NodeSchema();
 
         final RelRecordType ty = (RelRecordType) rowType;
         final List<String> names = ty.getFieldNames();
         int i = 0;
         for (RelDataTypeField item : ty.getFieldList()) {
-            TupleValueExpression tve = new TupleValueExpression("", "", "", names.get(i), i, i);
+            TupleValueExpression tve = new TupleValueExpression("", "", "",
+                    names.get(i), i + offset, i + offset);
             RexConverter.setType(tve, item.getType());
             nodeSchema.addColumn(new SchemaColumn("", "", "", names.get(i), tve, i));
             ++i;
