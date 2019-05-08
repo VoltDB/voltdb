@@ -1140,6 +1140,15 @@ ALTER TABLE T64 ADD
     USING TTL 10 SECONDS ON COLUMN C3
     BATCH_SIZE 100 MAX_FREQUENCY 1;
 
+CREATE TABLE T65
+(
+   C1 INTEGER,
+   C2 INTEGER,
+   C3 INTEGER NOT NULL,
+   PRIMARY KEY (C3)
+) EXPORT TO TARGET FOO ON(INSERT,DELETE);
+
+ALTER TABLE T65 EXPORT TO TARGET FOO ON(UPDATE);
 -- These statements were added when use of some Volt-specific functions or ||
 -- or NULL in indexed expressions was discovered to be mishandled (ENG-7792).
 -- They showed that views and procs did NOT share these problems,

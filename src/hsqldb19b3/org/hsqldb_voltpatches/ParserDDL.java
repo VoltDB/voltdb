@@ -1040,19 +1040,17 @@ public class ParserDDL extends ParserRoutine {
             while (token.tokenType != Tokens.CLOSEBRACKET) {
                 if (token.tokenType == Tokens.DELETE) {
                     triggers.add(Tokens.T_DELETE);
-                }
-                if (token.tokenType == Tokens.INSERT) {
+                } else if (token.tokenType == Tokens.INSERT) {
                     triggers.add(Tokens.T_INSERT);
-                }
-                if (token.tokenType == Tokens.UPDATE) {
+                } else if (token.tokenType == Tokens.UPDATE) {
                     hasUpdate = true;
                     triggers.add(Tokens.T_UPDATE);
-                }
-                if (token.tokenType == Tokens.UPDATEOLD) {
+                } else if (token.tokenType == Tokens.UPDATEOLD) {
                     triggers.add(Tokens.T_UPDATEOLD);
-                }
-                if (token.tokenType == Tokens.UPDATENEW) {
+                } else if (token.tokenType == Tokens.UPDATENEW) {
                     triggers.add(Tokens.T_UPDATENEW);
+                } else {
+                    throw unexpectedToken();
                 }
                 read();
                 tokenCount--;
