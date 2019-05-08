@@ -93,6 +93,7 @@ primary key (ID));
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -138,6 +139,7 @@ create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -251,6 +253,7 @@ drop procedure InsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -310,6 +313,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -355,6 +359,7 @@ create procedure from class sqlcmdtest.BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -474,6 +479,7 @@ drop procedure BoxedInsertEmployee;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar

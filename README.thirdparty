@@ -151,7 +151,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-Boost 1.53
+Boost 1.70
 Boost Software License - Version 1.0 - August 17th, 2003
 
 Permission is hereby granted, free of charge, to any person or organization
@@ -184,7 +184,7 @@ Cliff Click high-scale-lib-v1.1.2
  */
 
 ================================================================================
-JsonCpp 0.6.0-dev
+JsonCpp 1.8.0
 
 The JsonCpp library's source code, including accompanying documentation,
 tests and demonstration applications, are licensed under the following
@@ -2641,7 +2641,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ================================================================================
-PCRE2
+PCRE2-10.33
 License: The "BSD" License: http://www.pcre.org/license.txt
 
 THE "BSD" LICENCE
@@ -2674,7 +2674,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-OpenSSL
+OpenSSL-1.0.2d
 License: The OpenSSL License: https://github.com/openssl/openssl/blob/master/LICENSE
 /* ====================================================================
  * Copyright (c) 1998-2016 The OpenSSL Project.  All rights reserved.
@@ -2684,7 +2684,7 @@ License: The OpenSSL License: https://github.com/openssl/openssl/blob/master/LIC
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -2907,10 +2907,10 @@ FileSaver.min.js
 License: MIT
 Site: https://github.com/eligrey/FileSaver.js/blob/master/LICENSE.md
 =========================================================================================
-Patched source code of netty's utils 
+Patched source code of netty's utils
 (https://github.com/netty/netty/tree/netty-4.0.42.Final/common/src/main/java/io/netty/util)
-and bytebuffer 
-(https://github.com/netty/netty/tree/netty-4.0.42.Final/buffer/src/main/java/io/netty/buffer) 
+and bytebuffer
+(https://github.com/netty/netty/tree/netty-4.0.42.Final/buffer/src/main/java/io/netty/buffer)
 packages
 /*
  * Copyright 2012 The Netty Project
@@ -2928,9 +2928,9 @@ packages
  * under the License.
  */
 =========================================================================================
-Patched source code of JCTools 
+Patched source code of JCTools
 (https://github.com/JCTools/JCTools/tree/v1.2.1/jctools-core/src/main/java/org/jctools),
-needed for netty's util package 
+needed for netty's util package
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

@@ -36,7 +36,7 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
-    public final boolean createTransaction(long connectionId,
+    public final CreateTransactionResult createTransaction(long connectionId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int partition, int messageSize, long nowNanos)
     {
@@ -51,7 +51,7 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
-    public final boolean createTransaction(long connectionId,
+    public final CreateTransactionResult createTransaction(long connectionId,
             long txnId,
             long uniqueId,
             StoredProcedureInvocation invocation, boolean isReadOnly,

@@ -128,7 +128,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
-        String nonce = makeSnapshotNonce("Rejoin", HSIds.get(0));
+        String nonce = SnapshotUtil.makeSnapshotNonce("Rejoin", HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
         synchronized (m_lock) {
@@ -155,10 +155,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests, Long lowestSiteSinkHSId)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, lowestSiteSinkHSId);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, lowestSiteSinkHSId);
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
-        return makeSnapshotRequest(config);
+        return SnapshotUtil.makeSnapshotRequest(config);
     }
 
     public static void acquireLock(HostMessenger messenger )

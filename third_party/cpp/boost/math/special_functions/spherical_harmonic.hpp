@@ -11,6 +11,7 @@
 #pragma once
 #endif
 
+#include <boost/math/special_functions/math_fwd.hpp>
 #include <boost/math/special_functions/legendre.hpp>
 #include <boost/math/tools/workaround.hpp>
 #include <complex>
@@ -119,7 +120,7 @@ std::complex<T> spherical_harmonic(unsigned n, int m, U theta, U phi, const Poli
    if(m&1)
    {
       // Check phase if theta is outside [0, PI]:
-      U mod = boost::math::tools::fmod_workaround(theta, 2 * constants::pi<U>());
+      U mod = boost::math::tools::fmod_workaround(theta, U(2 * constants::pi<U>()));
       if(mod < 0)
          mod += 2 * constants::pi<U>();
       if(mod > constants::pi<U>())

@@ -172,6 +172,7 @@ namespace util {
         }
     };
 
+    #if !defined(BOOST_LOCALE_HIDE_AUTO_PTR) && !defined(BOOST_NO_AUTO_PTR)
     ///
     /// This function creates a \a base_converter that can be used for conversion between UTF-8 and
     /// unicode code points
@@ -200,7 +201,83 @@ namespace util {
     ///
     BOOST_LOCALE_DECL
     std::locale create_codecvt(std::locale const &in,std::auto_ptr<base_converter> cvt,character_facet_type type);
+    #endif
 
+    #ifndef BOOST_NO_CXX11_SMART_PTR
+    ///
+    /// This function creates a \a base_converter that can be used for conversion between UTF-8 and
+    /// unicode code points
+    ///
+    BOOST_LOCALE_DECL std::unique_ptr<base_converter> create_utf8_converter_unique_ptr();
+    ///
+    /// This function creates a \a base_converter that can be used for conversion between single byte
+    /// character encodings like ISO-8859-1, koi8-r, windows-1255 and Unicode code points,
+    /// 
+    /// If \a encoding is not supported, empty pointer is returned. You should check if
+    /// std::unique_ptr<base_converter>::get() != 0
+    ///
+    BOOST_LOCALE_DECL std::unique_ptr<base_converter> create_simple_converter_unique_ptr(std::string const &encoding);
+
+    ///
+    /// Install codecvt facet into locale \a in and return new locale that is based on \a in and uses new
+    /// facet.
+    ///
+    /// codecvt facet would convert between narrow and wide/char16_t/char32_t encodings using \a cvt converter.
+    /// If \a cvt is null pointer, always failure conversion would be used that fails on every first input or output.
+    /// 
+    /// Note: the codecvt facet handles both UTF-16 and UTF-32 wide encodings, it knows to break and join
+    /// Unicode code-points above 0xFFFF to and from surrogate pairs correctly. \a cvt should be unaware
+    /// of wide encoding type
+    ///
+    BOOST_LOCALE_DECL
+    std::locale create_codecvt(std::locale const &in,std::unique_ptr<base_converter> cvt,character_facet_type type);
+    #endif
+
+    ///
+    /// This function creates a \a base_converter that can be used for conversion between UTF-8 and
+    /// unicode code points
+    ///
+    BOOST_LOCALE_DECL base_converter *create_utf8_converter_new_ptr();
+    ///
+    /// This function creates a \a base_converter that can be used for conversion between single byte
+    /// character encodings like ISO-8859-1, koi8-r, windows-1255 and Unicode code points,
+    /// 
+    /// If \a encoding is not supported, empty pointer is returned. You should check if
+    /// std::unique_ptr<base_converter>::get() != 0
+    ///
+    BOOST_LOCALE_DECL base_converter *create_simple_converter_new_ptr(std::string const &encoding);
+
+    ///
+    /// Install codecvt facet into locale \a in and return new locale that is based on \a in and uses new
+    /// facet.
+    ///
+    /// codecvt facet would convert between narrow and wide/char16_t/char32_t encodings using \a cvt converter.
+    /// If \a cvt is null pointer, always failure conversion would be used that fails on every first input or output.
+    /// 
+    /// Note: the codecvt facet handles both UTF-16 and UTF-32 wide encodings, it knows to break and join
+    /// Unicode code-points above 0xFFFF to and from surrogate pairs correctly. \a cvt should be unaware
+    /// of wide encoding type
+    ///
+    /// ownership of cvt is transfered 
+    ///
+    BOOST_LOCALE_DECL
+    std::locale create_codecvt_from_pointer(std::locale const &in,base_converter *cvt,character_facet_type type);
+
+    /// 
+    /// Install utf8 codecvt to UTF-16 or UTF-32 into locale \a in and return
+    /// new locale that is based on \a in and uses new facet. 
+    /// 
+    BOOST_LOCALE_DECL
+    std::locale create_utf8_codecvt(std::locale const &in,character_facet_type type);
+
+    ///
+    /// This function installs codecvt that can be used for conversion between single byte
+    /// character encodings like ISO-8859-1, koi8-r, windows-1255 and Unicode code points,
+    /// 
+    /// Throws boost::locale::conv::invalid_charset_error if the chacater set is not supported or isn't single byte character
+    /// set
+    BOOST_LOCALE_DECL
+    std::locale create_simple_codecvt(std::locale const &in,std::string const &encoding,character_facet_type type);
 } // util
 } // locale 
 } // boost

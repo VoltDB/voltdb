@@ -152,6 +152,13 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
+     * Public constructor to initialize a hashinator with partition count with default total tokens
+     */
+    public ElasticHashinator(int partitionCount) {
+        this(new Buckets(partitionCount, DEFAULT_TOTAL_TOKENS).getTokens());
+    }
+
+    /**
      * Private constructor to initialize a hashinator with known tokens. Used for adding/removing
      * partitions from existing hashinator.
      * @param tokens

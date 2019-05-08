@@ -24,8 +24,8 @@
 #include <sstream>
 #include <algorithm>
 
-#include <jsoncpp/jsoncpp.h>
-#include <jsoncpp/jsoncpp-forwards.h>
+#include <json/json.h>
+#include <json/forwards.h>
 
 namespace voltdb {
 

@@ -6,15 +6,17 @@
 #ifndef BOOST_INT_ITERATOR_H
 #define BOOST_INT_ITERATOR_H
 
-#include <boost/iterator.hpp>
 #if !defined BOOST_MSVC
 #include <boost/operators.hpp>
 #endif
 #include <iostream>
+#include <iterator>
+#include <cstddef>
 //using namespace std;
 
 #ifndef BOOST_NO_OPERATORS_IN_NAMESPACE
 namespace boost {
+namespace iterators {
 #endif
 
 // this should use random_access_iterator_helper but I've had
@@ -61,13 +63,19 @@ inline int_iterator<IntT>
 operator+(IntT n, int_iterator<IntT> t) { t += n; return t; }
 
 #ifndef BOOST_NO_OPERATORS_IN_NAMESPACE
+} /* namespace iterators */
+
+using iterators::int_iterator;
+
 } /* namespace boost */
 #endif
 
 #ifdef BOOST_NO_OPERATORS_IN_NAMESPACE
 namespace boost {
-  using ::int_iterator;
-}
+using ::int_iterator;
+namespace iterators {
+using ::int_iterator;
+}}
 #endif
 
 

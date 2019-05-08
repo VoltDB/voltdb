@@ -20,5 +20,8 @@ package org.voltcore.messaging;
 import java.util.Set;
 
 public interface DisconnectFailedHostsCallback {
+    // Disconnect host before mesh determination is made. Used in rejoining scenario: a rejoining host
+    // can be shutdown before mesh arbitration is completed.
+    public void disconnectWithoutMeshDetermination();
     public void disconnect(Set<Integer> failedHostIds);
 }

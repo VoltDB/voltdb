@@ -12,7 +12,7 @@
 #define BOOST_STRING_FIND_ITERATOR_DETAIL_HPP
 
 #include <boost/algorithm/string/config.hpp>
-#include <boost/range/iterator_range.hpp>
+#include <boost/range/iterator_range_core.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/iterator_categories.hpp>
 #include <boost/function.hpp>
@@ -40,7 +40,7 @@ namespace boost {
             // Protected construction/destruction
 
                 // Default constructor
-                find_iterator_base() {};
+                find_iterator_base() {}
                 // Copy construction
                 find_iterator_base( const find_iterator_base& Other ) :
                     m_Finder(Other.m_Finder) {}

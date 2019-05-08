@@ -94,6 +94,7 @@ public:
 
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;
+    bool shouldStreamToExport();
 
 
     /**

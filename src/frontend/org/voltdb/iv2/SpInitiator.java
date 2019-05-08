@@ -57,7 +57,7 @@ import com.google_voltpatches.common.collect.Sets;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class SpInitiator extends BaseInitiator implements Promotable
+public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private final TickProducer m_tickProducer;
@@ -119,12 +119,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor,
                         startAction != StartAction.JOIN),
                 "SP", agent, startAction);
-        ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()),
-                m_initiatorMailbox);
+        m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
-        ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
+        m_scheduler.m_repairLog = m_repairLog;
     }
 
     @Override
@@ -346,6 +345,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
         return m_scheduler.isLeader();
     }
 
+
+//    public void resetMigratePartitionLeaderStatus(int failedHostId) {
+//        m_initiatorMailbox.resetMigratePartitionLeaderStatus();
+//        m_scheduler.updateReplicasFromMigrationLeaderFailedHost(failedHostId);
+//    }
+
+
     public Scheduler getScheduler() {
         return m_scheduler;
     }
@@ -356,6 +362,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         if (m_term != null) {
             replicasAdded = ((SpTerm) m_term).updateReplicas(snapshotTransactionState);
         }
-        ((SpScheduler) m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
+        m_scheduler.forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
     }
 }

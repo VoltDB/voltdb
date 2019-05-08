@@ -101,6 +101,11 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("Unexpected Borrow task");
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 

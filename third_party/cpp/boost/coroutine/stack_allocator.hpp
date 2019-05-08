@@ -7,17 +7,31 @@
 #ifndef BOOST_COROUTINES_STACK_ALLOCATOR_H
 #define BOOST_COROUTINES_STACK_ALLOCATOR_H
 
+#include <cstddef>
+
 #include <boost/config.hpp>
 
-#if defined (BOOST_WINDOWS)
-#include <boost/coroutine/detail/stack_allocator_windows.hpp>
-#else
-#include <boost/coroutine/detail/stack_allocator_posix.hpp>
+#include <boost/context/detail/config.hpp>
+#include <boost/coroutine/segmented_stack_allocator.hpp>
+#include <boost/coroutine/standard_stack_allocator.hpp>
+
+#ifdef BOOST_HAS_ABI_HEADERS
+#  include BOOST_ABI_PREFIX
 #endif
 
 namespace boost {
 namespace coroutines {
-using detail::stack_allocator;
+
+#if defined(BOOST_USE_SEGMENTED_STACKS)
+typedef segmented_stack_allocator   stack_allocator;
+#else
+typedef standard_stack_allocator    stack_allocator;
+#endif
+
 }}
+
+#ifdef BOOST_HAS_ABI_HEADERS
+#  include BOOST_ABI_SUFFIX
+#endif
 
 #endif // BOOST_COROUTINES_STACK_ALLOCATOR_H

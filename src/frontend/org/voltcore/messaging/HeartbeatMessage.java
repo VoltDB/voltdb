@@ -66,6 +66,11 @@ public class HeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("UNEXPECTED HEARTBEAT");
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
