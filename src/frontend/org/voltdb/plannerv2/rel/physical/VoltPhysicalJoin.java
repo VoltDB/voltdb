@@ -132,4 +132,12 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         }
         return node;
     }
+
+    public RexNode getLimit() {
+        return m_limit;
+    }
+
+    public RexNode getOffset() {
+        return m_offset;
+    }
 }

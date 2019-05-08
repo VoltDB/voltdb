@@ -44,7 +44,7 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
                 semiJoinDone, systemFieldList, null, null);
     }
 
-    private VoltPhysicalNestLoopJoin(
+    public VoltPhysicalNestLoopJoin(
             RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
             Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {

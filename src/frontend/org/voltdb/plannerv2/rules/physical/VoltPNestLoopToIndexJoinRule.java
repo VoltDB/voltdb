@@ -20,7 +20,6 @@ package org.voltdb.plannerv2.rules.physical;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.StreamSupport;
 
 import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
@@ -72,10 +71,10 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
      */
     private static final class RelExtractor {
         private final VoltPhysicalJoin m_join;
-        private RelNode m_outerScan;
-        private VoltPhysicalTableScan m_innerTableScan;
-        private Calc m_innerCalc;
-        private RexProgram m_innerProgram;
+        private final RelNode m_outerScan;
+        private final VoltPhysicalTableScan m_innerTableScan;
+        private final Calc m_innerCalc;
+        private final RexProgram m_innerProgram;
 
         RelExtractor(RelOptRuleCall call) {
             m_join = call.rel(0);
@@ -86,11 +85,14 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                 m_innerProgram = m_innerTableScan.getProgram();
                 // both are table scans: outer table contains matching index but inner doesn't:
                 // swap the 2 tables, since we are looking for matching index from inner table.
-                if (m_outerScan instanceof VoltPhysicalTableScan &&
-                        ! containsIndex(m_innerTableScan) &&
-                        containsIndex((VoltPhysicalTableScan) m_outerScan)) {
-                    commute();
-                }
+                // TODO: this fails Litmus check on:
+                // CREATE TABLE r2(a int, c int); CREATE TABLE r3(a int not null, c int); CREATE INDEX ind1 ON R3(a);
+                // SELECT * FROM r3 JOIN r2 ON r3.a = r2.a;
+//                if (m_outerScan instanceof VoltPhysicalTableScan &&
+//                        ! containsIndex(m_innerTableScan) &&
+//                        containsIndex((VoltPhysicalTableScan) m_outerScan)) {
+//                    commute();
+//                }
             } else {
                 m_innerCalc = call.rel(2);
                 m_innerTableScan = call.rel(3);
@@ -100,11 +102,15 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
             }
             Preconditions.checkNotNull(m_innerProgram, "Inner relation missing Program");
         }
-        private void commute() {       // swap member variables on outer <-> inner table
+        /*private void commute() {       // swap member variables on outer <-> inner table
             final VoltPhysicalTableScan scanTmp = (VoltPhysicalTableScan) m_outerScan;
             m_outerScan = m_innerTableScan;
             m_innerTableScan = scanTmp;
             m_innerProgram = ((VoltPhysicalTableScan) m_outerScan).getProgram();
+            m_join = new VoltPhysicalNestLoopJoin(m_join.getCluster(), m_join.getTraitSet(),
+                    m_join.getRight(), m_join.getLeft(), m_join.getCondition(), m_join.getVariablesSet(),
+                    m_join.getJoinType(), m_join.isSemiJoinDone(), ImmutableList.copyOf(m_join.getSystemFieldList()),
+                    m_join.getOffset(), m_join.getLimit());
         }
         private boolean containsIndex(VoltPhysicalTableScan scan) {
             final Table table = scan.getVoltTable().getCatalogTable();
@@ -113,7 +119,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                     .anyMatch(index -> getAccessPathFromInnerRel(
                             table, m_join, m_innerProgram, index, m_outerScan.getRowType().getFieldCount())
                             .isPresent());
-        }
+        }*/
 
         VoltPhysicalJoin getJoin() {
             return m_join;
