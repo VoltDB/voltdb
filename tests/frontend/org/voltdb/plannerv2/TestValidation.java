@@ -84,6 +84,38 @@ public class TestValidation extends Plannerv2TestCase {
                 .pass();
     }
 
+    public void testFullUsingJoinWithoutColumnScope() {
+        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").pass();
+    }
+
+    public void testInnerUsingJoinWithoutColumnScope() {
+        m_tester.sql("select i from R1 JOIN R2 using(i)").pass();
+    }
+
+    public void testFullOnJoinWithoutColumnScope() {
+        m_tester.sql("select ^i^ from R1 FUll JOIN R2 on R1.i = R2.i")
+        .exception("Column 'I' is ambiguous")
+        .pass();
+    }
+
+    public void testAmbiguousLeftUsing() {
+        m_tester.sql("select ^I^ from R1 left join R2 using(I)")
+        .exception("Column 'I' is ambiguous")
+        .pass();
+    }
+
+    public void testAmbiguousRightUsing() {
+        m_tester.sql("select ^I^ from R1 right join R2 using(I)")
+        .exception("Column 'I' is ambiguous")
+        .pass();
+    }
+
+    public void testAmbiguous3WayUsing() {
+        m_tester.sql("select i from R1 full join R2 using(i) full join RI1 using(^i^)")
+        .exception("Column name 'I' in USING clause is not unique on one side of join")
+        .pass();
+    }
+
     public void testFunctionArg() {
         m_tester.sql("select sum(i) from R2").pass();
 
@@ -134,11 +166,6 @@ public class TestValidation extends Plannerv2TestCase {
     public void testNullAsOperand() {
         //m_tester.sql("create table foo(i int, primary key (i + 1 + null));").pass();
         //m_tester.sql("create table foo(i int, unique (1 + null));").pass();
-    }
-
-    public void testFullJoinWithoutColumnScope() {
-        // TODO: fix this
-//        m_tester.sql("select i from R1 FUll JOIN R2 using(i)").pass();
     }
 }
 

@@ -34,6 +34,14 @@ public class VoltSqlConformance extends SqlAbstractConformance {
         return true;
     }
 
+    /**
+     * Whether to allow aliases from the {@code SELECT} clause to be used as
+     * column names in the {@code HAVING} clause.
+     */
+    @Override public boolean isHavingAlias() {
+        return true;
+    }
+
     @Override public boolean isBangEqualAllowed() {
         return true;
     }

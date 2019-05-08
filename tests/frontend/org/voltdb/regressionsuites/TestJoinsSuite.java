@@ -1708,21 +1708,23 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("R3.INSERT", 1, 3);
         client.callProcedure("R3.INSERT", 6, 8);
 
+        String query;
+
+        query = "SELECT MAX(R1.C), A FROM R1 FULL JOIN R2 USING (A) " +
+                "WHERE A > 0 " +
+                "GROUP BY A " +
+                "ORDER BY A";
+        validateTableOfLongs(client, query, new long[][]{
+            {2, 1},
+            {1, 2},
+            {3, 3},
+            {4, 4},
+            {NULL_VALUE, 5}
+        });
+
         // ENG-15253
-//        String query;
-//
-//        query = "SELECT MAX(R1.C), A FROM R1 FULL JOIN R2 USING (A) " +
-//                "WHERE R2.A > 0 " +
-//                "GROUP BY R2.A " +
-//                "ORDER BY A";
-//        validateTableOfLongs(client, query, new long[][]{
-//            {2, 1},
-//            {1, 2},
-//            {3, 3},
-//            {4, 4},
-//            {NULL_VALUE, 5}
-//        });
-//
+        // Fails to resolve ambiguous SELECT column for a multi-joins
+        // Calcite's Exception "Column name 'A' in USING clause is not unique on one side of join"
 //        query = "SELECT A FROM R1 FULL JOIN R2 USING (A) FULL JOIN R3 USING(A) " +
 //                "WHERE A > 0 " +
 //                "ORDER BY A";
