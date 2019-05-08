@@ -81,7 +81,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         // Start socket exporter client
         startListener();
 
-        m_cluster = new LocalCluster("TestPersistentExport.jar", 3, 2, KFACTOR, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("TestPersistentExport.jar", 4, 3, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setNewCli(true);
         m_cluster.setHasLocalServer(false);
         m_cluster.overrideAnyRequestForValgrind();
@@ -117,7 +117,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.callProcedure("@AdHoc", "delete from T1 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T1", 200);
+        checkTupleCount(client, "T1", 200, false);
         m_verifier.verifyRows();
     }
 
@@ -132,14 +132,14 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.callProcedure("@AdHoc", "update T2 set b = 100 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T2", 200);
+        checkTupleCount(client, "T2", 200, false);
 
         // Change trigger to update_new
         client.callProcedure("@AdHoc", "ALTER TABLE T2 EXPORT TO TARGET FOO2 ON (UPDATE_NEW)");
         client.callProcedure("@AdHoc", "update T2 set b = 200 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T2", 300);
+        checkTupleCount(client, "T2", 300, false);
     }
 
     @Test
@@ -153,18 +153,18 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         client.callProcedure("@AdHoc", "update T3 set b = 100 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T3", 200);
+        checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
         client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW)");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T3", 300);
+        checkTupleCount(client, "T3", 300, true);
     }
 
 
-    private static void checkTupleCount(Client client, String tableName, long expectedCount){
+    private static void checkTupleCount(Client client, String tableName, long expectedCount, boolean replicated){
 
         //allow time to get the stats
         final long maxSleep = TimeUnit.MINUTES.toMillis(2);
@@ -174,10 +174,15 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             try {
                 VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
                 long count = 0;
+                vt.resetRowPosition();
                 while (vt.advanceRow()) {
                     if (tableName.equalsIgnoreCase(vt.getString("SOURCE"))
                             && "TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
                         count +=vt.getLong("TUPLE_COUNT");
+                        if (replicated && count > 0) {
+                            assert(count == expectedCount);
+                            return;
+                        }
                     }
                 }
                 if (count == expectedCount) {

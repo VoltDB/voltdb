@@ -16,8 +16,9 @@
  */
 package org.voltdb;
 
-import java.util.Collections;
 import java.util.List;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /*
  * Define the different modes of operation for table streams.
@@ -48,6 +49,26 @@ public enum TableType {
     PERSISTENT_EXPORT_DELETE_UPDATE(112),
     PERSISTENT_EXPORT_INSERT_DELETE_UPDATE(120);
 
+    public static final ImmutableMap<Integer, String> typeToString;
+    static {
+        ImmutableMap.Builder<Integer, String> builder = ImmutableMap.builder();
+        builder.put(PERSISTENT_EXPORT_INSERT.get(), "INSERT");
+        builder.put(PERSISTENT_EXPORT_DELETE.get(), "DELETE");
+        builder.put(PERSISTENT_EXPORT_UPDATEOLD.get(), "UPDATE_OLD");
+        builder.put(PERSISTENT_EXPORT_UPDATENEW.get(), "UPDATE_NEW");
+        builder.put(PERSISTENT_EXPORT_INSERT_DELETE.get(), "INSERT,DELETE");
+        builder.put(PERSISTENT_EXPORT_INSERT_UPDATEOLD.get(), "INSERT,UPDATE_OLD");
+        builder.put(PERSISTENT_EXPORT_DELETE_UPDATEOLD.get(), "DELETE,UPDATE_OLD");
+        builder.put(PERSISTENT_EXPORT_INSERT_DELETE_UPDATEOLD.get(), "INSERT,DELETE,UPDATE_OLD");
+        builder.put(PERSISTENT_EXPORT_INSERT_UPDATENEW.get(), "INSERT,UPDATE_NEW");
+        builder.put(PERSISTENT_EXPORT_DELETE_UPDATENEW.get(), "DELETE,UPDATE_NEW");
+        builder.put(PERSISTENT_EXPORT_INSERT_DELETE_UPDATENEW.get(), "INSERT,DELETE,UPDATE_NEW");
+        builder.put(PERSISTENT_EXPORT_UPDATE.get(), "UPDATE");
+        builder.put(PERSISTENT_EXPORT_INSERT_UPDATE.get(), "INSERT,UPDATE");
+        builder.put(PERSISTENT_EXPORT_DELETE_UPDATE.get(), "DELETE,UPDATE");
+        builder.put(PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get(), "INSERT,DELETE,UPDATE");
+        typeToString = builder.build();
+    }
     final int type;
     TableType(int type) {
         this.type = type;
@@ -82,17 +103,16 @@ public enum TableType {
 
     public static int getPeristentExportTrigger(List<String> triggers) {
         int tableType = 0;
-        Collections.sort(triggers);
         for (String trigger : triggers) {
-            if(trigger.equals("INSERT")) {
+            if(trigger.equalsIgnoreCase("INSERT")) {
                 tableType += TableType.PERSISTENT_EXPORT_INSERT.get();
-            } else if(trigger.equals("DELETE")) {
+            } else if(trigger.equalsIgnoreCase("DELETE")) {
                 tableType += TableType.PERSISTENT_EXPORT_DELETE.get();
-            } else if(trigger.equals("UPDATE_OLD")) {
+            } else if(trigger.equalsIgnoreCase("UPDATE_OLD")) {
                 tableType += TableType.PERSISTENT_EXPORT_UPDATEOLD.get();
-            } else if(trigger.equals("UPDATE_NEW")) {
+            } else if(trigger.equalsIgnoreCase("UPDATE_NEW")) {
                 tableType += TableType.PERSISTENT_EXPORT_UPDATENEW.get();
-            } else if (trigger.equals("UPDATE")) {
+            } else if (trigger.equalsIgnoreCase("UPDATE")) {
                 tableType += TableType.PERSISTENT_EXPORT_UPDATE.get();
             }
         }
@@ -100,36 +120,8 @@ public enum TableType {
     }
 
     public static String toPersistentExportString(int tableType) {
-        if (tableType== PERSISTENT_EXPORT_INSERT.get()){
-            return "INSERT";
-        } else if (tableType == PERSISTENT_EXPORT_DELETE.get()) {
-            return "DELETE";
-        } else if (tableType == PERSISTENT_EXPORT_UPDATEOLD.get()) {
-            return "UPDATE_OLD";
-        } else if (tableType == PERSISTENT_EXPORT_UPDATENEW.get()) {
-            return "UPDATE_NEW";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_DELETE.get()) {
-            return "INSERT,DELETE";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_UPDATEOLD.get()) {
-            return "INSERT,UPDATE_OLD";
-        } else if (tableType == PERSISTENT_EXPORT_DELETE_UPDATEOLD.get()) {
-            return "DELETE,UPDATE_OLD";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_DELETE_UPDATEOLD.get()) {
-            return "INSERT,DELETE,UPFDATE_OLD";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_UPDATENEW.get()) {
-            return "INSERT,UPDATE_NEW";
-        } else if (tableType == PERSISTENT_EXPORT_DELETE_UPDATENEW.get()) {
-            return "DELETE,UPDATE_NEW";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_DELETE_UPDATENEW.get()) {
-            return "INSERT,DELETE,UPDATE_NEW";
-        } else if (tableType == PERSISTENT_EXPORT_UPDATE.get()) {
-            return "UPDATE";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_UPDATE.get()) {
-            return "INSERT,UPDATE";
-        } else if (tableType == PERSISTENT_EXPORT_DELETE_UPDATE.get()) {
-            return "DELETE,UPDATE";
-        } else if (tableType == PERSISTENT_EXPORT_INSERT_DELETE_UPDATE.get()) {
-            return "INSERT,DELETE,UPDATE";
+        if (isPersistentExport(tableType)) {
+            return typeToString.get(tableType);
         }
         return "";
     }
