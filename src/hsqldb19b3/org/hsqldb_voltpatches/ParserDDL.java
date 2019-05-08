@@ -1049,7 +1049,7 @@ public class ParserDDL extends ParserRoutine {
                     triggers.add(Tokens.T_UPDATEOLD);
                 } else if (token.tokenType == Tokens.UPDATENEW) {
                     triggers.add(Tokens.T_UPDATENEW);
-                } else {
+                } else if (token.tokenType != Tokens.COMMA){
                     throw unexpectedToken();
                 }
                 read();
