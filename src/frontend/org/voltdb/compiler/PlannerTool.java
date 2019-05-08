@@ -305,8 +305,8 @@ public class PlannerTool {
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO: enable when we are ready
-        //throw new PlannerFallbackException("planSqlCalcite not ready");
-        return new AdHocPlannedStatement(plan, core);
+        throw new PlannerFallbackException("planSqlCalcite not ready");
+        //return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
