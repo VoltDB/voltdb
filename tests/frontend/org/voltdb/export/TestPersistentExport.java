@@ -48,8 +48,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
     private static final String SCHEMA =
             "CREATE TABLE T1 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO1 ON(INSERT, DELETE);" +
             " PARTITION table T1 ON COLUMN a;" +
-            "CREATE TABLE T2 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO2 ON(UPDATE);" +
-            " PARTITION table T2 ON COLUMN a;" +
             "CREATE TABLE T3 (a integer not null, b integer not nulL) EXPORT TO TARGET FOO3 ON(UPDATE);";
 
     @Before
@@ -68,10 +66,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                          createSocketExportProperties("T1", false /* is replicated stream? */),
                          "FOO1");
-        builder.addExport(true /* enabled */,
-                ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
-                createSocketExportProperties("T2", false /* is replicated stream? */),
-                "FOO2");
 
         builder.addExport(true /* enabled */,
                 ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
@@ -119,19 +113,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T1", 200, false);
         m_verifier.verifyRows();
-
-        insertToStream("T2", 0, 100, client, data);
-        client.callProcedure("@AdHoc", "update T2 set b = 100 where a < 10000;");
-        client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T2", 200, false);
-
-        // Change trigger to update_new
-        client.callProcedure("@AdHoc", "ALTER TABLE T2 EXPORT TO TARGET FOO2 ON (UPDATE_NEW)");
-        client.callProcedure("@AdHoc", "update T2 set b = 200 where a < 10000;");
-        client.drain();
-        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        checkTupleCount(client, "T2", 300, false);
 
         // On replicated table
         insertToStream("T3", 0, 100, client, data);
