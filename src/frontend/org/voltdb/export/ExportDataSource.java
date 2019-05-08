@@ -1448,22 +1448,36 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
       * @throws IOException
       */
      private boolean handleDrainedSource() throws IOException {
+
+         // It may be that the drained source was detected and handled
+         // in the truncate, and that we may be called again from GuestProcessor.
+         // Send an end of stream to GuestProcessor but don't notify the generation.
+         if (m_closed) {
+             endOfStream();
+             return false;
+         }
+
+         // Send end of stream to GuestProcessor and notify generation.
          if (!inCatalog() && m_committedBuffers.isEmpty()) {
-             //Returning null indicates end of stream
-             try {
-                 if (m_pollTask != null) {
-                     m_pollTask.setFuture(null);
-                 }
-             } catch (RejectedExecutionException reex) {
-                 // Ignore, {@code GuestProcessor} was closed
-                 exportLog.info("Drained source event rejected ");
-             } finally {
-                 m_pollTask = null;
-             }
+             endOfStream();
              m_generation.onSourceDrained(m_partitionId, m_tableName);
              return true;
          }
          return false;
+     }
+
+     private void endOfStream() {
+         //Returning null indicates end of stream
+         try {
+             if (m_pollTask != null) {
+                 m_pollTask.setFuture(null);
+             }
+         } catch (RejectedExecutionException reex) {
+             // Ignore, {@code GuestProcessor} was closed
+             exportLog.info("End of Stream event rejected ");
+         } finally {
+             m_pollTask = null;
+         }
      }
 
     /**
