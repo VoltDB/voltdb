@@ -1308,6 +1308,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    private BinaryPayloadMessage getReleaseBufferMessage() {
+
+        final int msgLen = getAckMessageLength();
+
+        ByteBuffer buf = ByteBuffer.allocate(msgLen);
+        buf.put(ExportManager.RELEASE_BUFFER);
+        buf.putInt(m_partitionId);
+        buf.putInt(m_signatureBytes.length);
+        buf.put(m_signatureBytes);
+        buf.putLong(m_committedSeqNo);
+        buf.putInt(getGenerationCatalogVersion());
+
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+        return bpm;
+    }
+
     public void forwardAckToOtherReplicas() {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
@@ -1322,18 +1338,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
-            final int msgLen = getAckMessageLength();
 
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.RELEASE_BUFFER);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(m_committedSeqNo);
-            buf.putInt(getGenerationCatalogVersion());
-
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-
+            BinaryPayloadMessage bpm = getReleaseBufferMessage();
             for( Long siteId: p.getSecond()) {
                 mbx.send(siteId, bpm);
             }
@@ -1366,18 +1372,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
-                    final int msgLen = getAckMessageLength();
-
-                    ByteBuffer buf = ByteBuffer.allocate(msgLen);
-                    buf.put(ExportManager.RELEASE_BUFFER);
-                    buf.putInt(m_partitionId);
-                    buf.putInt(m_signatureBytes.length);
-                    buf.put(m_signatureBytes);
-                    buf.putLong(m_committedSeqNo);
-                    buf.putInt(getGenerationCatalogVersion());
-
-                    BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-
+                    BinaryPayloadMessage bpm = getReleaseBufferMessage();
                     for( Long siteId: newReplicas) {
                         mbx.send(siteId, bpm);
                     }
@@ -1385,7 +1380,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         exportLog.debug("Send RELEASE_BUFFER to " + toString()
                                 + " with sequence number " + m_committedSeqNo
                                 + " from " + CoreUtils.hsIdToString(mbx.getHSId())
-                                + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
+                                + " to " + CoreUtils.hsIdCollectionToString(newReplicas));
                     }
                 }
             }
@@ -1587,7 +1582,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Reset state in " + (isRejoin ? "REJOIN" : "RECOVER")
-                    + ", initial seqNo " + initialSequenceNumber + "last released/committed " + m_lastReleasedSeqNo
+                    + ", initial seqNo " + initialSequenceNumber + ", last released/committed " + m_lastReleasedSeqNo
                     + ", first unpolled " + m_firstUnpolledSeqNo);
         }
     }

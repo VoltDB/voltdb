@@ -327,6 +327,8 @@ public class ExportCoordinator {
                         // Process change of partition leadership
                         try {
                             Integer newLeaderHostId = proposedState.getInt();
+                            Long lastReleasedSeqNo = proposedState.getLong();
+
                             if (!success) {
                                 exportLog.warn("Rejected change to new leader host: " + newLeaderHostId);
                                 return;
@@ -338,13 +340,29 @@ public class ExportCoordinator {
                                     .append("is the new leader");
                             exportLog.info(sb.toString());
 
-                            //If leader and maps empty request {@code ExportSequenceNumberTracker} from all nodes.
+                            // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
                             // Note: cannot initiate a coordinator task directly from here, must go
                             // through another runnable and the invocation path.
                             if (isLeader() && m_trackers.isEmpty()) {
                                 requestTrackers();
                             }
 
+                            // If not the leader, check if the new leader is behind on acks
+                            // and if yes, ask the ExportDataSource to resend an ack to all the
+                            // other hosts so taht everybody gets even.
+                            if (!isLeader() && lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
+                                sb = new StringBuilder("Leader host ")
+                                        .append(m_leaderHostId)
+                                        .append(" released sequence number (")
+                                        .append(lastReleasedSeqNo)
+                                        .append(") is behind the local released sequence number (")
+                                        .append(m_eds.getLastReleaseSeqNo())
+                                        .append(")");
+                                exportLog.warn(sb.toString());
+                                m_eds.forwardAckToOtherReplicas();
+                                // Go through the safePoint logic to truncate our trackers
+                                isSafePoint(m_eds.getLastReleaseSeqNo());
+                            }
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
 
@@ -830,8 +848,9 @@ public class ExportCoordinator {
         m_task.invoke(new Runnable() {
             @Override
             public void run() {
-                ByteBuffer changeState = ByteBuffer.allocate(4);
+                ByteBuffer changeState = ByteBuffer.allocate(12);
                 changeState.putInt(m_hostId);
+                changeState.putLong(m_eds.getLastReleaseSeqNo());
                 changeState.flip();
                 m_task.proposeStateChange(changeState);
             }
