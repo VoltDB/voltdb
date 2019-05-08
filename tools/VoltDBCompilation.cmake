@@ -198,12 +198,19 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     MESSAGE("Using the Ubuntu 15.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_CXX0X)
+    # 4.6.0 < COMPILER_VERSION and COMPILER_VERSION <= 4.8.4
+    # Use -std=c++0x.  This is in GCC's experimental C++11 compiler
+    # support version, which is sufficient for our use.
+    MESSAGE("Using the Ubuntu 14.04 settings for ${CMAKE_CXX_COMPILER_VERSION}")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
+    SET (CXX_VERSION_FLAG -std=c++11)
   ELSE()
     message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_CXX0X}.")
   ENDIF()
 ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   # All versions of clang use C++11.
-  SET (CXX_VERSION_FLAG -std=c++17)
+  SET (CXX_VERSION_FLAG -std=c++14)
   MESSAGE("CXX_VERSION_FLAG is ${CXX_VERSION_FLAG}")
   IF ( ( "3.4.0" VERSION_LESS CMAKE_CXX_COMPILER_VERSION )
        AND ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0.0" ) )
