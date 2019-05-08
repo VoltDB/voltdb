@@ -112,7 +112,6 @@ public class PlannerRules {
             VoltLSetOpsRule.INSTANCE_INTERSECT,
             VoltLSetOpsRule.INSTANCE_EXCEPT,
             VoltLValuesRule.INSTANCE,
-            JoinCommuteRule.INSTANCE
 
 //            // Filter   ->  Project
 //            // Project      Filter
@@ -136,7 +135,7 @@ public class PlannerRules {
 //            AggregateExpandDistinctAggregatesRule.INSTANCE,
 //            // See comments inside for examples.
 //            AggregateReduceFunctionsRule.INSTANCE,
-//            JoinCommuteRule.INSTANCE,
+              JoinCommuteRule.INSTANCE
 //            JoinPushThroughJoinRule.LEFT,
 //            JoinPushThroughJoinRule.RIGHT,
 //            SortProjectTransposeRule.INSTANCE,
@@ -156,6 +155,7 @@ public class PlannerRules {
             VoltPAggregateRule.INSTANCE,
             // Here, the "SSCAN" means sequential scan; "ISCAN" means index scan.
             VoltPJoinRule.INSTANCE,
+            JoinCommuteRule.INSTANCE,
             VoltPNestLoopToIndexJoinRule.INSTANCE_SSCAN,
             VoltPNestLoopToIndexJoinRule.INSTANCE_CALC_SSCAN,
             VoltPNestLoopIndexToMergeJoinRule.INSTANCE_SSCAN_ISCAN,
