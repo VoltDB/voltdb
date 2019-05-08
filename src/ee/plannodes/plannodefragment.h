@@ -119,9 +119,9 @@ class PlanNodeFragment {
   private:
 
     // construct a new fragment from a serialized json object
-    static PlanNodeFragment* fromJSONObject(PlannerDomValue planNodesArray);
+    static PlanNodeFragment* fromJSONObject(PlannerDomValue const& planNodesArray);
     // read node list for a given sub statement
-    void nodeListFromJSONObject(PlannerDomValue planNodesList, PlannerDomValue executeList, int stmtId);
+    void nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId);
 
     // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
     std::string m_serializedType;

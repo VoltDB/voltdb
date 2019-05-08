@@ -14,7 +14,7 @@
 
 // IT = Integer type.
 // RT = Real type (built-in floating-point types, float, double, long double) & User Defined Types
-// AT = Integer or Real type 
+// AT = Integer or Real type
 
 #ifndef BOOST_MATH_SPECIAL_MATH_FWD_HPP
 #define BOOST_MATH_SPECIAL_MATH_FWD_HPP
@@ -23,10 +23,12 @@
 #pragma once
 #endif
 
+#include <vector>
 #include <boost/math/special_functions/detail/round_fwd.hpp>
 #include <boost/math/tools/promotion.hpp> // for argument promotion.
 #include <boost/math/policies/policy.hpp>
 #include <boost/mpl/comparison.hpp>
+#include <boost/utility/enable_if.hpp>
 #include <boost/config/no_tr1/complex.hpp>
 
 #define BOOST_NO_MACRO_EXPAND /**/
@@ -38,112 +40,118 @@ namespace boost
 
    // Beta functions.
    template <class RT1, class RT2>
-   typename tools::promote_args<RT1, RT2>::type 
+   typename tools::promote_args<RT1, RT2>::type
          beta(RT1 a, RT2 b); // Beta function (2 arguments).
 
    template <class RT1, class RT2, class A>
-   typename tools::promote_args<RT1, RT2, A>::type 
+   typename tools::promote_args<RT1, RT2, A>::type
          beta(RT1 a, RT2 b, A x); // Beta function (3 arguments).
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          beta(RT1 a, RT2 b, RT3 x, const Policy& pol); // Beta function (3 arguments).
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          betac(RT1 a, RT2 b, RT3 x);
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          betac(RT1 a, RT2 b, RT3 x, const Policy& pol);
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta(RT1 a, RT2 b, RT3 x); // Incomplete beta function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta(RT1 a, RT2 b, RT3 x, const Policy& pol); // Incomplete beta function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac(RT1 a, RT2 b, RT3 x); // Incomplete beta complement function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac(RT1 a, RT2 b, RT3 x, const Policy& pol); // Incomplete beta complement function.
 
    template <class T1, class T2, class T3, class T4>
-   typename tools::promote_args<T1, T2, T3, T4>::type  
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ibeta_inv(T1 a, T2 b, T3 p, T4* py);
 
    template <class T1, class T2, class T3, class T4, class Policy>
-   typename tools::promote_args<T1, T2, T3, T4>::type  
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ibeta_inv(T1 a, T2 b, T3 p, T4* py, const Policy& pol);
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_inv(RT1 a, RT2 b, RT3 p); // Incomplete beta inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_inv(RT1 a, RT2 b, RT3 p, const Policy&); // Incomplete beta inverse function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_inva(RT1 a, RT2 b, RT3 p); // Incomplete beta inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_inva(RT1 a, RT2 b, RT3 p, const Policy&); // Incomplete beta inverse function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_invb(RT1 a, RT2 b, RT3 p); // Incomplete beta inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_invb(RT1 a, RT2 b, RT3 p, const Policy&); // Incomplete beta inverse function.
 
    template <class T1, class T2, class T3, class T4>
-   typename tools::promote_args<T1, T2, T3, T4>::type 
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ibetac_inv(T1 a, T2 b, T3 q, T4* py);
 
    template <class T1, class T2, class T3, class T4, class Policy>
-   typename tools::promote_args<T1, T2, T3, T4>::type 
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ibetac_inv(T1 a, T2 b, T3 q, T4* py, const Policy& pol);
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_inv(RT1 a, RT2 b, RT3 q); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_inv(RT1 a, RT2 b, RT3 q, const Policy&); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_inva(RT1 a, RT2 b, RT3 q); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_inva(RT1 a, RT2 b, RT3 q, const Policy&); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_invb(RT1 a, RT2 b, RT3 q); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibetac_invb(RT1 a, RT2 b, RT3 q, const Policy&); // Incomplete beta complement inverse function.
 
    template <class RT1, class RT2, class RT3>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_derivative(RT1 a, RT2 b, RT3 x);  // derivative of incomplete beta
 
    template <class RT1, class RT2, class RT3, class Policy>
-   typename tools::promote_args<RT1, RT2, RT3>::type 
+   typename tools::promote_args<RT1, RT2, RT3>::type
          ibeta_derivative(RT1 a, RT2 b, RT3 x, const Policy& pol);  // derivative of incomplete beta
+
+   // Binomial:
+   template <class T, class Policy>
+   T binomial_coefficient(unsigned n, unsigned k, const Policy& pol);
+   template <class T>
+   T binomial_coefficient(unsigned n, unsigned k);
 
    // erf & erfc error functions.
    template <class RT> // Error function.
@@ -168,51 +176,65 @@ namespace boost
 
    // Polynomials:
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          legendre_next(unsigned l, T1 x, T2 Pl, T3 Plm1);
 
    template <class T>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
          legendre_p(int l, T x);
+   template <class T>
+   typename tools::promote_args<T>::type
+          legendre_p_prime(int l, T x);
+
 
    template <class T, class Policy>
-   typename tools::promote_args<T>::type 
-         legendre_p(int l, T x, const Policy& pol);
+   inline std::vector<T> legendre_p_zeros(int l, const Policy& pol);
 
    template <class T>
-   typename tools::promote_args<T>::type 
-         legendre_q(unsigned l, T x);
+   inline std::vector<T> legendre_p_zeros(int l);
 
+#if !BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
    template <class T, class Policy>
-   typename tools::promote_args<T>::type 
+   typename boost::enable_if_c<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
+         legendre_p(int l, T x, const Policy& pol);
+   template <class T, class Policy>
+   inline typename boost::enable_if_c<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
+      legendre_p_prime(int l, T x, const Policy& pol);
+#endif
+   template <class T>
+   typename tools::promote_args<T>::type
+         legendre_q(unsigned l, T x);
+#if !BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
+   template <class T, class Policy>
+   typename boost::enable_if_c<policies::is_policy<Policy>::value, typename tools::promote_args<T>::type>::type
          legendre_q(unsigned l, T x, const Policy& pol);
-
+#endif
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          legendre_next(unsigned l, unsigned m, T1 x, T2 Pl, T3 Plm1);
 
    template <class T>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
          legendre_p(int l, int m, T x);
 
    template <class T, class Policy>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
          legendre_p(int l, int m, T x, const Policy& pol);
 
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type  
+   typename tools::promote_args<T1, T2, T3>::type
          laguerre_next(unsigned n, T1 x, T2 Ln, T3 Lnm1);
 
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type  
+   typename tools::promote_args<T1, T2, T3>::type
       laguerre_next(unsigned n, unsigned l, T1 x, T2 Pl, T3 Plm1);
 
    template <class T>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
       laguerre(unsigned n, T x);
 
    template <class T, class Policy>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
       laguerre(unsigned n, unsigned m, T x, const Policy& pol);
 
    template <class T1, class T2>
@@ -226,77 +248,109 @@ namespace boost
    };
 
    template <class T1, class T2>
-   typename laguerre_result<T1, T2>::type 
+   typename laguerre_result<T1, T2>::type
       laguerre(unsigned n, T1 m, T2 x);
 
    template <class T>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
       hermite(unsigned n, T x);
 
    template <class T, class Policy>
-   typename tools::promote_args<T>::type 
+   typename tools::promote_args<T>::type
       hermite(unsigned n, T x, const Policy& pol);
 
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
       hermite_next(unsigned n, T1 x, T2 Hn, T3 Hnm1);
 
+   template<class T1, class T2, class T3>
+   typename tools::promote_args<T1, T2, T3>::type chebyshev_next(T1 const & x, T2 const & Tn, T3 const & Tn_1);
+
+   template <class Real, class Policy>
+   typename tools::promote_args<Real>::type
+      chebyshev_t(unsigned n, Real const & x, const Policy&);
+   template<class Real>
+   typename tools::promote_args<Real>::type chebyshev_t(unsigned n, Real const & x);
+   
+   template <class Real, class Policy>
+   typename tools::promote_args<Real>::type
+      chebyshev_u(unsigned n, Real const & x, const Policy&);
+   template<class Real>
+   typename tools::promote_args<Real>::type chebyshev_u(unsigned n, Real const & x);
+
+   template <class Real, class Policy>
+   typename tools::promote_args<Real>::type
+      chebyshev_t_prime(unsigned n, Real const & x, const Policy&);
+   template<class Real>
+   typename tools::promote_args<Real>::type chebyshev_t_prime(unsigned n, Real const & x);
+
+   template<class Real, class T2>
+   Real chebyshev_clenshaw_recurrence(const Real* const c, size_t length, const T2& x);
+
    template <class T1, class T2>
-   std::complex<typename tools::promote_args<T1, T2>::type> 
+   std::complex<typename tools::promote_args<T1, T2>::type>
          spherical_harmonic(unsigned n, int m, T1 theta, T2 phi);
 
    template <class T1, class T2, class Policy>
-   std::complex<typename tools::promote_args<T1, T2>::type> 
+   std::complex<typename tools::promote_args<T1, T2>::type>
       spherical_harmonic(unsigned n, int m, T1 theta, T2 phi, const Policy& pol);
 
    template <class T1, class T2>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          spherical_harmonic_r(unsigned n, int m, T1 theta, T2 phi);
 
    template <class T1, class T2, class Policy>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
       spherical_harmonic_r(unsigned n, int m, T1 theta, T2 phi, const Policy& pol);
 
    template <class T1, class T2>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          spherical_harmonic_i(unsigned n, int m, T1 theta, T2 phi);
 
    template <class T1, class T2, class Policy>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
       spherical_harmonic_i(unsigned n, int m, T1 theta, T2 phi, const Policy& pol);
 
    // Elliptic integrals:
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          ellint_rf(T1 x, T2 y, T3 z);
 
    template <class T1, class T2, class T3, class Policy>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          ellint_rf(T1 x, T2 y, T3 z, const Policy& pol);
 
    template <class T1, class T2, class T3>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          ellint_rd(T1 x, T2 y, T3 z);
 
    template <class T1, class T2, class T3, class Policy>
-   typename tools::promote_args<T1, T2, T3>::type 
+   typename tools::promote_args<T1, T2, T3>::type
          ellint_rd(T1 x, T2 y, T3 z, const Policy& pol);
 
    template <class T1, class T2>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          ellint_rc(T1 x, T2 y);
 
    template <class T1, class T2, class Policy>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          ellint_rc(T1 x, T2 y, const Policy& pol);
 
    template <class T1, class T2, class T3, class T4>
-   typename tools::promote_args<T1, T2, T3, T4>::type 
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ellint_rj(T1 x, T2 y, T3 z, T4 p);
 
    template <class T1, class T2, class T3, class T4, class Policy>
-   typename tools::promote_args<T1, T2, T3, T4>::type 
+   typename tools::promote_args<T1, T2, T3, T4>::type
          ellint_rj(T1 x, T2 y, T3 z, T4 p, const Policy& pol);
+
+   template <class T1, class T2, class T3>
+   typename tools::promote_args<T1, T2, T3>::type
+      ellint_rg(T1 x, T2 y, T3 z);
+
+   template <class T1, class T2, class T3, class Policy>
+   typename tools::promote_args<T1, T2, T3>::type
+      ellint_rg(T1 x, T2 y, T3 z, const Policy& pol);
 
    template <typename T>
    typename tools::promote_args<T>::type ellint_2(T k);
@@ -315,6 +369,27 @@ namespace boost
 
    template <class T1, class T2, class Policy>
    typename tools::promote_args<T1, T2>::type ellint_1(T1 k, T2 phi, const Policy& pol);
+
+   template <typename T>
+   typename tools::promote_args<T>::type ellint_d(T k);
+
+   template <class T1, class T2>
+   typename tools::promote_args<T1, T2>::type ellint_d(T1 k, T2 phi);
+
+   template <class T1, class T2, class Policy>
+   typename tools::promote_args<T1, T2>::type ellint_d(T1 k, T2 phi, const Policy& pol);
+
+   template <class T1, class T2>
+   typename tools::promote_args<T1, T2>::type jacobi_zeta(T1 k, T2 phi);
+
+   template <class T1, class T2, class Policy>
+   typename tools::promote_args<T1, T2>::type jacobi_zeta(T1 k, T2 phi, const Policy& pol);
+
+   template <class T1, class T2>
+   typename tools::promote_args<T1, T2>::type heuman_lambda(T1 k, T2 phi);
+
+   template <class T1, class T2, class Policy>
+   typename tools::promote_args<T1, T2>::type heuman_lambda(T1 k, T2 phi, const Policy& pol);
 
    namespace detail{
 
@@ -349,7 +424,7 @@ namespace boost
    template <class RT, class Policy>
    RT factorial(unsigned int, const Policy& pol);
    template <class RT>
-   RT unchecked_factorial(unsigned int BOOST_MATH_APPEND_EXPLICIT_TEMPLATE_TYPE(RT)); 
+   RT unchecked_factorial(unsigned int BOOST_MATH_APPEND_EXPLICIT_TEMPLATE_TYPE(RT));
    template <class RT>
    RT double_factorial(unsigned i);
    template <class RT, class Policy>
@@ -463,13 +538,27 @@ namespace boost
    template <class T, class Policy>
    typename tools::promote_args<T>::type digamma(T x, const Policy&);
 
+   // trigamma:
+   template <class T>
+   typename tools::promote_args<T>::type trigamma(T x);
+
+   template <class T, class Policy>
+   typename tools::promote_args<T>::type trigamma(T x, const Policy&);
+
+   // polygamma:
+   template <class T>
+   typename tools::promote_args<T>::type polygamma(int n, T x);
+
+   template <class T, class Policy>
+   typename tools::promote_args<T>::type polygamma(int n, T x, const Policy&);
+
    // Hypotenuse function sqrt(x ^ 2 + y ^ 2).
    template <class T1, class T2>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          hypot(T1 x, T2 y);
 
    template <class T1, class T2, class Policy>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          hypot(T1 x, T2 y, const Policy&);
 
    // cbrt - cube root.
@@ -502,11 +591,11 @@ namespace boost
 
    // Power - 1
    template <class T1, class T2>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          powm1(const T1 a, const T2 z);
 
    template <class T1, class T2, class Policy>
-   typename tools::promote_args<T1, T2>::type 
+   typename tools::promote_args<T1, T2>::type
          powm1(const T1 a, const T2 z, const Policy&);
 
    // sqrt(1+x) - 1
@@ -557,8 +646,10 @@ namespace boost
       template <class T1, class T2, class Policy>
       struct bessel_traits
       {
-         typedef typename tools::promote_args<
-            T1, T2
+         typedef typename mpl::if_<
+            is_integral<T1>,
+            typename tools::promote_args<T2>::type,
+            typename tools::promote_args<T1, T2>::type
          >::type result_type;
 
          typedef typename policies::precision<result_type, Policy>::type precision_type;
@@ -574,51 +665,124 @@ namespace boost
                bessel_maybe_int_tag
             >::type
          >::type optimisation_tag;
+         typedef typename mpl::if_<
+            mpl::or_<
+               mpl::less_equal<precision_type, mpl::int_<0> >,
+               mpl::greater<precision_type, mpl::int_<113> > >,
+            bessel_no_int_tag,
+            typename mpl::if_<
+               is_integral<T1>,
+               bessel_int_tag,
+               bessel_maybe_int_tag
+            >::type
+         >::type optimisation_tag128;
       };
    } // detail
 
    // Bessel functions:
    template <class T1, class T2, class Policy>
    typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_j(T1 v, T2 x, const Policy& pol);
+   template <class T1, class T2, class Policy>
+   typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_j_prime(T1 v, T2 x, const Policy& pol);
 
    template <class T1, class T2>
    typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_j(T1 v, T2 x);
+   template <class T1, class T2>
+   typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_j_prime(T1 v, T2 x);
 
    template <class T, class Policy>
    typename detail::bessel_traits<T, T, Policy>::result_type sph_bessel(unsigned v, T x, const Policy& pol);
+   template <class T, class Policy>
+   typename detail::bessel_traits<T, T, Policy>::result_type sph_bessel_prime(unsigned v, T x, const Policy& pol);
 
    template <class T>
    typename detail::bessel_traits<T, T, policies::policy<> >::result_type sph_bessel(unsigned v, T x);
+   template <class T>
+   typename detail::bessel_traits<T, T, policies::policy<> >::result_type sph_bessel_prime(unsigned v, T x);
 
    template <class T1, class T2, class Policy>
    typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_i(T1 v, T2 x, const Policy& pol);
+   template <class T1, class T2, class Policy>
+   typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_i_prime(T1 v, T2 x, const Policy& pol);
 
    template <class T1, class T2>
    typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_i(T1 v, T2 x);
+   template <class T1, class T2>
+   typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_i_prime(T1 v, T2 x);
 
    template <class T1, class T2, class Policy>
    typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_k(T1 v, T2 x, const Policy& pol);
+   template <class T1, class T2, class Policy>
+   typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_bessel_k_prime(T1 v, T2 x, const Policy& pol);
 
    template <class T1, class T2>
    typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_k(T1 v, T2 x);
+   template <class T1, class T2>
+   typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_bessel_k_prime(T1 v, T2 x);
 
    template <class T1, class T2, class Policy>
    typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_neumann(T1 v, T2 x, const Policy& pol);
+   template <class T1, class T2, class Policy>
+   typename detail::bessel_traits<T1, T2, Policy>::result_type cyl_neumann_prime(T1 v, T2 x, const Policy& pol);
 
    template <class T1, class T2>
    typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_neumann(T1 v, T2 x);
+   template <class T1, class T2>
+   typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type cyl_neumann_prime(T1 v, T2 x);
 
    template <class T, class Policy>
    typename detail::bessel_traits<T, T, Policy>::result_type sph_neumann(unsigned v, T x, const Policy& pol);
+   template <class T, class Policy>
+   typename detail::bessel_traits<T, T, Policy>::result_type sph_neumann_prime(unsigned v, T x, const Policy& pol);
 
    template <class T>
    typename detail::bessel_traits<T, T, policies::policy<> >::result_type sph_neumann(unsigned v, T x);
+   template <class T>
+   typename detail::bessel_traits<T, T, policies::policy<> >::result_type sph_neumann_prime(unsigned v, T x);
 
-   template <class T1, class T2, class Policy>
-   std::complex<typename detail::bessel_traits<T1, T2, Policy>::result_type> cyl_hankel_1(T1 v, T2 x, const Policy& pol);
+   template <class T, class Policy>
+   typename detail::bessel_traits<T, T, Policy>::result_type cyl_bessel_j_zero(T v, int m, const Policy& pol);
+
+   template <class T>
+   typename detail::bessel_traits<T, T, policies::policy<> >::result_type cyl_bessel_j_zero(T v, int m);
+
+   template <class T, class OutputIterator>
+   OutputIterator cyl_bessel_j_zero(T v,
+                          int start_index,
+                          unsigned number_of_zeros,
+                          OutputIterator out_it);
+
+   template <class T, class OutputIterator, class Policy>
+   OutputIterator cyl_bessel_j_zero(T v,
+                          int start_index,
+                          unsigned number_of_zeros,
+                          OutputIterator out_it,
+                          const Policy&);
+
+   template <class T, class Policy>
+   typename detail::bessel_traits<T, T, Policy>::result_type cyl_neumann_zero(T v, int m, const Policy& pol);
+
+   template <class T>
+   typename detail::bessel_traits<T, T, policies::policy<> >::result_type cyl_neumann_zero(T v, int m);
+
+   template <class T, class OutputIterator>
+   OutputIterator cyl_neumann_zero(T v,
+                         int start_index,
+                         unsigned number_of_zeros,
+                         OutputIterator out_it);
+
+   template <class T, class OutputIterator, class Policy>
+   OutputIterator cyl_neumann_zero(T v,
+                         int start_index,
+                         unsigned number_of_zeros,
+                         OutputIterator out_it,
+                         const Policy&);
 
    template <class T1, class T2>
    std::complex<typename detail::bessel_traits<T1, T2, policies::policy<> >::result_type> cyl_hankel_1(T1 v, T2 x);
+
+   template <class T1, class T2, class Policy>
+   std::complex<typename detail::bessel_traits<T1, T2, Policy>::result_type> cyl_hankel_1(T1 v, T2 x, const Policy& pol);
 
    template <class T1, class T2, class Policy>
    std::complex<typename detail::bessel_traits<T1, T2, Policy>::result_type> cyl_hankel_2(T1 v, T2 x, const Policy& pol);
@@ -662,6 +826,40 @@ namespace boost
    template <class T>
    typename tools::promote_args<T>::type airy_bi_prime(T x);
 
+   template <class T>
+   T airy_ai_zero(int m);
+   template <class T, class Policy>
+   T airy_ai_zero(int m, const Policy&);
+
+   template <class OutputIterator>
+   OutputIterator airy_ai_zero(
+                     int start_index,
+                     unsigned number_of_zeros,
+                     OutputIterator out_it);
+   template <class OutputIterator, class Policy>
+   OutputIterator airy_ai_zero(
+                     int start_index,
+                     unsigned number_of_zeros,
+                     OutputIterator out_it,
+                     const Policy&);
+
+   template <class T>
+   T airy_bi_zero(int m);
+   template <class T, class Policy>
+   T airy_bi_zero(int m, const Policy&);
+
+   template <class OutputIterator>
+   OutputIterator airy_bi_zero(
+                     int start_index,
+                     unsigned number_of_zeros,
+                     OutputIterator out_it);
+   template <class OutputIterator, class Policy>
+   OutputIterator airy_bi_zero(
+                     int start_index,
+                     unsigned number_of_zeros,
+                     OutputIterator out_it,
+                     const Policy&);
+
    template <class T, class Policy>
    typename tools::promote_args<T>::type sin_pi(T x, const Policy&);
 
@@ -689,17 +887,17 @@ namespace boost
    template <class T>
    bool isnormal BOOST_NO_MACRO_EXPAND(T t);
 
-   template<class T> 
+   template<class T>
    int signbit BOOST_NO_MACRO_EXPAND(T x);
 
    template <class T>
    int sign BOOST_NO_MACRO_EXPAND(const T& z);
 
-   template <class T>
-   T copysign BOOST_NO_MACRO_EXPAND(const T& x, const T& y);
+   template <class T, class U>
+   typename tools::promote_args_permissive<T, U>::type copysign BOOST_NO_MACRO_EXPAND(const T& x, const U& y);
 
    template <class T>
-   T changesign BOOST_NO_MACRO_EXPAND(const T& z);
+   typename tools::promote_args_permissive<T>::type changesign BOOST_NO_MACRO_EXPAND(const T& z);
 
    // Exponential integrals:
    namespace detail{
@@ -737,11 +935,11 @@ namespace boost
    typename tools::promote_args<T1, T2>::type owens_t(T1 h, T2 a);
 
    // Jacobi Functions:
-   template <class T, class Policy>
-   typename tools::promote_args<T>::type jacobi_elliptic(T k, T theta, T* pcn, T* pdn, const Policy&);
+   template <class T, class U, class V, class Policy>
+   typename tools::promote_args<T, U, V>::type jacobi_elliptic(T k, U theta, V* pcn, V* pdn, const Policy&);
 
-   template <class T>
-   typename tools::promote_args<T>::type jacobi_elliptic(T k, T theta, T* pcn = 0, T* pdn = 0);
+   template <class T, class U, class V>
+   typename tools::promote_args<T, U, V>::type jacobi_elliptic(T k, U theta, V* pcn = 0, V* pdn = 0);
 
    template <class U, class T, class Policy>
    typename tools::promote_args<T, U>::type jacobi_sn(U k, T theta, const Policy& pol);
@@ -827,22 +1025,86 @@ namespace boost
    typename tools::promote_args<T>::type pow(T base);
 
    // next:
+   template <class T, class U, class Policy>
+   typename tools::promote_args<T, U>::type nextafter(const T&, const U&, const Policy&);
+   template <class T, class U>
+   typename tools::promote_args<T, U>::type nextafter(const T&, const U&);
    template <class T, class Policy>
-   T nextafter(const T&, const T&, const Policy&);
+   typename tools::promote_args<T>::type float_next(const T&, const Policy&);
    template <class T>
-   T nextafter(const T&, const T&);
+   typename tools::promote_args<T>::type float_next(const T&);
    template <class T, class Policy>
-   T float_next(const T&, const Policy&);
+   typename tools::promote_args<T>::type float_prior(const T&, const Policy&);
    template <class T>
-   T float_next(const T&);
+   typename tools::promote_args<T>::type float_prior(const T&);
+   template <class T, class U, class Policy>
+   typename tools::promote_args<T, U>::type float_distance(const T&, const U&, const Policy&);
+   template <class T, class U>
+   typename tools::promote_args<T, U>::type float_distance(const T&, const U&);
    template <class T, class Policy>
-   T float_prior(const T&, const Policy&);
+   typename tools::promote_args<T>::type float_advance(T val, int distance, const Policy& pol);
    template <class T>
-   T float_prior(const T&);
+   typename tools::promote_args<T>::type float_advance(const T& val, int distance);
+
    template <class T, class Policy>
-   T float_distance(const T&, const T&, const Policy&);
+   typename tools::promote_args<T>::type ulp(const T& val, const Policy& pol);
    template <class T>
-   T float_distance(const T&, const T&);
+   typename tools::promote_args<T>::type ulp(const T& val);
+
+   template <class T, class U>
+   typename tools::promote_args<T, U>::type relative_difference(const T&, const U&);
+   template <class T, class U>
+   typename tools::promote_args<T, U>::type epsilon_difference(const T&, const U&);
+
+   template<class T>
+   BOOST_MATH_CONSTEXPR_TABLE_FUNCTION T unchecked_bernoulli_b2n(const std::size_t n);
+   template <class T, class Policy>
+   T bernoulli_b2n(const int i, const Policy &pol);
+   template <class T>
+   T bernoulli_b2n(const int i);
+   template <class T, class OutputIterator, class Policy>
+   OutputIterator bernoulli_b2n(const int start_index,
+                                       const unsigned number_of_bernoullis_b2n,
+                                       OutputIterator out_it,
+                                       const Policy& pol);
+   template <class T, class OutputIterator>
+   OutputIterator bernoulli_b2n(const int start_index,
+                                       const unsigned number_of_bernoullis_b2n,
+                                       OutputIterator out_it);
+   template <class T, class Policy>
+   T tangent_t2n(const int i, const Policy &pol);
+   template <class T>
+   T tangent_t2n(const int i);
+   template <class T, class OutputIterator, class Policy>
+   OutputIterator tangent_t2n(const int start_index,
+                                       const unsigned number_of_bernoullis_b2n,
+                                       OutputIterator out_it,
+                                       const Policy& pol);
+   template <class T, class OutputIterator>
+   OutputIterator tangent_t2n(const int start_index,
+                                       const unsigned number_of_bernoullis_b2n,
+                                       OutputIterator out_it);
+
+   // Lambert W:
+   template <class T, class Policy>
+   typename boost::math::tools::promote_args<T>::type lambert_w0(T z, const Policy& pol);
+   template <class T>
+   typename boost::math::tools::promote_args<T>::type lambert_w0(T z);
+   template <class T, class Policy>
+   typename boost::math::tools::promote_args<T>::type lambert_wm1(T z, const Policy& pol);
+   template <class T>
+   typename boost::math::tools::promote_args<T>::type lambert_wm1(T z);
+   template <class T, class Policy>
+   typename boost::math::tools::promote_args<T>::type lambert_w0_prime(T z, const Policy& pol);
+   template <class T>
+   typename boost::math::tools::promote_args<T>::type lambert_w0_prime(T z);
+   template <class T, class Policy>
+   typename boost::math::tools::promote_args<T>::type lambert_wm1_prime(T z, const Policy& pol);
+   template <class T>
+   typename boost::math::tools::promote_args<T>::type lambert_wm1_prime(T z);
+
+
+
 
     } // namespace math
 } // namespace boost
@@ -923,6 +1185,8 @@ namespace boost
    inline typename boost::math::tools::promote_args<RT1, RT2, RT3>::type \
    ibeta_derivative(RT1 a, RT2 b, RT3 x){ return ::boost::math::ibeta_derivative(a, b, x, Policy()); }\
 \
+   template <class T> T binomial_coefficient(unsigned n, unsigned k){ return ::boost::math::binomial_coefficient<T, Policy>(n, k, Policy()); }\
+\
    template <class RT>\
    inline typename boost::math::tools::promote_args<RT>::type erf(RT z) { return ::boost::math::erf(z, Policy()); }\
 \
@@ -940,6 +1204,10 @@ namespace boost
    template <class T>\
    inline typename boost::math::tools::promote_args<T>::type \
    legendre_p(int l, T x){ return ::boost::math::legendre_p(l, x, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::tools::promote_args<T>::type \
+   legendre_p_prime(int l, T x){ return ::boost::math::legendre_p(l, x, Policy()); }\
 \
    template <class T>\
    inline typename boost::math::tools::promote_args<T>::type \
@@ -966,6 +1234,19 @@ namespace boost
    hermite(unsigned n, T x){ return ::boost::math::hermite(n, x, Policy()); }\
 \
    using boost::math::hermite_next;\
+\
+   using boost::math::chebyshev_next;\
+\
+  template<class Real>\
+  Real chebyshev_t(unsigned n, Real const & x){ return ::boost::math::chebyshev_t(n, x, Policy()); }\
+\
+  template<class Real>\
+  Real chebyshev_u(unsigned n, Real const & x){ return ::boost::math::chebyshev_u(n, x, Policy()); }\
+\
+  template<class Real>\
+  Real chebyshev_t_prime(unsigned n, Real const & x){ return ::boost::math::chebyshev_t_prime(n, x, Policy()); }\
+\
+  using ::boost::math::chebyshev_clenshaw_recurrence;\
 \
    template <class T1, class T2>\
    inline std::complex<typename boost::math::tools::promote_args<T1, T2>::type> \
@@ -999,11 +1280,27 @@ namespace boost
    inline typename boost::math::tools::promote_args<T1, T2, T3, T4>::type \
    ellint_rj(T1 x, T2 y, T3 z, T4 p){ return boost::math::ellint_rj(x, y, z, p, Policy()); }\
 \
+   template <class T1, class T2, class T3>\
+   inline typename boost::math::tools::promote_args<T1, T2, T3>::type \
+   ellint_rg(T1 x, T2 y, T3 z){ return ::boost::math::ellint_rg(x, y, z, Policy()); }\
+   \
    template <typename T>\
    inline typename boost::math::tools::promote_args<T>::type ellint_2(T k){ return boost::math::ellint_2(k, Policy()); }\
 \
    template <class T1, class T2>\
    inline typename boost::math::tools::promote_args<T1, T2>::type ellint_2(T1 k, T2 phi){ return boost::math::ellint_2(k, phi, Policy()); }\
+\
+   template <typename T>\
+   inline typename boost::math::tools::promote_args<T>::type ellint_d(T k){ return boost::math::ellint_d(k, Policy()); }\
+\
+   template <class T1, class T2>\
+   inline typename boost::math::tools::promote_args<T1, T2>::type ellint_d(T1 k, T2 phi){ return boost::math::ellint_d(k, phi, Policy()); }\
+\
+   template <class T1, class T2>\
+   inline typename boost::math::tools::promote_args<T1, T2>::type jacobi_zeta(T1 k, T2 phi){ return boost::math::jacobi_zeta(k, phi, Policy()); }\
+\
+   template <class T1, class T2>\
+   inline typename boost::math::tools::promote_args<T1, T2>::type heuman_lambda(T1 k, T2 phi){ return boost::math::heuman_lambda(k, phi, Policy()); }\
 \
    template <typename T>\
    inline typename boost::math::tools::promote_args<T>::type ellint_1(T k){ return boost::math::ellint_1(k, Policy()); }\
@@ -1076,6 +1373,12 @@ namespace boost
    template <class T>\
    inline typename boost::math::tools::promote_args<T>::type digamma(T x){ return boost::math::digamma(x, Policy()); }\
 \
+   template <class T>\
+   inline typename boost::math::tools::promote_args<T>::type trigamma(T x){ return boost::math::trigamma(x, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::tools::promote_args<T>::type polygamma(int n, T x){ return boost::math::polygamma(n, x, Policy()); }\
+   \
    template <class T1, class T2>\
    inline typename boost::math::tools::promote_args<T1, T2>::type \
    hypot(T1 x, T2 y){ return boost::math::hypot(x, y, Policy()); }\
@@ -1118,9 +1421,17 @@ namespace boost
    inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type cyl_bessel_j(T1 v, T2 x)\
    { return boost::math::cyl_bessel_j(v, x, Policy()); }\
 \
+   template <class T1, class T2>\
+   inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type cyl_bessel_j_prime(T1 v, T2 x)\
+   { return boost::math::cyl_bessel_j_prime(v, x, Policy()); }\
+\
    template <class T>\
    inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type sph_bessel(unsigned v, T x)\
    { return boost::math::sph_bessel(v, x, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type sph_bessel_prime(unsigned v, T x)\
+   { return boost::math::sph_bessel_prime(v, x, Policy()); }\
 \
    template <class T1, class T2>\
    inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
@@ -1128,15 +1439,53 @@ namespace boost
 \
    template <class T1, class T2>\
    inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
+   cyl_bessel_i_prime(T1 v, T2 x) { return boost::math::cyl_bessel_i_prime(v, x, Policy()); }\
+\
+   template <class T1, class T2>\
+   inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
    cyl_bessel_k(T1 v, T2 x) { return boost::math::cyl_bessel_k(v, x, Policy()); }\
+\
+   template <class T1, class T2>\
+   inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
+   cyl_bessel_k_prime(T1 v, T2 x) { return boost::math::cyl_bessel_k_prime(v, x, Policy()); }\
 \
    template <class T1, class T2>\
    inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
    cyl_neumann(T1 v, T2 x){ return boost::math::cyl_neumann(v, x, Policy()); }\
 \
+   template <class T1, class T2>\
+   inline typename boost::math::detail::bessel_traits<T1, T2, Policy >::result_type \
+   cyl_neumann_prime(T1 v, T2 x){ return boost::math::cyl_neumann_prime(v, x, Policy()); }\
+\
    template <class T>\
    inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type \
    sph_neumann(unsigned v, T x){ return boost::math::sph_neumann(v, x, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type \
+   sph_neumann_prime(unsigned v, T x){ return boost::math::sph_neumann_prime(v, x, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type cyl_bessel_j_zero(T v, int m)\
+   { return boost::math::cyl_bessel_j_zero(v, m, Policy()); }\
+\
+template <class OutputIterator, class T>\
+   inline void cyl_bessel_j_zero(T v,\
+                                 int start_index,\
+                                 unsigned number_of_zeros,\
+                                 OutputIterator out_it)\
+   { boost::math::cyl_bessel_j_zero(v, start_index, number_of_zeros, out_it, Policy()); }\
+\
+   template <class T>\
+   inline typename boost::math::detail::bessel_traits<T, T, Policy >::result_type cyl_neumann_zero(T v, int m)\
+   { return boost::math::cyl_neumann_zero(v, m, Policy()); }\
+\
+template <class OutputIterator, class T>\
+   inline void cyl_neumann_zero(T v,\
+                                int start_index,\
+                                unsigned number_of_zeros,\
+                                OutputIterator out_it)\
+   { boost::math::cyl_neumann_zero(v, start_index, number_of_zeros, out_it, Policy()); }\
 \
    template <class T>\
    inline typename boost::math::tools::promote_args<T>::type sin_pi(T x){ return boost::math::sin_pi(x); }\
@@ -1198,6 +1547,7 @@ namespace boost
    template <class T> T float_next(const T& a){ return boost::math::float_next(a, Policy()); }\
    template <class T> T float_prior(const T& a){ return boost::math::float_prior(a, Policy()); }\
    template <class T> T float_distance(const T& a, const T& b){ return boost::math::float_distance(a, b, Policy()); }\
+   template <class T> T ulp(const T& a){ return boost::math::ulp(a, Policy()); }\
    \
    template <class RT1, class RT2>\
    inline typename boost::math::tools::promote_args<RT1, RT2>::type owens_t(RT1 a, RT2 z){ return boost::math::owens_t(a, z, Policy()); }\
@@ -1286,11 +1636,43 @@ namespace boost
    inline typename boost::math::tools::promote_args<T>::type airy_bi_prime(T x)\
    {  return boost::math::airy_bi_prime(x, Policy());  }\
    \
+   template <class T>\
+   inline T airy_ai_zero(int m)\
+   { return boost::math::airy_ai_zero<T>(m, Policy()); }\
+   template <class T, class OutputIterator>\
+   OutputIterator airy_ai_zero(int start_index, unsigned number_of_zeros, OutputIterator out_it)\
+   { return boost::math::airy_ai_zero<T>(start_index, number_of_zeros, out_it, Policy()); }\
+   \
+   template <class T>\
+   inline T airy_bi_zero(int m)\
+   { return boost::math::airy_bi_zero<T>(m, Policy()); }\
+   template <class T, class OutputIterator>\
+   OutputIterator airy_bi_zero(int start_index, unsigned number_of_zeros, OutputIterator out_it)\
+   { return boost::math::airy_bi_zero<T>(start_index, number_of_zeros, out_it, Policy()); }\
+   \
+   template <class T>\
+   T bernoulli_b2n(const int i)\
+   { return boost::math::bernoulli_b2n<T>(i, Policy()); }\
+   template <class T, class OutputIterator>\
+   OutputIterator bernoulli_b2n(int start_index, unsigned number_of_bernoullis_b2n, OutputIterator out_it)\
+   { return boost::math::bernoulli_b2n<T>(start_index, number_of_bernoullis_b2n, out_it, Policy()); }\
+   \
+   template <class T>\
+   T tangent_t2n(const int i)\
+   { return boost::math::tangent_t2n<T>(i, Policy()); }\
+   template <class T, class OutputIterator>\
+   OutputIterator tangent_t2n(int start_index, unsigned number_of_bernoullis_b2n, OutputIterator out_it)\
+   { return boost::math::tangent_t2n<T>(start_index, number_of_bernoullis_b2n, out_it, Policy()); }\
+   \
+   template <class T> inline typename boost::math::tools::promote_args<T>::type lambert_w0(T z) { return boost::math::lambert_w0(z, Policy()); }\
+   template <class T> inline typename boost::math::tools::promote_args<T>::type lambert_wm1(T z) { return boost::math::lambert_w0(z, Policy()); }\
+   template <class T> inline typename boost::math::tools::promote_args<T>::type lambert_w0_prime(T z) { return boost::math::lambert_w0(z, Policy()); }\
+   template <class T> inline typename boost::math::tools::promote_args<T>::type lambert_wm1_prime(T z) { return boost::math::lambert_w0(z, Policy()); }\
+   \
+
 
 
 
 
 
 #endif // BOOST_MATH_SPECIAL_MATH_FWD_HPP
-
-

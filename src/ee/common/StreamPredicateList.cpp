@@ -42,7 +42,7 @@ bool StreamPredicateList::parseStrings(
             try {
                 PlannerDomRoot domRoot((*iter).c_str());
                 if (!domRoot.isNull()) {
-                    PlannerDomValue predicateObject = domRoot.rootObject();
+                    PlannerDomValue predicateObject = domRoot();
 
                     predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
 

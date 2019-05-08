@@ -19,6 +19,9 @@
 //
 
 #include <boost/detail/sp_typeinfo.hpp>
+#include <boost/assert.hpp>
+#include <boost/config.hpp>
+#include <boost/cstdint.hpp>
 #include <pthread.h>
 
 namespace boost
@@ -27,15 +30,15 @@ namespace boost
 namespace detail
 {
 
-class sp_counted_base
+class BOOST_SYMBOL_VISIBLE sp_counted_base
 {
 private:
 
     sp_counted_base( sp_counted_base const & );
     sp_counted_base & operator= ( sp_counted_base const & );
 
-    long use_count_;        // #shared
-    long weak_count_;       // #weak + (#shared != 0)
+    boost::int_least32_t use_count_;        // #shared
+    boost::int_least32_t weak_count_;       // #weak + (#shared != 0)
 
     mutable pthread_mutex_t m_;
 
@@ -46,15 +49,15 @@ public:
 // HPUX 10.20 / DCE has a nonstandard pthread_mutex_init
 
 #if defined(__hpux) && defined(_DECTHREADS_)
-        pthread_mutex_init( &m_, pthread_mutexattr_default );
+        BOOST_VERIFY( pthread_mutex_init( &m_, pthread_mutexattr_default ) == 0 );
 #else
-        pthread_mutex_init( &m_, 0 );
+        BOOST_VERIFY( pthread_mutex_init( &m_, 0 ) == 0 );
 #endif
     }
 
     virtual ~sp_counted_base() // nothrow
     {
-        pthread_mutex_destroy( &m_ );
+        BOOST_VERIFY( pthread_mutex_destroy( &m_ ) == 0 );
     }
 
     // dispose() is called when use_count_ drops to zero, to release
@@ -70,28 +73,29 @@ public:
     }
 
     virtual void * get_deleter( sp_typeinfo const & ti ) = 0;
+    virtual void * get_local_deleter( sp_typeinfo const & ti ) = 0;
     virtual void * get_untyped_deleter() = 0;
 
     void add_ref_copy()
     {
-        pthread_mutex_lock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
         ++use_count_;
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
     }
 
     bool add_ref_lock() // true on success
     {
-        pthread_mutex_lock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
         bool r = use_count_ == 0? false: ( ++use_count_, true );
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
         return r;
     }
 
     void release() // nothrow
     {
-        pthread_mutex_lock( &m_ );
-        long new_use_count = --use_count_;
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
+        boost::int_least32_t new_use_count = --use_count_;
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
 
         if( new_use_count == 0 )
         {
@@ -102,16 +106,16 @@ public:
 
     void weak_add_ref() // nothrow
     {
-        pthread_mutex_lock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
         ++weak_count_;
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
     }
 
     void weak_release() // nothrow
     {
-        pthread_mutex_lock( &m_ );
-        long new_weak_count = --weak_count_;
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
+        boost::int_least32_t new_weak_count = --weak_count_;
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
 
         if( new_weak_count == 0 )
         {
@@ -121,9 +125,9 @@ public:
 
     long use_count() const // nothrow
     {
-        pthread_mutex_lock( &m_ );
-        long r = use_count_;
-        pthread_mutex_unlock( &m_ );
+        BOOST_VERIFY( pthread_mutex_lock( &m_ ) == 0 );
+        boost::int_least32_t r = use_count_;
+        BOOST_VERIFY( pthread_mutex_unlock( &m_ ) == 0 );
 
         return r;
     }

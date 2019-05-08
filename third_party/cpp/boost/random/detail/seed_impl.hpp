@@ -7,7 +7,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: seed_impl.hpp 72951 2011-07-07 04:57:37Z steven_watanabe $
+ * $Id$
  */
 
 #ifndef BOOST_RANDOM_DETAIL_SEED_IMPL_HPP
@@ -15,12 +15,11 @@
 
 #include <stdexcept>
 #include <boost/cstdint.hpp>
+#include <boost/throw_exception.hpp>
 #include <boost/config/no_tr1/cmath.hpp>
 #include <boost/integer/integer_mask.hpp>
 #include <boost/integer/static_log2.hpp>
-#include <boost/type_traits/is_signed.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/make_unsigned.hpp>
+#include <boost/random/traits.hpp>
 #include <boost/mpl/bool.hpp>
 #include <boost/mpl/if.hpp>
 #include <boost/mpl/int.hpp>
@@ -54,8 +53,8 @@ struct const_pow_impl
     template<class T>
     static T call(T arg, int n, T result)
     {
-        return const_pow_impl<N / 2>::call(arg * arg, n / 2,
-            n%2 == 0? result : result * arg);
+        return const_pow_impl<N / 2>::call(T(arg * arg), n / 2,
+            n%2 == 0? result : T(result * arg));
     }
 };
 
@@ -134,7 +133,7 @@ template<class Engine, class Iter>
 void generate_from_int(Engine& eng, Iter begin, Iter end)
 {
     typedef typename Engine::result_type IntType;
-    typedef typename boost::make_unsigned<IntType>::type unsigned_type;
+    typedef typename boost::random::traits::make_unsigned<IntType>::type unsigned_type;
     int remaining_bits = 0;
     boost::uint_least32_t saved_bits = 0;
     unsigned_type range = boost::random::detail::subtract<IntType>()((eng.max)(), (eng.min)());
@@ -169,9 +168,9 @@ void generate_from_int(Engine& eng, Iter begin, Iter end)
         } else if(available_bits % 32 == 0) {
             for(int i = 0; i < available_bits / 32; ++i) {
                 boost::uint_least32_t word = boost::uint_least32_t(val) & 0xFFFFFFFFu;
-                int supress_warning = (bits >= 32);
-                BOOST_ASSERT(supress_warning == 1);
-                val >>= (32 * supress_warning);
+                int suppress_warning = (bits >= 32);
+                BOOST_ASSERT(suppress_warning == 1);
+                val >>= (32 * suppress_warning);
                 *begin++ = word;
                 if(begin == end) return;
             }
@@ -190,9 +189,9 @@ void generate_from_int(Engine& eng, Iter begin, Iter end)
             if(bits >= 32) {
                 for(; available_bits >= 32; available_bits -= 32) {
                     boost::uint_least32_t word = boost::uint_least32_t(val) & 0xFFFFFFFFu;
-                    int supress_warning = (bits >= 32);
-                    BOOST_ASSERT(supress_warning == 1);
-                    val >>= (32 * supress_warning);
+                    int suppress_warning = (bits >= 32);
+                    BOOST_ASSERT(suppress_warning == 1);
+                    val >>= (32 * suppress_warning);
                     *begin++ = word;
                     if(begin == end) return;
                 }
@@ -218,7 +217,7 @@ void generate_impl(Engine& eng, Iter first, Iter last, boost::mpl::false_)
 template<class Engine, class Iter>
 void generate(Engine& eng, Iter first, Iter last)
 {
-    return detail::generate_impl(eng, first, last, boost::is_integral<typename Engine::result_type>());
+    return detail::generate_impl(eng, first, last, boost::random::traits::is_integral<typename Engine::result_type>());
 }
 
 
@@ -253,7 +252,7 @@ IntType get_one_int(Iter& first, Iter last)
     IntType s = 0;
     for(int j = 0; j < k; ++j) {
         if(first == last) {
-            throw ::std::invalid_argument("Not enough elements in call to seed.");
+            boost::throw_exception(::std::invalid_argument("Not enough elements in call to seed."));
         }
         IntType digit = const_mod<IntType, m>::apply(IntType(*first++));
         IntType mult = IntType(1) << 32*j;
@@ -280,6 +279,7 @@ void seed_array_int_impl(SeedSeq& seq, UIntType (&x)[n])
 template<int w, std::size_t n, class SeedSeq, class IntType>
 inline void seed_array_int_impl(SeedSeq& seq, IntType (&x)[n], boost::mpl::true_)
 {
+    BOOST_STATIC_ASSERT_MSG(boost::is_integral<IntType>::value, "Sorry but this routine has not been ported to non built-in integers as it relies on a reinterpret_cast.");
     typedef typename boost::make_unsigned<IntType>::type unsigned_array[n];
     seed_array_int_impl<w>(seq, reinterpret_cast<unsigned_array&>(x));
 }
@@ -293,7 +293,7 @@ inline void seed_array_int_impl(SeedSeq& seq, IntType (&x)[n], boost::mpl::false
 template<int w, std::size_t n, class SeedSeq, class IntType>
 inline void seed_array_int(SeedSeq& seq, IntType (&x)[n])
 {
-    seed_array_int_impl<w>(seq, x, boost::is_signed<IntType>());
+    seed_array_int_impl<w>(seq, x, boost::random::traits::is_signed<IntType>());
 }
 
 template<int w, std::size_t n, class Iter, class UIntType>
@@ -303,7 +303,7 @@ void fill_array_int_impl(Iter& first, Iter last, UIntType (&x)[n])
         UIntType val = 0;
         for(std::size_t k = 0; k < (w+31)/32; ++k) {
             if(first == last) {
-                throw std::invalid_argument("Not enough elements in call to seed.");
+                boost::throw_exception(std::invalid_argument("Not enough elements in call to seed."));
             }
             val += static_cast<UIntType>(*first++) << 32*k;
         }
@@ -314,6 +314,7 @@ void fill_array_int_impl(Iter& first, Iter last, UIntType (&x)[n])
 template<int w, std::size_t n, class Iter, class IntType>
 inline void fill_array_int_impl(Iter& first, Iter last, IntType (&x)[n], boost::mpl::true_)
 {
+    BOOST_STATIC_ASSERT_MSG(boost::is_integral<IntType>::value, "Sorry but this routine has not been ported to non built-in integers as it relies on a reinterpret_cast.");
     typedef typename boost::make_unsigned<IntType>::type unsigned_array[n];
     fill_array_int_impl<w>(first, last, reinterpret_cast<unsigned_array&>(x));
 }
@@ -327,7 +328,7 @@ inline void fill_array_int_impl(Iter& first, Iter last, IntType (&x)[n], boost::
 template<int w, std::size_t n, class Iter, class IntType>
 inline void fill_array_int(Iter& first, Iter last, IntType (&x)[n])
 {
-    fill_array_int_impl<w>(first, last, x, boost::is_signed<IntType>());
+    fill_array_int_impl<w>(first, last, x, boost::random::traits::is_signed<IntType>());
 }
 
 template<int w, std::size_t n, class RealType>
@@ -373,12 +374,12 @@ void fill_array_real(Iter& first, Iter last, RealType (&x)[n])
         RealType val = RealType(0);
         RealType mult = divisor;
         for(int k = 0; k < w/32; ++k, ++first) {
-            if(first == last) throw std::invalid_argument("Not enough elements in call to seed.");
+            if(first == last) boost::throw_exception(std::invalid_argument("Not enough elements in call to seed."));
             val += *first * mult;
             mult *= two32;
         }
         if(mask != 0) {
-            if(first == last) throw std::invalid_argument("Not enough elements in call to seed.");
+            if(first == last) boost::throw_exception(std::invalid_argument("Not enough elements in call to seed."));
             val += (*first & mask) * mult;
             ++first;
         }

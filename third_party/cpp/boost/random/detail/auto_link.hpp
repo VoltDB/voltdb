@@ -5,7 +5,7 @@
  * accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
- * $Id: auto_link.hpp 60755 2010-03-22 00:45:06Z steven_watanabe $
+ * $Id$
  */
 
 #ifndef BOOST_RANDOM_DETAIL_AUTO_LINK_HPP
@@ -13,13 +13,11 @@
 
 #include <boost/config.hpp>
 
-#ifdef BOOST_HAS_DECLSPEC
-    #if defined(BOOST_ALL_DYN_LINK) || defined(BOOST_RANDOM_DYN_LINK)
-        #if defined(BOOST_RANDOM_SOURCE)
-            #define BOOST_RANDOM_DECL __declspec(dllexport)
-        #else
-            #define BOOST_RANDOM_DECL __declspec(dllimport)
-        #endif
+#if defined(BOOST_ALL_DYN_LINK) || defined(BOOST_RANDOM_DYN_LINK)
+    #if defined(BOOST_RANDOM_SOURCE)
+        #define BOOST_RANDOM_DECL BOOST_SYMBOL_EXPORT
+    #else
+        #define BOOST_RANDOM_DECL BOOST_SYMBOL_IMPORT
     #endif
 #endif
 

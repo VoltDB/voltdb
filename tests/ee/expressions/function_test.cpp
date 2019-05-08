@@ -128,10 +128,10 @@ struct FunctionTest : public Test {
          * SQLException with the given inputs.
          */
         template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
-        std::string testBinaryThrows(int operation,
-                                     LEFT_INPUT_TYPE left_input,
-                                     RIGHT_INPUT_TYPE right_input,
-                                     const std::string& expectedMessage);
+        std::string testBinaryThrows(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, const std::string& expectedMessage);
+        template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+        std::string testBinaryThrows(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, const std::string& expectedMessage1,
+              const std::string& expectedMessage2);
 
         /**
          * A template for calling ternary functions.  This follows the pattern
@@ -369,10 +369,9 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
 }
 
 template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
-std::string FunctionTest::testBinaryThrows(int operation,
-                                           LEFT_INPUT_TYPE left_input,
-                                           RIGHT_INPUT_TYPE right_input,
-                                           const std::string& expectedMessage) {
+std::string FunctionTest::testBinaryThrows(
+      int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input,
+      const std::string& expectedMessage) {
     std::string diagnostic = "success";
     try {
         testBinary(operation, left_input, right_input, -1);
@@ -393,9 +392,34 @@ std::string FunctionTest::testBinaryThrows(int operation,
     }
 
     return diagnostic;
-
 }
 
+template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+std::string FunctionTest::testBinaryThrows(
+      int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input,
+      const std::string& expectedMessage1, const std::string& expectedMessage2) {
+    std::string diagnostic = "success";
+    try {
+        testBinary(operation, left_input, right_input, -1);
+        diagnostic = "Failed to throw an exception";
+    }
+    catch (const SQLException& exc) {
+        if (exc.message().find(expectedMessage1) == std::string::npos &&
+              exc.message().find(expectedMessage2) == std::string::npos) {
+            diagnostic = "Expected message \"" + expectedMessage1 + "\" or \"" + expectedMessage2 +"\", but found \"" +
+                exc.message() + "\"";
+        }
+    }
+    catch (...) {
+        diagnostic = "Caught some unexpected kind of exception";
+    }
+
+    if (diagnostic.compare("success") != 0) {
+        std::cerr << "\n***  " << diagnostic << "  ***\n";
+    }
+
+    return diagnostic;
+}
 
 
 /**
@@ -980,7 +1004,7 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
 
         // DATEADD that would produce an out of range timestamp should throw
         ASSERT_EQ("success", testBinaryThrows(func, -1, minValidTimestamp, outputOutOfRangeMessage));
-        ASSERT_EQ("success", testBinaryThrows(func, 1, maxValidTimestamp, outputOutOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, maxValidTimestamp, outputOutOfRangeMessage, intervalTooLargeMsg));
 
         ++i;
     }

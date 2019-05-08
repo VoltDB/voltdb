@@ -29,17 +29,18 @@
 //              (David Abrahams)
 
 # include <iterator>
-# include <boost/type_traits.hpp>
 # include <boost/static_assert.hpp>
 # include <boost/concept_archetype.hpp> // for detail::dummy_constructor
-# include <boost/detail/iterator.hpp>
 # include <boost/pending/iterator_tests.hpp>
 # include <boost/iterator/is_readable_iterator.hpp>
 # include <boost/iterator/is_lvalue_iterator.hpp>
+# include <boost/type_traits/is_same.hpp>
+# include <boost/mpl/bool.hpp>
+# include <boost/mpl/and.hpp>
 
 # include <boost/iterator/detail/config_def.hpp>
 # include <boost/detail/is_incrementable.hpp>
-# include <boost/detail/lightweight_test.hpp>
+# include <boost/core/lightweight_test.hpp>
 
 namespace boost {
 
@@ -76,7 +77,7 @@ template <class Iterator, class T>
 void readable_iterator_test(const Iterator i1, T v)
 {
   Iterator i2(i1); // Copy Constructible
-  typedef typename detail::iterator_traits<Iterator>::reference ref_t;
+  typedef typename std::iterator_traits<Iterator>::reference ref_t;
   ref_t r1 = *i1;
   ref_t r2 = *i2;
   T v1 = r1;
@@ -112,9 +113,9 @@ template <class Iterator>
 void swappable_iterator_test(Iterator i, Iterator j)
 {
   Iterator i2(i), j2(j);
-  typename detail::iterator_traits<Iterator>::value_type bi = *i, bj = *j;
+  typename std::iterator_traits<Iterator>::value_type bi = *i, bj = *j;
   iter_swap(i2, j2);
-  typename detail::iterator_traits<Iterator>::value_type ai = *i, aj = *j;
+  typename std::iterator_traits<Iterator>::value_type ai = *i, aj = *j;
   BOOST_TEST(bi == aj && bj == ai);
 }
 
@@ -122,8 +123,8 @@ template <class Iterator, class T>
 void constant_lvalue_iterator_test(Iterator i, T v1)
 {
   Iterator i2(i);
-  typedef typename detail::iterator_traits<Iterator>::value_type value_type;
-  typedef typename detail::iterator_traits<Iterator>::reference reference;
+  typedef typename std::iterator_traits<Iterator>::value_type value_type;
+  typedef typename std::iterator_traits<Iterator>::reference reference;
   BOOST_STATIC_ASSERT((is_same<const value_type&, reference>::value));
   const T& v2 = *i2;
   BOOST_TEST(v1 == v2);
@@ -137,8 +138,8 @@ template <class Iterator, class T>
 void non_const_lvalue_iterator_test(Iterator i, T v1, T v2)
 {
   Iterator i2(i);
-  typedef typename detail::iterator_traits<Iterator>::value_type value_type;
-  typedef typename detail::iterator_traits<Iterator>::reference reference;
+  typedef typename std::iterator_traits<Iterator>::value_type value_type;
+  typedef typename std::iterator_traits<Iterator>::reference reference;
   BOOST_STATIC_ASSERT((is_same<value_type&, reference>::value));
   T& v3 = *i2;
   BOOST_TEST(v1 == v3);
@@ -229,7 +230,7 @@ void random_access_readable_iterator_test(Iterator i, int N, TrueVals vals)
   {
     BOOST_TEST(i == j + c);
     BOOST_TEST(*i == vals[c]);
-    typename detail::iterator_traits<Iterator>::value_type x = j[c];
+    typename std::iterator_traits<Iterator>::value_type x = j[c];
     BOOST_TEST(*i == x);
     BOOST_TEST(*i == *(j + c));
     BOOST_TEST(*i == *(c + j));
@@ -245,7 +246,7 @@ void random_access_readable_iterator_test(Iterator i, int N, TrueVals vals)
   {
     BOOST_TEST(i == k - c);
     BOOST_TEST(*i == vals[N - 1 - c]);
-    typename detail::iterator_traits<Iterator>::value_type x = j[N - 1 - c];
+    typename std::iterator_traits<Iterator>::value_type x = j[N - 1 - c];
     BOOST_TEST(*i == x);
     Iterator q = k - c; 
     BOOST_TEST(*i == *q);

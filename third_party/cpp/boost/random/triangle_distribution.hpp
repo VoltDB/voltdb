@@ -8,7 +8,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: triangle_distribution.hpp 71018 2011-04-05 21:27:52Z steven_watanabe $
+ * $Id$
  *
  * Revision history
  *  2001-02-18  moved to individual header files
@@ -161,7 +161,7 @@ public:
     result_type operator()(Engine& eng)
     {
         using std::sqrt;
-        result_type u = uniform_01<>()(eng);
+        result_type u = uniform_01<result_type>()(eng);
         if( u <= q1 )
             return _a + p1*sqrt(u);
         else

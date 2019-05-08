@@ -95,7 +95,7 @@ TEST_F(TableTupleTest, HiddenColumns)
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
-    NValue nvalHiddenString = ValueFactory::getStringValue("platypus");
+    NValue nvalHiddenString = ValueFactory::getStringValue("platy数p");
 
     tuple.setNValue(0, nvalVisibleBigint);
     tuple.setNValue(1, nvalVisibleString);
@@ -107,7 +107,7 @@ TEST_F(TableTupleTest, HiddenColumns)
     EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
     EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(nvalHiddenString));
 
-    EXPECT_EQ(8 + (4 + 6) + 8 + (4 + 8), tuple.maxDRSerializationSize());
+    EXPECT_EQ(8 + (4 + 6) + 8 + (4 + 6+3), tuple.maxDRSerializationSize());
 
     tuple.setHiddenNValue(1, ValueFactory::getNullStringValue());
     nvalHiddenString.free();
@@ -144,7 +144,9 @@ TEST_F(TableTupleTest, ToJsonArray)
     tuple.setHiddenNValue(0, nvalHiddenBigint);
     tuple.setHiddenNValue(1, nvalHiddenString);
 
-    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]"));
+    puts(tuple.toJsonArray().c_str());
+    //EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]"));
+    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"\\u6570\\u636e\\u5e93\",\"null\"]"));
 
     nvalHiddenString.free();
     nvalVisibleString.free();

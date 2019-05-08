@@ -5,12 +5,6 @@
 
 #ifndef UUID_618474C2DE1511DEB74A388C56D89593
 #define UUID_618474C2DE1511DEB74A388C56D89593
-#if defined(__GNUC__) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
-#pragma GCC system_header
-#endif
-#if defined(_MSC_VER) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
-#pragma warning(push,1)
-#endif
 
 #include <boost/config.hpp>
 #ifdef BOOST_NO_EXCEPTIONS
@@ -19,19 +13,29 @@
 #include <boost/exception/exception.hpp>
 #include <boost/exception/info.hpp>
 #include <boost/exception/diagnostic_information.hpp>
-#include <boost/exception/detail/type_info.hpp>
 #include <boost/exception/detail/clone_current_exception.hpp>
+#include <boost/exception/detail/type_info.hpp>
+#ifndef BOOST_NO_RTTI
+#include <boost/core/demangle.hpp>
+#endif
 #include <boost/shared_ptr.hpp>
 #include <stdexcept>
 #include <new>
 #include <ios>
 #include <stdlib.h>
 
+#if (__GNUC__*100+__GNUC_MINOR__>301) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
+#pragma GCC system_header
+#endif
+#if defined(_MSC_VER) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
+#pragma warning(push,1)
+#endif
+
 namespace
 boost
     {
     class exception_ptr;
-    BOOST_ATTRIBUTE_NORETURN void rethrow_exception( exception_ptr const & );
+    BOOST_NORETURN void rethrow_exception( exception_ptr const & );
     exception_ptr current_exception();
 
     class
@@ -89,7 +93,7 @@ boost
     std::string
     to_string( original_exception_type const & x )
         {
-        return x.value()->name();
+        return core::demangle(x.value()->name());
         }
 #endif
 
@@ -118,10 +122,12 @@ boost
             {
             Exception ba;
             exception_detail::clone_impl<Exception> c(ba);
+#ifndef BOOST_EXCEPTION_DISABLE
             c <<
                 throw_function(BOOST_CURRENT_FUNCTION) <<
                 throw_file(__FILE__) <<
                 throw_line(__LINE__);
+#endif
             static exception_ptr ep(shared_ptr<exception_detail::clone_base const>(new exception_detail::clone_impl<Exception>(c)));
             return ep;
             }
@@ -389,7 +395,7 @@ boost
                         {
                         return exception_detail::current_exception_std_exception(e);
                         }
-#ifndef BOOST_NO_TYPEID
+        #ifndef BOOST_NO_TYPEID
                     catch(
                     std::bad_cast & e )
                         {
@@ -400,7 +406,7 @@ boost
                         {
                         return exception_detail::current_exception_std_exception(e);
                         }
-#endif
+        #endif
                     catch(
                     std::bad_exception & e )
                         {
@@ -449,7 +455,7 @@ boost
         return ret;
         }
 
-    BOOST_ATTRIBUTE_NORETURN
+    BOOST_NORETURN
     inline
     void
     rethrow_exception( exception_ptr const & p )
@@ -467,7 +473,7 @@ boost
 
     inline
     std::string
-    diagnostic_information( exception_ptr const & p )
+    diagnostic_information( exception_ptr const & p, bool verbose=true )
         {
         if( p )
             try
@@ -477,7 +483,7 @@ boost
             catch(
             ... )
                 {
-                return current_exception_diagnostic_information();
+                return current_exception_diagnostic_information(verbose);
                 }
         return "<empty>";
         }

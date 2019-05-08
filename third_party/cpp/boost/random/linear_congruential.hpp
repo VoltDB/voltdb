@@ -7,7 +7,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: linear_congruential.hpp 71018 2011-04-05 21:27:52Z steven_watanabe $
+ * $Id$
  *
  * Revision history
  *  2001-02-18  moved to individual header files
@@ -124,8 +124,12 @@ public:
      * distinct seeds in the range [1,m) will leave the generator in distinct
      * states. If c is not zero, the range is [0,m).
      */
-    BOOST_RANDOM_DETAIL_ARITHMETIC_SEED(linear_congruential_engine, IntType, x0)
+    BOOST_RANDOM_DETAIL_ARITHMETIC_SEED(linear_congruential_engine, IntType, x0_)
     {
+        // Work around a msvc 12/14 optimizer bug, which causes
+        // the line _x = 1 to run unconditionally sometimes.
+        // Creating a local copy seems to make it work.
+        IntType x0 = x0_;
         // wrap _x if it doesn't fit in the destination
         if(modulus == 0) {
             _x = x0;

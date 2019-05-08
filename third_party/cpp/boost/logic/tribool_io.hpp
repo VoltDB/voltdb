@@ -11,7 +11,7 @@
 #include <boost/detail/workaround.hpp>
 #include <boost/noncopyable.hpp>
 
-#if BOOST_WORKAROUND(_MSC_VER, >= 1200)
+#if defined(_MSC_VER)
 #  pragma once
 #endif
 
@@ -45,7 +45,7 @@ template<>
 inline std::basic_string<char> default_false_name<char>()
 { return "false"; }
 
-#  ifndef BOOST_NO_WCHAR_T
+#  if !defined(BOOST_NO_CWCHAR)
 /**
  * \brief Returns the wide character string L"false".
  *
@@ -76,7 +76,7 @@ template<>
 inline std::basic_string<char> default_true_name<char>()
 { return "true"; }
 
-#  ifndef BOOST_NO_WCHAR_T
+#  if !defined(BOOST_NO_CWCHAR)
 /**
  * \brief Returns the wide character string L"true".
  *
@@ -104,17 +104,11 @@ template<>
 inline std::basic_string<char> get_default_indeterminate_name<char>()
 { return "indeterminate"; }
 
-#if BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-// VC++ 6.0 chokes on the specialization below, so we're stuck without 
-// wchar_t support. What a pain. TODO: it might just need a the template 
-// parameter as function parameter...
-#else
-#  ifndef BOOST_NO_WCHAR_T
+#if !defined(BOOST_NO_CWCHAR)
 /// Returns the wide character string L"indeterminate".
 template<>
 inline std::basic_string<wchar_t> get_default_indeterminate_name<wchar_t>()
 { return L"indeterminate"; }
-#  endif
 #endif
 
 // http://www.cantrip.org/locale.html
@@ -285,9 +279,9 @@ operator>>(std::basic_istream<CharT, Traits>& in, tribool& x)
       bool falsename_ok = true, truename_ok = true, othername_ok = true;
 
       // Modeled after the code from Library DR 17
-      while (falsename_ok && pos < falsename.size()
-             || truename_ok && pos < truename.size()
-             || othername_ok && pos < othername.size()) {
+      while ((falsename_ok && pos < falsename.size())
+             || (truename_ok && pos < truename.size())
+             || (othername_ok && pos < othername.size())) {
         typename Traits::int_type c = in.get();
         if (c == Traits::eof())
           return in;

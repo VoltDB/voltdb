@@ -53,7 +53,7 @@
 
 #include <murmur3/MurmurHash3.h>
 
-#include "jsoncpp/jsoncpp.h"
+#include "json/json.h"
 
 #include <iostream>
 #include <stdint.h>

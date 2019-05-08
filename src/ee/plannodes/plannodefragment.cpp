@@ -100,65 +100,58 @@ PlanNodeFragment::~PlanNodeFragment()
     }
 }
 
-PlanNodeFragment *
-PlanNodeFragment::createFromCatalog(const string value)
-{
+PlanNodeFragment * PlanNodeFragment::createFromCatalog(const string value) {
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     PlannerDomRoot domRoot(value.c_str());
     try {
-        PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(domRoot.rootObject());
+        PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(domRoot());
         return retval;
-    }
-    catch (UnexpectedEEException& ue) {
+    } catch (UnexpectedEEException& ue) {
         string prefix("\ncreateFromCatalog:\n");
         ue.appendContextToMessage(prefix + value);
         throw;
     }
 }
 
-PlanNodeFragment *
-PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
-{
+PlanNodeFragment* PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
     PlanNodeFragment *retval = new PlanNodeFragment();
-    auto_ptr<PlanNodeFragment> pnf(retval);
-
     if (obj.hasNonNullKey("IS_LARGE_QUERY")) {
         retval->m_isLargeQuery = obj.valueForKey("IS_LARGE_QUERY").asBool();
-    }
-    else {
+    } else {
         retval->m_isLargeQuery = false;
     }
-
     // read and construct plannodes from json object
     if (obj.hasNonNullKey("PLAN_NODES_LISTS")) {
-        PlannerDomValue planNodesListArray = obj.valueForKey("PLAN_NODES_LISTS");
         if (!obj.hasNonNullKey("EXECUTE_LISTS")) {
             throwFatalException("Failed to construct plan fragment. Missing EXECUTE_LISTS key");
         }
-        PlannerDomValue executeListArray = obj.valueForKey("EXECUTE_LISTS");
+        PlannerDomValue const& planNodesListArray = obj.valueForKey("PLAN_NODES_LISTS");
+        PlannerDomValue const& executeListArray = obj.valueForKey("EXECUTE_LISTS");
         if (planNodesListArray.arrayLen() != executeListArray.arrayLen()) {
             throwFatalException("Failed to construct plan fragment. EXECUTE_LISTS and PLAN_NODES_LISTS do not match");
         }
         int stmtCnt = planNodesListArray.arrayLen();
         for (int i = 0; i < stmtCnt; i++) {
-            int stmtId = planNodesListArray.valueAtIndex(i).valueForKey("STATEMENT_ID").asInt();
-            PlannerDomValue planNodesList = planNodesListArray.valueAtIndex(i).valueForKey("PLAN_NODES");
-            PlannerDomValue executeList = executeListArray.valueAtIndex(i).valueForKey("EXECUTE_LIST");
+           auto const& planNode = planNodesListArray.valueAtIndex(i),
+                &executeNode = executeListArray.valueAtIndex(i);
+           assert(planNode.hasNonNullKey("STATEMENT_ID") &&
+                 planNode.hasNonNullKey("PLAN_NODES") &&
+                 executeNode.hasNonNullKey("EXECUTE_LIST"));
+            int stmtId = planNode.valueForKey("STATEMENT_ID").asInt();
+            auto const planNodesList = planNode.valueForKey("PLAN_NODES");
+            auto const executeList = executeNode.valueForKey("EXECUTE_LIST");
             retval->nodeListFromJSONObject(planNodesList, executeList, stmtId);
         }
-    }
-    else {
+    } else {
         retval->nodeListFromJSONObject(obj.valueForKey("PLAN_NODES"), obj.valueForKey("EXECUTE_LIST"), 0);
     }
-    pnf.release();
     return retval;
 }
 
 void
-PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue planNodesList, PlannerDomValue executeList, int stmtId)
-{
+PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId) {
     assert(m_stmtExecutionListMap.find(stmtId) == m_stmtExecutionListMap.end());
     // NODE_LIST
     std::vector<AbstractPlanNode*> planNodes;
