@@ -811,7 +811,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         DrRoleType.XDCR.value().equals(m_cluster.getDrrole())
                         && new_catalog_table.getIsdred();
                 final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
-                final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
+                final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(new_catalog_table.getTabletype());
 
                 Boolean needsConversion = null;
                 while (savefile.hasMoreChunks()) {
@@ -2168,7 +2168,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final boolean preserveDRHiddenColumn =
             DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && newCatalogTable.getIsdred();
         final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(newCatalogTable);
-        final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(newCatalogTable.getTabletype());
+        final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(newCatalogTable.getTabletype());
 
         Boolean needsConversion = null;
         Map<Long, Integer> sitesToPartitions = null;
@@ -2389,7 +2389,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final boolean preserveDRHiddenColumn =
                 DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
             final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
-            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(new_catalog_table.getTabletype());
+            final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(new_catalog_table.getTabletype());
             while (hasMoreChunks()) {
                 VoltTable table = null;
 

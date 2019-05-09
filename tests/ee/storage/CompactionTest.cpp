@@ -177,7 +177,10 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature,
+                        false,
+                        0,
+                        PERSISTENT_MIGRATE));
         // Set a dummy StreamedTable to avoid asserts in the main path
         m_table->setStreamedTable((StreamedTable*) 1);
 

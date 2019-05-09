@@ -80,7 +80,8 @@ Table* TableFactory::getPersistentTable(
                                                       tableAllocationTargetSize,
                                                       tupleLimit,
                                                       drEnabled,
-                                                      isReplicated);
+                                                      isReplicated,
+                                                      tableType);
     }
 
     initCommon(databaseId,

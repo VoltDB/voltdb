@@ -65,10 +65,12 @@ class DeleteExecutor : public AbstractExecutor
 {
 public:
     DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractExecutor(engine, abstract_node),
+          m_node(NULL),
+          m_truncate(false),
+          m_inputTable(NULL),
+          m_inputTuple()
     {
-        m_inputTable = NULL;
-        m_engine = engine;
     }
 
 protected:
@@ -86,9 +88,6 @@ private:
     TableTuple m_inputTuple;
 
     static int64_t s_modifiedTuples;
-    /** reference to the engine/context to store the number of
-        modified tuples */
-    VoltDBEngine* m_engine;
 };
 
 }
