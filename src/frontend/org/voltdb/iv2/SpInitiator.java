@@ -85,6 +85,9 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                     if (!m_promoted || reinstate) {
                         acceptPromotionImpl(reinstate ? Long.MAX_VALUE : info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
                         m_promoted = true;
+                        if (reinstate) {
+                            m_initiatorMailbox.resetMigratePartitionLeaderStatus();
+                        }
                     }
                     break;
                 }
