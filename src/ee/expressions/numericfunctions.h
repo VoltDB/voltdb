@@ -17,7 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "boost/math/constants/constants.hpp"
-
+#include "catalog/cluster.h"
 
 namespace voltdb {
 
@@ -484,6 +484,16 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
 }
 
 template<> inline NValue NValue::callConstant<FUNC_UNIQUE_ID>() {
-    return getBigIntValue(0);
+    NValue retval(VALUE_TYPE_BIGINT);
+    // get the catalog cluster
+    catalog::Cluster* catalogCluster = ExecutorContext::getExecutorContext()->getEngine()
+    		->getCatalog()->clusters().get("cluster");
+   	// retrieve the dr cluster id
+   	int64_t clusterId = catalogCluster->drClusterId();
+    // shift the cluster id to the left by 61 bits and then add 61 '1's on the right
+    clusterId = (clusterId << 61) | 2305843009213693951;
+    // bitwise and the transaction id with the bits we generated using the clusterId
+    retval.getBigInt() = ExecutorContext::getExecutorContext()->currentTxnId() & clusterId;
+    return retval;
 }
 }

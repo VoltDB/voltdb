@@ -19,7 +19,6 @@
 #include "expressions/functionexpression.h"
 #include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
-#include <stdio.h>
 
 namespace voltdb {
 
