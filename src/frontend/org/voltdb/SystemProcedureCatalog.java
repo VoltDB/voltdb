@@ -218,7 +218,7 @@ public class SystemProcedureCatalog {
                                                                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,      false,  false,            false,        false ));
         builder.put("@NibbleDeleteSP",          new Config("org.voltdb.sysprocs.NibbleDeleteSP",           true,  false, false, 0,    VoltType.INVALID,   false, false, true,      true,   false,            true,         true  ));
         builder.put("@NibbleDeleteMP",          new Config("org.voltdb.sysprocs.NibbleDeleteMP",           false, false, false, 0,    VoltType.INVALID,   false, false, true,      true,   false,            true,         true  ));
-        builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true,  false, false, 0,    VoltType.INVALID,   false, false, true,      false,  false,            false,        false ));
+        builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true,  false, false, 0,    VoltType.INVALID,   false, false, false,     false,  false,            false,        false ));
         builder.put("@ExportControl",           new Config("org.voltdb.sysprocs.ExportControl",            false, false, false, 0,    VoltType.INVALID,   false, false, true,      false,  false,            true,         false ));
         builder.put("@MigrateRowsAcked_SP",     new Config("org.voltdb.sysprocs.MigrateRowsAcked_SP",      true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   true,             true,         true  ));
         builder.put("@MigrateRowsAcked_MP",     new Config("org.voltdb.sysprocs.MigrateRowsAcked_MP",      false, false, false, 0,    VoltType.VARBINARY, false, false, false,     true,   true,             true,         false ));
@@ -226,6 +226,8 @@ public class SystemProcedureCatalog {
         builder.put("@MigrateRowsMP",           new Config("org.voltdb.sysprocs.MigrateRowsMP",            false, false, false, 0,    VoltType.VARBINARY, false, false, false,     true,   true,             true,         false ));
         builder.put("@MigrateRowsNT",           new Config("org.voltdb.sysprocs.MigrateRowsNT",            true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   false,            false,        false ));
         builder.put("@MigrateRowsDeleterNT",    new Config("org.voltdb.sysprocs.MigrateRowsDeleterNT",     true,  false, false, 0,    VoltType.INVALID,   false, false, false,     true,   false,            false,        false ));
+        builder.put("@ElasticRemoveNT",         new Config("org.voltdb.sysprocs.ElasticRemoveNT",          false, false, false, 0,    VoltType.INVALID,   true,  false, true,      false,  false,            false,        false ));
+        builder.put("@ElasticRemove",           new Config("org.voltdb.sysprocs.ElasticRemove",            false, false, false, 0,    VoltType.INVALID,   true,  false, false,     true,   false,            true,         true ));
 
         listing = builder.build();
     }

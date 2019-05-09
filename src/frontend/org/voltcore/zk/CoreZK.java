@@ -27,6 +27,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.VoltZK;
+
 import com.google_voltpatches.common.collect.Lists;
 
 /**
@@ -97,8 +98,7 @@ public class CoreZK {
      * the suffix. The suffix cannot have any underscores in it.
      */
     public static String getSuffixFromChildName(String childName) {
-        final String[] parts = childName.split("_");
-        return parts[parts.length - 1];
+        return childName.substring(childName.lastIndexOf('_') + 1);
     }
 
     /**
@@ -203,7 +203,7 @@ public class CoreZK {
         }
 
         for (ZKUtil.ChildrenCallback callback : childrenCallbacks) {
-            if (callback.getChildren().isEmpty()) {
+            if (callback.get().isEmpty()) {
                 return true;
             }
         }

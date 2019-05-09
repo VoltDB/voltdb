@@ -24,7 +24,6 @@ package genqa.procedures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 
 public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
     public final SQLStmt export = new SQLStmt(
@@ -32,8 +31,7 @@ public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
             );
 
     public long run(long rowid, int reversed) {
-        @SuppressWarnings("deprecation")
-        long txnid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
+        long txnid = getUniqueId();
 
         voltQueueSQL(export, rowid, txnid);
 

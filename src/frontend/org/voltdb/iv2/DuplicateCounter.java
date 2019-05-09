@@ -236,6 +236,14 @@ public class DuplicateCounter
         return m_lastResponse;
     }
 
+    public void dumpCounter(StringBuilder sb) {
+        sb.append("DuplicateCounter: [");
+        m_openMessage.toDuplicateCounterString(sb);
+        sb.append(" outstanding HSIds: ");
+        sb.append(CoreUtils.hsIdCollectionToString(m_expectedHSIds));
+        sb.append("]\n");
+    }
+
     @Override
     public String toString()
     {

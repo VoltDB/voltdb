@@ -754,9 +754,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.limit(buf.position());
     }
 
-    /**
-     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
-     */
     void flattenToSubMessageBuffer(ByteBuffer buf) throws IOException
     {
         // See Serialization Format comment above getSerializedSize().
@@ -914,9 +911,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(buf.capacity() == buf.position());
     }
 
-    /**
-     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
-     */
     void initFromSubMessageBuffer(ByteBuffer buf) throws IOException
     {
         // See Serialization Format comment above getSerializedSize().
@@ -1072,6 +1066,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_stmtText);
             }
         }
+    }
+
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("FRAGMENT TASK: FragmentIndex: ").append(m_currentBatchIndex);
     }
 
     @Override

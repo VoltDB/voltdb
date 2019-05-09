@@ -36,7 +36,6 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
@@ -117,17 +116,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             nextHSId = Long.parseLong(HSIdInfo.substring(nextHSIdOffset+1));
         }
         return new LeaderCallBackInfo(lastHSId, nextHSId, migratePartitionLeader);
-    }
-
-    public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
-        try {
-            ZKUtil.deleteRecursively(zk, node);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
-                log.debug("Failed to remove stop node indicator " + node + " on ZK: " + e.getMessage());
-            }
-            return;
-        } catch (InterruptedException ignore) {}
     }
 
     /**
@@ -301,7 +289,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         HashMap<Integer, LeaderCallBackInfo> cache = new HashMap<Integer, LeaderCallBackInfo>();
         for (ByteArrayCallback callback : callbacks) {
             try {
-                byte payload[] = callback.getData();
+                byte payload[] = callback.get();
                 // During initialization children node may contain no data.
                 if (payload == null) {
                     continue;
@@ -367,7 +355,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
             // cb.getData() and cb.getPath() throw KeeperException
-            byte payload[] = cb.getData();
+            byte payload[] = cb.get();
             String data = new String(payload, "UTF-8");
             LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
             Integer partitionId = getPartitionIdFromZKPath(cb.getPath());

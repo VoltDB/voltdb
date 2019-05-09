@@ -272,12 +272,11 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + dataSz;                   // non-null tuple data
 }
 
-void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block, bool sync) {
+void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_tableName,
                     block,
-                    sync,
                     m_generation);
 }
 
@@ -301,8 +300,8 @@ bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
         // There is no buffer or the (MP) transaction has not been committed to the buffer yet
         // so don't release the buffer yet
         if (timeInMillis < 0) {
-            // Send a null buffer with the sync flag
-            pushStreamBuffer(NULL, true);
+            // Send a null buffer
+            pushStreamBuffer(NULL);
         }
         return false;
     }
@@ -317,7 +316,7 @@ bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
             // Most paths move a block to m_pendingBlocks and then use pushPendingBlocks (comment from there)
             // The block is handed off to the topend which is responsible for releasing the
             // memory associated with the block data. The metadata is deleted here.
-            pushStreamBuffer(m_currBlock, timeInMillis < 0);
+            pushStreamBuffer(m_currBlock);
             delete m_currBlock;
             m_currBlock = NULL;
             extendBufferChain(0);
@@ -326,7 +325,7 @@ bool ExportTupleStream::periodicFlush(int64_t timeInMillis,
             m_flushPending = false;
         } else {
             if (timeInMillis < 0) {
-                pushStreamBuffer(NULL, true);
+                pushStreamBuffer(NULL);
             }
         }
 

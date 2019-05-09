@@ -55,7 +55,10 @@ import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.MultimapBuilder;
+import com.google_voltpatches.common.collect.Range;
+import com.google_voltpatches.common.collect.RangeMap;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.TreeRangeMap;
 
 public class AbstractTopology {
 
@@ -903,7 +906,6 @@ public class AbstractTopology {
             int kfactor, int firstPartitionId) {
         return new TopologyBuilder(hostInfos, missingHosts, firstPartitionId, kfactor + 1).addPartitionsToHosts();
     }
-
     /////////////////////////////////////
     //
     // PUBLIC STATIC API
@@ -920,10 +922,10 @@ public class AbstractTopology {
      */
     public static Pair<AbstractTopology, ImmutableList<Integer>> mutateAddNewHosts(AbstractTopology currentTopology,
             Map<Integer, HostInfo> newHostInfos) {
-        int largestPartitionId = getNextFreePartitionId(currentTopology);
+        int startingPartitionId = getNextFreePartitionId(currentTopology);
 
         TopologyBuilder topologyBuilder = addPartitionsToHosts(newHostInfos, Collections.emptySet(),
-                currentTopology.getReplicationFactor(), largestPartitionId);
+                currentTopology.getReplicationFactor(), startingPartitionId);
 
         ImmutableList.Builder<Integer> newPartitions = ImmutableList.builder();
         for (PartitionBuilder pb : topologyBuilder.m_partitions) {
@@ -931,6 +933,20 @@ public class AbstractTopology {
         }
 
         return Pair.of(new AbstractTopology(currentTopology, topologyBuilder), newPartitions.build());
+    }
+
+    /**
+     * Remove hosts from an existing topology
+     *
+     * @param currentTopology to extend
+     * @param removalHostInfos   hosts to be removed from topology
+     * @return update {@link AbstractTopology} with remaining hosts and removed partition IDs
+     * @throws RuntimeException if hosts are not valid for topology
+     */
+    public static Pair<AbstractTopology, Set<Integer>> mutateRemoveHosts(AbstractTopology currentTopology,
+                                                                         Set<Integer>  removalHosts) {
+        Set<Integer> removalPartitionIds = getPartitionIdsForHosts(currentTopology, removalHosts);
+        return Pair.of(new AbstractTopology(currentTopology, removalHosts, removalPartitionIds), removalPartitionIds);
     }
 
     /**
@@ -1072,6 +1088,48 @@ public class AbstractTopology {
         return new JSONObject(stringer.toString());
     }
 
+    /**
+     * Best effort to find the matching host on the existing topology from ZK Use the placement group of the recovering
+     * host to match a lost node in the topology
+     *
+     * @param topo       The topology
+     * @return recovered topology if a matching node is found
+     */
+    public static RangeMap<Integer, Set<Integer>> getPartitionGroupsFromTopology(AbstractTopology topo) {
+        Set<Integer> visited = new HashSet<>();
+        RangeMap<Integer, Set<Integer>> protectionGroups = TreeRangeMap.create();
+        for (AbstractTopology.Host host : topo.hostsById.values()) {
+            if (visited.contains(host.id) || host.partitions.isEmpty()) {
+                continue;
+            }
+            Set<Integer> hosts = new HashSet<>();
+            @SuppressWarnings("unchecked")
+            Range<Integer>[] partitionRange = new Range[1];
+            buildProtectionGroup(topo, visited, host, partitionRange, hosts);
+            assert hosts.size() * topo.getSitesPerHost() / (topo.getReplicationFactor() + 1) == partitionRange[0].upperEndpoint() - partitionRange[0].lowerEndpoint() + 1;
+            protectionGroups.put(partitionRange[0], hosts);
+        }
+        return protectionGroups;
+    }
+
+    private static void buildProtectionGroup(AbstractTopology topo, Set<Integer> visited, AbstractTopology.Host host,
+                                             Range<Integer>[] partitionRange, Set<Integer> hosts) {
+        if (!visited.add(host.id) || host.partitions.isEmpty()) {
+            return;
+        }
+
+        Range<Integer> hostRange = Range.closed(host.partitions.first().id, host.partitions.last().id);
+        partitionRange[0] = partitionRange[0] == null ? hostRange : partitionRange[0].span(hostRange);
+
+        for (AbstractTopology.Partition partition : host.partitions) {
+            for (Integer hostId : partition.hostIds) {
+                if (hosts.add(hostId)) {
+                    buildProtectionGroup(topo, visited, topo.hostsById.get(hostId), partitionRange, hosts);
+                }
+            }
+        }
+    }
+
     private static AbstractTopology mutateRestorePartitionsForRecovery(AbstractTopology topology,
             Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts) {
         Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
@@ -1193,6 +1251,7 @@ public class AbstractTopology {
     // PRIVATE TOPOLOGY CONSTRUCTOR
     //
     /////////////////////////////////////
+    // private construct for creating new or add new hosts
     private AbstractTopology(AbstractTopology existingTopology, TopologyBuilder topologyBuilder) {
         Preconditions.checkArgument(
                 (existingTopology.getSitesPerHost() == -1 && topologyBuilder.m_sitesPerHost != -1)
@@ -1227,6 +1286,34 @@ public class AbstractTopology {
                 + topologyBuilder.m_unbalancedPartitionCount;
     }
 
+    // private construct for removing host from existing valid Topology
+    private AbstractTopology(AbstractTopology existingTopology, Set<Integer> removalHosts, Set<Integer> removalPartitionIds) {
+        Preconditions.checkArgument(!removalHosts.isEmpty(),"Given remove host set is empty.");
+        Preconditions.checkArgument(existingTopology.getSitesPerHost() != -1,"Trying to remove from uninitialized Topology.");
+
+        assert(!removalHosts.isEmpty() && existingTopology.getSitesPerHost() != -1 );
+        version = existingTopology.version + 1;
+
+        ImmutableMap.Builder<Integer, Partition> partitionBuilder = ImmutableMap.builder();
+        partitionBuilder.putAll(
+                Iterables.filter(existingTopology.partitionsById.entrySet(), item -> !removalPartitionIds.contains(item.getKey())));
+        partitionsById = partitionBuilder.build();
+
+        ImmutableMap.Builder<Integer, Host> hostsBuilder = ImmutableMap.builder();
+        hostsBuilder.putAll(
+                Iterables.filter(existingTopology.hostsById.entrySet(), item -> !removalHosts.contains(item.getKey())));
+        try {
+            hostsById = hostsBuilder.build();
+        } catch (IllegalArgumentException e) {
+            // shouldn't happen for the remove case
+            throw new RuntimeException("must contain unique and unused hostid", e);
+        }
+        this.m_sitesPerHost = existingTopology.m_sitesPerHost;
+        m_replicationFactor = existingTopology.getReplicationFactor();
+        m_unbalancedPartitionCount = existingTopology.m_unbalancedPartitionCount;
+    }
+
+    // private construct for recovery
     private AbstractTopology(AbstractTopology existingTopology, ImmutableMap<Integer, Host> hostsById,
             ImmutableMap<Integer, Partition> partitionsById) {
         this(existingTopology.version + 1, hostsById, partitionsById, existingTopology.getSitesPerHost(),
@@ -1252,6 +1339,13 @@ public class AbstractTopology {
     // PRIVATE STATIC HELPER METHODS
     //
     /////////////////////////////////////
+    private static Set<Integer> getPartitionIdsForHosts(AbstractTopology topology, Set<Integer> hostIds) {
+        Set<Integer> partitionIds = new HashSet<>();
+        for (int hostId : hostIds) {
+            partitionIds.addAll(topology.getPartitionIdList(hostId));
+        }
+        return partitionIds;
+    }
 
     private static int getNextFreePartitionId(AbstractTopology topology) {
         OptionalInt maxPartitionIdOptional = topology.partitionsById.values().stream()
@@ -1274,6 +1368,24 @@ public class AbstractTopology {
     }
 
     /**
+     * get all the hostIds in the partition group
+     * contain the host(s) that have highest partition id
+     * @return all the hostIds in the partition group
+     */
+    public Set<Integer> getPartitionGroupPeersContainHighestPid() {
+        // find highest partition
+        int hPid = getPartitionCount() -1;
+
+        // find the host that contains the highest partition
+        Collection<Integer> hHostIds = getHostIdList(hPid);
+        if (hHostIds == null || hHostIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        int hHostId = hHostIds.iterator().next();
+        return getPartitionGroupPeers(hHostId);
+    }
+
+    /**
      * get all the hostIds in the partition group where the host with the given host id belongs
      * @param hostId the given hostId
      * @return all the hostIds in the partition group
@@ -1289,6 +1401,11 @@ public class AbstractTopology {
     public List<Integer> getPartitionIdList(int hostId) {
         Host h = hostsById.get(hostId);
         return (h != null) ? h.getPartitionIdList() : null;
+    }
+
+    public Collection<Integer> getHostIdList(int partitionId) {
+        Partition p = partitionsById.get(partitionId);
+        return (p != null) ? p.hostIds : null;
     }
 
     public int getSitesPerHost() {

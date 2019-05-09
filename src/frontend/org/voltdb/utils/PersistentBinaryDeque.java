@@ -361,7 +361,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private final String m_nonce;
     private final boolean m_compress;
     private boolean m_initializedFromExistingFiles = false;
-    private boolean m_awaitingTruncation = false;
 
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
@@ -1259,16 +1258,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         return numOpen;
-    }
-
-    public synchronized boolean isAwaitingTruncation()
-    {
-        return m_awaitingTruncation;
-    }
-
-    public synchronized void setAwaitingTruncation(boolean m_awaitingTruncation)
-    {
-        this.m_awaitingTruncation = m_awaitingTruncation;
     }
 
     @Override

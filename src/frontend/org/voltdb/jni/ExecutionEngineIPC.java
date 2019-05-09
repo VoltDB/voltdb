@@ -44,7 +44,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -52,7 +51,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -134,7 +132,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , ApplyBinaryLog(29)
         , ShutDown(30)
         , SetViewsEnabled(31)
-        , DeleteMigratedRows(32);
+        , DeleteMigratedRows(32)
+        , DisableExternalStreams(33)
+        , ExternalStreamsEnabled(34);
 
         Commands(final int id) {
             m_id = id;
@@ -431,7 +431,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // start sequence number - 8 bytes
                     // tupleCount - 8 bytes
                     // uniqueId - 8 bytes
-                    // sync - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
                     int partitionId = getBytes(4).getInt();
@@ -443,7 +442,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
-                    boolean sync = getBytes(1).get() == 1 ? true : false;
                     long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
@@ -455,8 +453,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uniqueId,
                             genId,
                             0,
-                            length == 0 ? null : getBytes(length),
-                            sync);
+                            length == 0 ? null : getBytes(length));
                 }
                 else if (status == kErrorCode_pushEndOfStream) {
                     ByteBuffer header = ByteBuffer.allocate(8);
@@ -1823,9 +1820,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             return  retval.array();
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        throw new RuntimeException("Failed to executeTask in IPC client");
     }
 
     @Override
@@ -1880,6 +1876,35 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.write();
         } catch (final IOException e) {
             System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        System.out.println("Disabling all external streams in EE");
+        m_data.clear();
+        m_data.putInt(Commands.DisableExternalStreams.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        m_data.clear();
+        m_data.putInt(Commands.ExternalStreamsEnabled.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            return m_connection.readByte() == 1 ? true : false;
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException();
         }
     }

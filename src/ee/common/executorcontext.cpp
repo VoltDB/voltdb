@@ -124,6 +124,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_currentDRTimestamp(0),
     m_lttBlockCache(topend, engine ? engine->tempTableMemoryLimit() : 50*1024*1024, siteId), // engine may be null in unit tests
     m_traceOn(false),
+    m_externalStreamsEnabled(true),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -401,7 +402,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
 bool ExecutorContext::checkTransactionForDR() {
     bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
-        if (m_drStream && m_drStream->drStreamStarted()) {
+        if (m_externalStreamsEnabled && m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,

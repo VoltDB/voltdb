@@ -19,10 +19,13 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -41,6 +44,8 @@ public class ExtensibleSnapshotDigestData {
     public static final String EXPORT_SEQUENCE_NUMBER = "exportSequenceNumber";
     public static final String EXPORT_USO = "exportUso";
 
+    public static final String DISABLED_EXTERNAL_STREAMS = "disabledExternalStreams";
+
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
      * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
@@ -56,6 +61,11 @@ public class ExtensibleSnapshotDigestData {
     private final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo;
 
     /**
+     * Set of partitions where external streams are disabled.
+     */
+    private Set<Integer> m_disabledExternalStreams;
+
+    /**
      * Used to pass the last seen unique ids from remote datacenters into the snapshot
      * termination path so it can publish it to ZK where it is extracted by rejoining
      * nodes
@@ -68,19 +78,25 @@ public class ExtensibleSnapshotDigestData {
      */
     private long m_terminus;
 
+    private final JSONObject m_elasticOperationMetadata;
+
     public ExtensibleSnapshotDigestData(
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, JSONObject> drMixedClusterSizeConsumerState,
-            final JSONObject jsData) {
+            JSONObject elasticOperationMetadata, final JSONObject jsData) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
+        m_elasticOperationMetadata = elasticOperationMetadata;
     }
 
-    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws IOException {
-        try {
+    public void setDisabledExternalStreams(Set<Integer> disabledStreams) {
+        m_disabledExternalStreams = disabledStreams;
+    }
+
+    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws JSONException {
             stringer.key(EXPORT_SEQUENCE_NUMBER_ARR).array();
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
@@ -99,9 +115,6 @@ public class ExtensibleSnapshotDigestData {
                 stringer.endObject();
             }
             stringer.endArray();
-        } catch (JSONException e) {
-            throw new IOException(e);
-        }
     }
 
     /*
@@ -161,34 +174,50 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
+    private void mergeExternalStreamStatesToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
+        JSONArray jsonPartitions;
+        Set<Integer> disabledStreamsInJson = new HashSet<>();
+        if (jsonObj.has(DISABLED_EXTERNAL_STREAMS)) {
+            jsonPartitions = jsonObj.getJSONArray(DISABLED_EXTERNAL_STREAMS);
+            for (int i=0; i<jsonPartitions.length(); i++) {
+                disabledStreamsInJson.add(jsonPartitions.getInt(i));
+            }
+        } else {
+            jsonPartitions = new JSONArray();
+            jsonObj.put(DISABLED_EXTERNAL_STREAMS, jsonPartitions);
+        }
+
+        for (Integer partition : m_disabledExternalStreams) {
+            if (!disabledStreamsInJson.contains(partition)) {
+                jsonPartitions.put(partition);
+            }
+        }
+    }
+
     private void mergeTerminusToZK(JSONObject jsonObj) throws JSONException {
         long jsTerminus = jsonObj.optLong(SnapshotUtil.JSON_TERMINUS, 0L);
         m_terminus = Math.max(jsTerminus, m_terminus);
         jsonObj.put(SnapshotUtil.JSON_TERMINUS, m_terminus);
     }
 
-    private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws IOException {
-        try {
-            stringer.key("drTupleStreamStateInfo");
+    private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws JSONException {
+        stringer.key("drTupleStreamStateInfo");
+        stringer.object();
+        for (Map.Entry<Integer, TupleStreamStateInfo> e : m_drTupleStreamInfo.entrySet()) {
+            stringer.key(e.getKey().toString());
             stringer.object();
-            for (Map.Entry<Integer, TupleStreamStateInfo> e : m_drTupleStreamInfo.entrySet()) {
-                stringer.key(e.getKey().toString());
-                stringer.object();
-                if (e.getKey() != MpInitiator.MP_INIT_PID) {
-                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
-                    stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
-                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
-                } else {
-                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
-                    stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
-                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
-                }
-                stringer.endObject();
+            if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
+                stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
+                stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
+            } else {
+                stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
+                stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
+                stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
             }
             stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
         }
+        stringer.endObject();
     }
 
     private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
@@ -301,38 +330,53 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    private void writeDRStateToSnapshot(JSONStringer stringer) throws IOException {
-        try {
-            long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
-            stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
+    private void writeDRStateToSnapshot(JSONStringer stringer) throws JSONException {
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
+        stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
 
-            Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
-            if (iter.hasNext()) {
-                stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
-            }
-            writeDRTupleStreamInfoToSnapshot(stringer);
-            stringer.key("drMixedClusterSizeConsumerState");
-            stringer.object();
-            for (Entry<Integer, JSONObject> e : m_drMixedClusterSizeConsumerState.entrySet()) {
-                stringer.key(e.getKey().toString());    // Consumer partitionId
-                stringer.value(e.getValue());           // Trackers from that site
-            }
-            stringer.endObject();
+        Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
+        if (iter.hasNext()) {
+            stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
+        }
+        writeDRTupleStreamInfoToSnapshot(stringer);
+        stringer.key("drMixedClusterSizeConsumerState");
+        stringer.object();
+        for (Entry<Integer, JSONObject> e : m_drMixedClusterSizeConsumerState.entrySet()) {
+            stringer.key(e.getKey().toString()); // Consumer partitionId
+            stringer.value(e.getValue()); // Trackers from that site
+        }
+        stringer.endObject();
+    }
+
+    public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
+        try {
+            writeExportSequencesToSnapshot(stringer);
+            writeExternalStreamStates(stringer);
+            writeDRStateToSnapshot(stringer);
+            stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(m_elasticOperationMetadata);
         } catch (JSONException e) {
             throw new IOException(e);
         }
     }
 
-    public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
-        writeExportSequencesToSnapshot(stringer);
-        writeDRStateToSnapshot(stringer);
+    /**
+     * Writes external streams state for partitions into snapshot digest.
+     */
+    private void writeExternalStreamStates(JSONStringer stringer) throws JSONException {
+            stringer.key(DISABLED_EXTERNAL_STREAMS).array();
+            for (int partition : m_disabledExternalStreams) {
+                stringer.value(partition);
+            }
+            stringer.endArray();
     }
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
         mergeExportSequenceNumbersToZK(jsonObj, log);
+        mergeExternalStreamStatesToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
         mergeTerminusToZK(jsonObj);
+        jsonObj.put(SnapshotUtil.JSON_ELASTIC_OPERATION, m_elasticOperationMetadata);
     }
 
     public long getTerminus() {
