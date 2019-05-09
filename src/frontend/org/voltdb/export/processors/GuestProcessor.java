@@ -344,6 +344,9 @@ public class GuestProcessor implements ExportDataProcessor {
                 try {
                     cont = fut.get();
                     if (cont == null) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received an end of stream event, exiting listener");
+                        }
                         return;
                     }
                     // If export master accepts promotion in case of mastership migration or leader re-election,

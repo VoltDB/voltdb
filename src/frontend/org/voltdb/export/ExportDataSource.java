@@ -434,6 +434,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
+                    if (m_closed) {
+                        exportLog.info("Closed, not ready for polling");
+                        return;
+                    }
                     if (!m_readyForPolling) {
                         return;
                     }
@@ -881,7 +885,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(sequenceNumber, isRejoin);
                     // Need to handle drained source if truncate emptied the buffers
-                    handleDrainedSource();
+                    // Note, this always happen before the first poll
+                    handleDrainedSource(null);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1127,9 +1132,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         try {
-            if (handleDrainedSource()) {
+            if (handleDrainedSource(pollTask)) {
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Exiting a drained source");
+                    exportLog.debug("Exiting a drained source on poll");
                 }
                 return;
             }
@@ -1434,7 +1439,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (seq > 0) {
             try {
                 releaseExportBytes(seq);
-                handleDrainedSource();
+                if (handleDrainedSource(m_pollTask)) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Handled a drained source on ack");
+                    }
+                    m_pollTask = null;
+                }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
@@ -1445,38 +1455,43 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      /**
       * Notify the generation when source is drained on an unused partition.
       *
+      * @param pollTask the current poll request or null
+      * @return true if handled a drained source
+      *
       * @throws IOException
       */
-     private boolean handleDrainedSource() throws IOException {
+     /**
+      *
+      * @throws IOException
+      */
+     private boolean handleDrainedSource(PollTask pollTask) throws IOException {
 
          // It may be that the drained source was detected and handled
          // in the truncate, and that we may be called again from GuestProcessor.
          // Send an end of stream to GuestProcessor but don't notify the generation.
          if (m_closed) {
-             endOfStream();
-             return false;
+             endOfStream(pollTask);
+             return true;
          }
 
          // Send end of stream to GuestProcessor and notify generation.
          if (!inCatalog() && m_committedBuffers.isEmpty()) {
-             endOfStream();
+             endOfStream(pollTask);
              m_generation.onSourceDrained(m_partitionId, m_tableName);
              return true;
          }
          return false;
      }
 
-     private void endOfStream() {
+     private void endOfStream(PollTask pollTask) {
          //Returning null indicates end of stream
          try {
-             if (m_pollTask != null) {
-                 m_pollTask.setFuture(null);
+             if (pollTask != null) {
+                 pollTask.setFuture(null);
              }
          } catch (RejectedExecutionException reex) {
              // Ignore, {@code GuestProcessor} was closed
              exportLog.info("End of Stream event rejected ");
-         } finally {
-             m_pollTask = null;
          }
      }
 
