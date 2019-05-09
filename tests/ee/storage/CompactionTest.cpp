@@ -129,8 +129,6 @@ public:
 
     ~CompactionTest() {
         delete m_engine;
-        // Clear the dummy StreamedTable so that PersistentTable is deallocated cleanly.
-        m_table->setStreamedTable(NULL);
         delete m_table;
         voltdb::globalDestroyOncePerProcess();
     }
@@ -181,8 +179,6 @@ public:
                         false,
                         0,
                         PERSISTENT_MIGRATE));
-        // Set a dummy StreamedTable to avoid asserts in the main path
-        m_table->setStreamedTable((StreamedTable*) 1);
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
