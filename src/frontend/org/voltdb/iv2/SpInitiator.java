@@ -78,16 +78,12 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
 
             Set<Long> leaders = Sets.newHashSet();
             for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                Long HSId = entry.getValue().m_HSId;
-                leaders.add(HSId);
-                if (HSId == getInitiatorHSId()){
-
-                    // The site could still be the leader although partition migration tries to move away but fail
-                    // In this case, SpScheduler has been marked as none leader, re-appoint itself to go through the repair
-                    // process and master update.
-                    if (!m_promoted || (!m_scheduler.m_isLeader && entry.getValue().m_lastHSId == HSId)) {
-                        acceptPromotionImpl(entry.getValue().m_lastHSId,
-                                entry.getValue().m_isMigratePartitionLeaderRequested);
+                LeaderCallBackInfo info = entry.getValue();
+                leaders.add(info.m_HSId);
+                if (info.m_HSId == getInitiatorHSId()){
+                    boolean reinstate = reinstateAsLeader(info);
+                    if (!m_promoted || reinstate) {
+                        acceptPromotionImpl(reinstate ? Long.MAX_VALUE : info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
                         m_promoted = true;
                     }
                     break;
@@ -110,6 +106,12 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
             }
         }
     };
+
+    // When the leader is migrated away from this site, m_scheduler is marked as not-a-leader. If the host for new leader fails
+    // before leader migration is completed. The previous leader, the current site, must be reinstated.
+    private boolean reinstateAsLeader(LeaderCallBackInfo info) {
+        return (m_promoted && !m_scheduler.m_isLeader && info.m_lastHSId == info.m_HSId);
+    }
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
             SnapshotCompletionMonitor snapMonitor,

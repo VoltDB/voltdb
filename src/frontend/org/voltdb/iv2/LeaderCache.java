@@ -198,6 +198,14 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         return info.m_HSId;
     }
 
+    public boolean isMigratePartitionLeaderRequested(int partitionId) {
+        LeaderCallBackInfo info = m_publicCache.get(partitionId);
+        if (info != null) {
+            return info.m_isMigratePartitionLeaderRequested;
+        }
+        return false;
+    }
+
     /**
      * Create or update a new rootNode child
      */

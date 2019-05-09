@@ -203,10 +203,8 @@ public class LeaderAppointer implements Promotable
                                              false, null);
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
-                boolean newLeaderAppointed = false;
                 if (missingHSIds.contains(m_currentLeader)) {
                     final long currentLeader = m_currentLeader;
-                    newLeaderAppointed = true;
                     m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug(WHOMIM + "Determining new leader when missing for partition " + m_partitionId +
@@ -214,33 +212,32 @@ public class LeaderAppointer implements Promotable
                                 " to " + CoreUtils.hsIdToString(m_currentLeader) + " from " +
                                 CoreUtils.hsIdCollectionToString(updatedHSIds));
                     }
+                } else {
+                    // When leader migration kicks in and the host for new partition leader fails before the partition completes promotion,
+                    // then, the partition leader stays on the old host and  m_currentLeader won't match
+                    // its appointee. The old leader won't go through the repair process as needed.
+                    Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
+                    boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
+                    if (supposedNewLeader != null && m_currentLeader != supposedNewLeader && isMigrateRequested) {
+                        String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
+                        try {
+                            m_iv2appointees.put(m_partitionId, masterPair);
+                            tmLog.info(WHOMIM + "Start to promote new master for partition.");
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + m_partitionId, true, e);
+                        }
+                    }
                 }
                 // If this partition doesn't have a leader yet, and we have new replicas added,
                 // elect a leader.
                 if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
                     final long currentLeader = m_currentLeader;
                     m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
-                    newLeaderAppointed = true;
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug(WHOMIM + "Determining new leader with no leader yet for partition " + m_partitionId +
                                 " current leader:" + CoreUtils.hsIdToString(currentLeader) +
                                 " to " + CoreUtils.hsIdToString(m_currentLeader) + " from " +
                                 CoreUtils.hsIdCollectionToString(updatedHSIds));
-                    }
-                }
-
-                // A host may fail before sp promotion process gets chance to update partition master, then m_currentLeader won't match
-                // its appointee, the leader should be re-elected to ensure transaction repair process is triggered.
-                // In this case, set both PREVIOUS and CURRENT leader to m_currentLeader.
-                if (!newLeaderAppointed) {
-                    Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
-                    if (supposedNewLeader != null && m_currentLeader != supposedNewLeader) {
-                        String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
-                        try {
-                            m_iv2appointees.put(m_partitionId, masterPair);
-                        } catch (Exception e) {
-                            VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + m_partitionId, true, e);
-                        }
                     }
                 }
             }
