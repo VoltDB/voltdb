@@ -67,7 +67,7 @@ public:
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    void streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type);
     virtual bool insertTuple(TableTuple &tuple);
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
@@ -94,7 +94,6 @@ public:
 
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;
-    bool shouldStreamToExport();
 
 
     /**

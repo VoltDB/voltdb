@@ -67,6 +67,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -149,6 +150,7 @@ public class Table extends TableBase implements SchemaObject {
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
     TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
+    PersistentExport      persistentExport;    //export to target(VOLTDB)
     private boolean isStream = false;          //is this a stream (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
@@ -2740,6 +2742,12 @@ public class Table extends TableBase implements SchemaObject {
         }
         assert(indexConstraintMap.isEmpty());
 
+        if (persistentExport != null) {
+            VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
+            pe.attributes.put("target", persistentExport.target);
+            pe.attributes.put("triggers", String.join(",", persistentExport.triggers));
+            table.children.add(pe);
+        }
         return table;
     }
 
@@ -2786,6 +2794,18 @@ public class Table extends TableBase implements SchemaObject {
 
     public void dropTTL() {
         timeToLive = null;
+    }
+
+    public void addPersistentExport(String target, List<String> triggers) {
+        persistentExport = new PersistentExport(target, triggers);
+    }
+
+    public PersistentExport getPersistentExport() {
+        return persistentExport;
+    }
+
+    public void dropPersistentExport() {
+        persistentExport = null;
     }
     // End of VoltDB extension
 

@@ -1409,7 +1409,7 @@ public class VoltCompiler {
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
-        if (tableref.getIsreplicated() && !TableType.isPersistentMigrate(tableref.getTabletype())) {
+        if (tableref.getIsreplicated() && !TableType.needsShadowStream(tableref.getTabletype())) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)
             tableref.setIsreplicated(false);
