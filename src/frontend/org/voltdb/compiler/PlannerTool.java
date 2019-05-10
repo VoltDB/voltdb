@@ -356,8 +356,6 @@ public class PlannerTool {
             }
             //return ahps;
             throw new PlannerFallbackException();
-        } catch (Exception e){
-            throw new PlannerFallbackException();
         } finally {
             if (m_plannerStats != null) {
                 m_plannerStats.endStatsCollection(m_calciteCache.getLiteralCacheSize(), m_calciteCache.getCoreCacheSize(), cacheUse, -1);
@@ -366,6 +364,9 @@ public class PlannerTool {
     }
 
     private Object[] generateVoltParams(ParameterizedSqlTask ptask) {
+        if (ptask.getSqlLiteralList() == null) {
+            return new Object[0];
+        }
         Object[] params = new Object[ptask.getSqlLiteralList().size()];
         int i = 0;
         // convert calcite literal to volt parameter

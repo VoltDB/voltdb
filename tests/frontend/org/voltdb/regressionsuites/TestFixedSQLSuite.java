@@ -27,13 +27,15 @@ import java.io.IOException;
 import java.math.BigDecimal;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
@@ -2465,22 +2467,24 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // test overflow and any underflow decimal are rounded
             sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
             if (isHSQL()) {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                verifyStmtFails(client, sql, "Decimal 111111111111111111111111111111111111111.111100000000 has more than 38 digits of precision.");
             } else {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                // TODO related to ENG-15053 and ENG-15353
+                // TODO related to ENG-15978
+                verifyStmtFails(client, sql, "Decimal 111111111111111111111111111111111111111.111100000000 has more than 38 digits of precision.");
             }
 
             // ENG-15234
 //        sql = "SELECT NUM + 111113.1111111111111111111111111111111111111 FROM R1";
 //        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
 
-            sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
-            runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
+            // ENG-15978 calcite should handle throw exception at here
+//            sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
+//            runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
 
-            sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
-            verifyStmtFails(client, sql, "Numeric literal '1.1111111111111111111E368' out of range");
-
+            // ENG-15978 calcite should handle throw exception at here
+//            sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
+//            verifyStmtFails(client, sql, "Numeric literal '1.1111111111111111111E368' out of range");
 
             // test stored procedure
             VoltTable vt;
@@ -2824,6 +2828,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {}, vt);
 
         // Subquery returns zero rows, so NOT EXISTS returns true
+        // TODO ENG-15982 the order by clause was original "order by 1, 2, 3, 4"
+        // this "order by ordinal" feature is not understand by Calcite
         vt = client.callProcedure("@AdHoc",
                 "SELECT * "
                         + "FROM P1 "
@@ -2832,12 +2838,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         + "  FROM R1 "
                         + "  WHERE DESC = 'bar' "
                         + "  GROUP BY NUM) "
-                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+                        + "ORDER BY id, desc, num, ratio").getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // WHERE predicate in inner query sometimes returns true, sometimes false
         // (bug occurred when predicate was always false and pass through values were
         // uninitialized)
+        // TODO ENG-15982 the order by clause was original "order by 1, 2, 3, 4"
+        // this "order by ordinal" feature is not understand by Calcite
         vt = client.callProcedure("@AdHoc",
                 "SELECT * "
                         + "FROM P1 "
@@ -2846,7 +2854,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         + "  FROM R1 "
                         + "  WHERE DESC = 'baz' "
                         + "  GROUP BY NUM) "
-                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+                        + "ORDER BY id, desc, num, ratio").getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // The original query

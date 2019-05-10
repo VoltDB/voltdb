@@ -22,6 +22,7 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.tools.ValidationException;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -138,6 +139,8 @@ public class NonDdlBatchPlanner {
         } catch (PlannerFallbackException ex) {
             // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
+        } catch (ValidationException vex) {
+            throw new PlannerFallbackException();
         } catch (Exception ex) {
             Throwable cause = ex.getCause();
             while(cause != null && cause.getCause() != null) {

@@ -44,7 +44,12 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltdb.*;
+import org.voltdb.AdHocQueryTester;
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
@@ -62,7 +67,11 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.*;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
