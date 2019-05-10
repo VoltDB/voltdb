@@ -179,6 +179,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // (same transaction can be restarted multiple times due to multiple leader promotions)
     long m_restartTimestamp = -1;
 
+    int m_maxResponseSize = Integer.MAX_VALUE;
+
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
     }
@@ -261,6 +263,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
+        m_maxResponseSize = ftask.m_maxResponseSize;
         assert(selfCheck());
     }
 
@@ -661,7 +664,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8 + 4;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
@@ -822,6 +825,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // timestamp for restarted transaction
         buf.putLong(m_restartTimestamp);
 
+        buf.putInt(m_maxResponseSize);
+
         // Plan Hash block
         for (FragmentData item : m_items) {
             buf.put(item.m_planHash);
@@ -959,6 +964,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_nPartTxn = buf.get() != 0;
         // timestamp for restarted transaction
         m_restartTimestamp = buf.getLong();
+        m_maxResponseSize = buf.getInt();
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1181,5 +1187,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public long getTimestamp() {
         return m_restartTimestamp;
+    }
+
+    public void setMaxResponseSize(int maxResponseSize) {
+        assert maxResponseSize > 0;
+        m_maxResponseSize = maxResponseSize;
+    }
+
+    public int getMaxResponseSize() {
+        return m_maxResponseSize;
     }
 }
