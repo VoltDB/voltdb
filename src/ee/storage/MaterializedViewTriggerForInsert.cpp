@@ -121,8 +121,8 @@ void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
                 mergeTupleForInsert(deltaTuple);
                 // Shouldn't need to update group-key-only indexes such as the primary key
                 // since their keys shouldn't ever change, but do update other indexes.
-                m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                       m_updatableIndexList, false);
+                m_dest->updateTupleWithSpecificIndexes(
+                      m_existingTuple, m_updatedTuple, m_updatableIndexList, false);
             }
             else {
                 m_dest->insertPersistentTuple(deltaTuple, false);
@@ -213,8 +213,7 @@ NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
     return tuple.getNValue(srcColIdx);
 }
 
-void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
-                                                          bool fallible) {
+void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple, bool fallible) {
     // If the view is not enabled, ignore it.
     // Snapshots will only do inserts, so this check is not added to handleTupleDelete.
     if (! m_enabled) {
@@ -230,7 +229,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         VOLT_TRACE("newTuple does not exist,create a blank tuple");
         m_existingTuple.move(m_emptyTuple.address());
     }
-
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
 
@@ -304,8 +302,8 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
-        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                               m_updatableIndexList, fallible);
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
+        assert(false);
     }
     else {
         int numCountStar = 0;

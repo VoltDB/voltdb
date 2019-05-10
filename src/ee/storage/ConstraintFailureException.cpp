@@ -45,7 +45,7 @@ ConstraintFailureException::ConstraintFailureException(
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
-        string message,
+        string const& message,
         PersistentTableSurgeon *surgeon) :
         SQLException(
                 SQLException::integrity_constraint_violation,
@@ -84,9 +84,7 @@ ConstraintFailureException::~ConstraintFailureException() throw () {
     }
 }
 
-const string
-ConstraintFailureException::message() const
-{
+string ConstraintFailureException::message() const {
     // This should probably be an override of the << operator and then used here, but meh
     string msg = SQLException::message();
     msg.append("\nConstraint violation type: ");

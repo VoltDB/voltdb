@@ -19,6 +19,7 @@
 #include "common/SynchronizedThreadLock.h"
 
 #include "executors/abstractexecutor.h"
+#include "executors/insertexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
@@ -187,9 +188,8 @@ UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
     return executeExecutors(executorList, subqueryId);
 }
 
-UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                         int subqueryId)
-{
+UniqueTempTableResult ExecutorContext::executeExecutors(
+      const std::vector<AbstractExecutor*>& executorList, int subqueryId) {
     // Walk through the list and execute each plannode.
     // The query planner guarantees that for a given plannode,
     // all of its children are positioned before it in this list,
@@ -211,8 +211,16 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 if (isTraceOn()) {
                     getPhysicalTopend()->traceLog(false, NULL, NULL);
                 }
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
+                InsertExecutor* insertExecutor = dynamic_cast<InsertExecutor*>(executor);
+                if (insertExecutor != nullptr && insertExecutor->exceptionMessage() != nullptr) {
+                   //throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                   //      insertExecutor->exceptionMessage());
+                   throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                         insertExecutor->exceptionMessage());
+                } else {
+                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                         "Unspecified execution error detected");
+                }
             }
 
             if (isTraceOn()) {
@@ -250,13 +258,13 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 inlineNode->getExecutor()->cleanupMemoryPool();
             }
         }
-
         if (subqueryId == 0) {
             VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
         } else {
             VOLT_TRACE("The Executor's execution at position '%d' in subquery %d failed", ctr, subqueryId);
         }
-        throw;
+        //throw;
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, e.what());
     }
 
     AbstractTempTable *result = executorList.back()->getPlanNode()->getTempOutputTable();

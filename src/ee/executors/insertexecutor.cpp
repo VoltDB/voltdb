@@ -53,6 +53,7 @@
 
 namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;
+std::string InsertExecutor::s_exceptionMessage;
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             const ExecutorVector& executorVector)
@@ -352,7 +353,6 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
     VOLT_TRACE("Target table:\n%s\n", m_targetTable->debug().c_str());
     // successfully inserted
     ++m_modifiedTuples;
-    return;
 }
 
 void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
@@ -364,13 +364,12 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         if (m_replicatedTableOperation) {
             s_modifiedTuples = m_modifiedTuples;
         }
-    }
-    else {
+    } else {
         if (s_modifiedTuples == -1) {
             // An exception was thrown on the lowest site thread and we need to throw here as well so
             // all threads are in the same state
             char msg[1024];
-            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+            snprintf(msg, 1024, "Replicated?? table insert threw an unknown exception on other thread for table %s",
                     m_targetTable->name().c_str());
             VOLT_DEBUG("%s", msg);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
@@ -397,47 +396,49 @@ void InsertExecutor::p_execute_finish() {
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
-    //
-    // See p_execute_init above.  If we are inserting a
-    // replicated table into an export table with no partition column,
-    // we only insert on one site.  For all other sites we just
-    // do nothing.
-    //
-    TableTuple inputTuple;
-    const TupleSchema *inputSchema = m_inputTable->schema();
-    {
-        if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
-            ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                    m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
-            if (possiblySynchronizedUseMpMemory.okToExecute()) {
-                //
-                // An insert is quite simple really. We just loop through our m_inputTable
-                // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
-                //
-                TableIterator iterator = m_inputTable->iterator();
-                while (iterator.next(inputTuple)) {
-                    p_execute_tuple_internal(inputTuple);
-                }
-                if (m_replicatedTableOperation) {
-                    s_modifiedTuples = m_modifiedTuples;
-                }
+   //
+   // See p_execute_init above.  If we are inserting a
+   // replicated table into an export table with no partition column,
+   // we only insert on one site.  For all other sites we just
+   // do nothing.
+   //
+   TableTuple inputTuple;
+   const TupleSchema *inputSchema = m_inputTable->schema();
+   if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
+      ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+            m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+      if (possiblySynchronizedUseMpMemory.okToExecute()) {
+         //
+         // An insert is quite simple really. We just loop through our m_inputTable
+         // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
+         //
+         TableIterator iterator = m_inputTable->iterator();
+         try {
+            while (iterator.next(inputTuple)) {
+               p_execute_tuple_internal(inputTuple);
             }
-            else {
-                if (s_modifiedTuples == -1) {
-                    // An exception was thrown on the lowest site thread and we need to throw here as well so
-                    // all threads are in the same state
-                    char msg[1024];
-                    snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
-                            m_targetTable->name().c_str());
-                    VOLT_DEBUG("%s", msg);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-                }
-            }
-        }
-    }
+         } catch (ConstraintFailureException const& e) {
+            FILE* fp = fopen("/tmp/baz", "w"); fputs(e.what(), fp); fclose(fp);
+            s_exceptionMessage = e.what();
+            //throw SerializableEEException(e.what());
+            return false;
+         }
+         if (m_replicatedTableOperation) {
+            s_modifiedTuples = m_modifiedTuples;
+         }
+      } else if (s_modifiedTuples == -1) {
+         // An exception was thrown on the lowest site thread and we need to throw here as well so
+         // all threads are in the same state
+         char msg[1024];
+         snprintf(msg, 1024, "Replicated!! table insert threw an unknown exception on other thread for table %s: %s",
+               m_targetTable->name().c_str(), s_exceptionMessage.c_str());
+         VOLT_DEBUG("%s", msg);
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+      }
+   }
 
-    p_execute_finish();
-    return true;
+   p_execute_finish();
+   return true;
 }
 
 InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node) {

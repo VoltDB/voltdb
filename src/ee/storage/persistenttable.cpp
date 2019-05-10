@@ -805,9 +805,9 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException& e) {
         deleteTupleStorage(target); // also frees object columns
+       FILE* fp = fopen("/tmp/bar", "w"); fputs("bar", fp); fclose(fp);
         throw;
     } catch (TupleStreamException& e) {
         deleteTupleStorage(target); // also frees object columns
@@ -979,12 +979,9 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUpdate,
-                                                     TableTuple& sourceTupleWithNewValues,
-                                                     std::vector<TableIndex*> const& indexesToUpdate,
-                                                     bool fallible,
-                                                     bool updateDRTimestamp,
-                                                     bool fromMigrate) {
+void PersistentTable::updateTupleWithSpecificIndexes(
+      TableTuple& targetTupleToUpdate, TableTuple& sourceTupleWithNewValues,
+      std::vector<TableIndex*> const& indexesToUpdate, bool fallible, bool updateDRTimestamp, bool fromMigrate) {
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
     int tupleLength = targetTupleToUpdate.tupleLength();
@@ -994,13 +991,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
      * Check for index constraint violations.
      */
     if (fallible) {
-        if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
-                                          sourceTupleWithNewValues,
-                                          indexesToUpdate)) {
-            throw ConstraintFailureException(this,
-                                             sourceTupleWithNewValues,
-                                             targetTupleToUpdate,
-                                             CONSTRAINT_TYPE_UNIQUE);
+        if (! checkUpdateOnUniqueIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate)) {
+            throw ConstraintFailureException(
+                  this, sourceTupleWithNewValues, targetTupleToUpdate, CONSTRAINT_TYPE_UNIQUE);
         }
 
         checkUpdateOnExpressions(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate);
@@ -1008,10 +1001,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
         FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-            throw ConstraintFailureException(this,
-                                             sourceTupleWithNewValues,
-                                             targetTupleToUpdate,
-                                             CONSTRAINT_TYPE_NOT_NULL);
+            throw ConstraintFailureException(
+                  this, sourceTupleWithNewValues, targetTupleToUpdate, CONSTRAINT_TYPE_NOT_NULL);
         }
 
         uq = ExecutorContext::currentUndoQuantum();
@@ -1564,9 +1555,8 @@ void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
          }
       }
    } catch (SQLException const& e) {
-      throw ConstraintFailureException(this,
-            sourceTupleWithNewValues,
-            e.what());
+      throw ConstraintFailureException(
+            this, sourceTupleWithNewValues, e.what());
    }
 }
 

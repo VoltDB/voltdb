@@ -386,7 +386,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
 // ------------------------------------------------------------------
 /**
  * Execute the given fragments serially and in order.
- * Return 0 if there are no failures and 1 if there are
+ * Return 0 if there are no failures and n>0 if there are
  * any failures.  Note that this is the meat of the JNI
  * call org.voltdb.jni.ExecutionEngine.nativeExecutePlanFragments.
  *
@@ -414,17 +414,9 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
  *                              the JNI call
  * @param traceOn               True to turn per-transaction tracing on.
  */
-int VoltDBEngine::executePlanFragments(int32_t numFragments,
-                                       int64_t planfragmentIds[],
-                                       int64_t inputDependencyIds[],
-                                       ReferenceSerializeInputBE &serialInput,
-                                       int64_t txnId,
-                                       int64_t spHandle,
-                                       int64_t lastCommittedSpHandle,
-                                       int64_t uniqueId,
-                                       int64_t undoToken,
-                                       bool traceOn)
-{
+int VoltDBEngine::executePlanFragments(
+      int32_t numFragments, int64_t planfragmentIds[], int64_t inputDependencyIds[], ReferenceSerializeInputBE &serialInput,
+      int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, int64_t undoToken, bool traceOn) {
     // count failures
     int failures = 0;
 

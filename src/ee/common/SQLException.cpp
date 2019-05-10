@@ -42,7 +42,7 @@ const char* SQLException::volt_decimal_serialization_error = "V0003";
 const char* SQLException::volt_user_defined_function_error = "V0004";
 
 namespace {
-    std::string make_error_message(int error_no, std::string &message) {
+    std::string make_error_message(int error_no, std::string const&message) {
         std::stringstream sb;
         sb << message << ": ";
         const char *strerror_msg = strerror(errno);
@@ -55,31 +55,27 @@ namespace {
     }
 }
 
-SQLException::SQLException(std::string sqlState, std::string message) :
+SQLException::SQLException(std::string const& sqlState, std::string const& message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
-    m_sqlState(sqlState), m_internalFlags(0)
-{
+    m_sqlState(sqlState), m_internalFlags(0) {
     assert(m_sqlState.length() == 5);
 }
 
-SQLException::SQLException(std::string sqlState, int error_no, std::string message) :
+SQLException::SQLException(std::string const& sqlState, int error_no, std::string const& message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, make_error_message(error_no, message)),
-    m_sqlState(sqlState), m_internalFlags(0)
-{
+    m_sqlState(sqlState), m_internalFlags(0) {
     assert(m_sqlState.length() == 5);
 }
 
-SQLException::SQLException(std::string sqlState, std::string message, VoltEEExceptionType type) :
+SQLException::SQLException(std::string const& sqlState, std::string const& message, VoltEEExceptionType type) :
     SerializableEEException(type, message),
-    m_sqlState(sqlState), m_internalFlags(0)
-{
+    m_sqlState(sqlState), m_internalFlags(0) {
     assert(m_sqlState.length() == 5);
 }
 
-SQLException::SQLException(std::string sqlState, std::string message, int internalFlags) :
+SQLException::SQLException(std::string const& sqlState, std::string const& message, int internalFlags) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
-    m_sqlState(sqlState), m_internalFlags(internalFlags)
-{
+    m_sqlState(sqlState), m_internalFlags(internalFlags) {
     assert(m_sqlState.length() == 5);
 }
 
@@ -89,3 +85,4 @@ void SQLException::p_serialize(ReferenceSerializeOutput *output) const {
         output->writeByte(sqlState[ii]);
     }
 }
+

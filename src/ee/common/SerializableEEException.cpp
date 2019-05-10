@@ -43,16 +43,14 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
 }
 #endif
 
-SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
-    std::runtime_error(message), m_exceptionType(exceptionType), m_message(message)
-{
+SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string const& message) :
+    std::runtime_error(message), m_exceptionType(exceptionType), m_message(message) {
     VOLT_DEBUG("Created SerializableEEException: type: %s message: %s",
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
 
-SerializableEEException::SerializableEEException(std::string message) :
-    std::runtime_error(message), m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message)
-{
+SerializableEEException::SerializableEEException(std::string const& message) :
+    std::runtime_error(message), m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message) {
     VOLT_DEBUG("Created SerializableEEException: default type, %s",
                message.c_str());
 }
@@ -69,10 +67,6 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
         output->writeInt(ENGINE_ERRORCODE_ERROR);
     const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
     output->writeIntAt( lengthPosition, length);
-}
-
-SerializableEEException::~SerializableEEException() throw() {
-    // TODO Auto-generated destructor stub
 }
 
 }

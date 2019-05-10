@@ -19,6 +19,7 @@
 #include <string>
 #include <limits.h>
 #include "common/NValue.hpp"
+#include "common/StackTrace.h"
 
 namespace voltdb {
 
@@ -380,10 +381,12 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
         sb << "Unrecognized format for IPv6 address string <"
            << cbuff
            << ">";
+        FILE* fp = fopen("/tmp/foo", "w");
+        StackTrace::printMangledAndUnmangledToFile(fp);
+        fclose(fp);
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addr, sizeof(addr), getTempStringPool());
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());
 }
 
 }
