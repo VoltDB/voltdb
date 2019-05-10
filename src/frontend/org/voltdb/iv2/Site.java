@@ -1901,4 +1901,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ComparisonOperation op) {
         return m_loadedProcedures.getMigrateProcRunner(procName, catTable, column, op);
     }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
+    }
 }
