@@ -1,0 +1,131 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2019 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.sched;
+
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Result returned by {@link Scheduler#nextRun(ScheduledProcedure)} to indicate the next step of the schedules life
+ * cycle.
+ */
+public final class SchedulerResult {
+    private final Status m_status;
+    private final String m_message;
+    private final ScheduledProcedure m_scheduledProcedure;
+
+    /**
+     * Create a {@link SchedulerResult} which indicates that an unrecoverable error has occurred and the scheduler must
+     * exit.
+     *
+     * @param message to log indicating the details of the error. May be {@code null}
+     * @return A new {@link Status#ERROR} instance of {@link SchedulerResult}
+     */
+    public static SchedulerResult error(String message) {
+        return new SchedulerResult(Status.ERROR, message, null);
+    }
+
+    /**
+     * Create a {@link SchedulerResult} which indicates that the scheduler has reached the end of its life cycle
+     * gracefully
+     *
+     * @param message to log indicating the details of the error. May be {@code null}
+     * @return A new {@link Status#EXIT} instance of {@link SchedulerResult}
+     */
+    public static SchedulerResult exit(String message) {
+        return new SchedulerResult(Status.EXIT, message, null);
+    }
+
+    /**
+     * Schedule a procedure to be executed after a delay
+     *
+     * @param delay               time for the procedure to be executed
+     * @param timeUnit            {#link TimeUnit} of {@code delay}
+     * @param procedure           name of procedure to execute
+     * @param procedureParameters to pass to procedure during execution
+     * @return A new {@link Status#PROCEDURE} instance of {@link SchedulerResult}
+     */
+    public static SchedulerResult scheduleProcedure(long delay, TimeUnit timeUnit, String procedure,
+            Object... procedureParameters) {
+        return new SchedulerResult(Status.PROCEDURE, null,
+                new ScheduledProcedure(delay, timeUnit, Objects.requireNonNull(procedure), procedureParameters));
+    }
+
+    /**
+     * Schedule the scheduler to be invoked again without a procedure being executed. This causes the
+     * {@link Scheduler#nextRun(ScheduledProcedure)} to be called again after a delay. A {@link ScheduledProcedure} will
+     * be associated with this call however it will have a {@code null} procedure but an {@code attachment} can be used.
+     *
+     * @param delay    time for the scheduler to be executed
+     * @param timeUnit {#link TimeUnit} of {@code delay}
+     * @return A new {@link Status#RERUN} instance of {@link SchedulerResult}
+     */
+    public static SchedulerResult rerun(long delay, TimeUnit timeUnit) {
+        return new SchedulerResult(Status.RERUN, null, new ScheduledProcedure(delay, timeUnit, null));
+    }
+
+    private SchedulerResult(Status status, String message, ScheduledProcedure scheduledProcedure) {
+        m_status = status;
+        m_message = message;
+        m_scheduledProcedure = scheduledProcedure;
+    }
+
+    /**
+     * @return The {@link Status} of this result
+     */
+    public Status getStatus() {
+        return m_status;
+    }
+
+    /**
+     * Use {@link #hasMessage()} to determine if there is a message attached to this result
+     *
+     * @return Optional message provided with a {@link Status#EXIT} or {@link Status#ERROR} result
+     */
+    public String getMessage() {
+        return m_message;
+    }
+
+    /**
+     * @return {@code true} if this result has a message
+     */
+    public boolean hasMessage() {
+        return m_message != null;
+    }
+
+    /**
+     * Get the next {@link ScheduledProcedure} to execute when this result is {@link Status#PROCEDURE} or
+     * {@link Status#RERUN}
+     *
+     * @return The next {@link ScheduledProcedure} definition
+     */
+    public ScheduledProcedure getScheduledProcedure() {
+        return m_scheduledProcedure;
+    }
+
+    public enum Status {
+        /** Schedule a procedure to be executed */
+        PROCEDURE,
+        /** Schedule the scheduler to be invoked again without a procedure being executed */
+        RERUN,
+        /** Unexpected error occurred within the scheduler and another procedures will not be scheduled */
+        ERROR,
+        /** Scheduler has reached an end to its life cycle and is not scheduling any more procedures */
+        EXIT;
+    }
+}
