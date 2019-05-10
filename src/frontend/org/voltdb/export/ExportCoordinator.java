@@ -429,7 +429,7 @@ public class ExportCoordinator {
                                             .append(m_eds.getLastReleaseSeqNo())
                                             .append(")");
                                     exportLog.warn(sb.toString());
-                                    m_eds.remoteAck(lastReleasedSeqNo);
+                                    m_eds.localAck(lastReleasedSeqNo, lastReleasedSeqNo);
                                 }
                             }
 

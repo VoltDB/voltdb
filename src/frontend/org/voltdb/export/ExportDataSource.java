@@ -1297,8 +1297,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                 try {
                     if (!m_es.isShutdown()) {
-                        setCommittedSeqNo(commitSeqNo);
-                        ackImpl(lastSeqNo);
+                        localAck(commitSeqNo, lastSeqNo);
                     }
                     forwardAckToOtherReplicas();
                     if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
@@ -1415,8 +1414,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
 
                     // Reflect the remote ack in our state
-                    setCommittedSeqNo(seq);
-                    ackImpl(seq);
+                    localAck(seq, seq);
 
                     // If we passed a safe point, try satisfying a pending poll request
                     if (m_coordinator.isSafePoint(seq)) {
@@ -1432,6 +1430,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
+    }
+
+    /**
+     * Common acknowledgement method: MUST be invoked from runnable
+     *
+     * @param commitSeq
+     * @param ackSeq
+     */
+    public void localAck(long commitSeq, long ackSeq) {
+        setCommittedSeqNo(commitSeq);
+        ackImpl(ackSeq);
     }
 
      private void ackImpl(long seq) {
