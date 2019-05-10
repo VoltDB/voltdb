@@ -487,13 +487,12 @@ template<> inline NValue NValue::callConstant<FUNC_UNIQUE_ID>() {
     NValue retval(VALUE_TYPE_BIGINT);
     // get the catalog cluster
     catalog::Cluster* catalogCluster = ExecutorContext::getExecutorContext()->getEngine()
-    		->getCatalog()->clusters().get("cluster");
+            ->getCatalog()->clusters().get("cluster");
    	// retrieve the dr cluster id
-   	int64_t clusterId = catalogCluster->drClusterId();
-    // shift the cluster id to the left by 61 bits and then add 61 '1's on the right
-    clusterId = (clusterId << 61) | 2305843009213693951;
+   	uint64_t clusterId = catalogCluster->drClusterId();
+    uint64_t txnid = ExecutorContext::getExecutorContext()->currentTxnId();
     // bitwise and the transaction id with the bits we generated using the clusterId
-    retval.getBigInt() = ExecutorContext::getExecutorContext()->currentTxnId() & clusterId;
+    retval.getBigInt() = txnid & 2305843009213693951 | (clusterId << 61);
     return retval;
 }
 }
