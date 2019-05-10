@@ -606,7 +606,8 @@ public class SynchronizedStatesManager {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
                                 if (m_log.isDebugEnabled()) {
-                                    m_log.debug(m_stateMachineId + ": XXX checkForBarrierParticipantsChange creates: " + m_myParticipantPath);
+                                    m_log.debug(m_stateMachineId + ": XXX checkForBarrierParticipantsChange creates: " + m_myParticipantPath
+                                            + ", current participants: " + m_currentParticipants);
                                 }
                                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
 
