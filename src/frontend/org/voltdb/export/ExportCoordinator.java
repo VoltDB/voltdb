@@ -334,7 +334,6 @@ public class ExportCoordinator {
                         // Process change of partition leadership
                         try {
                             Integer newLeaderHostId = proposedState.getInt();
-                            Long lastReleasedSeqNo = proposedState.getLong();
 
                             if (!success) {
                                 exportLog.warn("Rejected change to new leader host: " + newLeaderHostId);
@@ -354,36 +353,6 @@ public class ExportCoordinator {
                                 requestTrackers();
                             }
 
-                            // If not the leader, check if the leader is behind or ahead on acks.
-                            if (!isLeader()) {
-                                if (lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
-                                    // Leader is behind on acks, ask the ExportDataSource to resend
-                                    // an ack to all the other hosts.
-                                    sb = new StringBuilder("Leader host ")
-                                            .append(m_leaderHostId)
-                                            .append(" released sequence number (")
-                                            .append(lastReleasedSeqNo)
-                                            .append(") is behind the local released sequence number (")
-                                            .append(m_eds.getLastReleaseSeqNo())
-                                            .append(")");
-                                    exportLog.warn(sb.toString());
-                                    m_eds.forwardAckToOtherReplicas();
-                                    // Go through the safePoint logic to truncate our trackers
-                                    isSafePoint(m_eds.getLastReleaseSeqNo());
-
-                                } else if (m_eds.getLastReleaseSeqNo() < lastReleasedSeqNo) {
-                                    // Leader is ahead on acks, do a local release
-                                    sb = new StringBuilder("Leader host ")
-                                            .append(m_leaderHostId)
-                                            .append(" released sequence number (")
-                                            .append(lastReleasedSeqNo)
-                                            .append(") is ahead of the local released sequence number (")
-                                            .append(m_eds.getLastReleaseSeqNo())
-                                            .append(")");
-                                    exportLog.warn(sb.toString());
-                                    m_eds.remoteAck(lastReleasedSeqNo);
-                                }
-                            }
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
 
@@ -430,9 +399,43 @@ public class ExportCoordinator {
                     public void run() {
                         ByteBuffer response = null;
                         try {
+                            Long lastReleasedSeqNo = proposedTask.getLong();
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Task requested with leader acked to seqNo: " + lastReleasedSeqNo);
+                            }
+
+                            // If not the leader, check if the leader is behind or ahead on acks.
+                            if (!isLeader()) {
+                                if (lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
+                                    // Leader is behind on acks, ask the ExportDataSource to resend
+                                    // an ack to all the other hosts.
+                                    StringBuilder sb = new StringBuilder("Leader host ")
+                                            .append(m_leaderHostId)
+                                            .append(" released sequence number (")
+                                            .append(lastReleasedSeqNo)
+                                            .append(") is behind the local released sequence number (")
+                                            .append(m_eds.getLastReleaseSeqNo())
+                                            .append(")");
+                                    exportLog.warn(sb.toString());
+                                    m_eds.forwardAckToOtherReplicas();
+
+                                } else if (m_eds.getLastReleaseSeqNo() < lastReleasedSeqNo) {
+                                    // Leader is ahead on acks, do a local release
+                                    StringBuilder sb = new StringBuilder("Leader host ")
+                                            .append(m_leaderHostId)
+                                            .append(" released sequence number (")
+                                            .append(lastReleasedSeqNo)
+                                            .append(") is ahead of the local released sequence number (")
+                                            .append(m_eds.getLastReleaseSeqNo())
+                                            .append(")");
+                                    exportLog.warn(sb.toString());
+                                    m_eds.remoteAck(lastReleasedSeqNo);
+                                }
+                            }
+
                             // Get the EDS tracker (note, this is a duplicate)
                             ExportSequenceNumberTracker tracker = m_eds.getTracker();
-                            long lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
+                            lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
                             if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("Truncating coordination tracker: " + tracker
@@ -879,9 +882,8 @@ public class ExportCoordinator {
         m_task.invoke(new Runnable() {
             @Override
             public void run() {
-                ByteBuffer changeState = ByteBuffer.allocate(12);
+                ByteBuffer changeState = ByteBuffer.allocate(4);
                 changeState.putInt(m_hostId);
-                changeState.putLong(m_eds.getLastReleaseSeqNo());
                 changeState.flip();
                 m_task.proposeStateChange(changeState);
             }
@@ -1059,6 +1061,7 @@ public class ExportCoordinator {
     /**
      * Start a task requesting export trackers from all nodes.
      * Only the partition leader should initiate this.
+     * The request carries the leader's last released sequence number.
      */
     private void requestTrackers() {
         exportLog.info("Host: " + m_hostId + " requesting export trackers");
@@ -1067,7 +1070,9 @@ public class ExportCoordinator {
             @Override
             public void run() {
                 try {
-                    ByteBuffer task = ByteBuffer.allocate(0);
+                    ByteBuffer task = ByteBuffer.allocate(8);
+                    task.putLong(m_eds.getLastReleaseSeqNo());
+                    task.flip();
                     m_task.initiateCoordinatedTask(true, task);
 
                 } catch (Exception e) {
