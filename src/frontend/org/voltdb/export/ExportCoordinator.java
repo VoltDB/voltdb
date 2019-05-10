@@ -188,6 +188,13 @@ public class ExportCoordinator {
         }
 
         /**
+         * @return the count of invocations currently queued
+         */
+        int invocationCount() {
+            return m_invocations.size();
+        }
+
+        /**
          * Request lock for next queued invocation.
          */
         private void invokeNext() {
@@ -347,21 +354,35 @@ public class ExportCoordinator {
                                 requestTrackers();
                             }
 
-                            // If not the leader, check if the new leader is behind on acks
-                            // and if yes, ask the ExportDataSource to resend an ack to all the
-                            // other hosts so taht everybody gets even.
-                            if (!isLeader() && lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
-                                sb = new StringBuilder("Leader host ")
-                                        .append(m_leaderHostId)
-                                        .append(" released sequence number (")
-                                        .append(lastReleasedSeqNo)
-                                        .append(") is behind the local released sequence number (")
-                                        .append(m_eds.getLastReleaseSeqNo())
-                                        .append(")");
-                                exportLog.warn(sb.toString());
-                                m_eds.forwardAckToOtherReplicas();
-                                // Go through the safePoint logic to truncate our trackers
-                                isSafePoint(m_eds.getLastReleaseSeqNo());
+                            // If not the leader, check if the leader is behind or ahead on acks.
+                            if (!isLeader()) {
+                                if (lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
+                                    // Leader is behind on acks, ask the ExportDataSource to resend
+                                    // an ack to all the other hosts.
+                                    sb = new StringBuilder("Leader host ")
+                                            .append(m_leaderHostId)
+                                            .append(" released sequence number (")
+                                            .append(lastReleasedSeqNo)
+                                            .append(") is behind the local released sequence number (")
+                                            .append(m_eds.getLastReleaseSeqNo())
+                                            .append(")");
+                                    exportLog.warn(sb.toString());
+                                    m_eds.forwardAckToOtherReplicas();
+                                    // Go through the safePoint logic to truncate our trackers
+                                    isSafePoint(m_eds.getLastReleaseSeqNo());
+
+                                } else if (m_eds.getLastReleaseSeqNo() < lastReleasedSeqNo) {
+                                    // Leader is ahead on acks, do a local release
+                                    sb = new StringBuilder("Leader host ")
+                                            .append(m_leaderHostId)
+                                            .append(" released sequence number (")
+                                            .append(lastReleasedSeqNo)
+                                            .append(") is ahead of the local released sequence number (")
+                                            .append(m_eds.getLastReleaseSeqNo())
+                                            .append(")");
+                                    exportLog.warn(sb.toString());
+                                    m_eds.remoteAck(lastReleasedSeqNo);
+                                }
                             }
                         } catch (Exception e) {
                             exportLog.error("Failed to change to new leader: " + e);
@@ -833,7 +854,9 @@ public class ExportCoordinator {
     /**
      * Initiate a state change to make this host the partition leader.
      *
-     * NOTE: we accept this invocation even if not initialized yet
+     * NOTE: we accept this invocation even if not initialized yet, but
+     * since we may be called multiple times in that state, we ensure we don't
+     * queue more than one invocation.
      */
     public void becomeLeader() {
 
@@ -842,6 +865,14 @@ public class ExportCoordinator {
         }
         if (m_hostId.equals(m_leaderHostId)) {
             exportLog.warn(m_eds + " is already the partition leader");
+            return;
+        }
+
+        int count = m_task.invocationCount();
+        if (!isCoordinatorInitialized() &&  count >= 1) {
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(count + " invocations already pending to become leader");
+            }
             return;
         }
 
