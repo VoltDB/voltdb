@@ -287,4 +287,9 @@ public interface SiteProcedureConnection {
      * @return true if external streams are enabled for this site, false otherwise.
      */
     public boolean externalStreamsEnabled();
+
+    /**
+     * @return the max size for all MP responses
+     */
+    public long getMaxTotalMpResponseSize();
 }
