@@ -743,4 +743,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
     }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE / MpRoSitePool.MAX_POOL_SIZE;
+    }
 }

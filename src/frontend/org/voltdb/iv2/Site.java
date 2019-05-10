@@ -1861,4 +1861,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
     }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
+    }
 }
