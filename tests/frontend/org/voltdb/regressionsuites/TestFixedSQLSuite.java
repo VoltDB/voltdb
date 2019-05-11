@@ -2828,8 +2828,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {}, vt);
 
         // Subquery returns zero rows, so NOT EXISTS returns true
-        // TODO ENG-15982 the order by clause was original "order by 1, 2, 3, 4"
-        // this "order by ordinal" feature is not understand by Calcite
         vt = client.callProcedure("@AdHoc",
                 "SELECT * "
                         + "FROM P1 "
@@ -2838,14 +2836,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         + "  FROM R1 "
                         + "  WHERE DESC = 'bar' "
                         + "  GROUP BY NUM) "
-                        + "ORDER BY id, desc, num, ratio").getResults()[0];
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // WHERE predicate in inner query sometimes returns true, sometimes false
         // (bug occurred when predicate was always false and pass through values were
         // uninitialized)
-        // TODO ENG-15982 the order by clause was original "order by 1, 2, 3, 4"
-        // this "order by ordinal" feature is not understand by Calcite
         vt = client.callProcedure("@AdHoc",
                 "SELECT * "
                         + "FROM P1 "
@@ -2854,7 +2850,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         + "  FROM R1 "
                         + "  WHERE DESC = 'baz' "
                         + "  GROUP BY NUM) "
-                        + "ORDER BY id, desc, num, ratio").getResults()[0];
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
         assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
 
         // The original query
