@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlDynamicParam;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
@@ -98,6 +99,9 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         // Visit the operands in the order of their positions in the query.
         for (Pair<Integer, SqlNode> indexedOperand : indexedOperands) {
             SqlNode operand = indexedOperand.getSecond();
+            if (call instanceof SqlOrderBy && operand.equals(((SqlOrderBy) call).getOrderList())) {
+                continue;
+            }
             SqlNode convertedOperand = operand.accept(this);
             if (operand instanceof SqlLiteral
                     && convertedOperand != null) {
