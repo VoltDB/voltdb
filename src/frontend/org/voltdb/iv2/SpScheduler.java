@@ -498,7 +498,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
         }
-
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
@@ -519,7 +518,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             }
-
             /*
              * If this is CL replay use the txnid from the CL and also
              * update the txnid to match the one from the CL
@@ -1768,19 +1766,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 " has completed transactions before sphandle: " + m_migratePartitionLeaderCheckPoint);
         m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
         return true;
-    }
-
-    //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
-    //to allow the site to be promoted. Remove the sites on the new host from the replica list and
-    //update the duplicated counters after the host failure.
-    public void updateReplicasFromMigrationLeaderFailedHost(int failedHostId) {
-        List<Long> replicas = new ArrayList<>();
-        for (long hsid : m_replicaHSIds) {
-            if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {
-                replicas.add(hsid);
-            }
-        }
-        ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
     }
 
     // Because now in rejoin we rely on first fragment of stream snapshot to update the replica

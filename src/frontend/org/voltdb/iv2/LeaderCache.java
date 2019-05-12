@@ -49,6 +49,8 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * children. The children data objects must be JSONObjects.
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
+
+    public static long TEST_LAST_HSID = Long.MAX_VALUE -1;
     protected final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     protected final Callback m_cb; // the callback when the cache changes
@@ -67,7 +69,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
 
 
-    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
+    public static final String migrate_partition_leader_suffix = "_migrated";
 
     public static class LeaderCallBackInfo {
         Long m_lastHSId;

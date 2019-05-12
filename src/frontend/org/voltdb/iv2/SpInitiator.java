@@ -81,6 +81,11 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 LeaderCallBackInfo info = entry.getValue();
                 leaders.add(info.m_HSId);
                 if (info.m_HSId == getInitiatorHSId()){
+
+                    // Test case: Interrupt leader promotion process
+                    if (info.m_lastHSId == LeaderCache.TEST_LAST_HSID) {
+                        break;
+                    }
                     boolean reinstate = reinstateAsLeader(info);
                     if (!m_promoted || reinstate) {
                         acceptPromotionImpl(reinstate ? Long.MAX_VALUE : info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
@@ -270,13 +275,14 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                         iv2masters.put(m_partitionId, hsidStr);
                         if (lastLeaderHSId == m_initiatorMailbox.getHSId()) {
                             tmLog.info(m_whoami + "reinstate as partition leader.");
+                            m_initiatorMailbox.setMigratePartitionLeaderStatus(false);
                         } else {
                             tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
+                            m_initiatorMailbox.setMigratePartitionLeaderStatus(true);
                         }
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
-                    m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -291,7 +297,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
             }
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
-            if (!migratePartitionLeader) {
+            if (!migratePartitionLeader && lastLeaderHSId != m_initiatorMailbox.getHSId()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
@@ -349,13 +355,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
     public boolean isLeader() {
         return m_scheduler.isLeader();
     }
-
-
-//    public void resetMigratePartitionLeaderStatus(int failedHostId) {
-//        m_initiatorMailbox.resetMigratePartitionLeaderStatus();
-//        m_scheduler.updateReplicasFromMigrationLeaderFailedHost(failedHostId);
-//    }
-
 
     public Scheduler getScheduler() {
         return m_scheduler;

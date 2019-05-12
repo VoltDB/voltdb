@@ -650,7 +650,8 @@ public class InitiatorMailbox implements Mailbox
 
         //The host with old partition leader is down.
         if (message.isStatusReset()) {
-            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
+            m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.TXN_DRAINED;
+            m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
