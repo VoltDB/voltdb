@@ -220,11 +220,11 @@ public class LeaderAppointer implements Promotable
                     // then, the partition leader stays on the old host and  m_currentLeader won't match
                     // its appointee. The old leader won't go through the repair process as needed.
                     boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
-                    if (supposedNewLeader != null && m_currentLeader != supposedNewLeader && isMigrateRequested) {
+                    if (m_currentLeader != supposedNewLeader && isMigrateRequested) {
                         String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
                         try {
                             m_iv2appointees.put(m_partitionId, masterPair);
-                            tmLog.info(WHOMIM + "Start to promote new master for partition.");
+                            tmLog.info(WHOMIM + " reinstate master for partition " + m_partitionId + " to " + CoreUtils.hsIdToString(m_currentLeader));;
                         } catch (Exception e) {
                             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + m_partitionId, true, e);
                         }

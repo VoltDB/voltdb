@@ -88,11 +88,8 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                     }
                     boolean reinstate = reinstateAsLeader(info);
                     if (!m_promoted || reinstate) {
-                        acceptPromotionImpl(reinstate ? Long.MAX_VALUE : info.m_lastHSId, info.m_isMigratePartitionLeaderRequested);
+                        acceptPromotionImpl(info.m_lastHSId, (reinstate || info.m_isMigratePartitionLeaderRequested));
                         m_promoted = true;
-                        if (reinstate) {
-                            m_initiatorMailbox.resetMigratePartitionLeaderStatus();
-                        }
                     }
                     break;
                 }
@@ -118,7 +115,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
     // When the leader is migrated away from this site, m_scheduler is marked as not-a-leader. If the host for new leader fails
     // before leader migration is completed. The previous leader, the current site, must be reinstated.
     private boolean reinstateAsLeader(LeaderCallBackInfo info) {
-        return (m_promoted && !m_scheduler.m_isLeader && info.m_lastHSId == info.m_HSId);
+        return (!m_scheduler.m_isLeader && info.m_lastHSId == info.m_HSId);
     }
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
@@ -226,8 +223,10 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            int deadSPIHost = lastLeaderHSId == Long.MAX_VALUE ?
-                    Integer.MAX_VALUE : CoreUtils.getHostIdFromHSId(lastLeaderHSId);
+            int deadSPIHost = Integer.MAX_VALUE;
+            if ((lastLeaderHSId != Long.MAX_VALUE && lastLeaderHSId != m_initiatorMailbox.getHSId())) {
+                deadSPIHost = CoreUtils.getHostIdFromHSId(lastLeaderHSId);
+            }
             while (!success) {
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
@@ -267,18 +266,16 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                             "SpInitiator-iv2masters-" + m_partitionId,
                             m_zkMailboxNode);
 
-                    // If lastLeaderHSId == m_initiatorMailbox.getHSId(), leader migration fails and re-elect itself as
-                    // partition leader. Update the master to trigger all call backs on the master.
-                    if (migratePartitionLeader || lastLeaderHSId == m_initiatorMailbox.getHSId()) {
+                    if (migratePartitionLeader) {
                         String hsidStr = LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(
                                 m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId, hsidStr);
                         if (lastLeaderHSId == m_initiatorMailbox.getHSId()) {
                             tmLog.info(m_whoami + "reinstate as partition leader.");
-                            m_initiatorMailbox.setMigratePartitionLeaderStatus(false);
+                            m_initiatorMailbox.setMigrationState(false);
                         } else {
                             tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
-                            m_initiatorMailbox.setMigratePartitionLeaderStatus(true);
+                            m_initiatorMailbox.setMigrationState(true);
                         }
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
