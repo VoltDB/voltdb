@@ -3728,6 +3728,27 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    public void testGetUniqueId() throws Exception {
+        System.out.println("STARTING test get_unique_id() on Replicated Table...");
+        Client cl = getClient();
+        initialLoad(cl, "DB1");
+
+        ClientResponse cr = null;
+
+        for (int i = 0; i < 100000; ++i) {
+            cr = cl.callProcedure("@AdHoc", "INSERT INTO DB1 (ID) VALUES (GET_UNIQUE_ID());");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+
+        System.out.println("STARTING test get_unique_id() on Partition Table...");
+        initialLoad(cl, "DB2");
+
+        for (int i = 0; i < 100000; ++i) {
+            cr = cl.callProcedure("@AdHoc", "INSERT INTO DB2 (ID) VALUES (GET_UNIQUE_ID());");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+
+    }
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -3751,6 +3772,24 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
+
+                "CREATE TABLE DB1 ( " +
+                "ID BIGINT NOT NULL UNIQUE, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+
+                "CREATE TABLE DB2 ( " +
+                "ID BIGINT NOT NULL UNIQUE, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+
+                "PARTITION TABLE DB2 ON COLUMN ID;" +
 
                 "PARTITION TABLE P1 ON COLUMN ID;" +
 
