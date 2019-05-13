@@ -211,11 +211,14 @@ public class ExportManager
 
     /**
      * Construct ExportManager using catalog.
+     *
+     * NOTE: this synchronizes on the ExportManager class, but everyone else
+     * synchronizes on the instance.
+     *
      * @param myHostId
      * @param catalogContext
      * @throws ExportManager.SetupException
      */
-    // FIXME - this synchronizes on the ExportManager class, but everyone else synchronizes on the instance.
     public static synchronized void initialize(
             int myHostId,
             CatalogContext catalogContext,

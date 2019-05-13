@@ -36,8 +36,6 @@ import org.voltdb.VoltDB;
 
 
 /**
- * @author rdykiel
- *
  * An {@code ExportCoordinator} instance determines whether the associated
  * {@code ExportDataSource} instance should be an export master. It coordinates
  * the transfer of export mastership between the replicas of an export partition.
@@ -67,16 +65,14 @@ import org.voltdb.VoltDB;
 public class ExportCoordinator {
 
     /**
-     * @author rdykiel
-     *
      * This class is used to synchronize tasks and state changes for a topic/partition
      * across all the nodes in a cluster. Some methods are callbacks invoked from the
      * SSM daemon thread, others are methods invoked from ExportDataSource runnables.
      * Any access or update to state of the enclosing {@code ExportCoordinator} must be
      * done through Runnable executed on the ExportDataSource executor.
      *
-     * The task maintains a queue of invocations; only one invocation can be outstanding
-     * in the state machine. There are 2 kinds of invocation:
+     * The state machine maintains a queue of invocations; only one invocation can be
+     * outstanding in the state machine. There are 2 kinds of invocation:
      *
      *  - Request a state change to a new partition leader
      *  - Start a task to collect the {@code ExportSequenceNumberTracker} from all the nodes
@@ -89,7 +85,7 @@ public class ExportCoordinator {
      *  - we want to catch any exceptions occurring in the SSM daemon callbacks in order
      *    to preserve the integrity of the SSM.
      */
-    private class ExportCoordinationTask extends SynchronizedStatesManager.StateMachineInstance {
+    private class ExportCoordinationStateMachine extends SynchronizedStatesManager.StateMachineInstance {
 
         // A queue of invocation runnables: each invocation needs the distributed lock
         private ConcurrentLinkedQueue<Runnable> m_invocations = new ConcurrentLinkedQueue<>();
@@ -97,13 +93,12 @@ public class ExportCoordinator {
         private AtomicBoolean m_pending = new AtomicBoolean(false);
         private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
-        public ExportCoordinationTask(SynchronizedStatesManager ssm) {
+        public ExportCoordinationStateMachine(SynchronizedStatesManager ssm) {
             ssm.super(s_coordinatorTaskName, exportLog);
         }
 
         @Override
         protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
-            // FIXME: should we crash voltdb
             exportLog.error("State machine was reset");
             resetCoordinator(true, true);
             return null;
@@ -161,10 +156,11 @@ public class ExportCoordinator {
 
         @Override
         protected String taskToString(ByteBuffer task) {
-            return "ExportCoordinationTask";
+            Long lastReleasedSeqNo = task.getLong();
+            return "ExportCoordinationTask (last released seqNo: " + lastReleasedSeqNo + ")";
         }
 
-        void shutdown() {
+        void shutdownCoordinationTask() {
             m_shutdown.set(true);
         }
 
@@ -279,7 +275,6 @@ public class ExportCoordinator {
                 }
                 m_pending.set(false);
             } catch (Exception ex) {
-                // FIXME: should we crash voltdb
                 exportLog.error("Failed to execute runnable: " + ex);
                 m_pending.set(false);
             }
@@ -656,7 +651,7 @@ public class ExportCoordinator {
 
     // State machine will only be instantiated on initialize()
     private final SynchronizedStatesManager m_ssm;
-    private final ExportCoordinationTask m_task;
+    private final ExportCoordinationStateMachine m_stateMachine;
 
     private Integer m_leaderHostId = NO_HOST_ID;
     private static final int NO_HOST_ID =  -1;
@@ -725,7 +720,7 @@ public class ExportCoordinator {
         m_eds = eds;
 
         SynchronizedStatesManager ssm = null;
-        ExportCoordinationTask task = null;
+        ExportCoordinationStateMachine task = null;
         try {
             ZKUtil.addIfMissing(m_zk, m_rootPath, CreateMode.PERSISTENT, null);
 
@@ -738,7 +733,7 @@ public class ExportCoordinator {
                     m_hostId.toString(),
                     1);
 
-            task = new ExportCoordinationTask(ssm);
+            task = new ExportCoordinationStateMachine(ssm);
 
             exportLog.info("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
                     + ", leaderHostId: " + m_leaderHostId);
@@ -747,7 +742,7 @@ public class ExportCoordinator {
             VoltDB.crashLocalVoltDB("Failed to initialize ExportCoordinator state machine", true, e);
         } finally {
             m_ssm = ssm;
-            m_task = task;
+            m_stateMachine = task;
         }
     }
 
@@ -801,7 +796,7 @@ public class ExportCoordinator {
             ByteBuffer initialState = ByteBuffer.allocate(4);
             initialState.putInt(m_leaderHostId);
             initialState.flip();
-            m_task.registerStateMachineWithManager(initialState);
+            m_stateMachine.registerStateMachineWithManager(initialState);
 
             String topicName = getTopicName(m_eds.getTableName(), m_eds.getPartitionId());
             exportLog.info("Initializing export coordinator for topic " + topicName + ", and hostId " + m_hostId
@@ -828,23 +823,23 @@ public class ExportCoordinator {
             return;
         }
         exportLog.info("Export coordinator requesting shutdown: clearing pending invocations");
-        m_task.clearInvocations();
+        m_stateMachine.clearInvocations();
 
         // We want to shutdown after we get the lock
-        m_task.invoke(new Runnable() {
+        m_stateMachine.invoke(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Export coordinator shutting down...");
                     }
-                    m_task.shutdown();
+                    m_stateMachine.shutdownCoordinationTask();
                     m_ssm.ShutdownSynchronizedStatesManager();
 
                 } catch (Exception e) {
                     exportLog.error("Failed to initiate a coordinator shutdown: " + e);
                 } finally {
-                    m_eds.onCoordinatorShutdown();;
+                    m_eds.onCoordinatorShutdown();
                 }
             }
             @Override
@@ -871,7 +866,7 @@ public class ExportCoordinator {
             return;
         }
 
-        int count = m_task.invocationCount();
+        int count = m_stateMachine.invocationCount();
         if (!isCoordinatorInitialized() &&  count >= 1) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug(count + " invocations already pending to become leader");
@@ -879,13 +874,13 @@ public class ExportCoordinator {
             return;
         }
 
-        m_task.invoke(new Runnable() {
+        m_stateMachine.invoke(new Runnable() {
             @Override
             public void run() {
                 ByteBuffer changeState = ByteBuffer.allocate(4);
                 changeState.putInt(m_hostId);
                 changeState.flip();
-                m_task.proposeStateChange(changeState);
+                m_stateMachine.proposeStateChange(changeState);
             }
             @Override
             public String toString() {
@@ -1064,14 +1059,14 @@ public class ExportCoordinator {
     private void requestTrackers() {
         exportLog.info("Host: " + m_hostId + " requesting export trackers");
 
-        m_task.invoke(new Runnable() {
+        m_stateMachine.invoke(new Runnable() {
             @Override
             public void run() {
                 try {
                     ByteBuffer task = ByteBuffer.allocate(8);
                     task.putLong(m_eds.getLastReleaseSeqNo());
                     task.flip();
-                    m_task.initiateCoordinatedTask(true, task);
+                    m_stateMachine.initiateCoordinatedTask(true, task);
 
                 } catch (Exception e) {
                     exportLog.error("Failed to initiate a request for trackers: " + e);

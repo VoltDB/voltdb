@@ -812,7 +812,6 @@ public class ExportGeneration implements Generation {
         if (source == null) {
             /*
              * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
-             * FIXME: do we want to modify EE to let him discard those buffers?
              */
             exportLog.info("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("

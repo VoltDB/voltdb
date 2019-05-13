@@ -443,7 +443,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     if (!m_coordinator.isCoordinatorInitialized()) {
                         m_coordinator.initialize(m_runEveryWhere);
-                        // FIXME: do we need to ask generation whether we're leader
                     }
                     if (isMaster() && m_pollTask != null) {
                         exportLog.info("Newly ready for polling master executes pending poll");
@@ -471,7 +470,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     // Package private as only used for tests
-    // FIXME: replace by test on isLeader?
     boolean isMaster() {
         return m_coordinator.isMaster();
     }
@@ -954,7 +952,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.closeAndDelete();
                     m_adFile.delete();
                     m_coordinator.shutdown();
-
                 } catch(Exception e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 }
@@ -971,7 +968,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.close();
                     m_ackMailboxRefs.set(null);
                     m_coordinator.shutdown();
-
                 } catch (Exception e) {
                     exportLog.error(e.getMessage(), e);
                 }
@@ -1312,7 +1308,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private BinaryPayloadMessage getReleaseBufferMessage() {
+    private BinaryPayloadMessage createReleaseBufferMessage() {
 
         final int msgLen = getAckMessageLength();
 
@@ -1343,7 +1339,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
 
-            BinaryPayloadMessage bpm = getReleaseBufferMessage();
+            BinaryPayloadMessage bpm = createReleaseBufferMessage();
             for( Long siteId: p.getSecond()) {
                 mbx.send(siteId, bpm);
             }
@@ -1376,7 +1372,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
-                    BinaryPayloadMessage bpm = getReleaseBufferMessage();
+                    BinaryPayloadMessage bpm = createReleaseBufferMessage();
                     for( Long siteId: newReplicas) {
                         mbx.send(siteId, bpm);
                     }
@@ -1466,10 +1462,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
       *
       * @param pollTask the current poll request or null
       * @return true if handled a drained source
-      *
-      * @throws IOException
-      */
-     /**
       *
       * @throws IOException
       */
@@ -1630,7 +1622,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void blockOnGap(long start, long end) {
-
         // Set ourselves as blocked
         m_status = StreamStatus.BLOCKED;
         m_queueGap = end - start;

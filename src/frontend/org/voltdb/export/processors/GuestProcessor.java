@@ -52,10 +52,9 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class GuestProcessor implements ExportDataProcessor {
 
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final VoltLogger EXPORTLOG = new VoltLogger("EXPORT");
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
-    // FIXME - replace with fixed list of ExportDataSource. That is all we need from m_generation.
     private ExportGeneration m_generation;
     private volatile boolean m_shutdown = false;
 
@@ -110,14 +109,14 @@ public class GuestProcessor implements ExportDataProcessor {
             String groupName = m_targetsByTableName.get(tableName.toLowerCase());
             // skip export tables that don't have an enabled connector and are still in catalog
             if (groupName == null) {
-                exportLog.warn("Table " + tableName + " has no enabled export connector.");
+                EXPORTLOG.warn("Table " + tableName + " has no enabled export connector.");
                 return null;
             }
             //If we have a new client for the target use it or see if we have an older client which is set before
             //If no client is found dont create the runner and log
             client = m_clientsByTarget.get(groupName);
             if (client == null) {
-                exportLog.warn("Table " + tableName + " has no configured connector.");
+                EXPORTLOG.warn("Table " + tableName + " has no configured connector.");
                 return null;
             }
         }
@@ -131,15 +130,15 @@ public class GuestProcessor implements ExportDataProcessor {
             for (final ExportDataSource source : sources.values()) {
                 synchronized(GuestProcessor.this) {
                     if (m_shutdown) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.info("Skipping mastership notification for export because processor has been shut down.");
+                        if (EXPORTLOG.isDebugEnabled()) {
+                            EXPORTLOG.info("Skipping mastership notification for export because processor has been shut down.");
                         }
                         return;
                     }
                     String tableName = source.getTableName().toLowerCase();
                     String groupName = m_targetsByTableName.get(tableName);
                     if (source.getClient() == null) {
-                        exportLog.warn("Table " + tableName + " has no configured connector.");
+                        EXPORTLOG.warn("Table " + tableName + " has no configured connector.");
                         continue;
                     }
                     //If we configured a new client we already mapped it if not old client will be placed for cleanup at shutdown.
@@ -152,7 +151,7 @@ public class GuestProcessor implements ExportDataProcessor {
             }
         }
         //This will log any targets that are not there but draining datasources will keep them in list.
-        exportLog.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
+        EXPORTLOG.info("Active Targets are: " + m_clientsByTarget.keySet().toString());
     }
 
     /**
@@ -201,14 +200,14 @@ public class GuestProcessor implements ExportDataProcessor {
             try {
                 Method m = edb.getClass().getDeclaredMethod("processRow", int.class, byte[].class);
                 if (m != null) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Found Legacy ExportClient: " + client.getClass().getCanonicalName());
                     }
                     edb.setLegacy(true);
                 }
             } catch (Exception ex) {
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Found Modern export client: " + client.getClass().getCanonicalName());
+                if (EXPORTLOG.isDebugEnabled()) {
+                    EXPORTLOG.debug("Found Modern export client: " + client.getClass().getCanonicalName());
                 }
             }
         }
@@ -250,14 +249,14 @@ public class GuestProcessor implements ExportDataProcessor {
                     public void run() {
                         try {
                             if (m_startPolling) { // Wait for command log replay to be done.
-                                if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("Beginning export processing for export source " + m_source.getTableName()
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Beginning export processing for export source " + m_source.getTableName()
                                     + " partition " + m_source.getPartitionId());
                                 }
                                 m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
                                     if (m_shutdown) {
-                                        exportLog.warn("Got shutdown before starting polling.");
+                                        EXPORTLOG.warn("Got shutdown before starting polling.");
                                         return;
                                     }
                                     buildListener(ads);
@@ -276,11 +275,11 @@ public class GuestProcessor implements ExportDataProcessor {
                     private void resubmitSelf() {
                         synchronized (GuestProcessor.this) {
                             if (m_shutdown) {
-                                exportLog.warn("Got shutdown while waiting for truncation.");
+                                EXPORTLOG.warn("Got shutdown while waiting for truncation.");
                                 return;
                             }
                             if (m_source.getExecutorService().isShutdown()) {
-                                exportLog.warn("Data source shutdown while waiting for truncation.");
+                                EXPORTLOG.warn("Data source shutdown while waiting for truncation.");
                                 return;
                             }
                             try {
@@ -290,17 +289,17 @@ public class GuestProcessor implements ExportDataProcessor {
 
                                 // TODO: When truncation is finished, generation roll-over does not happen.
                                 // Log a message to and revisit the error handling for this case
-                                exportLog.warn("Got rejected execution exception while waiting for truncation to finish");
+                                EXPORTLOG.warn("Got rejected execution exception while waiting for truncation to finish");
                             }
                         }
                     }
                 };
                 if (m_shutdown) {
-                    exportLog.warn("Got shutdown while starting.");
+                    EXPORTLOG.warn("Got shutdown while starting.");
                     return;
                 }
                 if (m_source.getExecutorService().isShutdown()) {
-                    exportLog.warn("Data source shutdown while starting.");
+                    EXPORTLOG.warn("Data source shutdown while starting.");
                     return;
                 }
                 try {
@@ -310,7 +309,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
                     // TODO: When truncation is finished, generation roll-over does not happen.
                     // Log a message to and revisit the error handling for this case
-                    exportLog.warn("Got rejected execution exception while trying to start");
+                    EXPORTLOG.warn("Got rejected execution exception while trying to start");
                 }
             }
         }
@@ -344,8 +343,8 @@ public class GuestProcessor implements ExportDataProcessor {
                 try {
                     cont = fut.get();
                     if (cont == null) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Received an end of stream event, exiting listener");
+                        if (EXPORTLOG.isDebugEnabled()) {
+                            EXPORTLOG.debug("Received an end of stream event, exiting listener");
                         }
                         return;
                     }
@@ -421,7 +420,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                             row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setExportRowSchema(row);
                                         } catch (IOException ioe) {
-                                            exportLog.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
+                                            EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
                                             cont = null;
                                             break;
@@ -460,9 +459,9 @@ public class GuestProcessor implements ExportDataProcessor {
                                 break;
                             } catch (RestartBlockException e) {
                                 if (m_shutdown) {
-                                    if (exportLog.isDebugEnabled()) {
+                                    if (EXPORTLOG.isDebugEnabled()) {
                                         // log message for debugging.
-                                        exportLog.debug("Shutdown detected, ignore restart exception. " + e);
+                                        EXPORTLOG.debug("Shutdown detected, ignore restart exception. " + e);
                                     }
                                     break;
                                 }
@@ -479,9 +478,9 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                         //Don't discard the block also set the start position to the beginning.
                         if (m_shutdown && cont != null) {
-                            if (exportLog.isDebugEnabled()) {
+                            if (EXPORTLOG.isDebugEnabled()) {
                                 // log message for debugging.
-                                exportLog.debug("Shutdown detected, queue block to pending");
+                                EXPORTLOG.debug("Shutdown detected, queue block to pending");
                             }
                             cont.b().position(startPosition);
                             source.setPendingContainer(cont);
@@ -495,11 +494,11 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 } catch (Exception e) {
                     if (e.getCause() instanceof ReentrantPollException) {
-                        exportLog.info("Stopping processing export blocks: " + e.getMessage());
+                        EXPORTLOG.info("Stopping processing export blocks: " + e.getMessage());
                         return;
 
                     } else {
-                        exportLog.error("Error processing export block, continuing processing: ", e);
+                        EXPORTLOG.error("Error processing export block, continuing processing: ", e);
                     }
                 } finally {
                     if (cont != null) {
@@ -545,16 +544,16 @@ public class GuestProcessor implements ExportDataProcessor {
             for (final Pair<ExportDecoderBase, AdvertisedDataSource> p : m_decoders) {
                 try {
                     if (p == null) {
-                        exportLog.warn("ExportDecoderBase pair was unexpectedly null");
+                        EXPORTLOG.warn("ExportDecoderBase pair was unexpectedly null");
                         continue;
                     }
                     ExportDecoderBase edb = p.getFirst();
                     if (edb == null) {
-                        exportLog.warn("ExportDecoderBase was unexpectedly null");
+                        EXPORTLOG.warn("ExportDecoderBase was unexpectedly null");
                         continue;
                     }
                     if (p.getSecond() == null) {
-                        exportLog.warn("AdvertisedDataSource was unexpectedly null");
+                        EXPORTLOG.warn("AdvertisedDataSource was unexpectedly null");
                         continue;
                     }
                     synchronized(p.getSecond()) {
