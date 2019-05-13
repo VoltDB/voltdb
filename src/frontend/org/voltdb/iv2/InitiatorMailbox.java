@@ -69,7 +69,7 @@ public class InitiatorMailbox implements Mailbox
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
 
-    public static enum MigrationState {
+    public static enum LeaderMigrationState {
         STARTED,            //@MigratePartitionLeader on old master has been started
         TXN_RESTART,        //new master needs txn restart before old master drains txns
         TXN_DRAINED,        //new master is notified that old master has drained
@@ -91,8 +91,8 @@ public class InitiatorMailbox implements Mailbox
     //Queue all the transactions on the new master after MigratePartitionLeader till it receives a message
     //from its older master which has drained all the transactions.
     private long m_newLeaderHSID = Long.MIN_VALUE;
-    private AtomicReference<MigrationState> m_migrationState =
-            new AtomicReference<MigrationState>();
+    private AtomicReference<LeaderMigrationState> m_leaderMigrationState =
+            new AtomicReference<LeaderMigrationState>();
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -196,7 +196,7 @@ public class InitiatorMailbox implements Mailbox
          * Only used for an assertion on locking.
          */
         m_allInitiatorMailboxes.add(this);
-        m_migrationState.set(MigrationState.NONE);
+        m_leaderMigrationState.set(LeaderMigrationState.NONE);
     }
 
     public JoinProducerBase getJoinProducer()
@@ -358,7 +358,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof MigratePartitionLeaderMessage) {
-            setMigrationState((MigratePartitionLeaderMessage)message);
+            setLeaderMigrationState((MigratePartitionLeaderMessage)message);
             return;
         }
 
@@ -399,7 +399,7 @@ public class InitiatorMailbox implements Mailbox
         scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;
         m_newLeaderHSID = newLeaderHSId;
-        m_migrationState.set(MigrationState.STARTED);
+        m_leaderMigrationState.set(LeaderMigrationState.STARTED);
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(),
                 "initiateSPIMigrationIfRequested-" + m_partitionId, VoltZK.iv2appointees);
@@ -428,7 +428,7 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        if (m_scheduler.isLeader() && m_migrationState.get() != MigrationState.TXN_RESTART) {
+        if (m_scheduler.isLeader() && m_leaderMigrationState.get() != LeaderMigrationState.TXN_RESTART) {
             //At this point, the message is sent to partition leader
             return false;
         }
@@ -443,7 +443,7 @@ public class InitiatorMailbox implements Mailbox
         deliver(response);
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
-                    " status:" + m_migrationState + "\n" + message);
+                    " status:" + m_leaderMigrationState + "\n" + message);
         }
         //notify the new partition leader that the old leader has completed the Txns if needed.
         notifyNewLeaderOfTxnDoneIfNeeded();
@@ -649,47 +649,47 @@ public class InitiatorMailbox implements Mailbox
 
     //The new partition leader is notified by previous partition leader
     //that previous partition leader has drained its txns
-    private void setMigrationState(MigratePartitionLeaderMessage message) {
+    private void setLeaderMigrationState(MigratePartitionLeaderMessage message) {
 
         //The host with old partition leader is down.
         if (message.isStatusReset()) {
-            m_migrationState.set(MigrationState.TXN_DRAINED);
+            m_leaderMigrationState.set(LeaderMigrationState.TXN_DRAINED);
             m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
-        if (m_migrationState.get() == MigrationState.NONE) {
+        if (m_leaderMigrationState.get() == LeaderMigrationState.NONE) {
             //txn draining notification from the old leader arrives before this site is promoted
-            m_migrationState.compareAndSet(MigrationState.NONE ,MigrationState.TXN_DRAINED);
-        } else if (m_migrationState.get() == MigrationState.TXN_RESTART) {
+            m_leaderMigrationState.compareAndSet(LeaderMigrationState.NONE ,LeaderMigrationState.TXN_DRAINED);
+        } else if (m_leaderMigrationState.get() == LeaderMigrationState.TXN_RESTART) {
             //if the new leader has been promoted, stop restarting txns.
-            m_migrationState.compareAndSet(MigrationState.TXN_RESTART ,MigrationState.NONE);
+            m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_RESTART ,LeaderMigrationState.NONE);
         }
 
         tmLog.info("MigratePartitionLeader new leader " +
                 CoreUtils.hsIdToString(m_hsId) + " is notified by previous leader " +
-                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_migrationState);
+                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_leaderMigrationState);
     }
 
     //the site for new partition leader
-    public void setMigrationState(boolean migratePartitionLeader) {
+    public void setLeaderMigrationState(boolean migratePartitionLeader) {
         if (!migratePartitionLeader) {
-            m_migrationState.set(MigrationState.NONE);
+            m_leaderMigrationState.set(LeaderMigrationState.NONE);
             m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
         //The previous leader has already drained all txns
-        if (m_migrationState.get() == MigrationState.TXN_DRAINED) {
-            m_migrationState.compareAndSet(MigrationState.TXN_DRAINED ,MigrationState.NONE);
+        if (m_leaderMigrationState.get() == LeaderMigrationState.TXN_DRAINED) {
+            m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_DRAINED ,LeaderMigrationState.NONE);
             tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
-                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_migrationState);
+                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_leaderMigrationState);
             return;
         }
 
         //Wait for the notification from old partition leader
-        m_migrationState.set(MigrationState.TXN_RESTART);
-        tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_migrationState);
+        m_leaderMigrationState.set(LeaderMigrationState.TXN_RESTART);
+        tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_leaderMigrationState);
     }
 
     //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
@@ -709,10 +709,10 @@ public class InitiatorMailbox implements Mailbox
         send(message.getNewLeaderHSID(), message);
 
         //reset status on the old partition leader
-        m_migrationState.set(MigrationState.NONE);
+        m_leaderMigrationState.set(LeaderMigrationState.NONE);
         m_repairLog.setLeaderState(false);
         tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
-                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_migrationState);
+                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_leaderMigrationState);
         m_newLeaderHSID = Long.MIN_VALUE;
     }
 

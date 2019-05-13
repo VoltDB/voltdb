@@ -206,9 +206,10 @@ public class LeaderAppointer implements Promotable
                 Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
                 if (missingHSIds.contains(m_currentLeader)) {
                     final long currentLeader = m_currentLeader;
-                    if (m_currentLeader == Long.MAX_VALUE) {
-                        m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
-                    } else if (m_currentLeader == supposedNewLeader || missingHSIds.contains(supposedNewLeader)) {
+
+                    // When a promotion is in progress and the site in promotion is not on the failed hosts, should not
+                    // do another promoiton.
+                    if (m_currentLeader == supposedNewLeader || missingHSIds.contains(supposedNewLeader)) {
                         m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug(WHOMIM + "Determining new leader when missing for partition " + m_partitionId +
@@ -222,7 +223,7 @@ public class LeaderAppointer implements Promotable
                     // then, the partition leader stays on the old host and  m_currentLeader won't match
                     // its appointee. The old leader won't go through the repair process as needed.
                     boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
-                    if (m_currentLeader != supposedNewLeader && isMigrateRequested) {
+                    if (m_currentLeader != supposedNewLeader && missingHSIds.contains(supposedNewLeader) && isMigrateRequested) {
                         String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
                         try {
                             m_iv2appointees.put(m_partitionId, masterPair);
