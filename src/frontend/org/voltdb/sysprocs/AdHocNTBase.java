@@ -118,7 +118,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         EMPTY,
         ALL_DML_OR_DQL,
         ALL_DDL,
-        MIXED;
+        MIXED
     }
 
     /**
@@ -146,7 +146,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             String ddlToken = SQLLexer.extractDDLToken(stmt);
 
             if (hasDDL == null) {
-                hasDDL = (ddlToken != null) ? true : false;
+                hasDDL = ddlToken != null;
             }
             else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null)) {
                 return AdHocSQLMix.MIXED;
@@ -572,6 +572,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         @Override public CompletableFuture<ClientResponse> createAdHocTransaction(
                 AdHocPlannedStmtBatch plannedStmtBatch) throws VoltTypeException {
             return AdHocNTBase.this.createAdHocTransaction(plannedStmtBatch, false);
+        }
+
+        @Override public CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch plannedStmtBatch) {
+            return AdHocNTBase.processExplainPlannedStmtBatch(plannedStmtBatch);
         }
     }
 }

@@ -71,7 +71,7 @@ public class AdHoc extends AdHocNTBase {
         try {
             // We do not need to worry about the ParameterSet,
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-            batch = SqlBatch.from(params, m_context);
+            batch = SqlBatch.from(params, m_context, ExplainMode.NONE);
             return batch.execute();
         } catch (PlannerFallbackException | SqlParseException ex) {
             // Use the legacy planner to run this.

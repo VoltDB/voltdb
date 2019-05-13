@@ -25,6 +25,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
@@ -83,13 +84,14 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * @param params the user parameters. The first parameter is always the query text.
      *               The rest parameters are the ones used in the query.
      * @param context the AdHoc context which is used for calling internal AdHoc APIs before further refactor.
+     * @param explainMode the explain mode of the batch, see {@link ExplainMode}.
      * @return a {@code SqlBatch} built from the given {@code ParameterSet}.
      * @throws SqlParseException when the query parsing went wrong.
      * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
      * @throws UnsupportedOperationException when the batch is a mixture of DDL and non-DDL
      *         statements or has parameters and more than one query at the same time.
      */
-    public static SqlBatch from(ParameterSet params, Context context)
+    public static SqlBatch from(ParameterSet params, Context context, ExplainMode explainMode)
             throws SqlParseException, PlannerFallbackException {
         Object[] paramArray = params.toArray();
         // The first parameter is always the query string.
@@ -102,7 +104,9 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
         SqlBatch batch = new SqlBatchImpl(sqlBlock, userParams, context);
         if ( ! batch.isDDLBatch()) {
             // Decorate the batch with the add-ons for non-DDL batches so that it will just do the right thing.
-            batch = new NonDdlBatch(batch);
+            batch = new NonDdlBatch(batch, explainMode);
+        } else if (explainMode != ExplainMode.NONE) {
+            throw new PlanningErrorException("Explain doesn't support DDL.");
         }
         return batch;
     }
@@ -122,5 +126,6 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
         void logBatch(final CatalogContext context, final AdHocPlannedStmtBatch batch, final Object[] userParams);
         long getClientHandle();
         CompletableFuture<ClientResponse> createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) throws VoltTypeException;
+        CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch plannedStmtBatch);
     }
 }
