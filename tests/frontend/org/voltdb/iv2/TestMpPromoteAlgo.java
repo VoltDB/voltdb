@@ -113,7 +113,7 @@ public class TestMpPromoteAlgo
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig);
+            ofTotal, handle, handle, versionedHashinatorConfig, Long.MIN_VALUE);
         m.m_sourceHSId = sourceHSId;
         return m;
     }

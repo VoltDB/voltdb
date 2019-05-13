@@ -456,7 +456,7 @@ public class TestVoltMessageSerialization extends TestCase {
         // simulate the first message in the sequence, sequence must be 0
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
-                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3})
+                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3}), Long.MIN_VALUE
                 );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());

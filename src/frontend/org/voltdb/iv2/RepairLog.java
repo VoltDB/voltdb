@@ -18,25 +18,31 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * The repair log stores messages received from a partition initiator (leader) in case
@@ -57,8 +63,11 @@ public class RepairLog
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
 
+    // The MP repair truncation handle
+    long m_mpRepairTruncationHandle = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
+
     // Truncation point
-    long m_truncationHandle = Long.MIN_VALUE;
+    long m_spTruncationHandle = Long.MIN_VALUE;
     final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
 
     // is this a partition leader?
@@ -196,6 +205,7 @@ public class RepairLog
             if (newMp) {
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                 m_lastSpHandle = m.getSpHandle();
+                m_mpRepairTruncationHandle = Math.max(m.getTruncationHandle(), m_mpRepairTruncationHandle);
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
@@ -217,16 +227,17 @@ public class RepairLog
             truncate(ctm.getTruncationHandle(), IS_MP);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
-        }
-        else if (msg instanceof DumpMessage) {
+            m_mpRepairTruncationHandle = Math.max(ctm.getTruncationHandle(), m_mpRepairTruncationHandle);
+        } else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
             repairLogger.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
                     + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
                repairLogger.warn("[Repair log contents]" + who + ": msg: " + il);
             }
-        }
-        else if (msg instanceof RepairLogTruncationMessage) {
+        } else if (msg instanceof DummyTransactionTaskMessage) {
+            m_lastSpHandle = Math.max(m_lastSpHandle, ((DummyTransactionTaskMessage) msg).getSpHandle());
+        } else if (msg instanceof RepairLogTruncationMessage) {
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
             truncate(truncateMsg.getHandle(), IS_SP);
         }
@@ -243,8 +254,8 @@ public class RepairLog
         Deque<RepairLog.Item> deq = null;
         if (isSP) {
             deq = m_logSP;
-            if (m_truncationHandle < handle) {
-                m_truncationHandle = handle;
+            if (m_spTruncationHandle < handle) {
+                m_spTruncationHandle = handle;
                 notifyTxnCommitInterests(handle);
             }
         }
@@ -253,9 +264,11 @@ public class RepairLog
         }
 
         RepairLog.Item item = null;
+        Set<Long> truncatedTxns = Sets.newHashSet();
         while ((item = deq.peek()) != null) {
             if (item.canTruncate(handle)) {
                 deq.poll();
+                truncatedTxns.add(item.m_txnId);
             } else {
                 break;
             }
@@ -312,7 +325,9 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfigCooked());
+                        TheHashinator.getCurrentVersionedConfigCooked(),
+                        m_mpRepairTruncationHandle);
+
         responses.add(hheader);
 
         int seq = responses.size(); // = 1, as the first sequence
@@ -336,5 +351,28 @@ public class RepairLog
     void registerTransactionCommitInterest(TransactionCommitInterest interest)
     {
         m_txnCommitInterests.add(interest);
+    }
+
+    private void logSummary(StringBuilder sb, Deque<Item> log, String indentStr) {
+        final int txnIdsPerLine = 15;
+        Iterator<Item> itemator = log.iterator();
+        for (int lineCnt = 0; lineCnt <= (log.size() / txnIdsPerLine); lineCnt++) {
+            sb.append(indentStr);
+            for(int i = 0; i < txnIdsPerLine; i++) {
+                if (itemator.hasNext()) {
+                    sb.append(" ").append(TxnEgo.txnIdSeqToString(itemator.next().getTxnId()));
+                }
+            }
+        }
+    }
+
+    public void indentedString(StringBuilder sb, int indentCnt) {
+        char[] array = new char[indentCnt-1];
+        Arrays.fill(array, ' ');
+        String indentStr = new String("\n" + new String(array));
+        sb.append(indentStr).append("MP RepairLog:");
+        logSummary(sb, m_logMP, indentStr);
+        sb.append(indentStr).append("SP RepairLog:");
+        logSummary(sb, m_logSP, indentStr);
     }
 }
