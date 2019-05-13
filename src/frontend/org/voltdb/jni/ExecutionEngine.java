@@ -664,8 +664,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long lastCommittedSpHandle,
             long uniqueId,
             long undoQuantumToken,
-            boolean traceOn) throws EEException
-    {
+            boolean traceOn) throws EEException {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_fragmentContext = (undoQuantumToken == Long.MAX_VALUE) ? FragmentContext.RO_BATCH : FragmentContext.RW_BATCH;

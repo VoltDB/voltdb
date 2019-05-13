@@ -49,55 +49,53 @@
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName,
-                              bool skipNonInline) const {
-    assert(m_schema);
-    assert(m_data);
+   std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) const {
+      assert(m_schema);
+      assert(m_data);
 
-    std::ostringstream buffer;
-    if (tableName.empty()) {
-        buffer << "TableTuple(no table) ->";
-    } else {
-        buffer << "TableTuple(" << tableName << ") ->";
-    }
+      std::ostringstream buffer;
+      if (tableName.empty()) {
+         buffer << "TableTuple(no table) ->";
+      } else {
+         buffer << "TableTuple(" << tableName << ") ->";
+      }
 
-    if (isActive() == false) {
-        buffer << " <DELETED> ";
-    }
-    for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
-        buffer << "(";
-        const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
-        if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
+      if (isActive() == false) {
+         buffer << " <DELETED> ";
+      }
+      for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
+         buffer << "(";
+         const TupleSchema::ColumnInfo *colInfo = m_schema->getColumnInfo(ctr);
+         if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
             StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
             buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-        }
-        else {
+         } else {
             buffer << getNValue(ctr).debug();
-        }
-        buffer << ")";
-    }
+         }
+         buffer << ")";
+      }
 
-    if (m_schema->hiddenColumnCount() > 0) {
-        buffer << " hidden->";
+      if (m_schema->hiddenColumnCount() > 0) {
+         buffer << " hidden->";
 
-        for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
+         for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
             const TupleSchema::ColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
             if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
-                StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
-                buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
+               StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
+               buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
             }
             else {
-                buffer << getHiddenNValue(ctr).debug();
+               buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";
-        }
-    }
+         }
+      }
 
-    buffer << " @" << static_cast<const void*>(address());
+      buffer << " @" << static_cast<const void*>(address());
 
-    return buffer.str();
-}
+      return buffer.str();
+   }
 
 std::string TableTuple::debugNoHeader() const {
     assert(m_schema);

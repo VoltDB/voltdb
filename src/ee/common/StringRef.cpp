@@ -24,32 +24,34 @@
 
 using namespace voltdb;
 
-inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr)
-{ return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr); }
+inline ThreadLocalPool::Sized* asSizedObject(char* stringPtr) {
+   return reinterpret_cast<ThreadLocalPool::Sized*>(stringPtr);
+}
 
-char* StringRef::getObjectValue()
-{ return asSizedObject(m_stringPtr)->m_data; }
+char* StringRef::getObjectValue() {
+   return asSizedObject(m_stringPtr)->m_data;
+}
 
-const char* StringRef::getObjectValue() const
-{ return asSizedObject(m_stringPtr)->m_data; }
+const char* StringRef::getObjectValue() const {
+   return asSizedObject(m_stringPtr)->m_data;
+}
 
-int32_t StringRef::getObjectLength() const
-{ return asSizedObject(m_stringPtr)->m_size; }
+int32_t StringRef::getObjectLength() const {
+   return asSizedObject(m_stringPtr)->m_size;
+}
 
-const char* StringRef::getObject(int32_t* lengthOut) const
-{
+const char* StringRef::getObject(int32_t& lengthOut) const {
     /*/ enable to debug
     std::cout << this << " DEBUG: getting [" << asSizedObject(m_stringPtr)->m_size << "]"
               << std::string(asSizedObject(m_stringPtr)->m_data,
                              asSizedObject(m_stringPtr)->m_size)
               << std::endl;
     // */
-    *lengthOut = asSizedObject(m_stringPtr)->m_size;
+    lengthOut = asSizedObject(m_stringPtr)->m_size;
     return asSizedObject(m_stringPtr)->m_data;
 }
 
-int32_t StringRef::getAllocatedSizeInPersistentStorage() const
-{
+int32_t StringRef::getAllocatedSizeInPersistentStorage() const {
     // The CompactingPool allocated a chunk of this size for storage.
     int32_t alloc_size = ThreadLocalPool::getAllocationSizeForRelocatable(asSizedObject(m_stringPtr));
     //cout << "Pool allocation size: " << alloc_size << endl;

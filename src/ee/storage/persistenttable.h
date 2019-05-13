@@ -299,11 +299,8 @@ public:
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     void updateTupleWithSpecificIndexes(TableTuple& targetTupleToUpdate,
-                                        TableTuple& sourceTupleWithNewValues,
-                                        std::vector<TableIndex*> const& indexesToUpdate,
-                                        bool fallible = true,
-                                        bool updateDRTimestamp = true,
-                                        bool fromMigrate = false);
+          TableTuple& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate,
+          bool fallible = true, bool updateDRTimestamp = true, bool fromMigrate = false);
 
     // ------------------------------------------------------------------
     // INDEXES

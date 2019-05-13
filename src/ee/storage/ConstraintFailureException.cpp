@@ -28,16 +28,14 @@ ConstraintFailureException::ConstraintFailureException(
         TableTuple otherTuple,
         ConstraintType type,
         PersistentTableSurgeon *surgeon) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
+    SQLException(SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
             VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
     m_type(type),
-    m_surgeon(surgeon)
-{
+    m_surgeon(surgeon) {
     assert(table);
     assert(!tuple.isNullTuple());
 }

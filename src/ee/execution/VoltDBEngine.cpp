@@ -529,7 +529,6 @@ int VoltDBEngine::executePlanFragments(
     if (m_udfBufferCapacity > MAX_UDF_BUFFER_SIZE) {
         m_topend->resizeUDFBuffer(MAX_UDF_BUFFER_SIZE);
     }
-
     return failures;
 }
 
@@ -718,9 +717,9 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
 }
 
 void VoltDBEngine::undoUndoToken(int64_t undoToken) {
-    m_currentUndoQuantum = NULL;
-    m_executorContext->setupForPlanFragments(NULL);
-    m_undoLog.undo(undoToken);
+   m_currentUndoQuantum = NULL;
+   m_executorContext->setupForPlanFragments(NULL);
+   m_undoLog.undo(undoToken);
 }
 
 void VoltDBEngine::serializeException(const SerializableEEException& e) {

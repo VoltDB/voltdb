@@ -388,21 +388,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public FastDeserializer coreExecutePlanFragments(
-            final int batchIndex,
-            final int numFragmentIds,
-            final long[] planFragmentIds,
-            final long[] inputDepIds,
-            final Object[] parameterSets,
-            DeterminismHash determinismHash,
-            boolean[] isWriteFrags,
-            int[] sqlCRCs,
-            final long txnId,
-            final long spHandle,
-            final long lastCommittedSpHandle,
-            long uniqueId,
-            final long undoToken,
-            final boolean traceOn) throws EEException
-    {
+            final int batchIndex, final int numFragmentIds, final long[] planFragmentIds, final long[] inputDepIds,
+            final Object[] parameterSets, DeterminismHash determinismHash, boolean[] isWriteFrags, int[] sqlCRCs,
+            final long txnId, final long spHandle, final long lastCommittedSpHandle, long uniqueId,
+            final long undoToken, final boolean traceOn) throws EEException {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
@@ -434,13 +423,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             if (param instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) param;
                 m_psetBuffer.put(buf);
-            }
-            else {
+            } else {
                 ParameterSet pset = (ParameterSet) param;
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
-                }
-                catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
+                } catch (final Exception exception) { //Not Just IO but bad params can throw RuntimeExceptions
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +
@@ -460,20 +447,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         FastDeserializer targetDeserializer = (batchIndex == 0) ? m_firstDeserializer : m_nextDeserializer;
         targetDeserializer.clear();
 
-        final int errorCode =
-            nativeExecutePlanFragments(
-                    pointer,
-                    batchIndex,
-                    numFragmentIds,
-                    planFragmentIds,
-                    inputDepIds,
-                    txnId,
-                    spHandle,
-                    lastCommittedSpHandle,
-                    uniqueId,
-                    undoToken,
-                    traceOn);
-
+        final int errorCode = nativeExecutePlanFragments(
+                pointer, batchIndex, numFragmentIds, planFragmentIds, inputDepIds, txnId, spHandle,
+                lastCommittedSpHandle, uniqueId, undoToken, traceOn);
         try {
             checkErrorCode(errorCode);
             m_usingFallbackBuffer = m_fallbackBuffer != null;

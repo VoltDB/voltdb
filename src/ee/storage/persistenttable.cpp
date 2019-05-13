@@ -764,12 +764,10 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
 
     try {
         m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException& e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
-    }
-    catch (TupleStreamException& e) {
+    } catch (TupleStreamException& e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     }
@@ -805,24 +803,21 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    } catch (ConstraintFailureException& e) {
-        deleteTupleStorage(target); // also frees object columns
-       FILE* fp = fopen("/tmp/bar", "w"); fputs("bar", fp); fclose(fp);
-        throw;
     } catch (TupleStreamException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
+    // NOTE: it is safe to assume that when ConstraintFailureException occurs,
+    // no tuples had been added to target table.
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
+      bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
-
     }
 
     // Write to DR stream before everything else to ensure nothing gets left in
@@ -901,7 +896,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
+            UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(
+                  *uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 assert(m_shadowStream != nullptr);
@@ -916,14 +912,14 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     // Insert the tuple into the delta table first.
     //
-    // (Note: we may hit a NOT NULL constraint violation,
-    // in which case, we want to clean up by calling
-    // deleteTupleStorage, below)
+    // (Note: we may hit a NOT NULL constraint violation, or any
+    // types of constraint violation. In which case, we want to
+    // clean up by calling deleteTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
 }
 
 void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
+      bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
     doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
 
@@ -1120,8 +1116,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     //Copy the dirty status that was set by markTupleDirty.
     if (targetTupleToUpdate.isDirty()) {
         sourceTupleWithNewValues.setDirtyTrue();
-    }
-    else {
+    } else {
         sourceTupleWithNewValues.setDirtyFalse();
     }
 
@@ -1151,8 +1146,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
-    }
-    else {
+    } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
         // to keep the UndoAction stupid simple?
@@ -1168,10 +1162,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(
         TableIndex* index = indexesToUpdate[i];
         if (!indexRequiresUpdate[i]) {
             continue;
-        }
-
-        // For migrate, the hidden index should not be added back
-        if (fromMigrate && index->isMigratingIndex()) {
+        } else if (fromMigrate && index->isMigratingIndex()) {
+           // For migrate, the hidden index should not be added back
             continue;
         }
         index->addEntry(&targetTupleToUpdate, &conflict);
@@ -1424,37 +1416,37 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple& target) {
  *     can be used directly.
  */
 void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
-    TableTuple matchable(tupleData, m_schema);
-    TableTuple target(tupleData, m_schema);
-    //* enable for debug */ std::cout << "DEBUG: undoing "
-    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-    if (!skipLookup) {
-        // The UndoInsertAction got a pooled copy of the tupleData.
-        // Relocate the original tuple actually in the table.
-        target = lookupTupleForUndo(matchable);
-    }
-    if (target.isNullTuple()) {
-        throwFatalException("Failed to delete tuple from table %s:"
-                            " tuple does not exist\n%s\n", m_name.c_str(),
-                            matchable.debugNoHeader().c_str());
-    }
-    //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
-    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+   TableTuple matchable(tupleData, m_schema);
+   TableTuple target(tupleData, m_schema);
+   //* enable for debug */ std::cout << "DEBUG: undoing "
+   //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+   //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+   if (!skipLookup) {
+      // The UndoInsertAction got a pooled copy of the tupleData.
+      // Relocate the original tuple actually in the table.
+      target = lookupTupleForUndo(matchable);
+   }
+   if (target.isNullTuple()) {
+      // throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n", m_name.c_str());
+      throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
+            matchable.debugNoHeader().c_str());
+   }
+   //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
+   //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+   //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
 
-    // Make sure that they are not trying to delete the same tuple twice
-    assert(target.isActive());
-    deleteFromAllIndexes(&target);
+   // Make sure that they are not trying to delete the same tuple twice
+   assert(target.isActive());
+   deleteFromAllIndexes(&target);
 
-    // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
-    if (isTableWithMigrate(m_tableType)) {
-        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
-        if(!txnId.isNull()){
-            migratingRemove(ValuePeeker::peekBigInt(txnId), target);
-        }
-    }
-    deleteTupleFinalize(target); // also frees object columns
+   // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
+   if (isTableWithMigrate(m_tableType)) {
+      NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+      if(!txnId.isNull()){
+         migratingRemove(ValuePeeker::peekBigInt(txnId), target);
+      }
+   }
+   deleteTupleFinalize(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType) {
@@ -1549,20 +1541,18 @@ void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* confl
 void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
       TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
    try {
-      BOOST_FOREACH (auto index, indexesToUpdate) {
-         BOOST_FOREACH (auto expr, index->getIndexedExpressions()) {
-            expr->eval(&sourceTupleWithNewValues, NULL);
+      for (auto& index: indexesToUpdate) {
+         for (auto& expr: index->getIndexedExpressions()) {
+            expr->eval(&sourceTupleWithNewValues, nullptr);
          }
       }
    } catch (SQLException const& e) {
-      throw ConstraintFailureException(
-            this, sourceTupleWithNewValues, e.what());
+      throw ConstraintFailureException(this, sourceTupleWithNewValues, e.what());
    }
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
-                                                 TableTuple const& sourceTupleWithNewValues,
-                                                 std::vector<TableIndex*> const& indexesToUpdate) {
+      TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
     BOOST_FOREACH (auto index, indexesToUpdate) {
         if (index->isUniqueIndex()) {
             if (index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues) == false)
@@ -1570,8 +1560,7 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate
 
             // if there is a change, the new_key has to be checked
             FAIL_IF (index->exists(&sourceTupleWithNewValues)) {
-                VOLT_WARN("Unique Index '%s' complained to the update",
-                          index->debug().c_str());
+                VOLT_WARN("Unique Index '%s' complained to the update", index->debug().c_str());
                 return false; // cannot insert the new value
             }
         }

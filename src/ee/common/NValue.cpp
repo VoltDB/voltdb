@@ -118,101 +118,89 @@ TTInt NValue::s_minInt64AsDecimal(TTInt(-INT64_MAX) * kMaxScaleFactor);
  * Produce a debugging string describing an NValue.
  */
 std::string NValue::debug() const {
-    const ValueType type = getValueType();
-    std::ostringstream buffer;
-    std::string out_val;
-    const char* ptr;
+   const ValueType type = getValueType();
+   std::ostringstream buffer;
+   std::string out_val;
+   const char* ptr;
+   int32_t length;
+   buffer << getTypeName(type) << "::";
+   if (isNull()) {
+      buffer << "<NULL>";
+      return buffer.str();
+   }
 
-    buffer << getTypeName(type) << "::";
-    if (isNull()) {
-        buffer << "<NULL>";
-        return buffer.str();
-    }
-
-    switch (type) {
-    case VALUE_TYPE_BOOLEAN:
-        buffer << (getBoolean() ? "true" : "false");
-        break;
-    case VALUE_TYPE_TINYINT:
-        buffer << static_cast<int32_t>(getTinyInt());
-        break;
-    case VALUE_TYPE_SMALLINT:
-        buffer << getSmallInt();
-        break;
-    case VALUE_TYPE_INTEGER:
-        buffer << getInteger();
-        break;
-    case VALUE_TYPE_BIGINT:
-        buffer << getBigInt();
-        break;
-    case VALUE_TYPE_DOUBLE:
-        buffer << getDouble();
-        break;
-    case VALUE_TYPE_VARCHAR:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
-        break;
-    }
-    case VALUE_TYPE_VARBINARY:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
-        buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
-        break;
-    }
-    case VALUE_TYPE_DECIMAL:
-        buffer << createStringFromDecimal();
-        break;
-    case VALUE_TYPE_TIMESTAMP: {
-        try {
+   switch (type) {
+      case VALUE_TYPE_BOOLEAN:
+         buffer << (getBoolean() ? "true" : "false");
+         break;
+      case VALUE_TYPE_TINYINT:
+         buffer << static_cast<int32_t>(getTinyInt());
+         break;
+      case VALUE_TYPE_SMALLINT:
+         buffer << getSmallInt();
+         break;
+      case VALUE_TYPE_INTEGER:
+         buffer << getInteger();
+         break;
+      case VALUE_TYPE_BIGINT:
+         buffer << getBigInt();
+         break;
+      case VALUE_TYPE_DOUBLE:
+         buffer << getDouble();
+         break;
+      case VALUE_TYPE_VARCHAR:
+         ptr = getObject_withoutNull(length);
+         out_val = std::string(ptr, length);
+         buffer << "[" << length << "]";
+         buffer << "\"" << out_val << "\"[@" << static_cast<const void*>(ptr) << "]";
+         break;
+      case VALUE_TYPE_VARBINARY:
+         ptr = getObject_withoutNull(length);
+         out_val = std::string(ptr, length);
+         buffer << "[" << length << "]";
+         buffer << "-bin[@" << static_cast<const void*>(ptr) << "]";
+         break;
+      case VALUE_TYPE_DECIMAL:
+         buffer << createStringFromDecimal();
+         break;
+      case VALUE_TYPE_TIMESTAMP:
+         try {
             std::stringstream ss;
             streamTimestamp(ss);
             buffer << ss.str();
-        }
-        catch (const SQLException &) {
+         } catch (const SQLException &) {
             buffer << "<out of range timestamp:" << getBigInt() << ">";
-        }
-        catch (...) {
+         } catch (...) {
             buffer << "<exception when converting timestamp:" << getBigInt() << ">";
-        }
-        break;
-    }
-    case VALUE_TYPE_POINT:
-        buffer << getGeographyPointValue().toString();
-        break;
-    case VALUE_TYPE_GEOGRAPHY:
-        buffer << getGeographyValue().toString();
-        break;
-    default:
-        buffer << "(no details)";
-        break;
-    }
-    std::string ret(buffer.str());
-    return (ret);
+         }
+         break;
+      case VALUE_TYPE_POINT:
+         buffer << getGeographyPointValue().toString();
+         break;
+      case VALUE_TYPE_GEOGRAPHY:
+         buffer << getGeographyValue().toString();
+         break;
+      default:
+         buffer << "(no details)";
+         break;
+   }
+   return buffer.str();
 }
 
 int32_t NValue::serializedSize() const {
-    switch (m_valueType) {
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY: {
-            int32_t length = sizeof(int32_t);
-            if (! isNull()) {
-                int32_t valueLength;
-                getObject_withoutNull(&valueLength);
-                length += valueLength;
-            }
-            return length;
-        }
-    default:
-        return getTupleStorageSize(m_valueType);
-    }
+   int32_t length = sizeof(int32_t);
+   switch (m_valueType) {
+      case VALUE_TYPE_VARCHAR:
+      case VALUE_TYPE_VARBINARY:
+         if (! isNull()) {
+            int32_t valueLength;
+            getObject_withoutNull(valueLength);
+            length += valueLength;
+         }
+         return length;
+      default:
+         return getTupleStorageSize(m_valueType);
+   }
 }
 
 /**

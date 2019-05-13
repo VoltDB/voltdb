@@ -418,9 +418,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                p_execute_tuple_internal(inputTuple);
             }
          } catch (ConstraintFailureException const& e) {
-            FILE* fp = fopen("/tmp/baz", "w"); fputs(e.what(), fp); fclose(fp);
             s_exceptionMessage = e.what();
-            //throw SerializableEEException(e.what());
             return false;
          }
          if (m_replicatedTableOperation) {
@@ -430,10 +428,14 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
          // An exception was thrown on the lowest site thread and we need to throw here as well so
          // all threads are in the same state
          char msg[1024];
-         snprintf(msg, 1024, "Replicated!! table insert threw an unknown exception on other thread for table %s: %s",
-               m_targetTable->name().c_str(), s_exceptionMessage.c_str());
+         if (!s_exceptionMessage.empty()) {
+            strcpy(msg, s_exceptionMessage.c_str());
+         } else {
+            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                  m_targetTable->name().c_str());
+         }
          VOLT_DEBUG("%s", msg);
-         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+         throw ConstraintFailureException(m_targetTable, inputTuple, msg);
       }
    }
 

@@ -292,7 +292,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
 
     in_addr addr;
     int32_t addrlen;
-    const char *addr_str = getObject_withoutNull(&addrlen);
+    const char *addr_str = getObject_withoutNull(addrlen);
     if (INET_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
         sb << "Address string for INET_ATON is too long to be an IPv4 address: "
@@ -328,7 +328,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
         return getNullValue(VALUE_TYPE_VARCHAR);
     }
     int32_t addr_len;
-    const in6_addr *addr = (const in6_addr *)getObject_withoutNull(&addr_len);
+    const in6_addr *addr = (const in6_addr *)getObject_withoutNull(addr_len);
     if (addr_len != sizeof(in6_addr)) {
         std::stringstream sb;
         sb << "VARBINARY value is the wrong size to hold an IPv6 address: "
@@ -362,7 +362,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     }
 
     int32_t addrlen;
-    const char *addr_str = getObject_withoutNull(&addrlen);
+    const char *addr_str = getObject_withoutNull(addrlen);
     if (INET6_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
         sb << "INET6_ATON: Argument string is too long to be an IPv6 address: "
@@ -381,9 +381,6 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
         sb << "Unrecognized format for IPv6 address string <"
            << cbuff
            << ">";
-        FILE* fp = fopen("/tmp/foo", "w");
-        StackTrace::printMangledAndUnmangledToFile(fp);
-        fclose(fp);
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
     return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());
