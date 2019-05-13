@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
     # get ssh config [key_filename, hostname]
     CentosSSHInfo = getSSHInfoForHost("buildkits_C7")
-    MacSSHInfo = getSSHInfoForHost("voltmini")
+    MacSSHInfo = getSSHInfoForHost("voltmini2")
     UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
     # build community kit on the mini so that .so can be picked up for unified kit
