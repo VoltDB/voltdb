@@ -208,7 +208,7 @@ public class LeaderAppointer implements Promotable
                     final long currentLeader = m_currentLeader;
 
                     // When a promotion is in progress and the site in promotion is not on the failed hosts, should not
-                    // do another promoiton.
+                    // do another promotion.
                     if (m_currentLeader == supposedNewLeader || missingHSIds.contains(supposedNewLeader)) {
                         m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
                         if (tmLog.isDebugEnabled()) {
