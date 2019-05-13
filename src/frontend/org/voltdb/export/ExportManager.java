@@ -497,7 +497,7 @@ public class ExportManager
                  * This strategy is the one that piggy backs on
                  * regular partition leadership distribution to determine
                  * who will process export data for different partitions.
-                 * We stashed away all the ones we have leadershipof
+                 * We stashed away all the ones we have leadership of
                  * in m_masterOfPartitions
                  */
                 for (Integer partitionId: m_masterOfPartitions) {

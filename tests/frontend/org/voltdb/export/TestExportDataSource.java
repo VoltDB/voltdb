@@ -166,7 +166,7 @@ public class TestExportDataSource extends TestCase {
         void setMockCoordination() {
             m_coordinator = mock(ExportCoordinator.class);
             when(m_coordinator.isCoordinatorInitialized()).thenReturn(true);
-            when(m_coordinator.isLeader()).thenReturn(true);
+            when(m_coordinator.isPartitionLeader()).thenReturn(true);
             when(m_coordinator.isMaster()).thenReturn(true);
             when(m_coordinator.isSafePoint(anyLong())).thenReturn(true);
             when(m_coordinator.isExportMaster(anyLong())).thenReturn(true);

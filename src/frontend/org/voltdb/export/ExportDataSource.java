@@ -1527,7 +1527,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (m_coordinator.isLeader()) {
+                if (m_coordinator.isPartitionLeader()) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Already the leader of stream " + m_tableName + ", partition " + getPartitionId());
                     }
@@ -1593,7 +1593,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_coordinator != null) {
             sb.append(", ");
             sb.append((m_coordinator.isMaster() ? "Master":"Replica"));
-            if (m_coordinator.isLeader()) {
+            if (m_coordinator.isPartitionLeader()) {
                 sb.append(", Leader");
             }
         }

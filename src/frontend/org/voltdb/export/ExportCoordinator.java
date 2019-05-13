@@ -130,7 +130,7 @@ public class ExportCoordinator {
                             m_leaderHostId = newLeaderHostId;
                             StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
                                     .append(m_leaderHostId)
-                                    .append(isLeader() ? " (localHost) " : " ")
+                                    .append(isPartitionLeader() ? " (localHost) " : " ")
                                     .append("is the leader at initial state");
                             exportLog.info(sb.toString());
                             setCoordinatorInitialized();
@@ -342,14 +342,14 @@ public class ExportCoordinator {
                             m_leaderHostId = newLeaderHostId;
                             StringBuilder sb = new StringBuilder("Host ")
                                     .append(m_leaderHostId)
-                                    .append(isLeader() ? " (localHost) " : " ")
+                                    .append(isPartitionLeader() ? " (localHost) " : " ")
                                     .append("is the new leader");
                             exportLog.info(sb.toString());
 
                             // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
                             // Note: cannot initiate a coordinator task directly from here, must go
                             // through another runnable and the invocation path.
-                            if (isLeader() && m_trackers.isEmpty()) {
+                            if (isPartitionLeader() && m_trackers.isEmpty()) {
                                 requestTrackers();
                             }
 
@@ -405,7 +405,7 @@ public class ExportCoordinator {
                             }
 
                             // If not the leader, check if the leader is behind or ahead on acks.
-                            if (!isLeader()) {
+                            if (!isPartitionLeader()) {
                                 if (lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
                                     // Leader is behind on acks, ask the ExportDataSource to resend
                                     // an ack to all the other hosts.
@@ -589,7 +589,7 @@ public class ExportCoordinator {
                             // may have lost leadership. But this is not important as the goal is to start the task
                             // from one host. Note also that the request goes through another EDS runnable.
                             if (!addedMembers.isEmpty()) {
-                                if (isLeader()) {
+                                if (isPartitionLeader()) {
                                     exportLog.info("Leader requests trackers for added members: " + addedMembers);
                                     requestTrackers();
 
@@ -897,7 +897,7 @@ public class ExportCoordinator {
     /**
      * @return true if this host is the partition leader.
      */
-    public boolean isLeader() {
+    public boolean isPartitionLeader() {
         return m_hostId.equals(m_leaderHostId);
     }
 
@@ -991,12 +991,10 @@ public class ExportCoordinator {
 
         // Note: the trackers are truncated so the seqNo should not be past the first gap
         Pair<Long, Long> gap = leaderTracker.getFirstGap();
-        if (gap != null) {
-            assert (exportSeqNo <= gap.getSecond());
-        }
+        assert (gap == null || exportSeqNo <= gap.getSecond());
         if (gap == null || exportSeqNo < (gap.getFirst() - 1)) {
 
-            m_isMaster = isLeader();
+            m_isMaster = isPartitionLeader();
             if (gap == null) {
                 m_safePoint = INFINITE_SEQNO;
             } else {
@@ -1051,7 +1049,7 @@ public class ExportCoordinator {
 
         // If no replicas were found, the leader is Export Master and will become BLOCKED
         m_safePoint = gap.getFirst();
-        m_isMaster = isLeader();
+        m_isMaster = isPartitionLeader();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Leader host " + m_leaderHostId + " is Export Master and will be blocked");
         }

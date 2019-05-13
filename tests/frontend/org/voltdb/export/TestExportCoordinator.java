@@ -117,7 +117,7 @@ public class TestExportCoordinator extends ZKTestBase {
             }
 
             // Check leadership
-            assertTrue(ec0.isLeader());
+            assertTrue(ec0.isPartitionLeader());
 
             // Check the leader is export master forever even
             // past the initial tracker info
@@ -159,7 +159,7 @@ public class TestExportCoordinator extends ZKTestBase {
             }
 
             // Check leadership
-            assertTrue(ec0.isLeader());
+            assertTrue(ec0.isPartitionLeader());
 
             // Check the leader is always export master since we have no replica
             // (EDS trying to poll would become BLOCKED)
@@ -217,7 +217,7 @@ public class TestExportCoordinator extends ZKTestBase {
             }
 
             // Check leadership
-            assertTrue(ec0.isLeader());
+            assertTrue(ec0.isPartitionLeader());
 
             // Check the leader is export master up to the gap
             // and verify replica becomes master, then leader
@@ -297,7 +297,7 @@ public class TestExportCoordinator extends ZKTestBase {
             }
 
             // Check leadership
-            assertTrue(ec0.isLeader());
+            assertTrue(ec0.isPartitionLeader());
 
             // Check the leader is export master only after
             // the initial gap
@@ -383,7 +383,7 @@ public class TestExportCoordinator extends ZKTestBase {
             }
 
             // Check leadership
-            assertTrue(ec0.isLeader());
+            assertTrue(ec0.isPartitionLeader());
 
             // Check the leader is export master up to the gap
             // and verify replicas aren't masters until the lowest

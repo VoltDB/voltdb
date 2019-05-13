@@ -610,6 +610,8 @@ public class SynchronizedStatesManager {
                                             + ", current participants: " + m_currentParticipants);
                                 }
                                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                                // force the participant count to be 1, so that lock notifications can be correctly guarded
+                                m_currentParticipants = 1;
 
                                 m_pendingProposal = existingAndProposedStates.m_proposal;
                                 ByteBuffer proposedState = m_pendingProposal.asReadOnlyBuffer();
