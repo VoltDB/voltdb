@@ -463,9 +463,6 @@ public class SynchronizedStatesManager {
             lockLocalState();
             // put in two separate try-catch blocks so that both actions are attempted
             try {
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": XXX disableMembership deletes: " + m_myParticipantPath);
-                }
                 m_zk.delete(m_myParticipantPath, -1);
             }
             catch (KeeperException e) {
@@ -605,10 +602,6 @@ public class SynchronizedStatesManager {
                             else {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
-                                if (m_log.isDebugEnabled()) {
-                                    m_log.debug(m_stateMachineId + ": XXX checkForBarrierParticipantsChange creates: " + m_myParticipantPath
-                                            + ", current participants: " + m_currentParticipants);
-                                }
                                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                                 // force the participant count to be 1, so that lock notifications can be correctly guarded
                                 m_currentParticipants = 1;
@@ -768,9 +761,6 @@ public class SynchronizedStatesManager {
                     }
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": XXX getUncorrelatedResults deletes: " + m_myParticipantPath);
-                }
                 m_zk.delete(m_myParticipantPath, -1);
             } catch (KeeperException.SessionExpiredException e) {
                 results = new ArrayList<ByteBuffer>();
@@ -818,9 +808,6 @@ public class SynchronizedStatesManager {
                     }
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": XXX getCorrelatedResults deletes: " + m_myParticipantPath);
-                }
                 m_zk.delete(m_myParticipantPath, -1);
             } catch (KeeperException.SessionExpiredException e) {
                 results = new HashMap<String, ByteBuffer>();
@@ -904,9 +891,6 @@ public class SynchronizedStatesManager {
                     }
 
                     // Remove ourselves from the participants list to unblock the next distributed lock waiter
-                    if (m_log.isDebugEnabled()) {
-                        m_log.debug(m_stateMachineId + ": XXX processResultQuorum deletes: " + m_myParticipantPath);
-                    }
                     m_zk.delete(m_myParticipantPath, -1);
                 } catch (KeeperException.SessionExpiredException e) {
                     if (m_log.isDebugEnabled()) {
@@ -1230,16 +1214,9 @@ public class SynchronizedStatesManager {
             try {
                 List<String> results = m_zk.getChildren(m_barrierResultsPath, false);
                 for (String resultNode : results) {
-                    if (m_log.isDebugEnabled()) {
-                        m_log.debug(m_stateMachineId + ": XXX wakeCommunityWithProposal deletes: " + m_barrierResultsPath
-                                + ", for result: " + resultNode);
-                    }
                     m_zk.delete(ZKUtil.joinZKPath(m_barrierResultsPath, resultNode), -1);
                 }
                 Stat newProposalStat = m_zk.setData(m_barrierResultsPath, proposal, -1);
-                if (m_log.isDebugEnabled()) {
-                    m_log.debug(m_stateMachineId + ": XXX wakeCommunityWithProposal creates: " + m_myParticipantPath);
-                }
                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                 newProposalVersion = newProposalStat.getVersion();
                 // force the participant count to be 1, so that lock notifications can be correctly guarded
@@ -1570,9 +1547,6 @@ public class SynchronizedStatesManager {
                 m_pendingProposal = null;
                 try {
                     // Since we don't care about the outcome remove ourself from the participant list
-                    if (m_log.isDebugEnabled()) {
-                        m_log.debug(m_stateMachineId + ": XXX assignStateChangeAgreement deletes: " + m_myParticipantPath);
-                    }
                     m_zk.delete(m_myParticipantPath, -1);
                 } catch (KeeperException.SessionExpiredException e) {
                     if (m_log.isDebugEnabled()) {
