@@ -38,13 +38,12 @@ public class Explain extends AdHocNTBase {
      * anything that Calcite cannot handle, we will let it fall back to the
      * legacy parser and planner.
      *
-     * @param params
-     *            the user parameters. The first parameter is always the query
-     *            text. The rest parameters are the ones used in the queries.
-     *            </br>
+     * @param params the user parameters. The first parameter is always the query
+     *               text. The rest parameters are the ones used in the queries.
+     *               </br>
      * @return the client response.
-     * @since 9.0
      * @author Chao Zhou
+     * @since 9.1
      */
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         SqlBatch batch;
