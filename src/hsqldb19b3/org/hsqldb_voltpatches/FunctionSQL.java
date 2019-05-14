@@ -1806,9 +1806,7 @@ public class FunctionSQL extends Expression {
             }
 
             case FUNC_UNIQUE_ID: {
-
                 dataType = Type.SQL_BIGINT;
-
                 break;
             }
 
