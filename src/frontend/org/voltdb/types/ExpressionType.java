@@ -117,15 +117,18 @@ public enum ExpressionType {
     // ----------------------------
     // Aggregate
     // ----------------------------
-    AGGREGATE_COUNT               (AggregateExpression.class, 40, "COUNT", true),
-    AGGREGATE_COUNT_STAR          (AggregateExpression.class, 41, "COUNT(*)", true),
-    AGGREGATE_SUM                 (AggregateExpression.class, 42, "SUM"),
-    AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN", true),
-    AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX", true),
-    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
-    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT", true),
-    AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
-    AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
+    AGGREGATE_COUNT                  (AggregateExpression.class, 40, "COUNT", true),
+    AGGREGATE_COUNT_STAR             (AggregateExpression.class, 41, "COUNT(*)", true),
+    AGGREGATE_SUM                    (AggregateExpression.class, 42, "SUM"),
+    AGGREGATE_MIN                    (AggregateExpression.class, 43, "MIN", true),
+    AGGREGATE_MAX                    (AggregateExpression.class, 44, "MAX", true),
+    AGGREGATE_AVG                    (AggregateExpression.class, 45, "AVG"),
+    AGGREGATE_APPROX_COUNT_DISTINCT  (AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT", true),
+    AGGREGATE_VALS_TO_HYPERLOGLOG    (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
+    AGGREGATE_HYPERLOGLOGS_TO_CARD   (AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
+    AGGREGATE_ROARING_COUNT_DISTINCT (AggregateExpression.class, 49, "ROARING_COUNT_DISTINCT", true),
+    AGGREGATE_VALUESE_TO_ROARING     (AggregateExpression.class, 50, "VALUES_TO_ROARING"),
+    AGGREGATE_ROARING_TO_CARDINALITY (AggregateExpression.class, 51, "ROARING_TO_CARDINALITY"),
     // ----------------------------
     // Windowed Aggregates.  We need to treat these
     // somewhat differently than the non-windowed

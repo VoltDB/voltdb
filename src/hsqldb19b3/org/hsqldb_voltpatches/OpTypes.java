@@ -101,6 +101,7 @@ public interface OpTypes {
         MULTICOLUMN          = 97
         // A VoltDB extension APPROX_COUNT_DISTINCT
         , APPROX_COUNT_DISTINCT = 98
+        , ROARING_COUNT_DISTINCT = 106
         // The WindowedAggregate operators go here.  There
         // will be some duplication with the grouped aggregate
         // operators.  That is to say, MAX, MIN, and so forth

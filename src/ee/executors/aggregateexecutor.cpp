@@ -49,6 +49,8 @@
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 
+#include "roaring/roaring.c"
+#include "roaring/roaring.hh"
 #include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
 namespace voltdb {
@@ -487,6 +489,79 @@ public:
     }
 };
 
+class RoaringCountDistinctAgg : public Agg {
+public:
+    RoaringCountDistinctAgg()
+        : m_roaring
+    {
+    }
+
+    virtual void advance(const NValue& val)
+    {
+        if (val.isNull()) {
+            return;
+        }
+
+        std::size_t seed = 0;
+        val.hashCombine(seek)
+        m_roaring.add(seed);
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        double cardinality = m_roaring.cardinality();
+        return ValueFactory::getBigIntValue(static_cast<int64_t>(cardinality));
+    }
+
+    virtual void resetAgg()
+    {
+        roaring().clear();
+        Agg::resetAgg();
+    }
+
+protected:
+    Roaring& roaring() {
+        return m_roaring;
+    }
+
+private:
+
+    Roaring roaring;
+};
+
+
+/// Push-down aggregate
+class ValuesToRoaringAgg : public RoaringCountDistinctAgg {
+public:
+    virtual NValue finalize(ValueType type)
+    {
+        assert (type == VALUE_TYPE_VARBINARY);
+        uint32_t byteSize =  r1.getSizeInBytes();
+        char *serializedbytes = new char[expectedsize];
+
+        roaring().write(serializedbytes);
+        return ValueFactory::getTempBinaryValue(serializedBytes, byteSize);
+    }
+};
+
+/// Pull-up aggregate
+class RoaringToCardinalityAgg : public RoaringCountDistinctAgg {
+public:
+    virtual void advance(const NValue& val)
+    {
+        assert (ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        assert (!val.isNull());
+
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(val, &length);
+
+        assert (length > 0);
+
+        roaring() |= Roaring::read(buf);
+    }
+};
+
+
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
@@ -521,6 +596,12 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
+    case EXPRESSION_TYPE_AGGREGATE_ROARING_COUNT_DISTINCT:
+        return new (memoryPool) RoaringCountDistinctAgg();
+    case EXPRESSION_TYPE_AGGREGATE_VALUES_TO_ROARING:
+        return new (memoryPool) ValuesToRoaringAgg();
+    case EXPRESSION_TYPE_AGGREGATE_ROARING_TO_CARDINALITY:
+        return new (memoryPool) RoaringToCardinalityAgg();
     default:
         {
             char message[128];

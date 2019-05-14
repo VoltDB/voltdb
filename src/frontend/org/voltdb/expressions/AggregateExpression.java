@@ -80,6 +80,8 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_COUNT_STAR:
         case AGGREGATE_APPROX_COUNT_DISTINCT:
         case AGGREGATE_HYPERLOGLOGS_TO_CARD:
+        case AGGREGATE_ROARING_COUNT_DISTINCT:
+        case AGGREGATE_ROARING_TO_CARDINALITY:
             //
             // Always an integer
             //

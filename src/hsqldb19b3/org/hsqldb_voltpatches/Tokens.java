@@ -54,6 +54,7 @@ public class Tokens {
     static final String        T_ANY              = "ANY";
     // A VoltDB extension APPROX_COUNT_DISTINCT
     static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
+    static final String        T_ROARING_COUNT_DISTINCT = "ROARING_COUNT_DISTINCT";
     // End of VoltDB extension
     static final String        T_ARE              = "ARE";
     static final String        T_ARRAY            = "ARRAY";
@@ -897,6 +898,7 @@ public class Tokens {
     public static final int COUNT                            = 51;
     // A VoltDB extension APPROX_COUNT_DISTINCT
     public static final int APPROX_COUNT_DISTINCT            = 1304;
+    public static final int ROARING_COUNT_DISTINCT           = 1307;
     // End of VoltDB extension
     public static final int COVAR_POP                        = 52;
     public static final int COVAR_SAMP                       = 53;
@@ -1662,6 +1664,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ANY, ANY);
         // A VoltDB extension APPROX_COUNT_DISTINCT
         reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
+        reservedKeys.put(Tokens.T_ROARING_COUNT_DISTINCT, ROARING_COUNT_DISTINCT);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_ARE, ARE);
         reservedKeys.put(Tokens.T_ARRAY, ARRAY);
@@ -2354,6 +2357,7 @@ public class Tokens {
             // End of VoltDB extension
             // A VoltDB extension APPROX_COUNT_DISTINCT
             APPROX_COUNT_DISTINCT,
+            ROARING_COUNT_DISTINCT,
             // End of VoltDB extension
             // A VoltDB extension STREAM
             STREAM,
