@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -70,10 +71,17 @@ public class InitiatorMailbox implements Mailbox
     }
 
     public static enum LeaderMigrationState {
-        STARTED,            //@MigratePartitionLeader on old master has been started
-        TXN_RESTART,        //new master needs txn restart before old master drains txns
-        TXN_DRAINED,        //new master is notified that old master has drained
-        NONE                //no or complete MigratePartitionLeader
+        STARTED(1),            //@MigratePartitionLeader on old master has been started
+        TXN_RESTART(2),        //new master needs txn restart before old master drains txns
+        TXN_DRAINED(3),        //new master is notified that old master has drained
+        NONE(4);                //no or complete MigratePartitionLeader
+        final int state;
+        LeaderMigrationState(int s) {
+            this.state = s;
+        }
+        public int get() {
+            return state;
+        }
     }
 
     VoltLogger hostLog = new VoltLogger("HOST");
@@ -90,7 +98,7 @@ public class InitiatorMailbox implements Mailbox
 
     //Queue all the transactions on the new master after MigratePartitionLeader till it receives a message
     //from its older master which has drained all the transactions.
-    private long m_newLeaderHSID = Long.MIN_VALUE;
+    private AtomicLong m_newLeaderHSID = new AtomicLong(Long.MIN_VALUE);
     private AtomicReference<LeaderMigrationState> m_leaderMigrationState =
             new AtomicReference<LeaderMigrationState>();
 
@@ -398,7 +406,7 @@ public class InitiatorMailbox implements Mailbox
         SpScheduler scheduler = (SpScheduler)m_scheduler;
         scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;
-        m_newLeaderHSID = newLeaderHSId;
+        m_newLeaderHSID.set(newLeaderHSId);
         m_leaderMigrationState.set(LeaderMigrationState.STARTED);
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(),
@@ -647,14 +655,14 @@ public class InitiatorMailbox implements Mailbox
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 
-    //The new partition leader is notified by previous partition leader
-    //that previous partition leader has drained its txns
+    // The new partition leader is notified by previous partition leader
+    // that previous partition leader has drained its txns
     private void setLeaderMigrationState(MigratePartitionLeaderMessage message) {
 
-        //The host with old partition leader is down.
+        // The host with old partition leader is down.
         if (message.isStatusReset()) {
             m_leaderMigrationState.set(LeaderMigrationState.TXN_DRAINED);
-            m_newLeaderHSID = Long.MIN_VALUE;
+            m_newLeaderHSID.set(Long.MIN_VALUE);
             return;
         }
 
@@ -671,15 +679,15 @@ public class InitiatorMailbox implements Mailbox
                 CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_leaderMigrationState);
     }
 
-    //the site for new partition leader
+    // The site for new partition leader
     public void setLeaderMigrationState(boolean migratePartitionLeader) {
         if (!migratePartitionLeader) {
             m_leaderMigrationState.set(LeaderMigrationState.NONE);
-            m_newLeaderHSID = Long.MIN_VALUE;
+            m_newLeaderHSID.set(Long.MIN_VALUE);
             return;
         }
 
-        //The previous leader has already drained all txns
+        // The previous leader has already drained all txns
         if (m_leaderMigrationState.get() == LeaderMigrationState.TXN_DRAINED) {
             m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_DRAINED ,LeaderMigrationState.NONE);
             tmLog.info("MigratePartitionLeader transactions on previous partition leader are drained. New leader:" +
@@ -687,16 +695,16 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        //Wait for the notification from old partition leader
+        // Wait for the notification from old partition leader
         m_leaderMigrationState.set(LeaderMigrationState.TXN_RESTART);
         tmLog.info("MigratePartitionLeader restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_leaderMigrationState);
     }
 
-    //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
-    //Then new master can proceed to process transactions.
+    // Old master notifies new master that the transactions before the checkpoint on old master have been drained.
+    // Then new master can proceed to process transactions.
     public void notifyNewLeaderOfTxnDoneIfNeeded() {
-        //return quickly to avoid performance hit
-        if (m_newLeaderHSID == Long.MIN_VALUE ) {
+        // return quickly to avoid performance hit
+        if (m_newLeaderHSID.get() == Long.MIN_VALUE ) {
             return;
         }
 
@@ -705,15 +713,15 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_hsId, m_newLeaderHSID);
+        MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(m_hsId, m_newLeaderHSID.get());
         send(message.getNewLeaderHSID(), message);
 
-        //reset status on the old partition leader
+        // reset status on the old partition leader
         m_leaderMigrationState.set(LeaderMigrationState.NONE);
         m_repairLog.setLeaderState(false);
         tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
-                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_leaderMigrationState);
-        m_newLeaderHSID = Long.MIN_VALUE;
+                CoreUtils.hsIdToString(m_newLeaderHSID.get()) + " transactions are drained." + " status:" + m_leaderMigrationState);
+        m_newLeaderHSID.set(Long.MIN_VALUE);
     }
 
     public ZooKeeper getZK() {
