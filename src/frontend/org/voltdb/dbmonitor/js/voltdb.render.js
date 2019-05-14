@@ -1431,7 +1431,7 @@ function alertNodeClicked(obj) {
 
             connection.Metadata['@Statistics_EXPORT'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
-                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "SOURCE")
+                    || columnInfo["name"] == "TUPLE_COUNT" || columnInfo["name"] == "TARGET")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1439,7 +1439,6 @@ function alertNodeClicked(obj) {
             if(connection.Metadata["@Statistics_EXPORT"].data.length > 0){
                 var rowCount = connection.Metadata["@Statistics_EXPORT"].data.length
                 var tuple_count = 0;
-                var source = "";
                 var target = "";
                 connection.Metadata["@Statistics_EXPORT"].data.forEach(function (info) {
                     if(target != info[colIndex["TARGET"]]){
@@ -1450,8 +1449,8 @@ function alertNodeClicked(obj) {
                         exporterDetails["TUPLE_COUNT"] = {};
                     }
                     tuple_count += info[colIndex["TUPLE_COUNT"]];
-                    exporterDetails["TUPLE_COUNT"] = tuple_count;
-                    exporterDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    exporterDetails["TUPLE_COUNT"][target] = tuple_count;
+                    exporterDetails["TUPLE_COUNT"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                     exporterDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 });
             }

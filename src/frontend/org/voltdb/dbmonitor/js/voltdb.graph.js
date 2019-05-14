@@ -168,13 +168,18 @@
         function getExportData(emptyData, dataMapper){
             var count = 0;
             var tuplecounts = [];
+            var colorIndex = 1;
             //var dataExporterSuccess = [];
             //var dataExporterFailures = [];
             if(dataExporterDetails != undefined){
                 $.each(dataExporterDetails, function(key, value){
                     if(key == "TUPLE_COUNT"){
-                        tuplecounts.push({ key: key, values: value, color: colorList[colorIndex] })
-                        dataMapper[dataType] = count;
+                        var arr = [];
+                        arr.push(emptyData[0]);
+                        arr.push(emptyData[emptyData.length - 1]);
+
+                        tuplecounts.push({ key: key, values: arr, color: colorList[colorIndex] })
+                        dataMapper[key] = count;
                         count++;
                     }
                 });
@@ -1586,7 +1591,7 @@
                 arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
             }
             Monitors[dataType].push({ key: keyValue, values: arr, color: colorList[colorIndex] })
-            if(dataType == "successRateData"){
+            if(dataType == "tupleCountData"){
                 dataMapperExporterSec[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterSec);
                 dataMapperExporterMin[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterMin);
                 dataMapperExporterDay[keyValue] = MonitorGraphUI.getDataMapperIndex(dataMapperExporterDay);
@@ -3095,7 +3100,7 @@
             if(localStorage.tupleCountDetailsDay != undefined  && JSON.parse(localStorage.tupleCountDetailsDay).length == tupleCountDataDay.length){
                 tupleCountDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.tupleCountDetailsDay))
             } else {
-                tupleCountDetailsArrDay = JSON.stringify(convertDataFormatForPartition(otupleCountDataDay))
+                tupleCountDetailsArrDay = JSON.stringify(convertDataFormatForPartition(tupleCountDataDay))
                 tupleCountDetailsArrDay = JSON.parse(tupleCountDetailsArrDay)
             }
 
@@ -3153,7 +3158,7 @@
 
                         if (tupleCountSecCount >= 6 || monitor.tupleCountFirstData) {
                             if (!tupleCountDataMin.hasOwnProperty(keyValue)) {
-                                var keyIndex = dataMapperImporterMin[keyValue];
+                                var keyIndex = dataMapperExporterMin[keyValue];
                                 tupleCountDataMin[keyIndex]["values"] = sliceFirstData(tupleCountDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.tupleCountMaxTimeStamp) {
                                     tupleCountDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": tupleCountDataMin[keyIndex]["values"][tupleCountDataMin[keyIndex]["values"].length - 1].y });
@@ -3167,7 +3172,7 @@
                         }
 
                         if (tupleCountMinCount >= 60 || monitor.tupleCountFirstData) {
-                            var keyIndexDay = dataMapperImporterDay[keyValue];
+                            var keyIndexDay = dataMapperExporterDay[keyValue];
                             tupleCountDataDay[keyIndexDay]["values"] = sliceFirstData(tupleCountDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.tupleCountMaxTimeStamp) {
                                 tupleCountDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": tupleCountDataDay[keyIndexDay]["values"][tupleCountDataDay[keyIndexDay]["values"].length - 1].y });
@@ -3179,7 +3184,7 @@
                             Monitors.tupleCountDataDay = tupleCountDataDay;
                         }
 
-                        var keyIndexSec = dataMapperImporterSec[keyValue];
+                        var keyIndexSec = dataMapperExporterSec[keyValue];
 
                         tupleCountData[keyIndexSec]["values"] = sliceFirstData(tupleCountData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.tupleCountMaxTimeStamp) {
