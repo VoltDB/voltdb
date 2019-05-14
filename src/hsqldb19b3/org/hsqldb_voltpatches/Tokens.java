@@ -46,7 +46,6 @@ public class Tokens {
 
     //
     // SQL 200n reserved words full set
-    static final String        T_UNIQUE_ID        = "GET_UNIQUE_ID";
     static final String        T_ABS              = "ABS";
     public static final String T_ALL              = "ALL";
     static final String        T_ALLOCATE         = "ALLOCATE";
@@ -370,6 +369,7 @@ public class Tokens {
     static final String        T_MIGRATING         = "MIGRATING";
     // End of VoltDB extension
     public static final String T_UNIQUE            = "UNIQUE";
+    static final String        T_UNIQUE_ID         = "GET_UNIQUE_ID";
     static final String        T_UNKNOWN           = "UNKNOWN";
     static final String        T_UNNEST            = "UNNEST";
     static final String        T_UNTIL             = "UNTIL";
@@ -842,7 +842,6 @@ public class Tokens {
     //
     //
     //SQL 200n Standard reserved keywords - full set
-    public static final int UNIQUE_ID                        = 0;
     public static final int ABS                              = 1;
     public static final int ALL                              = 2;
     public static final int ALLOCATE                         = 3;
@@ -1526,6 +1525,7 @@ public class Tokens {
     static final int        SPACE_WORD       = 652;
     static final int        SUBSTR           = 653;
     static final int        UCASE            = 654;
+    static final int        UNIQUE_ID        = 0;
     static final int        DATEDIFF         = 655;
     public static final int SECONDS_MIDNIGHT = 656;
     static final int        CSC              = 657;
@@ -1650,7 +1650,6 @@ public class Tokens {
         new IntValueHashMap(351);
 
     static {
-        reservedKeys.put(Tokens.T_UNIQUE_ID, UNIQUE_ID);
         reservedKeys.put(Tokens.T_ABS, ABS);
         reservedKeys.put(Tokens.T_ALL, ALL);
         reservedKeys.put(Tokens.T_ALLOCATE, ALLOCATE);
@@ -1968,6 +1967,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNDO, UNDO);
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
+        reservedKeys.put(Tokens.T_UNIQUE_ID, UNIQUE_ID);
         // A VoltDB extension to support the assume unique index attribute
         reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);
         // A VoltDB extension to support the migrating index attribute

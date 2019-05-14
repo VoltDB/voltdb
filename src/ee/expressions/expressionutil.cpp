@@ -475,7 +475,6 @@ AbstractExpression* ExpressionUtil::expressionFactory(
          // add the function id
          functionId = obj.valueForKey("FUNCTION_ID").asInt();
          ret = functionFactory(functionId, args);
-        
          if (ret == nullptr) {
             std::string nameString;
             if (obj.hasNonNullKey("NAME")) {

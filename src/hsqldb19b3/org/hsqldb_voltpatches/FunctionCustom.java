@@ -63,9 +63,9 @@ public class FunctionCustom extends FunctionSQL {
 
     public static final String[] openGroupNumericFunctions = {
         "ABS", "ACOS", "ASIN", "ATAN", "ATAN2", "BITAND", "BITOR", "BITXOR",
-        "CEILING", "COS", "COT", "DEGREES", "EXP", "FLOOR", "LOG", "LOG10",
-        "MOD", "PI", "POWER", "RADIANS", "RAND", "ROUND", "ROUNDMAGIC", "SIGN",
-        "SIN", "SQRT", "TAN", "TRUNCATE", "GET_UNIQUE_ID"
+        "CEILING", "COS", "COT", "DEGREES", "EXP", "FLOOR", "GET_UNIQUE_ID",
+        "LOG", "LOG10", "MOD", "PI", "POWER", "RADIANS", "RAND", "ROUND",
+        "ROUNDMAGIC", "SIGN", "SIN", "SQRT", "TAN", "TRUNCATE"
     };
     public static final String[] openGroupStringFunctions = {
         "ASCII", "CHAR", "CONCAT", "DIFFERENCE", "HEXTORAW", "INSERT", "LCASE",
