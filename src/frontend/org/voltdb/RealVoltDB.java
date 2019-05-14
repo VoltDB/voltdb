@@ -3216,8 +3216,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             (new Socket(hostname, m_config.m_port)).close();
             consoleLog.info("There is already a connection on this port");
             System.exit(-1);
-        } catch (Exception e) {
-           consoleLog.info("There is not a connection on this port yet");     
+        } catch (Exception e) {  
+        
         }
            
 
