@@ -614,7 +614,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,COS,COT,CSC,DEGREES,EXP,FLOOR,LN,LOG,LOG10,PI,POWER,RADIANS,ROUND,SEC,SIN,SQRT,TAN,GET_UNIQUE_ID";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,COS,COT,CSC,DEGREES,EXP,FLOOR,GET_UNIQUE_ID,LN,LOG,LOG10,PI,POWER,RADIANS,ROUND,SEC,SIN,SQRT,TAN";
     }
 
     // Retrieves a description of the given table's primary key columns.

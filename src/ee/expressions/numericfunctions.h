@@ -488,9 +488,9 @@ template<> inline NValue NValue::callConstant<FUNC_UNIQUE_ID>() {
     // get the catalog cluster
     catalog::Cluster* catalogCluster = ExecutorContext::getExecutorContext()->getEngine()
         ->getCatalog()->clusters().get("cluster");
-   	// retrieve the data replication cluster id
-   	uint64_t clusterId = catalogCluster->drClusterId();
-   	// retrieve the transaction id
+    // retrieve the data replication cluster id
+    uint64_t clusterId = catalogCluster->drClusterId();
+    // retrieve the transaction id
     uint64_t txnId = ExecutorContext::getExecutorContext()->currentTxnId();
     // replace the first 3 bits of the transaction id to be the cluster id
     uint64_t uniqueId = (txnId & 2305843009213693951) | (clusterId << 61);

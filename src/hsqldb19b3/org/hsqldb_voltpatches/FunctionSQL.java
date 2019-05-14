@@ -101,7 +101,7 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_SYSTEM_USER                      = 59;
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
-    private final static int   FUNC_UNIQUE_ID 						 = 62;
+    private final static int   FUNC_UNIQUE_ID                        = 62;
 
     //
     static final short[] noParamList              = new short[]{};
@@ -661,10 +661,10 @@ public class FunctionSQL extends Expression {
                 break;
 
             case FUNC_UNIQUE_ID:
-				name = Tokens.T_UNIQUE_ID;
-				parseList = emptyParamList;
-				isValueFunction = true;
-				break;
+                name = Tokens.T_UNIQUE_ID;
+                parseList = emptyParamList;
+                isValueFunction = true;
+                break;
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "FunctionSQL");
@@ -1227,7 +1227,7 @@ public class FunctionSQL extends Expression {
                     session, session.getCurrentTimestamp(false));
 
             case FUNC_UNIQUE_ID:
-				return null;
+                return null;
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "FunctionSQL");
@@ -1807,10 +1807,10 @@ public class FunctionSQL extends Expression {
 
             case FUNC_UNIQUE_ID: {
 
-				dataType = Type.SQL_BIGINT;
+                dataType = Type.SQL_BIGINT;
 
-				break;
-			}
+                break;
+            }
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "FunctionSQL");
@@ -2103,8 +2103,8 @@ public class FunctionSQL extends Expression {
             }
             
             case FUNC_UNIQUE_ID: {
-				return sb.toString();
-			}
+                return sb.toString();
+            }
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "FunctionSQL");
