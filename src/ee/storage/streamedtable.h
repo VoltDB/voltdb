@@ -79,7 +79,7 @@ public:
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
-    void streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type);
+    void streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, bool isDREnabled = false);
     virtual bool insertTuple(TableTuple &tuple);
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);

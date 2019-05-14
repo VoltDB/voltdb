@@ -143,7 +143,7 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
-void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type) {
+void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, bool isDREnabled) {
     if (m_executorContext->externalStreamsEnabled()) {
         int64_t currSequenceNo = ++m_sequenceNo;
         assert(m_columnNames.size() == source.columnCount());
@@ -160,7 +160,7 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             // With no active UndoLog, there is no undo support.
             return;
         }
-        if (type == ExportTupleStream::MIGRATE) {
+        if (type == ExportTupleStream::MIGRATE && isDREnabled) {
             if (m_migrateTxnSizeGuard.undoToken == 0L) {
                 m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=

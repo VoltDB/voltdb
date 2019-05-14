@@ -1139,7 +1139,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE);
+        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE, isDREnabled());
     }
 
     if (uq) {

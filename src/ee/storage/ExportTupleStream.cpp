@@ -349,6 +349,6 @@ size_t ExportTupleStream::getEstimateDRLogSize(int64_t rawExportDataSize) {
     return rawExportDataSize - 4/*rowLength*/ - 4/*partitionColumnIndex*/ - 4/*columnCount*/
                              - EXPORT_BUFFER_METADATA_HEADER_SIZE
                              + 1/*HashDelimiter*/ + 4/*lastParHash*/ + 1/*DrTxnType*/ + 8/*tableHandle*/
-                             + 8/*HiddenColumn*/;
+                             + 8/*HiddenDRColumn, bigint*/;
 }
 
