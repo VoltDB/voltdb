@@ -360,8 +360,6 @@ public class RejoinProducer extends JoinProducerBase {
         }
         else {
             doFinishingTask(siteConnection);
-            // Remove the completion monitor for an empty (zero table) rejoin.
-            m_snapshotCompletionMonitor.set(null);
         }
     }
 
@@ -400,18 +398,16 @@ public class RejoinProducer extends JoinProducerBase {
                 long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
-                    if (m_hasPersistentTables) {
-                        REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
-                        exportSequenceNumbers = event.exportSequenceNumbers;
-                        m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                    REJOINLOG.debug(m_whoami + " waiting on snapshot completion monitor.");
+                    exportSequenceNumbers = event.exportSequenceNumbers;
+                    m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
-                        drSequenceNumbers = event.drSequenceNumbers;
-                        allConsumerSiteTrackers = event.drMixedClusterSizeConsumerState;
-                        clusterCreateTime = event.clusterCreateTime;
+                    drSequenceNumbers = event.drSequenceNumbers;
+                    allConsumerSiteTrackers = event.drMixedClusterSizeConsumerState;
+                    clusterCreateTime = event.clusterCreateTime;
 
-                        // Tells EE which DR version going to use
-                        siteConnection.setDRProtocolVersion(event.drVersion);
-                    }
+                    // Tells EE which DR version going to use
+                    siteConnection.setDRProtocolVersion(event.drVersion);
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
