@@ -363,6 +363,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     @Override
     public void toDuplicateCounterString(StringBuilder sb) {
-        sb.append("UNEXPECTED IV1 INITIATE TASK");
+        sb.append("INITIATE TASK");
     }
 }
