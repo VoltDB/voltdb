@@ -1525,7 +1525,6 @@ public class Tokens {
     static final int        SPACE_WORD       = 652;
     static final int        SUBSTR           = 653;
     static final int        UCASE            = 654;
-    static final int        UNIQUE_ID        = 0;
     static final int        DATEDIFF         = 655;
     public static final int SECONDS_MIDNIGHT = 656;
     static final int        CSC              = 657;
@@ -1633,6 +1632,7 @@ public class Tokens {
     public static final int WEEKOFYEAR                 = 740; // for compliant with MySQL
     public static final int WEEKDAY                    = 741; // for compliant with MySQL
     // End of VoltDB extension
+    public static final int UNIQUE_ID                  = 742;
 
     // A VoltDB extension to support TTL
     static final int TTL           = 1003;
