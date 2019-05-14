@@ -105,7 +105,7 @@ public class KafkaClientVerifier {
         Integer consumers = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
-        Integer timeout = 30;
+        Integer timeout = 120;
 
         @Override
         public void validate() {
@@ -158,7 +158,7 @@ public class KafkaClientVerifier {
                 consumedRows.addAndGet(records.count());
                 recordCnt = +records.count();
                 if (records.count() == 0) {
-                    // if we don't get any records for 30seconds or we reach the
+                    // if we don't get any records for "timeout" seconds or we reach the
                     // max number of
                     // expected
                     // records, break;
