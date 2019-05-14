@@ -764,10 +764,10 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
 
     try {
         m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
-    } catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException const& e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
-    } catch (TupleStreamException& e) {
+    } catch (TupleStreamException const& e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     }
@@ -803,7 +803,7 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    } catch (TupleStreamException& e) {
+    } catch (TupleStreamException const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }

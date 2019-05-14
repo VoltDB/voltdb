@@ -53,7 +53,7 @@
 
 namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;
-std::string InsertExecutor::s_exceptionMessage;
+std::string InsertExecutor::s_errorMessage;
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             const ExecutorVector& executorVector)
@@ -418,8 +418,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                p_execute_tuple_internal(inputTuple);
             }
          } catch (ConstraintFailureException const& e) {
-            s_exceptionMessage = e.what();
-            return false;
+            s_errorMessage = e.what();
+            throw;
          }
          if (m_replicatedTableOperation) {
             s_modifiedTuples = m_modifiedTuples;
@@ -428,8 +428,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
          // An exception was thrown on the lowest site thread and we need to throw here as well so
          // all threads are in the same state
          char msg[1024];
-         if (!s_exceptionMessage.empty()) {
-            strcpy(msg, s_exceptionMessage.c_str());
+         if (!s_errorMessage.empty()) {
+            strcpy(msg, s_errorMessage.c_str());
          } else {
             snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
                   m_targetTable->name().c_str());

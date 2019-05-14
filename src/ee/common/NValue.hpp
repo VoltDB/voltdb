@@ -918,7 +918,7 @@ private:
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
         } else {
            char const* retVal = getObjectPointer()->getObject(lengthOut);
-           assert(lengthOut > 0);
+           assert(lengthOut >= 0);
            return retVal;
         }
     }

@@ -299,7 +299,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
-        // m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
         assert(false);
     } else {
         int numCountStar = 0;
@@ -329,7 +328,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             assert(m_dest->schema()->hiddenColumnCount() == 1);
             m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(1));
         }
-        // m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);  // ???
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }

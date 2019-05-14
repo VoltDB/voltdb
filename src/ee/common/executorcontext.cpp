@@ -213,9 +213,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
                 }
                 InsertExecutor* insertExecutor = dynamic_cast<InsertExecutor*>(executor);
                 if (insertExecutor != nullptr && insertExecutor->exceptionMessage() != nullptr) {
-                   //throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                   //      insertExecutor->exceptionMessage());
-                   throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                   throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                          insertExecutor->exceptionMessage());
                 } else {
                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -263,8 +261,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
         } else {
             VOLT_TRACE("The Executor's execution at position '%d' in subquery %d failed", ctr, subqueryId);
         }
-        //throw;
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, e.what());
+        throw;
     }
 
     AbstractTempTable *result = executorList.back()->getPlanNode()->getTempOutputTable();

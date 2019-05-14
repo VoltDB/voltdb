@@ -113,8 +113,8 @@ class InsertExecutor : public AbstractExecutor
         return m_targetTable;
     }
     char const* exceptionMessage() const {
-       return ! m_sourceIsPartitioned &&  ! s_exceptionMessage.empty() ?
-          s_exceptionMessage.c_str() : nullptr;
+       return ! m_sourceIsPartitioned &&  ! s_errorMessage.empty() ?
+          s_errorMessage.c_str() : nullptr;
     }
  protected:
     bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
@@ -179,7 +179,7 @@ class InsertExecutor : public AbstractExecutor
     Table* m_targetTable;
     int64_t m_modifiedTuples;
     static int64_t s_modifiedTuples;
-    static std::string s_exceptionMessage;
+    static std::string s_errorMessage;
     TableTuple m_count_tuple;
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;
