@@ -603,6 +603,8 @@ public class SynchronizedStatesManager {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
                                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                                // force the participant count to be 1, so that lock notifications can be correctly guarded
+                                m_currentParticipants = 1;
 
                                 m_pendingProposal = existingAndProposedStates.m_proposal;
                                 ByteBuffer proposedState = m_pendingProposal.asReadOnlyBuffer();
@@ -801,6 +803,8 @@ public class SynchronizedStatesManager {
                         if (m_log.isDebugEnabled()) {
                             m_log.debug(m_stateMachineId + ":    " + memberId + " did not supply a Task Result");
                         }
+                        // Signal the caller that a member didn't answer
+                        results.put(memberId, null);
                     }
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter
@@ -1890,6 +1894,8 @@ public class SynchronizedStatesManager {
                 // lost the full connection. some test cases do this...
                 // means shutdown without the elector being
                 // shutdown; ignore.
+            } catch (KeeperException.NoNodeException e) {
+                // FIXME: need to investigate why this happens on multinode shutdown
             } catch (InterruptedException e) {
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
