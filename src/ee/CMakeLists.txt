@@ -63,6 +63,7 @@ BANNER("Configuring the VoltDB Execution Engine Runtime."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
        "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
+       "VOLT_TRACE_ALLOCATIONS: ${VOLT_TRACE_ALLOCATIONS}"
        "VOLT_TIMER_ENABLED:     ${VOLT_TIMER_ENABLED}"
    )
 
