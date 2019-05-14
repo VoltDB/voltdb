@@ -245,9 +245,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId,
-                                   boolean schemaHasNoTables)
-    {
+    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId) {
         String nonce = null;
         String data = null;
         synchronized(m_lock) {
@@ -273,7 +271,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
                     CoreUtils.hsIdToString(HSId));
         }
-        if (data != null && !schemaHasNoTables) {
+        if (data != null) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotPathType.SNAP_NO_PATH, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
@@ -297,8 +295,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             assert(m_catalog != null);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
-            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),
-                              rm.schemaHasNoTables());
+            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());
         } else {
             VoltDB.crashLocalVoltDB("Wrong rejoin message of type " + type +
                                     " sent to the rejoin coordinator", false, null);
