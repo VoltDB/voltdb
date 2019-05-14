@@ -1721,7 +1721,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         };
         if (hostLog.isDebugEnabled()) {
-            r.taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
+            r.taskInfo = "Repair Log Truncate Message Handle:" + TxnEgo.txnIdToString(m_repairLogTruncationHandle);
         }
         m_tasks.offer(r);
     }
@@ -1741,7 +1741,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void checkPointMigratePartitionLeader() {
         m_migratePartitionLeaderCheckPoint = getMaxScheduledTxnSpHandle();
         tmLog.info("MigratePartitionLeader checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                    " sphandle: " + m_migratePartitionLeaderCheckPoint);
+                    " sphandle: " + TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint));
     }
 
     public boolean txnDoneBeforeCheckPoint() {
@@ -1758,12 +1758,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     DuplicateCounter counter = m_duplicateCounters.get(dc);
                     builder.append(counter.m_openMessage + "\n");
                 }
-                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_migratePartitionLeaderCheckPoint + "\n" + builder.toString());
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" +
+                        TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint) + "\n" + builder.toString());
             }
             return false;
         }
         tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                " has completed transactions before sphandle: " + m_migratePartitionLeaderCheckPoint);
+                " has completed transactions before sphandle: " + TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint));
         m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
         return true;
     }
