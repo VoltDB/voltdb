@@ -2759,7 +2759,8 @@ public class PlanAssembler {
                          */
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT
+                                 agg_expression_type != ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -3009,13 +3010,20 @@ public class PlanAssembler {
         assert (coordNode != null);
 
         // Patch up any APPROX_COUNT_DISTINCT on the distributed node.
+        // Patch up any ROARING_COUNT_DISTINCT on the distributed node.
         List<ExpressionType> distAggTypes = distNode.getAggregateTypes();
         boolean hasApproxCountDistinct = false;
+        boolean hasRoaringCountDistinct = false;
         for (int i = 0; i < distAggTypes.size(); ++i) {
             ExpressionType et = distAggTypes.get(i);
             if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                 hasApproxCountDistinct = true;
                 distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG);
+            }
+
+            if (et == ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
+                hasRoaringCountDistinct = true;
+                distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALUES_TO_ROARING);
             }
         }
 
@@ -3026,6 +3034,17 @@ public class PlanAssembler {
                 ExpressionType et = coordAggTypes.get(i);
                 if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                     coordNode.updateAggregate(i, ExpressionType.AGGREGATE_HYPERLOGLOGS_TO_CARD);
+                }
+            }
+        }
+
+        if (hasRoaringCountDistinct) {
+            // Now, patch up any ROARING_COUNT_DISTINCT on the coordinating node.
+            List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
+            for (int i = 0; i < coordAggTypes.size(); ++i) {
+                ExpressionType et = coordAggTypes.get(i);
+                if (et == ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
+                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_ROARING_TO_CARDINALITY);
                 }
             }
         }
