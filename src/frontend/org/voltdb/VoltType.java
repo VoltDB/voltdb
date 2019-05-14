@@ -386,7 +386,7 @@ public enum VoltType {
 
     /** Size in bytes of the maximum length for a VoltDB field value, presumably a
      * <code>STRING</code> or <code>VARBINARY</code> */
-    public static final int MAX_VALUE_LENGTH = 1024 * 1024;
+    public static final int MAX_VALUE_LENGTH = 1024 * 1024 * 32;
     public static final int MAX_VALUE_LENGTH_IN_CHARACTERS = MAX_VALUE_LENGTH / 4;
 
     /** String representation of <code>MAX_VALUE_LENGTH</code>.
@@ -545,7 +545,7 @@ public enum VoltType {
     }
 
     /** Support class to represent optional value length variability. */
-    private static final class LengthRange {
+    public static final class LengthRange {
         private final int m_min;
         private final int m_max;
         private final int m_default;
@@ -571,7 +571,7 @@ public enum VoltType {
         // These constants should be kept up-to-date with those in DDLCompiler.
         // Don't reference DDLCompiler here since this class is used in the client.
         private static final int MAX_COLUMNS = 1024;
-        private static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+        private static final int MAX_ROW_SIZE = 1024 * 1024 * 64;
 
         private static final int DEFAULT_COLUMN_SIZE = MAX_ROW_SIZE / MAX_COLUMNS;
 

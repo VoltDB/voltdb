@@ -2759,7 +2759,7 @@ public class PlanAssembler {
                          */
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT
+                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
                                  agg_expression_type != ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).

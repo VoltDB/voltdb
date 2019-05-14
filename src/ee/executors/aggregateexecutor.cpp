@@ -492,7 +492,7 @@ public:
 class RoaringCountDistinctAgg : public Agg {
 public:
     RoaringCountDistinctAgg()
-        : m_roaring
+        : m_roaring()
     {
     }
 
@@ -502,20 +502,21 @@ public:
             return;
         }
 
-        std::size_t seed = 0;
-        val.hashCombine(seek)
+        size_t seed = 0;
+        val.hashCombine(seed);
         m_roaring.add(seed);
     }
 
     virtual NValue finalize(ValueType type)
     {
-        double cardinality = m_roaring.cardinality();
+        double cardinality = roaring().cardinality();
         return ValueFactory::getBigIntValue(static_cast<int64_t>(cardinality));
     }
 
     virtual void resetAgg()
     {
-        roaring().clear();
+        Roaring empty;
+        roaring().intersect(empty);
         Agg::resetAgg();
     }
 
@@ -526,7 +527,7 @@ protected:
 
 private:
 
-    Roaring roaring;
+    Roaring m_roaring;
 };
 
 
@@ -536,10 +537,10 @@ public:
     virtual NValue finalize(ValueType type)
     {
         assert (type == VALUE_TYPE_VARBINARY);
-        uint32_t byteSize =  r1.getSizeInBytes();
-        char *serializedbytes = new char[expectedsize];
+        uint32_t byteSize =  roaring().getSizeInBytes();
+        char *serializedBytes = new char[byteSize];
 
-        roaring().write(serializedbytes);
+        roaring().write(serializedBytes);
         return ValueFactory::getTempBinaryValue(serializedBytes, byteSize);
     }
 };

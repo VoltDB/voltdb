@@ -300,9 +300,14 @@ public class ExpressionAggregate extends Expression {
 
         if (currValue == null) {
             // A VoltDB extension APPROX_COUNT_DISTINCT
-            return opType == OpTypes.COUNT
-                || opType == OpTypes.APPROX_COUNT_DISTINCT ? ValuePool.INTEGER_0: null
-                || opType == OpTypes.ROARING_COUNT_DISTINCT ? ValuePool.INTEGER_0: null;
+            switch (opType) {
+                case OpTypes.COUNT:
+                case OpTypes.APPROX_COUNT_DISTINCT:
+                case OpTypes.ROARING_COUNT_DISTINCT:
+                    return ValuePool.INTEGER_0;
+                default:
+                    return null;
+            }
             /* disable 2 lines...
             return opType == OpTypes.COUNT ? ValuePool.INTEGER_0
                                            : null;
