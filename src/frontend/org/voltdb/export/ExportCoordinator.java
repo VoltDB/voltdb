@@ -686,8 +686,9 @@ public class ExportCoordinator {
         resetSafePoint();
     }
 
+    // The safe point is reset with mastership back to partition leader
     private void resetSafePoint() {
-        m_isMaster = false;
+        m_isMaster = isPartitionLeader();
         m_safePoint = 0L;
     }
 
@@ -981,7 +982,7 @@ public class ExportCoordinator {
         if (leaderTracker == null) {
             // This means that the leadership has been resolved but the
             // trackers haven't been gathered
-            return false;
+            return m_isMaster;
         }
 
         // Note: the trackers are truncated so the seqNo should not be past the first gap
@@ -1000,6 +1001,11 @@ public class ExportCoordinator {
                 exportLog.debug("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
             }
             return m_isMaster;
+        }
+
+        // Leader is not master
+        if (isPartitionLeader()) {
+            m_isMaster = false;
         }
 
         // Return the lowest hostId that can fill the gap
