@@ -18,7 +18,6 @@
 package org.voltdb.expressions;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
