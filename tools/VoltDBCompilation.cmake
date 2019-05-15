@@ -60,7 +60,7 @@ ENDIF()
 
 VOLTDB_ADD_COMPILE_OPTIONS(
   -Wall -Wextra -Werror -Woverloaded-virtual
-  -Wpointer-arith -Wwrite-strings
+  -Wpointer-arith -Wcast-qual -Wwrite-strings
   -Winit-self -Wno-sign-compare -Wno-unused-parameter
   -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
   -fno-omit-frame-pointer
