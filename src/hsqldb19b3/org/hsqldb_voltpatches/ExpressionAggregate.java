@@ -87,8 +87,8 @@ public class ExpressionAggregate extends Expression {
             case OpTypes.APPROX_COUNT_DISTINCT :
                 sb.append(' ').append(Tokens.T_APPROX_COUNT_DISTINCT).append('(');
                 break;
-            case OpTypes.ROARING_COUNT_DISTINCT :
-                sb.append(' ').append(Tokens.T_ROARING_COUNT_DISTINCT).append('(');
+            case OpTypes.COMPACT_COUNT_DISTINCT :
+                sb.append(' ').append(Tokens.T_COMPACT_COUNT_DISTINCT).append('(');
                 break;
             // End of VoltDB extension
             case OpTypes.SUM :
@@ -169,8 +169,8 @@ public class ExpressionAggregate extends Expression {
             case OpTypes.APPROX_COUNT_DISTINCT :
                 sb.append("APPROX_COUNT_DISTINCT ");
                 break;
-            case OpTypes.ROARING_COUNT_DISTINCT :
-                sb.append("ROARING_COUNT_DISTINCT ");
+            case OpTypes.COMPACT_COUNT_DISTINCT :
+                sb.append("COMPACT_COUNT_DISTINCT ");
                 break;
             // End of VoltDB extension
             case OpTypes.SUM :
@@ -303,7 +303,7 @@ public class ExpressionAggregate extends Expression {
             switch (opType) {
                 case OpTypes.COUNT:
                 case OpTypes.APPROX_COUNT_DISTINCT:
-                case OpTypes.ROARING_COUNT_DISTINCT:
+                case OpTypes.COMPACT_COUNT_DISTINCT:
                     return ValuePool.INTEGER_0;
                 default:
                     return null;

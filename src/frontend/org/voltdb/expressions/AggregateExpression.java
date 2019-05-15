@@ -80,8 +80,8 @@ public class AggregateExpression extends AbstractExpression {
             case AGGREGATE_COUNT_STAR:
             case AGGREGATE_APPROX_COUNT_DISTINCT:
             case AGGREGATE_HYPERLOGLOGS_TO_CARD:
-            case AGGREGATE_ROARING_COUNT_DISTINCT:
-            case AGGREGATE_ROARING_TO_CARDINALITY:
+            case AGGREGATE_COMPACT_COUNT_DISTINCT:
+            case AGGREGATE_COMPACT_TO_CARDINALITY:
                 //
                 // Always an integer
                 //
@@ -92,7 +92,7 @@ public class AggregateExpression extends AbstractExpression {
                 expr.m_valueType = VoltType.VARBINARY;
                 expr.m_valueSize = 65537;
                 break;
-            case AGGREGATE_VALUES_TO_ROARING:
+            case AGGREGATE_VALUES_TO_COMPACT:
                 expr.m_valueType = VoltType.VARBINARY;
                 expr.m_valueSize = VoltType.MAX_VALUE_LENGTH;
                 break;

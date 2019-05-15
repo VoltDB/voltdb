@@ -124,7 +124,7 @@ public class Expression {
         aggregateFunctionSet.add(OpTypes.COUNT);
         // A VoltDB extension APPROX_COUNT_DISTINCT
         aggregateFunctionSet.add(OpTypes.APPROX_COUNT_DISTINCT);
-        aggregateFunctionSet.add(OpTypes.ROARING_COUNT_DISTINCT);
+        aggregateFunctionSet.add(OpTypes.COMPACT_COUNT_DISTINCT);
 
         // End of VoltDB extension
         aggregateFunctionSet.add(OpTypes.SUM);
@@ -161,7 +161,7 @@ public class Expression {
         subqueryAggregateExpressionSet.add(OpTypes.COUNT);
         // A VoltDB extension APPROX_COUNT_DISTINCT
         subqueryAggregateExpressionSet.add(OpTypes.APPROX_COUNT_DISTINCT);
-        subqueryAggregateExpressionSet.add(OpTypes.ROARING_COUNT_DISTINCT);
+        subqueryAggregateExpressionSet.add(OpTypes.COMPACT_COUNT_DISTINCT);
 
         // End of VoltDB extension
         subqueryAggregateExpressionSet.add(OpTypes.SUM);
@@ -567,7 +567,7 @@ public class Expression {
             case OpTypes.COUNT :
             // A VoltDB extension APPROX_COUNT_DISTINCT
             case OpTypes.APPROX_COUNT_DISTINCT:
-            case OpTypes.ROARING_COUNT_DISTINCT:
+            case OpTypes.COMPACT_COUNT_DISTINCT:
             // End of VoltDB extension
             case OpTypes.SUM :
             case OpTypes.MIN :
@@ -622,7 +622,7 @@ public class Expression {
             case OpTypes.COUNT :
             // A VoltDB extension APPROX_COUNT_DISTINCT
             case OpTypes.APPROX_COUNT_DISTINCT:
-            case OpTypes.ROARING_COUNT_DISTINCT:
+            case OpTypes.COMPACT_COUNT_DISTINCT:
             // End of VoltDB extension
             case OpTypes.SUM :
             case OpTypes.MIN :
@@ -1549,7 +1549,7 @@ public class Expression {
         // unwindowed aggregate functions
         prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
         prototypes.put(OpTypes.APPROX_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "approx_count_distinct"));
-        prototypes.put(OpTypes.ROARING_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "roaring_count_distinct"));
+        prototypes.put(OpTypes.COMPACT_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "roaring_count_distinct"));
         prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
         prototypes.put(OpTypes.MIN,           (new VoltXMLElement("aggregation")).withValue("optype", "min"));
         prototypes.put(OpTypes.MAX,           (new VoltXMLElement("aggregation")).withValue("optype", "max"));

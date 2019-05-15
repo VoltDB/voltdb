@@ -2760,7 +2760,7 @@ public class PlanAssembler {
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
                                  agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
+                                 agg_expression_type != ExpressionType.AGGREGATE_COMPACT_COUNT_DISTINCT) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -3010,10 +3010,10 @@ public class PlanAssembler {
         assert (coordNode != null);
 
         // Patch up any APPROX_COUNT_DISTINCT on the distributed node.
-        // Patch up any ROARING_COUNT_DISTINCT on the distributed node.
+        // Patch up any COMPACT_COUNT_DISTINCT on the distributed node.
         List<ExpressionType> distAggTypes = distNode.getAggregateTypes();
         boolean hasApproxCountDistinct = false;
-        boolean hasRoaringCountDistinct = false;
+        boolean hasCompactCountDistinct = false;
         for (int i = 0; i < distAggTypes.size(); ++i) {
             ExpressionType et = distAggTypes.get(i);
             if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
@@ -3021,9 +3021,9 @@ public class PlanAssembler {
                 distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG);
             }
 
-            if (et == ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
-                hasRoaringCountDistinct = true;
-                distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALUES_TO_ROARING);
+            if (et == ExpressionType.AGGREGATE_COMPACT_COUNT_DISTINCT) {
+                hasCompactCountDistinct = true;
+                distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALUES_TO_COMPACT);
             }
         }
 
@@ -3038,13 +3038,13 @@ public class PlanAssembler {
             }
         }
 
-        if (hasRoaringCountDistinct) {
-            // Now, patch up any ROARING_COUNT_DISTINCT on the coordinating node.
+        if (hasCompactCountDistinct) {
+            // Now, patch up any COMPACT_COUNT_DISTINCT on the coordinating node.
             List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
             for (int i = 0; i < coordAggTypes.size(); ++i) {
                 ExpressionType et = coordAggTypes.get(i);
-                if (et == ExpressionType.AGGREGATE_ROARING_COUNT_DISTINCT) {
-                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_ROARING_TO_CARDINALITY);
+                if (et == ExpressionType.AGGREGATE_COMPACT_COUNT_DISTINCT) {
+                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_COMPACT_TO_CARDINALITY);
                 }
             }
         }

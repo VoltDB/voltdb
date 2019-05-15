@@ -489,9 +489,9 @@ public:
     }
 };
 
-class RoaringCountDistinctAgg : public Agg {
+class CompactCountDistinctAgg : public Agg {
 public:
-    RoaringCountDistinctAgg()
+    CompactCountDistinctAgg()
         : m_roaring()
     {
     }
@@ -532,7 +532,7 @@ private:
 
 
 /// Push-down aggregate
-class ValuesToRoaringAgg : public RoaringCountDistinctAgg {
+class ValuesToCompactAgg : public CompactCountDistinctAgg {
 public:
     virtual NValue finalize(ValueType type)
     {
@@ -546,7 +546,7 @@ public:
 };
 
 /// Pull-up aggregate
-class RoaringToCardinalityAgg : public RoaringCountDistinctAgg {
+class CompactToCardinalityAgg : public CompactCountDistinctAgg {
 public:
     virtual void advance(const NValue& val)
     {
@@ -597,12 +597,12 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
-    case EXPRESSION_TYPE_AGGREGATE_ROARING_COUNT_DISTINCT:
-        return new (memoryPool) RoaringCountDistinctAgg();
-    case EXPRESSION_TYPE_AGGREGATE_VALUES_TO_ROARING:
-        return new (memoryPool) ValuesToRoaringAgg();
-    case EXPRESSION_TYPE_AGGREGATE_ROARING_TO_CARDINALITY:
-        return new (memoryPool) RoaringToCardinalityAgg();
+    case EXPRESSION_TYPE_AGGREGATE_COMPACT_COUNT_DISTINCT:
+        return new (memoryPool) CompactCountDistinctAgg();
+    case EXPRESSION_TYPE_AGGREGATE_VALUES_TO_COMPACT:
+        return new (memoryPool) ValuesToCompactAgg();
+    case EXPRESSION_TYPE_AGGREGATE_COMPACT_TO_CARDINALITY:
+        return new (memoryPool) CompactToCardinalityAgg();
     default:
         {
             char message[128];

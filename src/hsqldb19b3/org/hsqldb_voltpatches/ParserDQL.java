@@ -1703,7 +1703,7 @@ public class ParserDQL extends ParserBase {
             case OpTypes.VAR_SAMP :
             // A VoltDB extension APPROX_COUNT_DISTINCT
             case OpTypes.APPROX_COUNT_DISTINCT :
-            case OpTypes.ROARING_COUNT_DISTINCT :
+            case OpTypes.COMPACT_COUNT_DISTINCT :
             // End of VoltDB extension
                 if (all || distinct) {
                     throw Error.error(ErrorCode.X_42582, all ? Tokens.T_ALL
@@ -2127,7 +2127,7 @@ public class ParserDQL extends ParserBase {
             case Tokens.EVERY :
             case Tokens.COUNT :
             case Tokens.APPROX_COUNT_DISTINCT :
-            case Tokens.ROARING_COUNT_DISTINCT :
+            case Tokens.COMPACT_COUNT_DISTINCT :
             case Tokens.MAX :
             case Tokens.MIN :
             case Tokens.SUM :
