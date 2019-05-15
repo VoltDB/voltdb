@@ -151,6 +151,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // This flag is specifically added for XDCR conflicts stream, which export conflict logs
     // on every host. Every data source with this flag set to true is an export master.
     private boolean m_runEveryWhere = false;
+    // This flag true if next poll needs a schema
+    private boolean m_forcePollSchema = false;
     // *Generation Id* is actually a timestamp generated during catalog update(UpdateApplicationBase.java)
     // genId in this class represents the genId of the most recent pushed buffer. If a new buffer contains
     // different genId than the previous value, the new buffer needs to be written to new PBD segment.
@@ -1191,6 +1193,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         // Put the poll aside until we become Export Master
                         m_pollTask = pollTask;
+                        // Next time we are Export Master, we must force a schema
+                        m_forcePollSchema = true;
                         return;
                     }
 
@@ -1234,12 +1238,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     clearGap(true);
                 }
+
+                // Create a container, forcing the schema as required by the poll() caller,
+                // or on first block after transition to Export Master (schema may have
+                // changed while we were not Export Master).
+
                 final AckingContainer ackingContainer = AckingContainer.create(
-                        this, first_unpolled_block, m_committedBuffers, pollTask.forcePollSchema());
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Posting Export data for " + ackingContainer.toString());
-                }
+                        this, first_unpolled_block, m_committedBuffers,
+                        pollTask.forcePollSchema() || m_forcePollSchema);
+                m_forcePollSchema = false;
+
                 try {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Posting Export data for " + ackingContainer.toString());
+                    }
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being
