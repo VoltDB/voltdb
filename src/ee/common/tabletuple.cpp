@@ -48,6 +48,7 @@
 #include "common/tabletuple.h"
 
 namespace voltdb {
+Json::FastWriter TableTuple::s_writer{};
 
 std::string TableTuple::debug(const std::string& tableName,
                               bool skipNonInline) const {

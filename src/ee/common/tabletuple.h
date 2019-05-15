@@ -448,8 +448,7 @@ public:
         for (int i = 0; i < totalColumns; i++) {
            array.append({getNValue(i).toString()});
         }
-        const auto result = writeJson(array);
-        return result;
+        return writeJson(array);
     }
 
     std::string toJsonString(const std::vector<std::string>& columnNames) const {
@@ -506,10 +505,10 @@ public:
     size_t hashCode() const;
 
 private:
+    static Json::FastWriter s_writer;
     static string writeJson(Json::Value const& val) {
-       static Json::FastWriter writer{};
-       writer.omitEndingLineFeed();
-       return writer.write(val);
+       s_writer.omitEndingLineFeed();
+       return std::string{s_writer.write(val)};
     }
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
