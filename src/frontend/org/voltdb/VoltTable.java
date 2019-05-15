@@ -139,9 +139,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     int m_rowCount = -1;
     int m_colCount = -1;
 
-    // cache column indexes for column names used for lookup
-    private HashMap<String, Integer> m_columnNameIndexMap;
-
     // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
     private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
 
@@ -726,19 +723,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     @Override
     public final int getColumnIndex(String name) {
 
-        if (m_columnNameIndexMap == null) {
-            m_columnNameIndexMap = new HashMap<String, Integer>(m_colCount);
+        if (m_columnNameIndexMap != null) {
+            Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
+            if (cachedIndex != null) {
+                return cachedIndex;
+            }
+        } else {
+            m_columnNameIndexMap = new HashMap<String,Integer>(m_colCount);
+        }
 
-            for (int i = 0; i < m_colCount; i++) {
-                m_columnNameIndexMap.put(getColumnName(i).toUpperCase(), Integer.valueOf(i));
+        assert(verifyTableInvariants());
+        for (int i = 0; i < m_colCount; i++) {
+            if (getColumnName(i).equalsIgnoreCase(name)) {
+                m_columnNameIndexMap.put(name.toUpperCase(), Integer.valueOf(i));
+                return i;
             }
         }
-
-        Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
-        if (cachedIndex != null) {
-            return cachedIndex;
-        }
-
         String msg = "No Column named '" + name + "'. Existing columns are:";
         for (int i = 0; i < m_colCount; i++) {
             msg += "[" + i + "]" + getColumnName(i) + ",";
