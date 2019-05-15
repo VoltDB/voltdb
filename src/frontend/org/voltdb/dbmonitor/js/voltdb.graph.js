@@ -174,13 +174,17 @@
             if(dataExporterDetails != undefined){
                 $.each(dataExporterDetails, function(key, value){
                     if(key == "TUPLE_COUNT"){
-                        var arr = [];
-                        arr.push(emptyData[0]);
-                        arr.push(emptyData[emptyData.length - 1]);
+                        $.each(value, function(dataType, dataTypeValue) {
+                            if(dataType != "TIMESTAMP") {
+                                var arr = [];
+                                arr.push(emptyData[0]);
+                                arr.push(emptyData[emptyData.length - 1]);
 
-                        tuplecounts.push({ key: key, values: arr, color: colorList[colorIndex] })
-                        dataMapper[key] = count;
-                        count++;
+                                tuplecounts.push({key: dataType, values: arr, color: colorList[colorIndex]})
+                                dataMapper[dataType] = count;
+                                count++;
+                            }
+                        });
                     }
                 });
             }
@@ -3208,7 +3212,7 @@
                 monitor.tupleCountFirstData = false;
                 if (tupleCountSecCount >= 6)
                     tupleCountSecCount = 0;
-                if (tupleCountsMinCount >= 60)
+                if (tupleCountMinCount >= 60)
                     tupleCountMinCount = 0;
                 if (graphView == 'Minutes')
                     dataTupleCount = tupleCountDataMin;

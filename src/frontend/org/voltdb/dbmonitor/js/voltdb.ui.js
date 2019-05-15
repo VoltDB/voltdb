@@ -1204,7 +1204,7 @@ var loadPage = function (serverName, portid) {
                     }
                 });
 
-                MonitorGraphUI.RefreshTupleCountGraph(exporterDetails, graphView, curTab);
+                MonitorGraphUI.RefreshTupleCountGraph(exporterDetails["TUPLE_COUNT"], graphView, curTab);
                 MonitorGraphUI.RefreshExporterGraph(VoltDbUI.getFromLocalStorage("exporter-graph-view"))
             } else {
                 if($("#navExporter").hasClass('active'))
