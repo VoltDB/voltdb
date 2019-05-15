@@ -139,9 +139,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     int m_rowCount = -1;
     int m_colCount = -1;
 
-    // cache column indexes for column names used for lookup
-    private HashMap<String, Integer> m_columnNameIndexMap;
-
     // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
     private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
 
