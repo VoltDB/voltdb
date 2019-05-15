@@ -1142,7 +1142,7 @@
                 d3.select('#visualisationTupleCount')
                     .datum([])
                     .transition().duration(500)
-                    .call(ChartOutTrans);
+                    .call(ChartTupleCount);
 
                 nv.utils.windowResize(ChartTupleCount.update);
             },
