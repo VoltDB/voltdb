@@ -505,10 +505,11 @@ public:
     size_t hashCode() const;
 
 private:
-    static Json::FastWriter s_writer;
     static string writeJson(Json::Value const& val) {
-       s_writer.omitEndingLineFeed();
-       return std::string{s_writer.write(val)};
+       // ENG-15989: FastWriter is not thread-safe, and therefore cannot be made static.
+       Json::FastWriter writer;
+       writer.omitEndingLineFeed();
+       return writer.write(val);
     }
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
