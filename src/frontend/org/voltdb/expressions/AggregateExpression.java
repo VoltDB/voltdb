@@ -94,7 +94,7 @@ public class AggregateExpression extends AbstractExpression {
                 break;
             case AGGREGATE_VALUES_TO_COMPACT:
                 expr.m_valueType = VoltType.VARBINARY;
-                expr.m_valueSize = VoltType.MAX_VALUE_LENGTH;
+                expr.m_valueSize = 1024 * 1024 * 8; // AbstractExpression enforces 10_000_000
                 break;
             case AGGREGATE_AVG:
             case AGGREGATE_MAX:

@@ -1,3 +1,5 @@
+#pragma GCC diagnostic ignored "-Wcast-qual"
+
 /* auto-generated on Mon 25 Feb 2019 16:08:20 EST. Do not edit! */
 #include "roaring.h"
 /* begin file /Users/lemire/CVS/github/CRoaring/cpp/roaring.hh */
@@ -92,7 +94,7 @@ class Roaring {
      * Add value x
      * Returns true if a new value was added, false if the value was already existing.
      */
-    bool addChecked(uint32_t x) { 
+    bool addChecked(uint32_t x) {
         return roaring_bitmap_add_checked(&roaring, x);
     }
 
@@ -271,7 +273,7 @@ class Roaring {
     }
     /**
      * to int array with pagination
-     * 
+     *
      */
     void rangeUint32Array(uint32_t *ans, size_t offset, size_t limit) const {
         roaring_bitmap_range_uint32_array(&roaring, offset, limit, ans);
@@ -410,18 +412,18 @@ class Roaring {
     *       namespace serialization {
     *
     *       template <class Archive>
-    *       void save(Archive& ar, const Roaring& bitmask, 
+    *       void save(Archive& ar, const Roaring& bitmask,
     *          const unsigned int version) {
     *         std::size_t expected_size_in_bytes = bitmask.getSizeInBytes();
     *         std::vector<char> buffer(expected_size_in_bytes);
     *         std::size_t       size_in_bytes = bitmask.write(buffer.data());
     *
     *         ar& size_in_bytes;
-    *         ar& boost::serialization::make_binary_object(buffer.data(), 
+    *         ar& boost::serialization::make_binary_object(buffer.data(),
     *             size_in_bytes);
     *      }
     *      template <class Archive>
-    *      void load(Archive& ar, Roaring& bitmask, 
+    *      void load(Archive& ar, Roaring& bitmask,
     *          const unsigned int version) {
     *         std::size_t size_in_bytes = 0;
     *         ar& size_in_bytes;

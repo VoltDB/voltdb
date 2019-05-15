@@ -1,3 +1,5 @@
+#pragma GCC diagnostic ignored "-Wcast-qual"
+
 /* auto-generated on Mon 25 Feb 2019 16:08:20 EST. Do not edit! */
 #include "roaring.h"
 

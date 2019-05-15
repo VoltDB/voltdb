@@ -1549,7 +1549,7 @@ public class Expression {
         // unwindowed aggregate functions
         prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
         prototypes.put(OpTypes.APPROX_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "approx_count_distinct"));
-        prototypes.put(OpTypes.COMPACT_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "roaring_count_distinct"));
+        prototypes.put(OpTypes.COMPACT_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "compact_count_distinct"));
         prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
         prototypes.put(OpTypes.MIN,           (new VoltXMLElement("aggregation")).withValue("optype", "min"));
         prototypes.put(OpTypes.MAX,           (new VoltXMLElement("aggregation")).withValue("optype", "max"));

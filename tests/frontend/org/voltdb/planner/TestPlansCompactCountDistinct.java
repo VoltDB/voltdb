@@ -156,44 +156,44 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT compact_count_distinct(num) from P1");
         assertEquals(2,  pn.size());
 
-        assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG), AGGREGATE_HYPERLOGLOGS_TO_CARD);
-        assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG), AGGREGATE_VALS_TO_HYPERLOGLOG);
+        assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG), AGGREGATE_COMPACT_TO_CARDINALITY);
+        assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG), AGGREGATE_VALUES_TO_COMPACT);
 
         // Two push-down-able aggs.
         pn = compileToFragments("SELECT compact_count_distinct(num), count(ratio) from P1");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // Three push-down-able aggs.
         pn = compileToFragments("SELECT compact_count_distinct(num), min(desc), max(ratio) from P1");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_MIN, AGGREGATE_MAX);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_MIN, AGGREGATE_MAX);
 
         // With an agg that can be pushed down, but only because its argument is a partition key.
         pn = compileToFragments("SELECT compact_count_distinct(num), count(distinct id) from P1");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // With an agg that can be pushed down, but only because its argument is a partition key.
         // Also, with compact count distinct with partition key as argument.
         pn = compileToFragments("SELECT compact_count_distinct(id), count(distinct id) from P1");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // With an agg that cannot be pushed down,
@@ -210,18 +210,18 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "from P1 "
                 + "group by desc");
         assertEquals(2,  pn.size());
-        assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG), AGGREGATE_HYPERLOGLOGS_TO_CARD);
-        assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG), AGGREGATE_VALS_TO_HYPERLOGLOG);
+        assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG), AGGREGATE_COMPACT_TO_CARDINALITY);
+        assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG), AGGREGATE_VALUES_TO_COMPACT);
 
         // Two push-down-able aggs.
         pn = compileToFragments("SELECT desc, compact_count_distinct(num), count(ratio) "
                 + "from P1 "
                 + "group by desc");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // A case similar to above.
@@ -230,10 +230,10 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "from P1 "
                 + "group by desc");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_MAX);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_MAX);
 
         // With an agg that can be pushed down, but only because its argument is a partition key.
@@ -242,10 +242,10 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "from P1 "
                 + "group by ratio");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // With an agg that can be pushed down, but only because its argument is a partition key.
@@ -255,10 +255,10 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "from P1 "
                 + "group by desc");
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD,
+                AGGREGATE_COMPACT_TO_CARDINALITY,
                 AGGREGATE_SUM);
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG,
+                AGGREGATE_VALUES_TO_COMPACT,
                 AGGREGATE_COUNT);
 
         // With partition key as group by key.
@@ -354,10 +354,10 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "  p1");
         assertEquals(2, pn.size());
         assertFragContainsAggWithFunctions(pn.get(COORDINATOR_FRAG),
-                AGGREGATE_HYPERLOGLOGS_TO_CARD);
+                AGGREGATE_COMPACT_TO_CARDINALITY);
         assertFragContainsTwoAggsWithFunctions(pn.get(PARTITION_FRAG),
                 new ExpressionType[] {AGGREGATE_COMPACT_COUNT_DISTINCT},
-                new ExpressionType[] {AGGREGATE_VALS_TO_HYPERLOGLOG});
+                new ExpressionType[] {AGGREGATE_VALUES_TO_COMPACT});
 
         // Like above but with some more aggregate functions
         // (which breaks the push-down-ability of distributed agg)
@@ -377,10 +377,10 @@ public class TestPlansCompactCountDistinct extends PlannerTestCase {
                 + "  t1");
         assertEquals(2, pn.size());
         assertFragContainsTwoAggsWithFunctions(pn.get(COORDINATOR_FRAG),
-                new ExpressionType[] {AGGREGATE_HYPERLOGLOGS_TO_CARD},
+                new ExpressionType[] {AGGREGATE_COMPACT_TO_CARDINALITY},
                 new ExpressionType[] {AGGREGATE_COMPACT_COUNT_DISTINCT});
         assertFragContainsAggWithFunctions(pn.get(PARTITION_FRAG),
-                AGGREGATE_VALS_TO_HYPERLOGLOG);
+                AGGREGATE_VALUES_TO_COMPACT);
 
         // Like above but with some more aggregate functions
         // (which breaks the push-down-ability of distributed agg)
