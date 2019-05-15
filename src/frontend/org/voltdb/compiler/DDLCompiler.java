@@ -115,9 +115,9 @@ import org.voltdb.utils.SQLCommand;
 public class DDLCompiler {
 
     public static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
-    public static final int MAX_ROW_SIZE = 1024 * 1024 * 64;
+    public static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     // These constants should be consistent with the definitions in VoltType.java
-    protected static final int MAX_VALUE_LENGTH = 1024 * 1024 * 32;
+    protected static final int MAX_VALUE_LENGTH = 1024 * 1024 * 1;
     private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     private final HSQLInterface m_hsql;
