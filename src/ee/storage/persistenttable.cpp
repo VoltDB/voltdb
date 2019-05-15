@@ -246,11 +246,9 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
             //Check if the block goes into the pending snapshot set of buckets
-            }
-            else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
-            }
-            else {
+            } else {
                 //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
                 //do nothing, once the block is finished by the iterator, the iterator will return it
             }
@@ -284,12 +282,10 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
         //Now check if it goes in with the others
-        }
-        else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+        } else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
-        }
-        else {
+        } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
@@ -806,6 +802,9 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     } catch (TupleStreamException const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
+    } catch (ConstraintFailureException const& e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
     }
     // NOTE: it is safe to assume that when ConstraintFailureException occurs,
     // no tuples had been added to target table.
@@ -818,6 +817,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
+        // Check for any constraint violations on indexes that contains SQL functions.
+        checkUpdateOnExpressions(source, allIndexes());
     }
 
     // Write to DR stream before everything else to ensure nothing gets left in
@@ -922,7 +923,6 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
       bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
     doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
-
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -991,8 +991,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
             throw ConstraintFailureException(
                   this, sourceTupleWithNewValues, targetTupleToUpdate, CONSTRAINT_TYPE_UNIQUE);
         }
-
-        checkUpdateOnExpressions(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate);
+        checkUpdateOnExpressions(sourceTupleWithNewValues, indexesToUpdate);
         /**
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
@@ -1538,8 +1537,8 @@ void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* confl
     }
 }
 
-void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
-      TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
+void PersistentTable::checkUpdateOnExpressions(TableTuple const& sourceTupleWithNewValues,
+      std::vector<TableIndex*> const& indexesToUpdate) {
    try {
       for (auto& index: indexesToUpdate) {
          for (auto& expr: index->getIndexedExpressions()) {

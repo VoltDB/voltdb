@@ -3115,8 +3115,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         // Not a null string: write it out
         if (type != VALUE_TYPE_GEOGRAPHY) {
             output.writeBytes(buf, length);
-        }
-        else {
+        } else {
             // geography gets its own serialization to deal with
             // byteswapping and endianness
             getGeographyValue().serializeTo(output);

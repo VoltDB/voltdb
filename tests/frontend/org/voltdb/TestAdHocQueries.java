@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import junit.framework.Assert;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
@@ -725,6 +726,40 @@ public class TestAdHocQueries extends AdHocQueryTester {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
+        }
+    }
+
+    @Test
+    public void testIndexFunction() {
+        // Test that tuple insert that violates index functions should not succeed.
+        final TestEnv env = new TestEnv("CREATE TABLE R3(i INTEGER NOT NULL, IPV6 VARCHAR(100));\n" +
+                "CREATE INDEX DIDR1 ON R3(INET6_ATON(IPV6));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    Pair.of("INSERT INTO R3 VALUES(0, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(1, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(2, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(3, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(4, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(5, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0:0:8a2e:370:7334');", true),
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true))
+                    .forEachOrdered(queryAndStatus -> {
+                        final String query = queryAndStatus.getFirst();
+                        final boolean success = queryAndStatus.getSecond();
+                        try {
+                            assertEquals(String.format("Query \"%s\" should have %s", query,
+                                    success ? "passed" : "failed"),
+                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
+                        }
+                    });
+        } finally {
+            env.tearDown();
         }
     }
 

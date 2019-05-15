@@ -240,7 +240,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         NValue value = exists ? m_existingTuple.getNValue(colindex) : m_searchKeyValue[colindex];
         m_updatedTuple.setNValue(colindex, value);
     }
-    m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
 
     int aggOffset = (int)m_groupByColumnCount;
     // m_aggExprs has complex aggregation operations which does not include COUNT(*)
@@ -299,6 +298,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
         assert(false);
     } else {
         int numCountStar = 0;
@@ -329,6 +329,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(1));
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
     }
 }
 

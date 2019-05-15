@@ -265,9 +265,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
     char answer[INET_ADDRSTRLEN + 1];
     answer[sizeof(answer)-1] = 0;
     if (inet_ntop(AF_INET, &addr, answer, sizeof(answer)) == 0) {
-        throw SQLException(SQLException::dynamic_sql_error,
-                           errno,
-                           "INET_NTOA Conversion error");
+        throw SQLException(SQLException::dynamic_sql_error, errno, "INET_NTOA Conversion error");
     }
     return getTempStringValue(answer, strlen(answer));
 }
@@ -340,9 +338,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     char dest[INET6_ADDRSTRLEN + 1];
     dest[sizeof(dest) - 1] = 0;
     if (inet_ntop(AF_INET6, (const void *)addr, dest, sizeof(dest)) == 0) {
-        throw SQLException(SQLException::dynamic_sql_error,
-                           errno,
-                           "INET6_NTOA Conversion error");
+        throw SQLException(SQLException::dynamic_sql_error, errno, "INET6_NTOA Conversion error");
     }
     return getTempStringValue(dest, strlen(dest));
 }

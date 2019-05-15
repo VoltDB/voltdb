@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREPERSISTENTTABLE_H
-#define HSTOREPERSISTENTTABLE_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -668,8 +667,8 @@ private:
 
     void tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict);
 
-    void checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
-          TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate);
+    void checkUpdateOnExpressions(TableTuple const& sourceTupleWithNewValues,
+          std::vector<TableIndex*> const& indexesToUpdate);
 
     bool checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
                                     TableTuple const& sourceTupleWithNewValues,
@@ -1076,8 +1075,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(ElasticIndexHashRange const& 
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
-                                                bool deleteLastEmptyBlock) {
+inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, bool deleteLastEmptyBlock) {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
 
@@ -1115,11 +1113,9 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
-        }
-        else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        }
-        else {
+        } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
@@ -1131,19 +1127,15 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
             // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
             m_data.erase(block->address());
             m_blocksWithSpace.erase(block);
-        }
-        else {
-            // In the unlikely event that tuplesPerBlock == 1
-            if (transitioningToBlockWithSpace) {
-                m_blocksWithSpace.insert(block);
-            }
+        } else if (transitioningToBlockWithSpace) {
+           // In the unlikely event that tuplesPerBlock == 1
+           m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    }
-    else if (transitioningToBlockWithSpace) {
+    } else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }
 }
@@ -1197,4 +1189,3 @@ inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
 
 }
 
-#endif
