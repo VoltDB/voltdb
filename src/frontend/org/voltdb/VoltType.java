@@ -545,7 +545,7 @@ public enum VoltType {
     }
 
     /** Support class to represent optional value length variability. */
-    public static final class LengthRange {
+    private static final class LengthRange {
         private final int m_min;
         private final int m_max;
         private final int m_default;
