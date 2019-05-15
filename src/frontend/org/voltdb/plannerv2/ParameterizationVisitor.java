@@ -99,7 +99,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         // Visit the operands in the order of their positions in the query.
         for (Pair<Integer, SqlNode> indexedOperand : indexedOperands) {
             SqlNode operand = indexedOperand.getSecond();
-            if (call instanceof SqlOrderBy && operand.equals(((SqlOrderBy) call).getOrderList())) {
+            if (call instanceof SqlOrderBy && operand.equals(((SqlOrderBy) call).orderList)) {
                 continue;
             }
             SqlNode convertedOperand = operand.accept(this);
