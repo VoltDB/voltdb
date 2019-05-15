@@ -1017,7 +1017,7 @@ public class ExportCoordinator {
         }
 
         Integer replicaId = NO_HOST_ID;
-        long leaderNextSafePoint = gap.getSecond() + 1;
+        long leaderNextSafePoint = gap.getSecond();
         long  replicaSafePoint = 0L;
 
         for (Integer hostId : m_trackers.keySet()) {
@@ -1034,7 +1034,9 @@ public class ExportCoordinator {
                 if (rgap == null) {
                     replicaSafePoint = INFINITE_SEQNO;
                 } else {
-                    replicaSafePoint = rgap.getSecond() + 1;
+                    // The next safe point of the replica is the last before the
+                    // replica gap
+                    replicaSafePoint = rgap.getFirst() -1;
                 }
                 break;
             }
