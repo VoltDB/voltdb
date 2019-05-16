@@ -78,6 +78,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         this.totalRangeSize = totalRangeSize;
         this.lastReportTime = overallStats.getStartTimeNanos();
         this.lastBalanceDuration = 0;
+        this.throughput = 0;
 
         startInterval();
 
