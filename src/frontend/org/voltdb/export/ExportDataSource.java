@@ -209,7 +209,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_forcePollSchema = forcePollSchema;
         }
 
-        public boolean forcePollSchema() {
+        public void setForcePollSchema(boolean force) {
+            m_forcePollSchema = force;
+        }
+
+        public boolean getForcePollSchema() {
             return m_forcePollSchema;
         }
 
@@ -220,6 +224,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public void setException(Throwable t) {
             m_pollFuture.setException(t);
         }
+
     }
 
     /**
@@ -1079,7 +1084,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (cont == null) {
             return false;
         }
-        if (cont.schema() == null && pollTask.forcePollSchema()) {
+        if (cont.schema() == null && pollTask.getForcePollSchema()) {
             // Ensure this first block has a schema
             BBContainer schemaContainer = m_committedBuffers.pollSchema();
             if (schemaContainer == null) {
@@ -1191,6 +1196,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         // Put the poll aside until we become Export Master
                         m_pollTask = pollTask;
+                        // Next time we are Export Master, we must force a schema
+                        m_pollTask.setForcePollSchema(true);
                         return;
                     }
 
@@ -1234,12 +1241,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     clearGap(true);
                 }
+
+                // Create a container, forcing the schema as required by the poll() caller,
+                // or on first block after transition to Export Master (schema may have
+                // changed while we were not Export Master).
+
                 final AckingContainer ackingContainer = AckingContainer.create(
-                        this, first_unpolled_block, m_committedBuffers, pollTask.forcePollSchema());
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Posting Export data for " + ackingContainer.toString());
-                }
+                        this, first_unpolled_block, m_committedBuffers,
+                        pollTask.getForcePollSchema());
+
                 try {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Posting Export data for " + ackingContainer.toString());
+                    }
                     pollTask.setFuture(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     // The {@code GuestProcessor} instance wasn't able to handle the future (e.g. being

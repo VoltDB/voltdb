@@ -448,8 +448,7 @@ public:
         for (int i = 0; i < totalColumns; i++) {
            array.append({getNValue(i).toString()});
         }
-        const auto result = writeJson(array);
-        return result;
+        return writeJson(array);
     }
 
     std::string toJsonString(const std::vector<std::string>& columnNames) const {
@@ -507,7 +506,8 @@ public:
 
 private:
     static string writeJson(Json::Value const& val) {
-       static Json::FastWriter writer{};
+       // ENG-15989: FastWriter is not thread-safe, and therefore cannot be made static.
+       Json::FastWriter writer;
        writer.omitEndingLineFeed();
        return writer.write(val);
     }

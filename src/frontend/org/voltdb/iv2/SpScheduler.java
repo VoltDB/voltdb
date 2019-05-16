@@ -498,7 +498,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
         }
-
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
@@ -519,7 +518,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             }
-
             /*
              * If this is CL replay use the txnid from the CL and also
              * update the txnid to match the one from the CL
@@ -1723,7 +1721,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         };
         if (hostLog.isDebugEnabled()) {
-            r.taskInfo = "Repair Log Truncate Message Handle:" + m_repairLogTruncationHandle;
+            r.taskInfo = "Repair Log Truncate Message Handle:" + TxnEgo.txnIdToString(m_repairLogTruncationHandle);
         }
         m_tasks.offer(r);
     }
@@ -1743,7 +1741,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void checkPointMigratePartitionLeader() {
         m_migratePartitionLeaderCheckPoint = getMaxScheduledTxnSpHandle();
         tmLog.info("MigratePartitionLeader checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                    " sphandle: " + m_migratePartitionLeaderCheckPoint);
+                    " sphandle: " + TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint));
     }
 
     public boolean txnDoneBeforeCheckPoint() {
@@ -1760,27 +1758,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     DuplicateCounter counter = m_duplicateCounters.get(dc);
                     builder.append(counter.m_openMessage + "\n");
                 }
-                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_migratePartitionLeaderCheckPoint + "\n" + builder.toString());
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" +
+                        TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint) + "\n" + builder.toString());
             }
             return false;
         }
         tmLog.info("MigratePartitionLeader previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                " has completed transactions before sphandle: " + m_migratePartitionLeaderCheckPoint);
+                " has completed transactions before sphandle: " + TxnEgo.txnIdToString(m_migratePartitionLeaderCheckPoint));
         m_migratePartitionLeaderCheckPoint = Long.MIN_VALUE;
         return true;
-    }
-
-    //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
-    //to allow the site to be promoted. Remove the sites on the new host from the replica list and
-    //update the duplicated counters after the host failure.
-    public void updateReplicasFromMigrationLeaderFailedHost(int failedHostId) {
-        List<Long> replicas = new ArrayList<>();
-        for (long hsid : m_replicaHSIds) {
-            if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {
-                replicas.add(hsid);
-            }
-        }
-        ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
     }
 
     // Because now in rejoin we rely on first fragment of stream snapshot to update the replica

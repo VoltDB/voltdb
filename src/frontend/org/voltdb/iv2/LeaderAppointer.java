@@ -203,14 +203,34 @@ public class LeaderAppointer implements Promotable
                                              false, null);
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
+                Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
                 if (missingHSIds.contains(m_currentLeader)) {
                     final long currentLeader = m_currentLeader;
-                    m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug(WHOMIM + "Determining new leader when missing for partition " + m_partitionId +
-                                " current leader:" + CoreUtils.hsIdToString(currentLeader) +
-                                " to " + CoreUtils.hsIdToString(m_currentLeader) + " from " +
-                                CoreUtils.hsIdCollectionToString(updatedHSIds));
+
+                    // When a promotion is in progress and the site in promotion is not on the failed hosts, should not
+                    // do another promotion.
+                    if (m_currentLeader == supposedNewLeader || missingHSIds.contains(supposedNewLeader)) {
+                        m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug(WHOMIM + "Determining new leader when missing for partition " + m_partitionId +
+                                    " current leader:" + CoreUtils.hsIdToString(currentLeader) +
+                                    " to " + CoreUtils.hsIdToString(m_currentLeader) + " from " +
+                                    CoreUtils.hsIdCollectionToString(updatedHSIds));
+                        }
+                    }
+                } else if (m_currentLeader != Long.MAX_VALUE){
+                    // When leader migration kicks in and the host for new partition leader fails before the partition completes promotion,
+                    // then, the partition leader stays on the old host and  m_currentLeader won't match
+                    // its appointee. The old leader won't go through the repair process as needed.
+                    boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
+                    if (m_currentLeader != supposedNewLeader && missingHSIds.contains(supposedNewLeader) && isMigrateRequested) {
+                        String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
+                        try {
+                            m_iv2appointees.put(m_partitionId, masterPair);
+                            tmLog.info(WHOMIM + " reinstate master for partition " + m_partitionId + " to " + CoreUtils.hsIdToString(m_currentLeader));;
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + m_partitionId, true, e);
+                        }
                     }
                 }
                 // If this partition doesn't have a leader yet, and we have new replicas added,

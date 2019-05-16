@@ -1104,13 +1104,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
-            assert determination.paused || !m_config.m_isPaused;
-            m_config.m_isPaused = determination.paused;
+            m_rejoining = m_config.m_startAction.doesRejoin();
+            if (!m_rejoining) {
+                assert (determination.paused || !m_config.m_isPaused);
+                m_config.m_isPaused = determination.paused;
+            } else if (m_config.m_isPaused) {
+                m_config.m_isPaused = false;
+                m_messenger.unpause();
+                hostLog.info("Rejoining a running cluster, ignore paused mode");
+            }
             m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            m_rejoining = m_config.m_startAction.doesRejoin();
             m_rejoinDataPending = m_config.m_startAction.doesJoin();
             m_meshDeterminationLatch.countDown();
             m_joining = m_config.m_startAction == StartAction.JOIN;
@@ -1842,11 +1848,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final int oldHostId = migratePartitionLeaderInfo.getOldLeaderHostId();
         final int newHostId = migratePartitionLeaderInfo.getNewLeaderHostId();
 
-        //if both old and new hosts fail or no one fails
-        if (failedHosts.contains(oldHostId) == failedHosts.contains(newHostId)) {
-            return;
-        }
-
         //The host which initiates MigratePartitionLeader is down before it gets chance to notify new leader that
         //all sp transactions are drained.
         //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
@@ -1856,15 +1857,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                           + CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
             ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
-        } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) { //The new leader is down, on old leader host:
-            int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(migratePartitionLeaderInfo.getPartitionId()));
-            SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
-            //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
-            if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
-                String msg = "The host with new partition leader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
-                hostLog.info(msg);
-                initiator.resetMigratePartitionLeaderStatus(newHostId);
-            }
+        } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
+            //The new leader is down, on old leader host:
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
         }
     }
