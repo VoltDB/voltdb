@@ -160,17 +160,20 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             // With no active UndoLog, there is no undo support.
             return;
         }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
         if (type == ExportTupleStream::MIGRATE && isDREnabled) {
             if (m_migrateTxnSizeGuard.undoToken == 0L) {
                 m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=
                         ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - mark);
-                std::cout << "streamTuple getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
+                std::cout << "streamTuple append mark=" << mark << " seqNo=" << currSequenceNo << " undo token = " << uq->getUndoToken()
+                          << " getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
             } else {
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=
                         ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - m_migrateTxnSizeGuard.uso);
-                std::cout << "streamTuple getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
-                if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
+                std::cout << "streamTuple append mark=" << mark << " seqNo=" << currSequenceNo << " undo token = " << uq->getUndoToken()
+                          << " getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
+                if (m_migrateTxnSizeGuard.estimatedDRLogSize >= /*voltdb::SECONDARY_BUFFER_SIZE*/2000) {
                     std::cout << "Exceeds max DR Buffer size." << std::endl;
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                                       "Exceeds max DR Buffer size.");
@@ -178,8 +181,6 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             }
             m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
         }
-        std::cout << "streamTuple append mark=" << mark << " undo token = " << uq->getUndoToken() << std::endl;
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
     }
 }
 
@@ -226,7 +227,7 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
-        std::cout << "undo rollbackTo mark=" << mark << " seqNo=" << seqNo << std::endl;
+        std::cout << "undo rollbackTo mark=" << mark << " seqNo=" << seqNo << " undoToken=" << getLastSeenUndoToken() << std::endl;
         if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
             m_migrateTxnSizeGuard.reset();
         }
