@@ -24,11 +24,11 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.Serializable;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
@@ -36,8 +36,6 @@ import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.collect.Maps;
 
 public class BalancePartitionsStatistics extends StatsSource {
     private static final VoltLogger log = new VoltLogger("ELASTIC");
@@ -51,8 +49,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     long balanceStart = 0;
 
     // Bytes transferred in each @BalancePartitions call in the past second.
-    // Keyed by nanosecond timestamp.
-    TreeMap<Long, Long> bytesTransferredInLastSec = Maps.newTreeMap();
+    ArrayDeque<DataTransfered> bytesTransferredInLastSec = new ArrayDeque<>();
     long throughput = 0;
     long lastTransferTimeNanos = 0;
 
@@ -98,12 +95,12 @@ public class BalancePartitionsStatistics extends StatsSource {
         lastBalanceDuration = balanceEnd - balanceStart;
 
         final long aSecondAgo = balanceEnd - TimeUnit.SECONDS.toNanos(1);
-        bytesTransferredInLastSec.put(balanceEnd, bytesTransferred);
+        bytesTransferredInLastSec.add(new DataTransfered(balanceEnd, bytesTransferred));
 
         // remove entries older than a second
         throughput += bytesTransferred;
-        while (bytesTransferredInLastSec.firstKey() < aSecondAgo) {
-            throughput -= bytesTransferredInLastSec.pollFirstEntry().getValue();
+        while (bytesTransferredInLastSec.peekFirst().m_timestamp < aSecondAgo) {
+            throughput -= bytesTransferredInLastSec.pollFirst().m_bytesTransferred;
         }
 
         lastTransferTimeNanos = transferTimeNanos;
@@ -191,7 +188,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         if (!bytesTransferredInLastSec.isEmpty()) {
             statsPoint = overallStats.capture(
                     "Point",
-                    bytesTransferredInLastSec.lastKey());
+                    bytesTransferredInLastSec.peekLast().m_timestamp);
         }
     }
 
@@ -448,7 +445,9 @@ public class BalancePartitionsStatistics extends StatsSource {
         public final static String formatTimeInterval(double dms)
         {
             long ldms = (long)dms;
-            if (ldms < 0) ldms = 0;
+            if (ldms < 0) {
+                ldms = 0;
+            }
 
             final long day = MILLISECONDS.toDays(ldms);
             final long hr  = MILLISECONDS.toHours(  ldms
@@ -540,6 +539,17 @@ public class BalancePartitionsStatistics extends StatsSource {
                     movedBytes, getMegabytesPerSecond(),
                     getInvocationLatencyMillis(), invocationCount,
                     getAverageInvocationLatency(), getAverageInvocationTime(), getAverageInvocationTransferTime());
+        }
+    }
+
+    private static final class DataTransfered {
+        final long m_timestamp;
+        final long m_bytesTransferred;
+
+        public DataTransfered(long m_timestamp, long m_bytesTransferred) {
+            super();
+            this.m_timestamp = m_timestamp;
+            this.m_bytesTransferred = m_bytesTransferred;
         }
     }
 }
