@@ -175,8 +175,8 @@ public class KafkaClientVerifier {
                 }
 
                 // do we need to update time inside the loop or is this sufficient?
-                LocalTime time = LocalTime.now();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                // LocalTime time = LocalTime.now();
+                // DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
                 for (ConsumerRecord<String, String> record : records) {
 
                     String smsg = record.value();
@@ -192,8 +192,8 @@ public class KafkaClientVerifier {
                     expectedRows.set(maxRow);
                     foundRowIds.add(rowNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
-                        System.out.printf(time.format(formatter));
-                        System.out.println(" Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
+                        // System.out.printf(time.format(formatter));
+                        System.out.println(timeString() + " Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
                                 + " Last row num: " + row[m_sequenceFieldNum] + ", txnid" + row[m_uniqueFieldNum] + ","
                                 + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
                     }
@@ -202,8 +202,8 @@ public class KafkaClientVerifier {
                         Integer partition = Integer.parseInt(row[m_partitionFieldNum].trim());
 
                         if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                            System.err.printf(time.format(formatter));
-                            System.err.println(" ERROR mismatched exported partition for txid " + rowTxnId
+                            // System.err.printf(time.format(formatter));
+                            System.err.println(timeString() + " ERROR mismatched exported partition for txid " + rowTxnId
                                     + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
                                     + ", while export record says " + partition);
 
@@ -215,10 +215,10 @@ public class KafkaClientVerifier {
 
             if (m_cdl != null) {
                 m_cdl.countDown();
-                LocalTime time = LocalTime.now();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
-                System.out.printf(time.format(formatter));
-                System.out.println(" Consumers still remaining: " + m_cdl.getCount());
+                // LocalTime time = LocalTime.now();
+                // DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                // System.out.printf(time.format(formatter));
+                System.out.println(timeString() + " Consumers still remaining: " + m_cdl.getCount());
             }
         }
     }
@@ -281,7 +281,7 @@ public class KafkaClientVerifier {
         System.out.println("All Consumer Creation Done...Waiting for EOS");
 
         // Wait for all consumers to consume and timeout.
-        System.out.println("Wait for drain of consumers.");
+        System.out.println(timeString() + " Wait for drain of consumers.");
         long cnt = 0;
         long wtime = System.currentTimeMillis();
         while (true) {
@@ -290,11 +290,11 @@ public class KafkaClientVerifier {
             if (cnt != consumedRows.get()) {
                 long delta = consumedRows.get() - cnt;
                 wtime = System.currentTimeMillis();
-                System.out.println("Train is still running, got " + delta + " more records");
+                System.out.println(timeString() + " Train is still running, got " + delta + " more records");
                 continue;
             }
             if ((System.currentTimeMillis() - wtime) > 60000) {
-                System.out.println("Waited long enough looks like train has stopped.");
+                System.out.println(timeString() + " Waited long enough looks like train has stopped.");
                 break;
             }
             if (consumersLatch.getCount() == 0) {
@@ -388,6 +388,12 @@ public class KafkaClientVerifier {
 
     static {
         VoltDB.setDefaultTimezone();
+    }
+
+    public static String timeString() {
+        LocalTime time = LocalTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+        return(time.format(formatter));
     }
 
     public static void main(String[] args) throws Exception {
