@@ -70,7 +70,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * batch passed to an ad-hoc query. Used for debugging and logging.
      */
     public static String adHocSQLFromInvocationForDebug(StoredProcedureInvocation invocation) {
-        assert(invocation.getProcName().startsWith("@AdHoc"));
+        assert(invocation.getProcName().startsWith("@AdHoc")) : invocation.getProcName();
         ParameterSet params = invocation.getParams();
         assert(params.size() == 2 || params.size() == 3);
         // the final param is the byte array we need
