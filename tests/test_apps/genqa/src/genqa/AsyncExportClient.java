@@ -45,6 +45,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -84,6 +86,7 @@ public class AsyncExportClient
         String m_nonce;
         String m_txnLogPath;
         AtomicLong m_count = new AtomicLong(0);
+        AtomicLong m_row_count = new AtomicLong(0); // TBD: will app need to track row count as part of end decision and pass/fail condition?
 
         private Map<Integer,File> m_curFiles = new TreeMap<>();
         private Map<Integer,File> m_baseDirs = new TreeMap<>();
@@ -218,6 +221,7 @@ public class AsyncExportClient
         final String procedure;
         final boolean exportGroups;
         final int exportTimeout;
+        final boolean usemigrate;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval = apph.longValue("displayinterval");
@@ -232,6 +236,7 @@ public class AsyncExportClient
             parsedServers   = servers.split(",");
             exportGroups    = apph.booleanValue("exportgroups");
             exportTimeout   = apph.intValue("timeout");
+            usemigrate      = apph.booleanValue("usemigrate");
         }
     }
 
@@ -285,6 +290,7 @@ public class AsyncExportClient
                 .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "false")
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
+                .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
                 .setArguments(args)
             ;
 
@@ -510,6 +516,8 @@ public class AsyncExportClient
     /**
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
+     **
+     * If usemigrate, prints table row count per cycle as well.
      */
     static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
         if (resetBaseline) {
@@ -524,14 +532,37 @@ public class AsyncExportClient
 
         if (stats == null) return;
 
-        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+        // long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+        // switch from app's runtime to clock time so results line up
+        // with apprunner if running in that framework
+        //long now = System.currentTimeMillis();
+        LocalTime time = LocalTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        // System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf(time.format(formatter));
+        System.out.printf(" Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
+
+        if (config.usemigrate) {
+            VoltTable rowcount = null;
+            try {
+                rowcount = clientRef.get().callProcedure("MigrateCount").getResults()[0];
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+            System.out.printf(time.format(formatter));
+            // System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+            System.out.printf(" Migration progress rows remaining");
+            while (rowcount.advanceRow()) {
+                System.out.printf(" %d\n", rowcount.getLong(0));
+            }
+        }
+
     }
 
     /**
@@ -550,9 +581,12 @@ public class AsyncExportClient
         Instant maxStatsTime = Instant.now().plusSeconds(60);
         long lastPending = 0;
         VoltTable stats = null;
+
+        // this is a problem -- Quiesce forces queuing but does NOT mean export is done
         try {
             System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
         }
         while (true) {
 
@@ -562,9 +596,10 @@ public class AsyncExportClient
             try {
                 stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
                 maxStatsTime = Instant.now().plusSeconds(60);
-            } catch (Exception ex) {
-                // Export Statistics are updated asynchronously and may not be upto date immediately on all hosts
-                //retry a few times if we don't get an answer
+            }
+            catch (Exception ex) {
+                // Export Statistics are updated asynchronously and may not be up to date immediately on all hosts
+                // retry a few times if we don't get an answer
                 System.err.println("Problem getting @Statistics export: "+ex.getMessage());
             }
             if (stats == null) {
@@ -583,9 +618,10 @@ public class AsyncExportClient
                     maxTime = Instant.now().plusSeconds(timeout);
                     pending = lastPending;
                 }
-                if (0 != pending ) {
-                    String stream = stats.getString("SOURCE");
-                    Long partition = stats.getLong("PARTITION_ID");
+                String stream = stats.getString("SOURCE");
+                Long partition = stats.getLong("PARTITION_ID");
+                System.out.println("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
+                if (pending != 0) {
                     passedThisTime = false;
                     System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
 

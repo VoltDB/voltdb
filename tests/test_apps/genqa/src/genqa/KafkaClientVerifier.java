@@ -35,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -55,7 +57,7 @@ import org.voltdb.iv2.TxnEgo;
  * Partition information will also be verified.  It expects that the voltdb partition in the
  * metadata fields matches the computed partition from org.voltdb.iv2.TxnEgo.
  *
- * it will also check that their are not too many duplicates.
+ * it will also check that there are not too many duplicates.
  *
  */
 public class KafkaClientVerifier {
@@ -172,6 +174,9 @@ public class KafkaClientVerifier {
                     break;
                 }
 
+                // do we need to update time inside the loop or is this sufficient?
+                LocalTime time = LocalTime.now();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
                 for (ConsumerRecord<String, String> record : records) {
 
                     String smsg = record.value();
@@ -180,13 +185,15 @@ public class KafkaClientVerifier {
                     String row[] = RoughCSVTokenizer.tokenize(smsg);
                     Long rowTxnId = Long.parseLong(row[m_uniqueFieldNum].trim());
                     Long rowNum = Long.parseLong(row[m_sequenceFieldNum]);
+
                     // the number of expected rows should match the max of the
                     // field that contains the seqeuence field
                     long maxRow = Math.max(expectedRows.get(), rowNum);
                     expectedRows.set(maxRow);
                     foundRowIds.add(rowNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
-                        System.out.println("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
+                        System.out.printf(time.format(formatter));
+                        System.out.println(" Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
                                 + " Last row num: " + row[m_sequenceFieldNum] + ", txnid" + row[m_uniqueFieldNum] + ","
                                 + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
                     }
@@ -195,7 +202,8 @@ public class KafkaClientVerifier {
                         Integer partition = Integer.parseInt(row[m_partitionFieldNum].trim());
 
                         if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                            System.err.println("ERROR mismatched exported partition for txid " + rowTxnId
+                            System.err.printf(time.format(formatter));
+                            System.err.println(" ERROR mismatched exported partition for txid " + rowTxnId
                                     + ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId)
                                     + ", while export record says " + partition);
 
@@ -207,7 +215,10 @@ public class KafkaClientVerifier {
 
             if (m_cdl != null) {
                 m_cdl.countDown();
-                System.out.println("Consumers still remaining: " + m_cdl.getCount());
+                LocalTime time = LocalTime.now();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+                System.out.printf(time.format(formatter));
+                System.out.println(" Consumers still remaining: " + m_cdl.getCount());
             }
         }
     }
