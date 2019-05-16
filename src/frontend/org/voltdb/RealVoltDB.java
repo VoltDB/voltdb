@@ -1104,13 +1104,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
-            assert determination.paused || !m_config.m_isPaused;
-            m_config.m_isPaused = determination.paused;
+            m_rejoining = m_config.m_startAction.doesRejoin();
+            if (!m_rejoining) {
+                assert (determination.paused || !m_config.m_isPaused);
+                m_config.m_isPaused = determination.paused;
+            } else if (m_config.m_isPaused) {
+                m_config.m_isPaused = false;
+                m_messenger.unpause();
+                hostLog.info("Rejoining a running cluster, ignore paused mode");
+            }
             m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            m_rejoining = m_config.m_startAction.doesRejoin();
             m_rejoinDataPending = m_config.m_startAction.doesJoin();
             m_meshDeterminationLatch.countDown();
             m_joining = m_config.m_startAction == StartAction.JOIN;
