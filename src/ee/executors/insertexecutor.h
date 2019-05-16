@@ -113,7 +113,7 @@ class InsertExecutor : public AbstractExecutor
         return m_targetTable;
     }
     char const* exceptionMessage() const {
-       return ! m_sourceIsPartitioned &&  ! s_errorMessage.empty() ?
+       return ! m_sourceIsPartitioned && ! s_errorMessage.empty() ?
           s_errorMessage.c_str() : nullptr;
     }
  protected:

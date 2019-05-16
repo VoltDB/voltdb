@@ -369,7 +369,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             // An exception was thrown on the lowest site thread and we need to throw here as well so
             // all threads are in the same state
             char msg[1024];
-            snprintf(msg, 1024, "Replicated?? table insert threw an unknown exception on other thread for table %s",
+            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
                     m_targetTable->name().c_str());
             VOLT_DEBUG("%s", msg);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
@@ -435,7 +435,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                   m_targetTable->name().c_str());
          }
          VOLT_DEBUG("%s", msg);
-         throw ConstraintFailureException(m_targetTable, inputTuple, msg);
+         // NOTE!!! Cannot throw any other types like ConstraintFailureException
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
       }
    }
 

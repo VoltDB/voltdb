@@ -65,22 +65,7 @@ using std::string;
 namespace voltdb {
 
 Table::Table(int tableAllocationTargetSize) :
-    m_tempTuple(),
-    m_schema(NULL),
-    m_columnNames(),
-    m_columnHeaderData(NULL),
-    m_columnHeaderSize(-1),
-    m_tupleCount(0),
-    m_tuplesPinnedByUndo(0),
-    m_columnCount(0),
-    m_tuplesPerBlock(0),
-    m_nonInlinedMemorySize(0),
-    m_databaseId(-1),
-    m_name(""),
-    m_ownsTupleSchema(true),
-    m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_refcount(0),
-    m_compactionThreshold(95)
+    m_tableAllocationTargetSize(tableAllocationTargetSize)
 {
 }
 
@@ -93,12 +78,9 @@ Table::~Table() {
         TupleSchema::freeTupleSchema(m_schema);
     }
 
-    m_schema = NULL;
-
     // clear any cached column serializations
     if (m_columnHeaderData)
         delete[] m_columnHeaderData;
-    m_columnHeaderData = NULL;
 }
 
 void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
@@ -264,7 +246,7 @@ size_t Table::getAccurateSizeToSerialize() {
     return bytes;
 }
 
-size_t Table::getColumnHeaderSizeToSerialize() const {
+size_t Table::getColumnHeaderSizeToSerialize() {
     // use a cache if possible
     if (m_columnHeaderData) {
         assert(m_columnHeaderSize != -1);
@@ -283,7 +265,7 @@ size_t Table::getColumnHeaderSizeToSerialize() const {
         bytes += columnName(i).size();
     }
 
-    return bytes;
+    return m_columnHeaderSize = bytes;
 }
 
 
@@ -294,18 +276,15 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
        bug in tables of single integers, make sure that's correct.
     */
 
-    // skip header position
-    std::size_t start;
-
+    assert((m_columnHeaderSize == -1) == (m_columnHeaderData == nullptr));
     // use a cache
     if (m_columnHeaderData) {
-        assert(m_columnHeaderSize != -1);
         serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
         return;
     }
-    assert(m_columnHeaderSize == -1);
 
-    start = serialOutput.position();
+    // skip header position
+    std::size_t const start = serialOutput.position();
 
     // skip header position
     serialOutput.writeInt(-1);
@@ -338,7 +317,7 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
 
 
     // write the header size which is a non-inclusive int
-    size_t position = serialOutput.position();
+    size_t const position = serialOutput.position();
     m_columnHeaderSize = static_cast<int32_t>(position - start);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
     serialOutput.writeIntAt(start, nonInclusiveHeaderSize);

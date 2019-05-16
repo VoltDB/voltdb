@@ -297,6 +297,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         }
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
     } else {
         int numCountStar = 0;
         // A new group row gets its initial agg values copied directly from the first source row
@@ -327,7 +328,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
-    m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_updatableIndexList, fallible);
 }
 
 void MaterializedViewTriggerForInsert::setDestTable(PersistentTable * dest) {

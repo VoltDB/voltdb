@@ -817,8 +817,6 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
-        // Check for any constraint violations on indexes that contains SQL functions.
-        checkUpdateOnExpressions(source, allIndexes());
     }
 
     // Write to DR stream before everything else to ensure nothing gets left in
@@ -855,8 +853,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     TableTuple conflict(m_schema);
     try {
-        tryInsertOnAllIndexes(&target, &conflict);
-    } catch (SQLException& e) {
+        tryInsertOnAllIndexes(&target, &conflict);    // Also evaluates if the index update might throw
+    } catch (std::exception const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
@@ -1062,7 +1060,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
      */
     const bool someIndexGotUpdated = !indexesToUpdate.empty();
     bool indexRequiresUpdate[indexesToUpdate.size()];
-    if (indexesToUpdate.size()) {
+    if (someIndexGotUpdated) {
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex* index = indexesToUpdate[i];
             if (!index->keyUsesNonInlinedMemory() || index->isPartialIndex()) {
@@ -1515,26 +1513,28 @@ void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
     }
 }
 
+void PersistentTable::rollbackIndexChanges(TableTuple* tuple, int upto) {
+   for(int i = 0; i < upto; ++i) {
+      m_indexes[i]->deleteEntry(tuple);
+   }
+}
+
 void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict) {
-    for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
-       try {
-          m_indexes[i]->addEntry(tuple, conflict);
-       } catch (SQLException const& e) {    // ENG-15047, when inserting a value that causes Inf, the exception is SQLException. Clean up the mess.
-          for (int j = 0; j < i; ++j) {
-             m_indexes[j]->deleteEntry(tuple);
-          }
-          throw;
-       }
-        FAIL_IF(!conflict->isNullTuple()) {
-            VOLT_DEBUG("Failed to insert into index %s,%s",
-                       m_indexes[i]->getTypeName().c_str(),
-                       m_indexes[i]->getName().c_str());
-            for (int j = 0; j < i; ++j) {
-                m_indexes[j]->deleteEntry(tuple);
-            }
+   int i = 0;
+   try {
+      for (; i < indexCount(); ++i) {
+         m_indexes[i]->addEntry(tuple, conflict);
+         FAIL_IF(!conflict->isNullTuple()) {
+            VOLT_DEBUG("Failed to insert into index %s,%s", m_indexes[i]->getTypeName().c_str(),
+                  m_indexes[i]->getName().c_str());
+            rollbackIndexChanges(tuple, i);
             return;
-        }
-    }
+         }
+      }
+   } catch (std::exception const& e) {
+      rollbackIndexChanges(tuple, i);
+      throw;
+   }
 }
 
 void PersistentTable::checkUpdateOnExpressions(TableTuple const& sourceTupleWithNewValues,
@@ -1545,14 +1545,14 @@ void PersistentTable::checkUpdateOnExpressions(TableTuple const& sourceTupleWith
             expr->eval(&sourceTupleWithNewValues, nullptr);
          }
       }
-   } catch (SQLException const& e) {
+   } catch (SQLException const& e) {   // TODO: is this necessary?
       throw ConstraintFailureException(this, sourceTupleWithNewValues, e.what());
    }
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
       TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
-    BOOST_FOREACH (auto index, indexesToUpdate) {
+    for(auto const* index: indexesToUpdate) {
         if (index->isUniqueIndex()) {
             if (index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues) == false)
                 continue; // no update is needed for this index

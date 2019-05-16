@@ -352,8 +352,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
 template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET6_ATON function");
-    }
-    if (isNull()) {
+    } else if (isNull()) {
         return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
@@ -361,9 +360,10 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     const char *addr_str = getObject_withoutNull(addrlen);
     if (INET6_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
-        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: "
-           << addrlen;
+        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: " << addrlen;
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    } else {
+       throwDataExceptionIfInfiniteOrNaN(0, "function LN");
     }
     // Copy the string out to cbuff so we can
     // null terminate it for inet_pton.
@@ -374,9 +374,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     // Let inet_pton do the validation.
     if (inet_pton(AF_INET6, cbuff, (void*)&addr) == 0) {
         std::stringstream sb;
-        sb << "Unrecognized format for IPv6 address string <"
-           << cbuff
-           << ">";
+        sb << "Unrecognized format for IPv6 address string <" << cbuff << ">";
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
     return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*) &addr, sizeof(addr), getTempStringPool());

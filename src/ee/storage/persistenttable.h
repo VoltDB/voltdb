@@ -227,6 +227,7 @@ private:
             std::vector<std::string> const& columnNames,
             bool ownsTupleSchema,
             int32_t compactionThreshold = 95);
+    void rollbackIndexChanges(TableTuple* tuple, int upto);
 
 public:
     virtual ~PersistentTable();
