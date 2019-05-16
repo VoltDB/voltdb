@@ -97,9 +97,8 @@ public class BalancePartitionsStatistics extends StatsSource {
         final long balanceEnd = System.nanoTime();
         lastBalanceDuration = balanceEnd - balanceStart;
 
-        final long now = System.nanoTime();
-        final long aSecondAgo = now - TimeUnit.SECONDS.toNanos(1);
-        bytesTransferredInLastSec.put(now, bytesTransferred);
+        final long aSecondAgo = balanceEnd - TimeUnit.SECONDS.toNanos(1);
+        bytesTransferredInLastSec.put(balanceEnd, bytesTransferred);
 
         // remove entries older than a second
         throughput += bytesTransferred;
@@ -129,8 +128,8 @@ public class BalancePartitionsStatistics extends StatsSource {
         markStatsPoint();
 
         // Close out the interval and log statistics every logIntervalSeconds seconds.
-        if (now - lastReportTime > logIntervalNanos && now != lastReportTime) {
-            lastReportTime = now;
+        if (balanceEnd - lastReportTime > logIntervalNanos && balanceEnd != lastReportTime) {
+            lastReportTime = balanceEnd;
             endInterval();
         }
     }
@@ -435,7 +434,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getAverageInvocationLatency()
         {
             //Convert to floating point millis
-            return invocationCount == 0 ? 0.0 : getInvocationLatencyMillis() / (double)invocationCount;
+            return invocationCount == 0 ? 0.0 : getInvocationLatencyMillis() / invocationCount;
         }
 
         public double getAverageInvocationTime() {
