@@ -339,6 +339,7 @@ public class PlannerTool {
                                                  corePlan,
                                                  ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
                                                  null);
+                cacheUse = CacheUse.HIT2;
             } else {
                 //////////////////////
                 // PLAN THE STMT
