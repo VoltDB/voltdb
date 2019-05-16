@@ -235,8 +235,8 @@ public class TestExportCoordinator extends ZKTestBase {
             assertFalse(ec0.isExportMaster(101L));
             assertTrue(ec1.isExportMaster(101L));
 
-            assertFalse(ec0.isExportMaster(200L));
-            assertTrue(ec1.isExportMaster(200L));
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
 
             assertTrue(ec0.isExportMaster(201L));
             assertFalse(ec1.isExportMaster(201L));
@@ -260,6 +260,182 @@ public class TestExportCoordinator extends ZKTestBase {
             fail();
         }
     }
+
+    // THis is an image of an actual test failure
+    @Test
+    public void test2NodesWithGap1() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(973L, 973L);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(973L, 991L);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ec0.initialize();
+            ec1.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertFalse(ec0.isExportMaster(974L));
+            assertTrue(ec1.isExportMaster(974L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+
+            // Simulate ack at 991
+            assertTrue(ec0.isSafePoint(991L));
+            assertTrue(ec1.isSafePoint(991L));
+
+            // Leader is back to master
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertTrue(ec0.isExportMaster(992L));
+            assertFalse(ec1.isExportMaster(992L));
+
+            ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    @Test
+    public void test2NodesWithGapSafePoints() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(1L, 100L);
+            tracker0.append(200L, 300L);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(1L, 300L);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ec0.initialize();
+            ec1.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            // Check the leader is export master up to the gap
+            // and verify replica becomes master, then leader
+            // gets mastership past the gap. Simulate the ack paths
+            assertTrue(ec0.isExportMaster(1L));
+            assertFalse(ec1.isExportMaster(1L));
+
+            // Simulate safe point management via acks and verify mastership
+            assertFalse(ec0.isSafePoint(10L));
+            assertFalse(ec1.isSafePoint(10L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertTrue(ec0.isSafePoint(100L));
+            assertTrue(ec1.isSafePoint(100L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            // Ec1 covers the gap until safe point 200L
+            assertFalse(ec0.isExportMaster(101L));
+            assertTrue(ec1.isExportMaster(101L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+
+            assertFalse(ec0.isSafePoint(150L));
+            assertFalse(ec1.isSafePoint(150L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+
+            // Ec0 (leader) regains mastership
+            assertTrue(ec0.isSafePoint(199L));
+            assertTrue(ec1.isSafePoint(199L));
+
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+
+            assertTrue(ec0.isExportMaster(300L));
+            assertFalse(ec1.isExportMaster(300L));
+
+            assertFalse(ec0.isSafePoint(300L));
+            assertFalse(ec1.isSafePoint(300L));
+
+            assertTrue(ec0.isExportMaster(1000L));
+            assertFalse(ec1.isExportMaster(1000L));
+
+            assertFalse(ec0.isSafePoint(1000L));
+            assertFalse(ec1.isSafePoint(1000L));
+
+            ec0.shutdown();
+            ec1.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+
 
     @Test
     public void test2NodesWithLeaderInitialGap() {
@@ -307,8 +483,8 @@ public class TestExportCoordinator extends ZKTestBase {
             assertFalse(ec0.isExportMaster(10L));
             assertTrue(ec1.isExportMaster(10L));
 
-            assertFalse(ec0.isExportMaster(200L));
-            assertTrue(ec1.isExportMaster(200L));
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
 
             assertTrue(ec0.isExportMaster(201L));
             assertFalse(ec1.isExportMaster(201L));
@@ -405,11 +581,15 @@ public class TestExportCoordinator extends ZKTestBase {
             assertTrue(ec1.isExportMaster(101L));
             assertFalse(ec2.isExportMaster(101L));
 
-            assertFalse(ec0.isExportMaster(200L));
-            assertTrue(ec1.isExportMaster(200L));
-            assertFalse(ec2.isExportMaster(200L));
+            assertFalse(ec0.isExportMaster(199L));
+            assertTrue(ec1.isExportMaster(199L));
+            assertFalse(ec2.isExportMaster(199L));
 
             // Leader regains mastership
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
+            assertFalse(ec2.isExportMaster(200L));
+
             assertTrue(ec0.isExportMaster(201L));
             assertFalse(ec1.isExportMaster(201L));
             assertFalse(ec2.isExportMaster(101L));
@@ -425,6 +605,300 @@ public class TestExportCoordinator extends ZKTestBase {
             assertTrue(ec0.isExportMaster(1000L));
             assertFalse(ec1.isExportMaster(1000L));
             assertFalse(ec2.isExportMaster(1000L));
+
+            ec0.shutdown();
+            ec1.shutdown();
+            ec2.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+            eds2.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    // Test handing over mastership 0 -> 1 -> 2 -> 0
+    @Test
+    public void test3Nodes_0_1_2_0() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(1L, 100L);
+            tracker0.append(200L, 400L);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(1L, 130L);
+            tracker1.append(250L, 400L);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            ExportSequenceNumberTracker tracker2 = new ExportSequenceNumberTracker();
+            tracker2.append(1L, 70L);
+            tracker2.append(100L, 400L);
+            ExportDataSource eds2 = mockDataSource(0, tracker2);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ExportCoordinator ec2 = new ExportCoordinator(
+                    m_messengers.get(2).getZK(),
+                    stateMachineManagerRoot,
+                    2,
+                    eds2,
+                    true);
+
+            ec0.initialize();
+            ec1.initialize();
+            ec2.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady() || !ec2.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            // Check the leader is export master up to the gap,
+            // Check that host 1 starts filling the gap until its own gap
+            assertTrue(ec0.isExportMaster(1L));
+            assertFalse(ec1.isExportMaster(1L));
+            assertFalse(ec2.isExportMaster(1L));
+
+            assertTrue(ec0.isSafePoint(100L));
+            assertTrue(ec1.isSafePoint(100L));
+            assertTrue(ec2.isSafePoint(100L));
+
+            assertFalse(ec0.isExportMaster(101L));
+            assertTrue(ec1.isExportMaster(101L));
+            assertFalse(ec2.isExportMaster(101L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertFalse(ec0.isExportMaster(110L));
+            assertTrue(ec1.isExportMaster(110L));
+            assertFalse(ec2.isExportMaster(110L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertTrue(ec0.isSafePoint(130L));
+            assertTrue(ec1.isSafePoint(130L));
+            assertTrue(ec2.isSafePoint(130L));
+
+            // Host 1 hits his gap, host 2 fills until leader safe point
+            assertFalse(ec0.isExportMaster(131L));
+            assertFalse(ec1.isExportMaster(131L));
+            assertTrue(ec2.isExportMaster(131L));
+
+            assertFalse(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertTrue(ec2.isMaster());
+
+            assertFalse(ec0.isExportMaster(150L));
+            assertFalse(ec1.isExportMaster(150L));
+            assertTrue(ec2.isExportMaster(150L));
+
+            assertFalse(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertTrue(ec2.isMaster());
+
+            assertTrue(ec0.isSafePoint(199L));
+            assertTrue(ec1.isSafePoint(199L));
+            assertTrue(ec2.isSafePoint(199L));
+
+            // Leader regains mastership until forever
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
+            assertFalse(ec2.isExportMaster(200L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertTrue(ec0.isExportMaster(2000L));
+            assertFalse(ec1.isExportMaster(2000L));
+            assertFalse(ec2.isExportMaster(2000L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+
+            ec0.shutdown();
+            ec1.shutdown();
+            ec2.shutdown();
+
+            eds0.getExecutorService().shutdown();
+            eds1.getExecutorService().shutdown();
+            eds2.getExecutorService().shutdown();
+        }
+        catch (InterruptedException e) {
+            fail();
+        }
+    }
+
+    // Test handing over mastership 0 -> 1 -> 2 -> 1 -> 0
+    @Test
+    public void test3Nodes_0_1_2_1_0() {
+
+        try {
+            ExportSequenceNumberTracker tracker0 = new ExportSequenceNumberTracker();
+            tracker0.append(1L, 100L);
+            tracker0.append(200L, 400L);
+            ExportDataSource eds0 = mockDataSource(0, tracker0);
+
+            ExportSequenceNumberTracker tracker1 = new ExportSequenceNumberTracker();
+            tracker1.append(1L, 130L);
+            tracker1.append(170L, 400L);
+            ExportDataSource eds1 = mockDataSource(0, tracker1);
+
+            ExportSequenceNumberTracker tracker2 = new ExportSequenceNumberTracker();
+            tracker2.append(1L, 70L);
+            tracker2.append(90L, 180L);
+            tracker2.append(300L, 400L);
+            ExportDataSource eds2 = mockDataSource(0, tracker2);
+
+            // Note: use the special constructors for JUnit
+            ExportCoordinator ec0 = new ExportCoordinator(
+                    m_messengers.get(0).getZK(),
+                    stateMachineManagerRoot,
+                    0,
+                    eds0,
+                    true);
+
+            ExportCoordinator ec1 = new ExportCoordinator(
+                    m_messengers.get(1).getZK(),
+                    stateMachineManagerRoot,
+                    1,
+                    eds1,
+                    true);
+
+            ExportCoordinator ec2 = new ExportCoordinator(
+                    m_messengers.get(2).getZK(),
+                    stateMachineManagerRoot,
+                    2,
+                    eds2,
+                    true);
+
+            ec0.initialize();
+            ec1.initialize();
+            ec2.initialize();
+
+            ec0.becomeLeader();
+            while(!ec0.isTestReady() || !ec1.isTestReady() || !ec2.isTestReady()) {
+                Thread.yield();
+            }
+
+            // Check leadership
+            assertTrue(ec0.isPartitionLeader());
+
+            // Check the leader is export master up to the gap,
+            // Check that host 1 starts filling the gap until its own gap
+            assertTrue(ec0.isExportMaster(1L));
+            assertFalse(ec1.isExportMaster(1L));
+            assertFalse(ec2.isExportMaster(1L));
+
+            assertTrue(ec0.isSafePoint(100L));
+            assertTrue(ec1.isSafePoint(100L));
+            assertTrue(ec2.isSafePoint(100L));
+
+            assertFalse(ec0.isExportMaster(101L));
+            assertTrue(ec1.isExportMaster(101L));
+            assertFalse(ec2.isExportMaster(101L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertFalse(ec0.isExportMaster(110L));
+            assertTrue(ec1.isExportMaster(110L));
+            assertFalse(ec2.isExportMaster(110L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertTrue(ec0.isSafePoint(130L));
+            assertTrue(ec1.isSafePoint(130L));
+            assertTrue(ec2.isSafePoint(130L));
+
+            // Host 1 hits his gap, host 2 fills until its own safe point
+            assertFalse(ec0.isExportMaster(131L));
+            assertFalse(ec1.isExportMaster(131L));
+            assertTrue(ec2.isExportMaster(131L));
+
+            assertFalse(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertTrue(ec2.isMaster());
+
+            assertFalse(ec0.isExportMaster(150L));
+            assertFalse(ec1.isExportMaster(150L));
+            assertTrue(ec2.isExportMaster(150L));
+
+            assertFalse(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertTrue(ec2.isMaster());
+
+            assertTrue(ec0.isSafePoint(180L));
+            assertTrue(ec1.isSafePoint(180L));
+            assertTrue(ec2.isSafePoint(180L));
+
+            // Host 1 resumes mastership until leader safe point
+            assertFalse(ec0.isExportMaster(181L));
+            assertTrue(ec1.isExportMaster(181L));
+            assertFalse(ec2.isExportMaster(181L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertFalse(ec0.isExportMaster(190L));
+            assertTrue(ec1.isExportMaster(190L));
+            assertFalse(ec2.isExportMaster(190L));
+
+            assertFalse(ec0.isMaster());
+            assertTrue(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertTrue(ec0.isSafePoint(199L));
+            assertTrue(ec1.isSafePoint(199L));
+            assertTrue(ec2.isSafePoint(199L));
+
+            // Leader regains mastership until forever
+            assertTrue(ec0.isExportMaster(200L));
+            assertFalse(ec1.isExportMaster(200L));
+            assertFalse(ec2.isExportMaster(200L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
+            assertTrue(ec0.isExportMaster(2000L));
+            assertFalse(ec1.isExportMaster(2000L));
+            assertFalse(ec2.isExportMaster(2000L));
+
+            assertTrue(ec0.isMaster());
+            assertFalse(ec1.isMaster());
+            assertFalse(ec2.isMaster());
+
 
             ec0.shutdown();
             ec1.shutdown();

@@ -686,8 +686,9 @@ public class ExportCoordinator {
         resetSafePoint();
     }
 
+    // The safe point is reset with mastership back to partition leader
     private void resetSafePoint() {
-        m_isMaster = false;
+        m_isMaster = isPartitionLeader();
         m_safePoint = 0L;
     }
 
@@ -981,7 +982,7 @@ public class ExportCoordinator {
         if (leaderTracker == null) {
             // This means that the leadership has been resolved but the
             // trackers haven't been gathered
-            return false;
+            return m_isMaster;
         }
 
         // Note: the trackers are truncated so the seqNo should not be past the first gap
@@ -1002,6 +1003,11 @@ public class ExportCoordinator {
             return m_isMaster;
         }
 
+        // Leader is not master
+        if (isPartitionLeader()) {
+            m_isMaster = false;
+        }
+
         // Return the lowest hostId that can fill the gap
         assert (gap != null);
         if (exportLog.isDebugEnabled()) {
@@ -1011,7 +1017,7 @@ public class ExportCoordinator {
         }
 
         Integer replicaId = NO_HOST_ID;
-        long leaderNextSafePoint = gap.getSecond() + 1;
+        long leaderNextSafePoint = gap.getSecond();
         long  replicaSafePoint = 0L;
 
         for (Integer hostId : m_trackers.keySet()) {
@@ -1028,7 +1034,9 @@ public class ExportCoordinator {
                 if (rgap == null) {
                     replicaSafePoint = INFINITE_SEQNO;
                 } else {
-                    replicaSafePoint = rgap.getSecond() + 1;
+                    // The next safe point of the replica is the last before the
+                    // replica gap
+                    replicaSafePoint = rgap.getFirst() -1;
                 }
                 break;
             }
