@@ -1092,7 +1092,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
-    @Test(timeout = 60_000)
+    @Test(timeout = 120_000)
     public void testRejoinWithOnlyAStream() throws Exception {
         SocketExportTestServer socketServer = new SocketExportTestServer(5001);
 
