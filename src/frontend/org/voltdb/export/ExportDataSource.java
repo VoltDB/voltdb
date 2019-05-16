@@ -151,8 +151,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // This flag is specifically added for XDCR conflicts stream, which export conflict logs
     // on every host. Every data source with this flag set to true is an export master.
     private boolean m_runEveryWhere = false;
-    // This flag true if next poll needs a schema
-    private boolean m_forcePollSchema = false;
     // *Generation Id* is actually a timestamp generated during catalog update(UpdateApplicationBase.java)
     // genId in this class represents the genId of the most recent pushed buffer. If a new buffer contains
     // different genId than the previous value, the new buffer needs to be written to new PBD segment.
@@ -211,7 +209,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_forcePollSchema = forcePollSchema;
         }
 
-        public boolean forcePollSchema() {
+        public void setForcePollSchema(boolean force) {
+            m_forcePollSchema = force;
+        }
+
+        public boolean getForcePollSchema() {
             return m_forcePollSchema;
         }
 
@@ -222,6 +224,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public void setException(Throwable t) {
             m_pollFuture.setException(t);
         }
+
     }
 
     /**
@@ -1081,7 +1084,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (cont == null) {
             return false;
         }
-        if (cont.schema() == null && pollTask.forcePollSchema()) {
+        if (cont.schema() == null && pollTask.getForcePollSchema()) {
             // Ensure this first block has a schema
             BBContainer schemaContainer = m_committedBuffers.pollSchema();
             if (schemaContainer == null) {
@@ -1194,7 +1197,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         // Put the poll aside until we become Export Master
                         m_pollTask = pollTask;
                         // Next time we are Export Master, we must force a schema
-                        m_forcePollSchema = true;
+                        m_pollTask.setForcePollSchema(true);
                         return;
                     }
 
@@ -1245,8 +1248,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                 final AckingContainer ackingContainer = AckingContainer.create(
                         this, first_unpolled_block, m_committedBuffers,
-                        pollTask.forcePollSchema() || m_forcePollSchema);
-                m_forcePollSchema = false;
+                        pollTask.getForcePollSchema());
 
                 try {
                     if (exportLog.isDebugEnabled()) {
