@@ -40,7 +40,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.Socket;
 import java.net.URL;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -3212,13 +3211,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String hostname = hostAndPort.getHost();
         int port = hostAndPort.getPort();
         
-        try {
-            (new Socket(hostname, m_config.m_port)).close();
-            consoleLog.info("There is already a connection on this port");
-            System.exit(-1);
-        } catch (Exception e) {  
+        // try {
+        //     (new Socket(hostname, m_config.m_port)).close();
+        //     consoleLog.info("There is already a connection on this port");
+        //     System.exit(-1);
+        // } catch (Exception e) {  
         
-        }
+        // }
            
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;

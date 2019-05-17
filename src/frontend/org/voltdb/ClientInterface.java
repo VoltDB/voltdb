@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
@@ -110,6 +111,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google.common.net.InetAddresses;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
@@ -308,8 +310,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 try {
                     if (m_interface != null) {
                         m_serverSocket.socket().bind(new InetSocketAddress(m_interface, m_port));
+                        /*byte[] addr = m_interface.getAddress();
+                        Inet6Address ipv6_address = Inet6Address.getByAddress("localhost", addr, 0);
+                        Inet4Address ipv4_address = InetAddresses.getCompatIPv4Address(ipv6_address);
+                        byte[] new_addr = ipv4_address.getAddress();
+                        InetAddress new_m_interface = InetAddress.getByAddress(new_addr);
+                        m_serverSocket.socket().bind(new InetSocketAddress(new_m_interface, m_port));*/
+                        //(new Socket(m_interface, m_port)).close();
                     } else {
+                        System.setProperty("java.net.preferIPv4Stack" , "true");
+                        System.setProperty("java.net.preferIPv6Addresses", "false");
                         m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                        //(new Socket("localhost", m_port)).close();
+                        // VoltDB.crashLocalVoltDB(m_serverSocket.socket().getInetAddress().getHostName(),
+                        //     false, new IOException());
+                        // (new Socket(m_serverSocket.socket().getInetAddress(), m_port)).close();
+
                     }
                 }
                 catch (IOException e) {
