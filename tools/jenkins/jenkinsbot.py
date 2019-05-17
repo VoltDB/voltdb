@@ -43,7 +43,7 @@ JUNIT = os.environ.get('junit', None)
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
 # TODO: change this back to 'ENG', before merging to master
-JIRA_PROJECT = os.environ.get('jiraproject', 'FAUX')
+JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
 # Queries
 
