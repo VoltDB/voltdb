@@ -26,7 +26,6 @@
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
 #include "ConstraintFailureException.h"
-#include "logging/LogManager.h"
 
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -106,26 +105,8 @@ StreamedTable::~StreamedTable() {
 // Stream writes were done so commit all the writes
 void StreamedTable::notifyQuantumRelease() {
     if (m_wrapper) {
-        {
-            char errMsg[1024];
-            snprintf(errMsg,
-                     1024,
-                     "notifyQuantumRelease m_lastSeenUndoToken=%lld partition=%d",
-                     getLastSeenUndoToken(), m_executorContext->getPartitionId());
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-        }
-        //std::cout << "notifyQuantumRelease m_lastSeenUndoToken=" << getLastSeenUndoToken() << std::endl;
         if (m_migrateTxnSizeGuard.undoToken == getLastSeenUndoToken()) {
             m_migrateTxnSizeGuard.reset();
-            {
-                char errMsg[1024];
-                snprintf(errMsg,
-                         1024,
-                         "notifyQuantumRelease clear migrateTxnSize partition=%d",
-                         m_executorContext->getPartitionId());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-            }
-            //std::cout << "notifyQuantumRelease clear migrateTxnSize" << std::endl;
         }
         m_wrapper->commit(m_executorContext->getContextEngine(),
                 m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
@@ -183,43 +164,12 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
                 m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=
                         ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - mark);
-                //std::cout << "streamTuple append mark=" << mark << " seqNo=" << currSequenceNo << " undo token = " << uq->getUndoToken()
-                //          << " getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
-                {
-                    char errMsg[1024];
-                    snprintf(errMsg,
-                             1024,
-                             "streamTuple append mark=%jd seqNo=%lld undoToken=%lld getEstimateDRLogSize=%d partition=%d",
-                             mark, currSequenceNo, uq->getUndoToken(), m_migrateTxnSizeGuard.estimatedDRLogSize,
-                             m_executorContext->getPartitionId());
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-                }
             } else {
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=
                         ExportTupleStream::getEstimateDRLogSize(m_wrapper->getUso() - m_migrateTxnSizeGuard.uso);
-                //std::cout << "streamTuple append mark=" << mark << " seqNo=" << currSequenceNo << " undo token = " << uq->getUndoToken()
-                //          << " getEstimateDRLogSize=" << m_migrateTxnSizeGuard.estimatedDRLogSize << std::endl;
-                {
-                    char errMsg[1024];
-                    snprintf(errMsg,
-                             1024,
-                             "streamTuple append mark=%jd seqNo=%lld undoToken=%lld getEstimateDRLogSize=%d partition=%d",
-                             mark, currSequenceNo, uq->getUndoToken(), m_migrateTxnSizeGuard.estimatedDRLogSize,
-                             m_executorContext->getPartitionId());
-                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-                }
                 if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
-                    //std::cout << "Exceeds max DR Buffer size." << std::endl;
-                    {
-                        char errMsg[1024];
-                        snprintf(errMsg,
-                                 1024,
-                                 "Exceeds max DR Buffer size. partition=%d",
-                                 m_executorContext->getPartitionId());
-                        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-                    }
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                      "Exceeds max DR Buffer size.");
+                                                      "Migrate transaction failed, exceeding 50MB DR buffer size limit.");
                 }
             }
             m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
@@ -270,15 +220,6 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
-        //std::cout << "undo rollbackTo mark=" << mark << " seqNo=" << seqNo << " undoToken=" << getLastSeenUndoToken() << std::endl;
-        {
-            char errMsg[1024];
-            snprintf(errMsg,
-                     1024,
-                     "undo rollbackTo mark=%jd seqNo=%lld undoToken=%lld partition=%d",
-                     mark, seqNo, getLastSeenUndoToken(), m_executorContext->getPartitionId());
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
-        }
         if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
             m_migrateTxnSizeGuard.reset();
         }
