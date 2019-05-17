@@ -808,7 +808,7 @@ tr:hover{
                              jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                              project=JIRA_PROJECT):
         """
-        Finds (exactly) one existing, open bug tickets in Jira.
+        Finds (exactly) one existing, open bug ticket in Jira.
         :param summary_keys: One or more substrings of the Summary, used to
                find a related, open Jira ticket; typically the first one is the Test Suite in which the failed
                test exists, and the second is the name of the test itself.
@@ -869,8 +869,9 @@ tr:hover{
             return False
 
 
-    def get_jira_components(self, component, jira, project=JIRA_PROJECT):
-        jira_component = 'Core'  # default, since Components is a required field
+    def get_jira_component_list(self, jira, component='Core',
+                                project=JIRA_PROJECT):
+        jira_component = component
 
         components = jira.project_components(project)
         for c in components:
@@ -883,8 +884,9 @@ tr:hover{
         return [jira_component]
 
 
-    def get_jira_versions(self, version, jira, project=JIRA_PROJECT):
-        jira_version = 'Backlog'  # default, since Versions is a required field
+    def get_jira_version_list(self, jira, version='Backlog',
+                              project=JIRA_PROJECT):
+        jira_version = version
 
         if not version.startswith('V') and self.is_number(version):
             version = 'V' + version
@@ -959,8 +961,8 @@ tr:hover{
             'labels': labels
         }
 
-        issue_dict['components'] = self.get_jira_components(component, jira, project)
-        issue_dict['versions']   = self.get_jira_versions(version, jira, project)
+        issue_dict['components'] = self.get_jira_component_list(jira, component, project)
+        issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
 
         issue_dict['fixVersions'] = [{'name':'Backlog'}]
         issue_dict['priority']    = {'name': priority}
