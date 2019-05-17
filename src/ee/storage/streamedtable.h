@@ -37,6 +37,8 @@ class MaterializedViewTriggerForStreamInsert;
 
 class MigrateTxnSizeGuard {
 public:
+    MigrateTxnSizeGuard()
+        :undoToken(0L),uso(0L),estimatedDRLogSize(0) {}
     inline void reset() {
         undoToken = 0L;
         uso = 0L;
