@@ -783,11 +783,19 @@ tr:hover{
             jira = self.get_jira_interface(user, passwd)
             logging.debug('    jira        : '+str(jira))
 
-        summary_partial_query = 'summary ~ ' + ' AND summary ~ '.join(summary_keys)
-        labels_partial_query = ' AND labels = ' + ' AND labels = '.join(labels)
+        summary_partial_query = "summary ~ '" + "' AND summary ~ '".join(summary_keys)
+        labels_partial_query = ''
+        if labels:
+            labels_partial_query = "' AND labels = '" + "' AND labels = '".join(labels)
         full_jira_query = (summary_partial_query + labels_partial_query
-                           + " AND project = '%s' AND status != Closed") % project
-        tickets = jira.search_issues(full_jira_query)
+                           + "' AND project = '%s' AND status != Closed") % project
+        tickets = []
+        try:
+            tickets = jira.search_issues(full_jira_query)
+        except Exception as e:
+            logging.exception('Jira ticket query failed with Exception:'
+                              '\n    %s\n    using Jira query:\n    %s'
+                              % (str(e), full_jira_query) )
 
         logging.debug('    summary_partial_query: '+summary_partial_query)
         logging.debug('    full_jira_query:\n    '+str(full_jira_query))
@@ -957,13 +965,19 @@ tr:hover{
         issue_dict['fixVersions'] = [{'name':'Backlog'}]
         issue_dict['priority']    = {'name': priority}
 
-        self.logger.debug("Filing ticket with summary:\n%s" % summary)
+        logging.debug("Filing ticket with summary:\n%s" % summary)
         logging.debug('  issue_dict  :\n    '+str(issue_dict))
 
         if DRY_RUN:
             new_issue = None
         else:
-            new_issue = jira.create_issue(fields=issue_dict)
+            try:
+                new_issue = jira.create_issue(fields=issue_dict)
+            except Exception as e:
+                logging.exception("Jira ticket creation failed with Exception:"
+                                  "\n    %s\n    using:\n    %s"
+                                  % (str(e), str(issue_dict)) )
+                return new_issue
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -986,7 +1000,7 @@ tr:hover{
             comment = ("Filed ticket due to %s, build #%s%s."
                        % (jenkins_job, build_number, with_attachments) )
             jira.add_comment(new_issue.key, comment)
-            logging.debug(logging_message)
+            logging.info(logging_message)
 
             # Post a message in the specified slack channel (if any)
             try:
@@ -1017,7 +1031,8 @@ tr:hover{
 
     def get_modified_description(self, old_description, new_description_pieces,
                                  num_chars_for_partial_match=12,
-                                 ignore_partial_match_for_last_n_pieces=1):
+                                 ignore_partial_match_for_last_n_pieces=1,
+                                 max_num_chars_per_description_piece=5000):
         """Interweaves an old (Jira bug ticket) description with new description
            pieces; essentially, parts of the old description that match new
            description pieces will remain unchanged, but preceded first by parts
@@ -1075,17 +1090,27 @@ tr:hover{
         # Interweave the non-matching and matching old_description parts
         # and new_description_pieces
         new_description = ''
-        old_desc_index = 0
-        new_desc_index = 0
+        old_desc_index = 0    # index in a string (of characters)
+        new_desc_index = 0    # index in a list (of strings)
         for msi in matching_substring_indexes:
             logging.debug('    msi: '+str(msi))
+
+            new_desc_end_index = msi['ndpi'] + 1
+            # Special case: if a partially matching new_description_piece is
+            # extremely long, skip it; this can sometimes avoid exceeding Jira's
+            # maximum description size (32,767 characters)
+            if ( not msi['full'] and len(new_description_pieces[msi['ndpi']])
+                                         > max_num_chars_per_description_piece ):
+                new_desc_end_index = msi['ndpi']
+
             # Add in any parts of the old_description that we haven't used yet,
             # and which precede the current match (full or partial); and elements
             # of the new_description_pieces that we haven't used yet, up to and
             # including the one that matches (fully or partially)
             new_description = ( new_description
                 + old_description[old_desc_index:msi['odsi']]
-                + ''.join(new_description_pieces[i] for i in range(new_desc_index, msi['ndpi']+1)) )
+                + ''.join(new_description_pieces[i][:max_num_chars_per_description_piece]
+                          for i in range(new_desc_index, new_desc_end_index)) )
             # henceforth, ignore the new_description_pieces that we've now used
             new_desc_index = msi['ndpi'] + 1
             # henceforth, ignore the parts of the old_description that we've now used...
@@ -1188,13 +1213,28 @@ tr:hover{
         if ticket_to_modify and not DRY_RUN:
             # Update the Jira ticket's summary, description, etc.
             previous_summary = ticket_to_modify.fields.summary
-            new_description = self.get_modified_description(ticket_to_modify.fields.description, descriptions)
-            ticket_to_modify.update(fields={'summary'    : summary,
-                                            'description': new_description,
-                                            'fixVersions': [{"set":[{"name" : version}]}],
-                                            'labels'     : labels,
-                                            'priority'   : {'name': priority}
-                                            })
+            old_description  = ticket_to_modify.fields.description
+            new_description  = self.get_modified_description(old_description, descriptions)
+            try:
+                ticket_to_modify.update(fields={'summary'    : summary,
+                                                'description': new_description,
+                                                'fixVersions': [{"set":[{"name" : version}]}],
+                                                'labels'     : labels,
+                                                'priority'   : {'name': priority}
+                                                })
+            except Exception as e:
+                logging.exception("Jira ticket update failed with Exception:\n    %s"
+                                  "\n    for Jira ticket %s, using:"
+                                  "\n    version '%s', priority '%s', labels %s;"
+                                  "\n    old and new summaries:\n    '%s'\n    '%s'"
+                                  "\n    old description:\n    %s"
+                                  "\n    new description pieces:\n    %s"
+                                  "\n    new (combined) description:\n    %s\n"
+                                  % (str(e), str(ticket_to_modify.key),
+                                     version, priority, str(labels),
+                                     previous_summary, summary, old_description,
+                                     str(descriptions), new_description) )
+                return ticket_to_modify
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -1355,7 +1395,12 @@ tr:hover{
         if ticket_to_close and not DRY_RUN:
             transitions = jira.transitions(ticket_to_close)
             logging.info("Available transitions for ticket '"+str(ticket_to_close)+"':\n"+str(transitions))
-            jira.transition_issue(ticket_to_close, transition='Close Issue')
+            try:
+                jira.transition_issue(ticket_to_close, transition='Close Issue')
+            except Exception as e:
+                logging.exception("Closing Jira ticket %s failed with Exception:\n    %s"
+                                  % (str(ticket_to_close.key), str(e)) )
+                return ticket_to_close
 
             logging_message = ("Closed ticket %s (https://issues.voltdb.com/browse/%s), "
                                "with summary:\n    '%s'"

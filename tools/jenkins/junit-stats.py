@@ -94,12 +94,17 @@ JENKINS_JOB_NICKNAMES = {
 BAD_URL_PREFIX  = 'ci:8080'
 GOOD_URL_PREFIX = 'ci.voltdb.lan:8080'
 
+# Use to modify URLs by changing problematic characters into underscores
+from string import maketrans
+TT = maketrans("[]-<> ", "______")
+
+# Print a log (info) message after every group of this many test cases are processed
+# (in each "run" of a build, e.g. junit_other_p4 vs. junit_regression_h2)
+LOG_MESSAGE_EVERY_NUM_TEST_CASES = 200
+
 # TODO: possibly obsolete?? :
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
-
-from string import maketrans
-TT = maketrans("[]-<>", "_____")
 
 # TODO: probably obsolete:
 QUERY1 = """
@@ -213,6 +218,17 @@ class Stats(object):
         logging.getLogger('').addHandler(console)
         logging.info("starting... %s" % sys.argv)
 
+
+    def fix_url(self, url):
+        """
+        :param url: url to download data from
+        :return: TODO
+        """
+        if not url:
+            return None
+        return GOOD_URL_PREFIX.join(url.split(BAD_URL_PREFIX))
+
+
     def read_url(self, url, ignore404=False):
         """
         :param url: url to download data from
@@ -221,7 +237,7 @@ class Stats(object):
         logging.debug('In read_url:')
         logging.debug('    url: '+url)
 
-        url = GOOD_URL_PREFIX.join(url.split(BAD_URL_PREFIX))
+        url = self.fix_url(url)
         logging.debug('    url: '+url)
 
         data = None
@@ -530,7 +546,7 @@ class Stats(object):
         logging.debug('  note         : '+str(note))
         logging.debug('  history(0)   : '+str(history))
 
-        history = GOOD_URL_PREFIX.join(history.split(BAD_URL_PREFIX))
+        history = self.fix_url(history)
         logging.debug('  history(1)   : '+str(history))
 
         summary = issue['type']+' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
@@ -839,7 +855,9 @@ class Stats(object):
                 # single job report we already retrieved.
                 for run in job_report.get('runs', [job_report]):
 
-                    logging.info('run: %s' % str(run))
+                    run['url'] = self.fix_url(run.get('url'))
+                    logging.info('run:  number: %s;  url: %s'
+                                 % (str(run.get('number')), str(run.get('url')) ))
 
                     # very strange but sometimes there is a run from a different build??
                     if run['number'] != build:
@@ -849,8 +867,6 @@ class Stats(object):
 
                     if build != int(run['url'].split('/')[-2]):
                         raise RuntimeError("build # not correct %s %s" % (build, run['url']))
-
-                    run['url'] = GOOD_URL_PREFIX.join(run['url'].split(BAD_URL_PREFIX))
 
                     tr_url = run['url'] + "testReport/api/python"
                     child = self.read_url(tr_url, True)
@@ -904,6 +920,7 @@ class Stats(object):
                     suites = child['suites']
                     #logging.debug('suites: %s' % suites)
 
+                    count_test_cases = 0
                     for suite in suites:
                         cases = suite['cases']
                         test_stamp = suite.get('timestamp', None)
@@ -989,7 +1006,8 @@ class Stats(object):
                             # We need to record 'FIXED' and 'FAILED' and 'REGRESSION'
                             # in the 'qa' database, but not 'PASSED'
                             if status != 'PASSED':
-                                logging.info("working on: %s %s %s %s %s" % (job,build,fullTestName,status,url))
+                                logging.info('working on  : %s, %s, %s; %s; %s'
+                                             % (build, status, fullTestName, job, url) )
 
                                 # record test results to database (with issue url)
                                 # if an issue was filed, its url will be recorded in the database
@@ -1131,6 +1149,11 @@ class Stats(object):
                                                             cursor, fullTestName, job, build,
                                                             previous_ticket_description):
                                         self.close_jira_issue(test_data, DRY_RUN)
+
+                            count_test_cases = count_test_cases + 1
+                            if not (count_test_cases % LOG_MESSAGE_EVERY_NUM_TEST_CASES):
+                                logging.info('     - processed %d test cases (in %s)'
+                                             % (count_test_cases, str(run.get('url'))) )
 
             except KeyError:
                 logging.exception('Error retrieving test data for this particular build: %d\n' % build)
@@ -1284,8 +1307,8 @@ if __name__ == '__main__':
     stats = Stats()
     job = os.environ.get('job', None)
     build_range = os.environ.get('build_range', None)
-    process_passed = os.environ.get('process_passed', False)
-    post_to_slack  = os.environ.get('post_to_slack', False)
+    process_passed = os.environ.get('process_passed', None)
+    post_to_slack  = os.environ.get('post_to_slack', None)
 
     if len(args) > 1:
         job = args[1]
@@ -1302,9 +1325,9 @@ if __name__ == '__main__':
     process_passed = isTruthy(process_passed)
     post_to_slack  = isTruthy(post_to_slack)
 
-    logging.info('Processing job: '+str(job)+'; build range: '+str(build_range)
-                 +'; process passed: '+str(process_passed)+'; post to slack: '+str(post_to_slack))
-    failurePercent = 0
+    logging.info('Processing job: %s;  build range: %s;\n'
+                 '    process tests that passed: %s;  post to slack: %s'
+                 % (job, build_range, str(process_passed), str(post_to_slack)) )
 
     stats.get_build_data(job, build_range, process_passed,
                          post_to_slack, file_jira_ticket=not DRY_RUN)
