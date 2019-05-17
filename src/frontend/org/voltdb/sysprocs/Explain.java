@@ -22,17 +22,47 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 public class Explain extends AdHocNTBase {
+    private AdHocNTBaseContext m_context = new AdHocNTBaseContext();
 
+    /**
+     * Run an AdHoc explain batch through Calcite parser and planner. If there is
+     * anything that Calcite cannot handle, we will let it fall back to the
+     * legacy parser and planner.
+     *
+     * @param params the user parameters. The first parameter is always the query
+     *               text. The rest parameters are the ones used in the queries.
+     *               </br>
+     * @return the client response.
+     * @author Chao Zhou
+     * @since 9.1
+     */
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        SqlBatch batch;
+        try {
+            // We do not need to worry about the ParameterSet,
+            // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
+            batch = SqlBatch.from(params, m_context, ExplainMode.EXPLAIN_ADHOC);
+            return batch.execute();
+        } catch (PlannerFallbackException | SqlParseException ex) {
+            // Use the legacy planner to run this.
+            return runFallback(params);
+        } catch (Exception ex) {
+            // For now, let's just fail the batch if any error happens.
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
+        }
+    }
 
+    public CompletableFuture<ClientResponse> runFallback(ParameterSet params) {
         // dispatch common
-
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
         Object[] userParams = null;
@@ -66,13 +96,12 @@ public class Explain extends AdHocNTBase {
 
         // assume all DML/DQL at this point
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
-                              sqlStatements,
-                              true, // infer partitioning
-                              null, // no partition key
-                              ExplainMode.EXPLAIN_ADHOC,
-                              false, // not a large query
-                              false, // not swap tables
-                              userParams);
+                sqlStatements,
+                true, // infer partitioning
+                null, // no partition key
+                ExplainMode.EXPLAIN_ADHOC,
+                false, // not a large query
+                false, // not swap tables
+                userParams);
     }
-
 }

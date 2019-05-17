@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -44,6 +45,7 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.SqlBatch;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -116,7 +118,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         EMPTY,
         ALL_DML_OR_DQL,
         ALL_DDL,
-        MIXED;
+        MIXED
     }
 
     /**
@@ -144,7 +146,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             String ddlToken = SQLLexer.extractDDLToken(stmt);
 
             if (hasDDL == null) {
-                hasDDL = (ddlToken != null) ? true : false;
+                hasDDL = ddlToken != null;
             }
             else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null)) {
                 return AdHocSQLMix.MIXED;
@@ -541,4 +543,39 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                          userParams);
     }
 
+    /**
+     * The {@link org.voltdb.plannerv2.SqlBatch} was designed to be
+     * self-contained. However, this is not entirely true due to the way that
+     * the legacy code was organized. Until I have further reshaped the legacy
+     * code path, I will leave this interface to call back into the private
+     * methods of {@link org.voltdb.sysprocs.AdHocNTBase}.
+     */
+    class AdHocNTBaseContext implements SqlBatch.Context {
+
+        @Override public CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements,
+                                                                       List<SqlNode> sqlNodes) {
+            throw new UnsupportedOperationException("Not Implemented.");
+        }
+
+        @Override public void logBatch(CatalogContext context, AdHocPlannedStmtBatch batch, Object[] userParams) {
+            AdHocNTBase.this.logBatch(context, batch, userParams);
+        }
+
+        @Override public VoltLogger getLogger() {
+            return adhocLog;
+        }
+
+        @Override public long getClientHandle() {
+            return AdHocNTBase.this.getClientHandle();
+        }
+
+        @Override public CompletableFuture<ClientResponse> createAdHocTransaction(
+                AdHocPlannedStmtBatch plannedStmtBatch) throws VoltTypeException {
+            return AdHocNTBase.this.createAdHocTransaction(plannedStmtBatch, false);
+        }
+
+        @Override public CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch plannedStmtBatch) {
+            return AdHocNTBase.processExplainPlannedStmtBatch(plannedStmtBatch);
+        }
+    }
 }

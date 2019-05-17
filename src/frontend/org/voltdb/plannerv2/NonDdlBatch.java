@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
@@ -62,18 +63,24 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
     private StatementPartitioning m_partitioning;
 
     /**
+     * NonDdlBatch is either regular planning, ad hoc explain, default proc explain or ad hoc explain in JSON format.
+     */
+    private ExplainMode m_explainMode;
+
+    /**
      * Decorate a basic query batch so it becomes a DQL/DML batch, adding the default
      * context information.
      *
      * @param batchToDecorate the {link SqlBatch} this decorator is decorating.
      * @throws IllegalArgumentException if the given batch is in fact a DDL batch.
      */
-    NonDdlBatch(SqlBatch batchToDecorate) {
+    NonDdlBatch(SqlBatch batchToDecorate, ExplainMode explainMode) {
         super(batchToDecorate);
         if (batchToDecorate.isDDLBatch()) {
             throw new IllegalArgumentException("Cannot create a non-DDL batch from a batch of DDL statements.");
         }
         m_userPartitionKeys = null;
+        m_explainMode = explainMode;
         setInferPartitioning(true);
     }
 
@@ -85,9 +92,19 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
         AdHocPlannedStmtBatch plannedStmtBatch = planner.plan();
 
         // Note - ethan - 12/28/2018:
-        // No explain mode and swap tables now.
+        // No swap tables now.
         try {
-            return getContext().createAdHocTransaction(plannedStmtBatch);
+            switch (m_explainMode) {
+                case NONE:
+                    return getContext().createAdHocTransaction(plannedStmtBatch);
+                case EXPLAIN_ADHOC:
+                    return getContext().processExplainPlannedStmtBatch(plannedStmtBatch);
+                case EXPLAIN_DEFAULT_PROC:
+                case EXPLAIN_JSON:
+                    throw new PlannerFallbackException("Explain mode: " + m_explainMode.name() + "Not implemented in Calcite.");
+                default:
+                    throw new PlanningErrorException("invalid explain mode: " + m_explainMode.name());
+            }
         } catch (VoltTypeException vte) {
             String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
             throw new PlanningErrorException(msg);

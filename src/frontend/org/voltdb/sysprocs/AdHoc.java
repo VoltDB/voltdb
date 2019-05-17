@@ -71,7 +71,7 @@ public class AdHoc extends AdHocNTBase {
         try {
             // We do not need to worry about the ParameterSet,
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-            batch = SqlBatch.from(params, m_context);
+            batch = SqlBatch.from(params, m_context, ExplainMode.NONE);
             return batch.execute();
         } catch (PlannerFallbackException | SqlParseException ex) {
             // Use the legacy planner to run this.
@@ -204,28 +204,11 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      * @since 9.0
      */
-    private class AdHocContext implements SqlBatch.Context {
+    private class AdHocContext extends AdHocNTBaseContext {
 
         @Override public CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements,
                 List<SqlNode> sqlNodes) {
             return AdHoc.this.runDDLBatch(sqlStatements, sqlNodes);
-        }
-
-        @Override public void logBatch(CatalogContext context, AdHocPlannedStmtBatch batch, Object[] userParams) {
-            AdHoc.this.logBatch(context, batch, userParams);
-        }
-
-        @Override public VoltLogger getLogger() {
-            return adhocLog;
-        }
-
-        @Override public long getClientHandle() {
-            return AdHoc.this.getClientHandle();
-        }
-
-        @Override public CompletableFuture<ClientResponse> createAdHocTransaction(
-                AdHocPlannedStmtBatch plannedStmtBatch) throws VoltTypeException {
-            return AdHoc.this.createAdHocTransaction(plannedStmtBatch, false);
         }
     }
 

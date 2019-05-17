@@ -306,7 +306,7 @@ public class PlannerTool {
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO: enable when we are ready
         throw new PlannerFallbackException("planSqlCalcite not ready");
-        //return new AdHocPlannedStatement(plan, core);
+//        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
