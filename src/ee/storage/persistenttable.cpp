@@ -100,7 +100,8 @@ PersistentTable::PersistentTable(int partitionColumn,
                                  int tableAllocationTargetSize,
                                  int tupleLimit,
                                  bool drEnabled,
-                                 bool isReplicated)
+                                 bool isReplicated,
+                                 TableType tableType)
     : Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize)
     , m_data()
     , m_iter(this, m_data.begin())
@@ -134,6 +135,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
     , m_releaseReplicated(this)
+    , m_tableType(tableType)
     , m_shadowStream(nullptr)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
@@ -870,7 +872,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         tryInsertOnAllIndexes(&target, &conflict);
 
         // from stream snapshot/rejoin, add it to migrating index
-        if (m_shadowStream != nullptr) {
+        if (isTableWithMigrate(m_tableType)) {
+            assert(m_shadowStream != nullptr);
             NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
             if(!txnId.isNull()){
                migratingAdd(ValuePeeker::peekBigInt(txnId), target);
@@ -899,6 +902,10 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
+            if (isTableWithExportInserts(m_tableType)) {
+                assert(m_shadowStream != nullptr);
+                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+            }
         }
     }
 
@@ -954,7 +961,7 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     }
 
     // Add tuple back to migrating index if needed
-    if (m_shadowStream != nullptr) {
+    if (isTableWithMigrate(m_tableType)) {
        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
        if (!txnId.isNull()) {
           migratingAdd(ValuePeeker::peekBigInt(txnId), target);
@@ -1009,6 +1016,14 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              * into the undo pool temp storage and hold onto it with oldTupleData.
              */
            oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
+
+           // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
+           if (isTableWithExportUpdateOld(m_tableType)) {
+               m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
+           }
+           if (isTableWithExportUpdateNew(m_tableType)) {
+               m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW);
+           }
         }
     }
 
@@ -1018,7 +1033,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    if (m_shadowStream != nullptr) {
+    if (isTableWithMigrate(m_tableType)) {
        uint16_t migrateColumnIndex = getMigrateColumnIndex();
        NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
        if (txnId.isNull()) {
@@ -1122,9 +1137,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (fromMigrate) {
-        assert(m_shadowStream != nullptr);
+        assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        m_shadowStream->insertTuple(sourceTupleWithNewValues);
+        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE);
     }
 
     if (uq) {
@@ -1248,7 +1263,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         migratingRemove(ec->currentSpHandle(), targetTupleToUpdate);
     } else {
-        if (m_shadowStream != nullptr) {
+        if (isTableWithMigrate(m_tableType)) {
             NValue txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
             if(!txnId.isNull()){
                 migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
@@ -1285,7 +1300,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
-    if (m_shadowStream != nullptr && removeMigratingIndex) {
+    if (isTableWithMigrate(m_tableType) && removeMigratingIndex) {
         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
         if (!txnId.isNull()) {
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
@@ -1298,6 +1313,10 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
               *uq->getPool(), target.address(), &m_surgeon);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
+        if (isTableWithExportDeletes(m_tableType)) {
+            assert(m_shadowStream != nullptr);
+            m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE);
+        }
     }
 
     // handle any materialized views, insert the tuple into delta table,
@@ -1427,7 +1446,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     deleteFromAllIndexes(&target);
 
     // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
-    if (m_shadowStream != nullptr) {
+    if (isTableWithMigrate(m_tableType)) {
         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
@@ -1944,7 +1963,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             }
         }
     }
-    if (m_shadowStream != nullptr) {
+    if (isTableWithMigrate(m_tableType)) {
         int64_t migrateTxnId = ValuePeeker::peekBigInt(originalTuple.getHiddenNValue(getMigrateColumnIndex()));
         if (migrateTxnId != INT64_NULL) {
             MigratingRows::iterator it = m_migratingRows.find(migrateTxnId);
@@ -2459,7 +2478,7 @@ void PersistentTable::polluteViews() {
 }
 
 void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
-    assert(m_shadowStream != nullptr);
+    assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.lower_bound(txnId);
     if (it == m_migratingRows.end() || it->first != txnId) {
         // txnId not allocated yet
@@ -2474,7 +2493,7 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
 };
 
 bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
-    assert(m_shadowStream != nullptr);
+    assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.find(txnId);
     if (it == m_migratingRows.end()) {
         assert(false);
@@ -2495,7 +2514,8 @@ uint16_t PersistentTable::getMigrateColumnIndex() {
 }
 
 int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
-    if (m_shadowStream != nullptr) {
+    if (isTableWithMigrate(m_tableType)) {
+        assert(m_shadowStream != nullptr);
         MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
         int32_t deletedRows = 0;
         if (it != m_migratingRows.end()) {

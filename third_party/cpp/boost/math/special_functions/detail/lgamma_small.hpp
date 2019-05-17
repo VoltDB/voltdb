@@ -12,6 +12,16 @@
 
 #include <boost/math/tools/big_constant.hpp>
 
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
+
 namespace boost{ namespace math{ namespace detail{
 
 //
@@ -87,7 +97,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<64>&, const Policy& /* l *
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, -0.324588649825948492091e-4))
       };
       static const T Q[] = {
-         static_cast<T>(0.1e1),
+         static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.1e1)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.196202987197795200688e1)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.148019669424231326694e1)),
          static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.541391432071720958364e0)),
@@ -198,7 +208,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<64>&, const Policy& /* l *
             static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.431171342679297331241e-3))
          };
          static const T Q[] = {
-            static_cast<T>(0.1e1),
+            static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.1e1)),
             static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, -0.150169356054485044494e1)),
             static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, 0.846973248876495016101e0)),
             static_cast<T>(BOOST_MATH_BIG_CONSTANT(T, 64, -0.220095151814995745555e0)),
@@ -278,7 +288,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
          BOOST_MATH_BIG_CONSTANT(T, 113, -0.70529798686542184668416911331718963364e-8)
       };
       static const T Q[] = {
-         BOOST_MATH_BIG_CONSTANT(T, 113, 1),
+         BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
          BOOST_MATH_BIG_CONSTANT(T, 113, 2.5877485070422317542808137697939233685),
          BOOST_MATH_BIG_CONSTANT(T, 113, 2.8797959228352591788629602533153837126),
          BOOST_MATH_BIG_CONSTANT(T, 113, 1.8030885955284082026405495275461180977),
@@ -357,7 +367,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
             BOOST_MATH_BIG_CONSTANT(T, 113, 0.13680157145361387405588201461036338274e-8)
          };
          static const T Q[] = {
-            1,
+            BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
             BOOST_MATH_BIG_CONSTANT(T, 113, 4.9106336261005990534095838574132225599),
             BOOST_MATH_BIG_CONSTANT(T, 113, 10.258804800866438510889341082793078432),
             BOOST_MATH_BIG_CONSTANT(T, 113, 11.88588976846826108836629960537466889),
@@ -408,7 +418,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
             BOOST_MATH_BIG_CONSTANT(T, 113, 0.8207548771933585614380644961342925976e-6)
          };
          static const T Q[] = {
-            1,
+            BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
             BOOST_MATH_BIG_CONSTANT(T, 113, -2.9629552288944259229543137757200262073),
             BOOST_MATH_BIG_CONSTANT(T, 113, 3.7118380799042118987185957298964772755),
             BOOST_MATH_BIG_CONSTANT(T, 113, -2.5569815272165399297600586376727357187),
@@ -449,7 +459,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
             BOOST_MATH_BIG_CONSTANT(T, 113, 0.13240510580220763969511741896361984162e-6)
          };
          static const T Q[] = {
-            1,
+            BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
             BOOST_MATH_BIG_CONSTANT(T, 113, -2.4240003754444040525462170802796471996),
             BOOST_MATH_BIG_CONSTANT(T, 113, 2.4868383476933178722203278602342786002),
             BOOST_MATH_BIG_CONSTANT(T, 113, -1.4047068395206343375520721509193698547),

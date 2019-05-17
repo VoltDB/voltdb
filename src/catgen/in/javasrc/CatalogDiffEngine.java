@@ -524,7 +524,7 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             Table tbl = (Table)suspect;
-            if (TableType.isStream(tbl.getTabletype()) || TableType.isPersistentMigrate(tbl.getTabletype())) {
+            if (TableType.isStream(tbl.getTabletype()) || TableType.needsShadowStream(tbl.getTabletype())) {
                 m_requiresNewExportGeneration = true;
             }
             // No special guard against dropping a table or view
@@ -788,7 +788,7 @@ public class CatalogDiffEngine {
                     }
                 }
             }
-            if (TableType.isPersistentMigrate(tbl.getTabletype())) {
+            if (TableType.needsShadowStream(tbl.getTabletype())) {
                 m_requiresNewExportGeneration = true;
             }
         }
@@ -1027,10 +1027,15 @@ public class CatalogDiffEngine {
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
-            if (field.equals("signature") ||
-                field.equals("tuplelimit") || field.equals("tableType"))
+            if (field.equals("signature") || field.equals("tuplelimit") )
                 return null;
 
+            if (field.equals("tableType") && prevType != null) {
+                if (((Table)suspect).getTabletype() != ((Table)prevType).getTabletype()) {
+                    m_requiresNewExportGeneration = true;
+                    return null;
+                }
+            }
             // Always allow disabling DR on table
             if (field.equalsIgnoreCase("isdred")) {
                 Boolean isDRed = (Boolean) suspect.getField(field);
@@ -1052,7 +1057,8 @@ public class CatalogDiffEngine {
 
             // now assume parent is a Table
             Table table = (Table) parent;
-            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table) ||
+                    TableType.needsShadowStream(table.getTabletype())) {
                 m_requiresNewExportGeneration = true;
                 return null;
             }

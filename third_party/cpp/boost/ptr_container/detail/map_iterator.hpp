@@ -48,8 +48,8 @@ namespace boost
             ref_pair( const RP* rp )
             : first(rp->first), second(rp->second)
             { }
-            
-            const ref_pair* const operator->() const
+
+            const ref_pair* operator->() const
             {
                 return this;
             }

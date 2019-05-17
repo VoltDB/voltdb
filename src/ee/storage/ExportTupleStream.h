@@ -41,7 +41,7 @@ class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
     friend class StreamBlock;
 
 public:
-    enum Type { INSERT, DELETE };
+    enum STREAM_ROW_TYPE { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE };
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
@@ -92,7 +92,7 @@ public:
             int64_t uniqueId,
             const TableTuple &tuple,
             int partitionColumn,
-            ExportTupleStream::Type type);
+            ExportTupleStream::STREAM_ROW_TYPE type);
 
     /** Close Txn and send full buffers with committed data to the top end. */
     void commit(VoltDBEngine* engine, int64_t spHandle, int64_t uniqueId);

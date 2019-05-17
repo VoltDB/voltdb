@@ -270,7 +270,7 @@ void ElasticContext::updatePredicates(const std::vector<std::string> &predicateS
     if (m_predicates.size() > 0 && dynamic_cast<HashRangeExpression*>(&m_predicates[0]) != NULL && predicateStrings.size() > 0) {
         PlannerDomRoot domRoot(predicateStrings[0].c_str());
         if (!domRoot.isNull()) {
-            PlannerDomValue predicateObject = domRoot.rootObject();
+            PlannerDomValue predicateObject = domRoot();
             HashRangeExpression *expression = dynamic_cast<HashRangeExpression*>(&m_predicates[0]);
             if (predicateObject.hasKey("predicateExpression")) {
                 PlannerDomValue predicateExpression = predicateObject.valueForKey("predicateExpression");

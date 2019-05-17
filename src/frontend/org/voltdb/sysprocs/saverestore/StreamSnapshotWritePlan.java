@@ -135,7 +135,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
             VoltTable schemaTable;
-            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(table.getTabletype());
+            final boolean preserveMigrateHiddenColumn = TableType.isPersistentMigrate(table.getTabletype());
             if (XDCR && table.getIsdred()) {
                 if (preserveMigrateHiddenColumn) {
                     schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);

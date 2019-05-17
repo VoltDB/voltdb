@@ -5,88 +5,57 @@
 #ifndef ITERATOR_TRAITS_DWA200347_HPP
 # define ITERATOR_TRAITS_DWA200347_HPP
 
-# include <boost/detail/iterator.hpp>
 # include <boost/detail/workaround.hpp>
 
-namespace boost { 
+#include <iterator>
 
-// Unfortunately, g++ 2.95.x chokes when we define a class template
-// iterator_category which has the same name as its
-// std::iterator_category() function, probably due in part to the
-// "std:: is visible globally" hack it uses.  Use
-// BOOST_ITERATOR_CATEGORY to write code that's portable to older
-// GCCs.
+namespace boost {
+namespace iterators {
 
-# if BOOST_WORKAROUND(__GNUC__, <= 2)
-#  define BOOST_ITERATOR_CATEGORY iterator_category_
-# else
-#  define BOOST_ITERATOR_CATEGORY iterator_category
-# endif
+// Macro for supporting old compilers, no longer needed but kept
+// for backwards compatibility (it was documented).
+#define BOOST_ITERATOR_CATEGORY iterator_category
 
 
 template <class Iterator>
 struct iterator_value
 {
-    typedef typename boost::detail::iterator_traits<Iterator>::value_type type;
+    typedef typename std::iterator_traits<Iterator>::value_type type;
 };
-  
+
 template <class Iterator>
 struct iterator_reference
 {
-    typedef typename boost::detail::iterator_traits<Iterator>::reference type;
+    typedef typename std::iterator_traits<Iterator>::reference type;
 };
-  
-  
+
+
 template <class Iterator>
 struct iterator_pointer
 {
-    typedef typename boost::detail::iterator_traits<Iterator>::pointer type;
+    typedef typename std::iterator_traits<Iterator>::pointer type;
 };
-  
+
 template <class Iterator>
 struct iterator_difference
 {
-    typedef typename boost::detail::iterator_traits<Iterator>::difference_type type;
+    typedef typename std::iterator_traits<Iterator>::difference_type type;
 };
 
 template <class Iterator>
-struct BOOST_ITERATOR_CATEGORY
+struct iterator_category
 {
-    typedef typename boost::detail::iterator_traits<Iterator>::iterator_category type;
+    typedef typename std::iterator_traits<Iterator>::iterator_category type;
 };
 
-# if BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-template <>
-struct iterator_value<int>
-{
-    typedef void type;
-};
-  
-template <>
-struct iterator_reference<int>
-{
-    typedef void type;
-};
+} // namespace iterators
 
-template <>
-struct iterator_pointer<int>
-{
-    typedef void type;
-};
-  
-template <>
-struct iterator_difference<int>
-{
-    typedef void type;
-};
-  
-template <>
-struct BOOST_ITERATOR_CATEGORY<int>
-{
-    typedef void type;
-};
-# endif
+using iterators::iterator_value;
+using iterators::iterator_reference;
+using iterators::iterator_pointer;
+using iterators::iterator_difference;
+using iterators::iterator_category;
 
-} // namespace boost::iterator
+} // namespace boost
 
 #endif // ITERATOR_TRAITS_DWA200347_HPP

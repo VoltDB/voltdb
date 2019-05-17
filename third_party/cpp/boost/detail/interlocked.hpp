@@ -1,16 +1,11 @@
 #ifndef BOOST_DETAIL_INTERLOCKED_HPP_INCLUDED
 #define BOOST_DETAIL_INTERLOCKED_HPP_INCLUDED
 
-// MS compatible compilers support #pragma once
-
-#if defined(_MSC_VER) && (_MSC_VER >= 1020)
-# pragma once
-#endif
-
 //
 //  boost/detail/interlocked.hpp
 //
 //  Copyright 2005 Peter Dimov
+//  Copyright 2018 Andrey Semashev
 //
 //  Distributed under the Boost Software License, Version 1.0. (See
 //  accompanying file LICENSE_1_0.txt or copy at
@@ -18,6 +13,40 @@
 //
 
 #include <boost/config.hpp>
+
+#ifdef BOOST_HAS_PRAGMA_ONCE
+#pragma once
+#endif
+
+// BOOST_INTERLOCKED_HAS_INTRIN_H
+
+// VC9 has intrin.h, but it collides with <utility>
+#if defined( BOOST_MSVC ) && BOOST_MSVC >= 1600
+
+# define BOOST_INTERLOCKED_HAS_INTRIN_H
+
+// Unlike __MINGW64__, __MINGW64_VERSION_MAJOR is defined by MinGW-w64 for both 32 and 64-bit targets.
+#elif defined( __MINGW64_VERSION_MAJOR )
+
+// MinGW-w64 provides intrin.h for both 32 and 64-bit targets.
+# define BOOST_INTERLOCKED_HAS_INTRIN_H
+
+#elif defined( __CYGWIN__ ) && defined( __LP64__ )
+
+// We have to use intrin.h on Cygwin 64
+# define BOOST_INTERLOCKED_HAS_INTRIN_H
+
+// Intel C++ on Windows on VC10+ stdlib
+#elif defined( BOOST_INTEL_WIN ) && defined( _CPPLIB_VER ) && _CPPLIB_VER >= 520
+
+# define BOOST_INTERLOCKED_HAS_INTRIN_H
+
+// clang-cl on Windows on VC10+ stdlib
+#elif defined( __clang__ ) && defined( _MSC_VER ) && defined( _CPPLIB_VER ) && _CPPLIB_VER >= 520
+
+# define BOOST_INTERLOCKED_HAS_INTRIN_H
+
+#endif
 
 #if defined( BOOST_USE_WINDOWS_H )
 
@@ -30,6 +59,30 @@
 # define BOOST_INTERLOCKED_EXCHANGE_ADD InterlockedExchangeAdd
 # define BOOST_INTERLOCKED_COMPARE_EXCHANGE_POINTER InterlockedCompareExchangePointer
 # define BOOST_INTERLOCKED_EXCHANGE_POINTER InterlockedExchangePointer
+
+#elif defined( BOOST_USE_INTRIN_H ) || defined( BOOST_INTERLOCKED_HAS_INTRIN_H )
+
+#include <intrin.h>
+
+# define BOOST_INTERLOCKED_INCREMENT _InterlockedIncrement
+# define BOOST_INTERLOCKED_DECREMENT _InterlockedDecrement
+# define BOOST_INTERLOCKED_COMPARE_EXCHANGE _InterlockedCompareExchange
+# define BOOST_INTERLOCKED_EXCHANGE _InterlockedExchange
+# define BOOST_INTERLOCKED_EXCHANGE_ADD _InterlockedExchangeAdd
+
+# if defined(_M_IA64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__x86_64)
+
+#  define BOOST_INTERLOCKED_COMPARE_EXCHANGE_POINTER _InterlockedCompareExchangePointer
+#  define BOOST_INTERLOCKED_EXCHANGE_POINTER _InterlockedExchangePointer
+
+# else
+
+#  define BOOST_INTERLOCKED_COMPARE_EXCHANGE_POINTER(dest,exchange,compare) \
+    ((void*)BOOST_INTERLOCKED_COMPARE_EXCHANGE((long volatile*)(dest),(long)(exchange),(long)(compare)))
+#  define BOOST_INTERLOCKED_EXCHANGE_POINTER(dest,exchange) \
+    ((void*)BOOST_INTERLOCKED_EXCHANGE((long volatile*)(dest),(long)(exchange)))
+
+# endif
 
 #elif defined(_WIN32_WCE)
 
@@ -47,14 +100,15 @@ extern "C" long __cdecl _InterlockedExchangeAdd( long volatile *, long );
 # define BOOST_INTERLOCKED_EXCHANGE _InterlockedExchange
 # define BOOST_INTERLOCKED_EXCHANGE_ADD _InterlockedExchangeAdd
 
-#else
+#else // _WIN32_WCE >= 0x600
+
 // under Windows CE we still have old-style Interlocked* functions
 
-extern "C" long __cdecl InterlockedIncrement( long* );
-extern "C" long __cdecl InterlockedDecrement( long* );
-extern "C" long __cdecl InterlockedCompareExchange( long*, long, long );
-extern "C" long __cdecl InterlockedExchange( long*, long );
-extern "C" long __cdecl InterlockedExchangeAdd( long*, long );
+extern "C" long __cdecl InterlockedIncrement( long * );
+extern "C" long __cdecl InterlockedDecrement( long * );
+extern "C" long __cdecl InterlockedCompareExchange( long *, long, long );
+extern "C" long __cdecl InterlockedExchange( long *, long );
+extern "C" long __cdecl InterlockedExchangeAdd( long *, long );
 
 # define BOOST_INTERLOCKED_INCREMENT InterlockedIncrement
 # define BOOST_INTERLOCKED_DECREMENT InterlockedDecrement
@@ -62,7 +116,7 @@ extern "C" long __cdecl InterlockedExchangeAdd( long*, long );
 # define BOOST_INTERLOCKED_EXCHANGE InterlockedExchange
 # define BOOST_INTERLOCKED_EXCHANGE_ADD InterlockedExchangeAdd
 
-#endif
+#endif // _WIN32_WCE >= 0x600
 
 # define BOOST_INTERLOCKED_COMPARE_EXCHANGE_POINTER(dest,exchange,compare) \
     ((void*)BOOST_INTERLOCKED_COMPARE_EXCHANGE((long*)(dest),(long)(exchange),(long)(compare)))
@@ -71,41 +125,32 @@ extern "C" long __cdecl InterlockedExchangeAdd( long*, long );
 
 #elif defined( BOOST_MSVC ) || defined( BOOST_INTEL_WIN )
 
-#if defined( BOOST_MSVC ) && BOOST_MSVC >= 1600
+# if defined( __CLRCALL_PURE_OR_CDECL )
+#  define BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL __CLRCALL_PURE_OR_CDECL
+# else
+#  define BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL __cdecl
+# endif
 
-#include <intrin.h>
+extern "C" long BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL _InterlockedIncrement( long volatile * );
+extern "C" long BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL _InterlockedDecrement( long volatile * );
+extern "C" long BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL _InterlockedCompareExchange( long volatile *, long, long );
+extern "C" long BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL _InterlockedExchange( long volatile *, long );
+extern "C" long BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL _InterlockedExchangeAdd( long volatile *, long );
 
-#elif defined( __CLRCALL_PURE_OR_CDECL )
+# undef BOOST_INTERLOCKED_CLRCALL_PURE_OR_CDECL
 
-extern "C" long __CLRCALL_PURE_OR_CDECL _InterlockedIncrement( long volatile * );
-extern "C" long __CLRCALL_PURE_OR_CDECL _InterlockedDecrement( long volatile * );
-extern "C" long __CLRCALL_PURE_OR_CDECL _InterlockedCompareExchange( long volatile *, long, long );
-extern "C" long __CLRCALL_PURE_OR_CDECL _InterlockedExchange( long volatile *, long );
-extern "C" long __CLRCALL_PURE_OR_CDECL _InterlockedExchangeAdd( long volatile *, long );
-
-#else
-
-extern "C" long __cdecl _InterlockedIncrement( long volatile * );
-extern "C" long __cdecl _InterlockedDecrement( long volatile * );
-extern "C" long __cdecl _InterlockedCompareExchange( long volatile *, long, long );
-extern "C" long __cdecl _InterlockedExchange( long volatile *, long );
-extern "C" long __cdecl _InterlockedExchangeAdd( long volatile *, long );
-
-#endif
-
-# pragma intrinsic( _InterlockedIncrement )
-# pragma intrinsic( _InterlockedDecrement )
-# pragma intrinsic( _InterlockedCompareExchange )
-# pragma intrinsic( _InterlockedExchange )
-# pragma intrinsic( _InterlockedExchangeAdd )
+# if defined( BOOST_MSVC ) && BOOST_MSVC >= 1310
+#  pragma intrinsic( _InterlockedIncrement )
+#  pragma intrinsic( _InterlockedDecrement )
+#  pragma intrinsic( _InterlockedCompareExchange )
+#  pragma intrinsic( _InterlockedExchange )
+#  pragma intrinsic( _InterlockedExchangeAdd )
+# endif
 
 # if defined(_M_IA64) || defined(_M_AMD64)
 
 extern "C" void* __cdecl _InterlockedCompareExchangePointer( void* volatile *, void*, void* );
 extern "C" void* __cdecl _InterlockedExchangePointer( void* volatile *, void* );
-
-#  pragma intrinsic( _InterlockedCompareExchangePointer )
-#  pragma intrinsic( _InterlockedExchangePointer )
 
 #  define BOOST_INTERLOCKED_COMPARE_EXCHANGE_POINTER _InterlockedCompareExchangePointer
 #  define BOOST_INTERLOCKED_EXCHANGE_POINTER _InterlockedExchangePointer
@@ -127,12 +172,7 @@ extern "C" void* __cdecl _InterlockedExchangePointer( void* volatile *, void* );
 
 #elif defined( WIN32 ) || defined( _WIN32 ) || defined( __WIN32__ ) || defined( __CYGWIN__ )
 
-#if defined(__MINGW64__)
-#define BOOST_INTERLOCKED_IMPORT
-#else
 #define BOOST_INTERLOCKED_IMPORT __declspec(dllimport)
-#endif
-
 
 namespace boost
 {

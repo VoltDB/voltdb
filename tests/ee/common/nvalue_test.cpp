@@ -59,7 +59,7 @@ public:
     NValue lower;
     NValue upper;
 
-    static PlannerDomValue emptyDom() { return m_emptyRoot.rootObject(); }
+    static PlannerDomValue emptyDom() { return m_emptyRoot(); }
 
     void deserDecHelper()
     {

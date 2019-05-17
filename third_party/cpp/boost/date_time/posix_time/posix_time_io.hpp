@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2008-11-13 11:05:31 -0800 (Thu, 13 Nov 2008) $
+ * $Date$
  */
 
 #include <locale>
@@ -47,7 +47,6 @@ namespace posix_time {
              const ptime& p) {
     boost::io::ios_flags_saver iflags(os);
     typedef boost::date_time::time_facet<ptime, CharT> custom_ptime_facet;
-    typedef std::time_put<CharT>                  std_ptime_facet;
     std::ostreambuf_iterator<CharT> oitr(os);
     if (std::has_facet<custom_ptime_facet>(os.getloc()))
       std::use_facet<custom_ptime_facet>(os.getloc()).put(oitr, os, os.fill(), p);
@@ -75,13 +74,13 @@ namespace posix_time {
     typename std::basic_istream<CharT, Traits>::sentry strm_sentry(is, false);
     if (strm_sentry) {
       try {
-        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet;
+        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet_local;
         std::istreambuf_iterator<CharT,Traits> sit(is), str_end;
-        if(std::has_facet<time_input_facet>(is.getloc())) {
-          std::use_facet<time_input_facet>(is.getloc()).get(sit, str_end, is, pt);
+        if(std::has_facet<time_input_facet_local>(is.getloc())) {
+          std::use_facet<time_input_facet_local>(is.getloc()).get(sit, str_end, is, pt);
         }
         else {
-          time_input_facet* f = new time_input_facet();
+          time_input_facet_local* f = new time_input_facet_local();
           std::locale l = std::locale(is.getloc(), f);
           is.imbue(l);
           f->get(sit, str_end, is, pt);
@@ -114,7 +113,6 @@ namespace posix_time {
              const boost::posix_time::time_period& p) {
     boost::io::ios_flags_saver iflags(os);
     typedef boost::date_time::time_facet<ptime, CharT> custom_ptime_facet;
-    typedef std::time_put<CharT>                  std_time_facet;
     std::ostreambuf_iterator<CharT> oitr(os);
     if (std::has_facet<custom_ptime_facet>(os.getloc())) {
       std::use_facet<custom_ptime_facet>(os.getloc()).put(oitr, os, os.fill(), p);
@@ -143,13 +141,13 @@ namespace posix_time {
     typename std::basic_istream<CharT, Traits>::sentry strm_sentry(is, false);
     if (strm_sentry) {
       try {
-        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet;
+        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet_local;
         std::istreambuf_iterator<CharT,Traits> sit(is), str_end;
-        if(std::has_facet<time_input_facet>(is.getloc())) {
-          std::use_facet<time_input_facet>(is.getloc()).get(sit, str_end, is, tp);
+        if(std::has_facet<time_input_facet_local>(is.getloc())) {
+          std::use_facet<time_input_facet_local>(is.getloc()).get(sit, str_end, is, tp);
         }
         else {
-          time_input_facet* f = new time_input_facet();
+          time_input_facet_local* f = new time_input_facet_local();
           std::locale l = std::locale(is.getloc(), f);
           is.imbue(l);
           f->get(sit, str_end, is, tp);
@@ -180,7 +178,6 @@ namespace posix_time {
   {
     boost::io::ios_flags_saver iflags(os);
     typedef boost::date_time::time_facet<ptime, CharT> custom_ptime_facet;
-    typedef std::time_put<CharT>                  std_ptime_facet;
     std::ostreambuf_iterator<CharT> oitr(os);
     if (std::has_facet<custom_ptime_facet>(os.getloc()))
       std::use_facet<custom_ptime_facet>(os.getloc()).put(oitr, os, os.fill(), td);
@@ -208,13 +205,13 @@ namespace posix_time {
     typename std::basic_istream<CharT, Traits>::sentry strm_sentry(is, false);
     if (strm_sentry) {
       try {
-        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet;
+        typedef typename date_time::time_input_facet<ptime, CharT> time_input_facet_local;
         std::istreambuf_iterator<CharT,Traits> sit(is), str_end;
-        if(std::has_facet<time_input_facet>(is.getloc())) {
-          std::use_facet<time_input_facet>(is.getloc()).get(sit, str_end, is, td);
+        if(std::has_facet<time_input_facet_local>(is.getloc())) {
+          std::use_facet<time_input_facet_local>(is.getloc()).get(sit, str_end, is, td);
         }
         else {
-          time_input_facet* f = new time_input_facet();
+          time_input_facet_local* f = new time_input_facet_local();
           std::locale l = std::locale(is.getloc(), f);
           is.imbue(l);
           f->get(sit, str_end, is, td);

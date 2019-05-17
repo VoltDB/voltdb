@@ -12,7 +12,6 @@
 #ifndef BOOST_ALGORITHM_ONE_OF_HPP
 #define BOOST_ALGORITHM_ONE_OF_HPP
 
-#include <algorithm>            // for std::find and std::find_if
 #include <boost/algorithm/cxx11/none_of.hpp>
 
 #include <boost/range/begin.hpp>
@@ -28,12 +27,16 @@ namespace boost { namespace algorithm {
 /// \param p     A predicate for testing the elements of the sequence
 ///
 template<typename InputIterator, typename Predicate> 
-bool one_of ( InputIterator first, InputIterator last, Predicate p )
+BOOST_CXX14_CONSTEXPR bool one_of ( InputIterator first, InputIterator last, Predicate p )
 {
-    InputIterator i = std::find_if (first, last, p);
-    if (i == last)
+//  find_if
+    for (; first != last; ++first)
+        if (p(*first))
+            break;
+
+    if (first == last)
         return false;    // Didn't occur at all
-    return boost::algorithm::none_of (++i, last, p);
+    return boost::algorithm::none_of (++first, last, p);
 }
 
 /// \fn one_of ( const Range &r, Predicate p )
@@ -43,7 +46,7 @@ bool one_of ( InputIterator first, InputIterator last, Predicate p )
 /// \param p    A predicate for testing the elements of the range
 ///
 template<typename Range, typename Predicate> 
-bool one_of ( const Range &r, Predicate p ) 
+BOOST_CXX14_CONSTEXPR bool one_of ( const Range &r, Predicate p )
 {
     return boost::algorithm::one_of ( boost::begin (r), boost::end (r), p );
 }
@@ -57,12 +60,16 @@ bool one_of ( const Range &r, Predicate p )
 /// \param val      A value to compare against
 ///
 template<typename InputIterator, typename V> 
-bool one_of_equal ( InputIterator first, InputIterator last, const V &val )
+BOOST_CXX14_CONSTEXPR bool one_of_equal ( InputIterator first, InputIterator last, const V &val )
 {
-    InputIterator i = std::find (first, last, val); // find first occurrence of 'val'
-    if (i == last)
+//  find
+    for (; first != last; ++first)
+        if (*first == val)
+            break;
+
+    if (first == last)
         return false;                    // Didn't occur at all
-    return boost::algorithm::none_of_equal (++i, last, val);
+    return boost::algorithm::none_of_equal (++first, last, val);
 }
 
 /// \fn one_of_equal ( const Range &r, const V &val )
@@ -72,7 +79,7 @@ bool one_of_equal ( InputIterator first, InputIterator last, const V &val )
 /// \param val  A value to compare against
 ///
 template<typename Range, typename V> 
-bool one_of_equal ( const Range &r, const V &val )
+BOOST_CXX14_CONSTEXPR bool one_of_equal ( const Range &r, const V &val )
 {
     return boost::algorithm::one_of_equal ( boost::begin (r), boost::end (r), val );
 } 

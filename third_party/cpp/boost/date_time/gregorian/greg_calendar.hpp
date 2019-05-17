@@ -6,10 +6,11 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland
- * $Date: 2010-01-10 11:17:23 -0800 (Sun, 10 Jan 2010) $
+ * $Date$
  */
 
 #include <boost/cstdint.hpp>
+#include <boost/date_time/compiler_config.hpp>
 #include <boost/date_time/gregorian/greg_weekday.hpp>
 #include <boost/date_time/gregorian/greg_day_of_year.hpp>
 #include <boost/date_time/gregorian_calendar.hpp>
@@ -23,7 +24,7 @@ namespace gregorian {
   typedef date_time::int_adapter<uint32_t> fancy_date_rep;
 
   //! Gregorian calendar for this implementation, hard work in the base
-  class gregorian_calendar :
+  class BOOST_SYMBOL_VISIBLE gregorian_calendar :
     public date_time::gregorian_calendar_base<greg_year_month_day, fancy_date_rep::int_type> {
   public:
     //! Type to hold a weekday (eg: Sunday, Monday,...)

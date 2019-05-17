@@ -654,7 +654,7 @@ std::vector<int> ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpre
 void ExpressionUtil::loadIndexedExprsFromJson(
       std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring) {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
-    PlannerDomValue expressionsArray = domRoot.rootObject();
+    PlannerDomValue expressionsArray = domRoot();
     for (int i = 0; i < expressionsArray.arrayLen(); i++) {
         PlannerDomValue exprValue = expressionsArray.valueAtIndex(i);
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(exprValue);
@@ -664,7 +664,7 @@ void ExpressionUtil::loadIndexedExprsFromJson(
 
 AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring) {
     PlannerDomRoot domRoot(jsonstring.c_str());
-    return AbstractExpression::buildExpressionTree(domRoot.rootObject());
+    return AbstractExpression::buildExpressionTree(domRoot());
 }
 
 OperatorIsNullExpression* ExpressionUtil::columnIsNull(const int tableIndex, const int valueIndex) {

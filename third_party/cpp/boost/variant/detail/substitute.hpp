@@ -18,18 +18,19 @@
 #ifndef BOOST_VARIANT_DETAIL_SUBSTITUTE_HPP
 #define BOOST_VARIANT_DETAIL_SUBSTITUTE_HPP
 
-#include "boost/mpl/aux_/config/ctps.hpp"
+#include <boost/mpl/aux_/config/ctps.hpp>
 
-#include "boost/variant/detail/substitute_fwd.hpp"
-#include "boost/mpl/aux_/lambda_arity_param.hpp"
-#include "boost/mpl/aux_/preprocessor/params.hpp"
-#include "boost/mpl/aux_/preprocessor/repeat.hpp"
-#include "boost/mpl/int_fwd.hpp"
-#include "boost/mpl/limits/arity.hpp"
-#include "boost/preprocessor/cat.hpp"
-#include "boost/preprocessor/empty.hpp"
-#include "boost/preprocessor/arithmetic/inc.hpp"
-#include "boost/preprocessor/iterate.hpp"
+#include <boost/variant/detail/substitute_fwd.hpp>
+#include <boost/variant/variant_fwd.hpp> // for BOOST_VARIANT_DO_NOT_USE_VARIADIC_TEMPLATES
+#include <boost/mpl/aux_/lambda_arity_param.hpp>
+#include <boost/mpl/aux_/preprocessor/params.hpp>
+#include <boost/mpl/aux_/preprocessor/repeat.hpp>
+#include <boost/mpl/int_fwd.hpp>
+#include <boost/mpl/limits/arity.hpp>
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/empty.hpp>
+#include <boost/preprocessor/arithmetic/inc.hpp>
+#include <boost/preprocessor/iterate.hpp>
 
 namespace boost {
 namespace detail { namespace variant {
@@ -125,6 +126,52 @@ struct substitute<
 // template expression (i.e., F<...>) specializations
 //
 
+#if !defined(BOOST_VARIANT_DO_NOT_USE_VARIADIC_TEMPLATES)
+template <
+      template <typename...> class F
+    , typename... Ts
+    , typename Dest
+    , typename Source
+      BOOST_MPL_AUX_LAMBDA_ARITY_PARAM(typename Arity)
+    >
+struct substitute<
+      F<Ts...>
+    , Dest
+    , Source
+      BOOST_MPL_AUX_LAMBDA_ARITY_PARAM(Arity)
+    >
+{
+    typedef F<typename substitute<
+          Ts, Dest, Source
+        >::type...> type;
+};
+
+//
+// function specializations
+//
+template <
+      typename R
+    , typename... A
+    , typename Dest
+    , typename Source
+    >
+struct substitute<
+      R (*)(A...)
+    , Dest
+    , Source
+      BOOST_MPL_AUX_LAMBDA_ARITY_PARAM(mpl::int_<-1>)
+    >
+{
+private:
+    typedef typename substitute< R, Dest, Source >::type r;
+
+public:
+    typedef r (*type)(typename substitute<
+          A, Dest, Source
+        >::type...);
+};
+#else
+
 #define BOOST_VARIANT_AUX_SUBSTITUTE_TYPEDEF_IMPL(N) \
     typedef typename substitute< \
           BOOST_PP_CAT(U,N), Dest, Source \
@@ -136,12 +183,13 @@ struct substitute<
     /**/
 
 #define BOOST_PP_ITERATION_LIMITS (0,BOOST_MPL_LIMIT_METAFUNCTION_ARITY)
-#define BOOST_PP_FILENAME_1 "boost/variant/detail/substitute.hpp"
+#define BOOST_PP_FILENAME_1 <boost/variant/detail/substitute.hpp>
 #include BOOST_PP_ITERATE()
 
 #undef BOOST_VARIANT_AUX_SUBSTITUTE_TYPEDEF_IMPL
 #undef BOOST_VARIANT_AUX_SUBSTITUTE_TYPEDEF
 
+#endif // !defined(BOOST_VARIANT_DO_NOT_USE_VARIADIC_TEMPLATES)
 #endif // !defined(BOOST_VARIANT_DETAIL_NO_SUBSTITUTE)
 
 }} // namespace detail::variant

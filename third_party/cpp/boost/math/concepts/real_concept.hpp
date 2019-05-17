@@ -31,6 +31,8 @@
 #include <boost/math/tools/big_constant.hpp>
 #include <boost/math/tools/precision.hpp>
 #include <boost/math/policies/policy.hpp>
+#include <boost/math/special_functions/asinh.hpp>
+#include <boost/math/special_functions/atanh.hpp>
 #if defined(__SGI_STL_PORT)
 #  include <boost/math/tools/real_cast.hpp>
 #endif
@@ -84,6 +86,9 @@ public:
    real_concept(float c) : m_value(c){}
    real_concept(double c) : m_value(c){}
    real_concept(long double c) : m_value(c){}
+#ifdef BOOST_MATH_USE_FLOAT128
+   real_concept(BOOST_MATH_FLOAT128_TYPE c) : m_value(c){}
+#endif
 
    // Assignment:
    real_concept& operator=(char c) { m_value = c; return *this; }
@@ -212,10 +217,17 @@ inline real_concept floor(real_concept a)
 { return std::floor(a.value()); }
 inline real_concept modf(real_concept a, real_concept* ipart)
 {
+#ifdef __MINGW32__
+   real_concept_base_type ip;
+   real_concept_base_type result = boost::math::modf(a.value(), &ip);
+   *ipart = ip;
+   return result;
+#else
    real_concept_base_type ip;
    real_concept_base_type result = std::modf(a.value(), &ip);
    *ipart = ip;
    return result;
+#endif
 }
 inline real_concept frexp(real_concept a, int* expon)
 { return std::frexp(a.value(), expon); }
@@ -244,6 +256,24 @@ inline real_concept sqrt(real_concept a)
 { return std::sqrt(a.value()); }
 inline real_concept tanh(real_concept a)
 { return std::tanh(a.value()); }
+
+//
+// C++11 ism's
+// Note that these must not actually call the std:: versions as that precludes using this
+// header to test in C++03 mode, call the Boost versions instead:
+//
+inline boost::math::concepts::real_concept asinh(boost::math::concepts::real_concept a)
+{
+   return boost::math::asinh(a.value(), boost::math::policies::make_policy(boost::math::policies::overflow_error<boost::math::policies::ignore_error>()));
+}
+inline boost::math::concepts::real_concept acosh(boost::math::concepts::real_concept a)
+{
+   return boost::math::acosh(a.value(), boost::math::policies::make_policy(boost::math::policies::overflow_error<boost::math::policies::ignore_error>()));
+}
+inline boost::math::concepts::real_concept atanh(boost::math::concepts::real_concept a)
+{
+   return boost::math::atanh(a.value(), boost::math::policies::make_policy(boost::math::policies::overflow_error<boost::math::policies::ignore_error>()));
+}
 
 //
 // Conversion and truncation routines:
@@ -304,7 +334,7 @@ inline std::basic_istream<charT, traits>& operator>>(std::basic_istream<charT, t
    is >> v;
    a = v;
    return is;
-#elif defined(__SGI_STL_PORT) || defined(_RWSTD_VER) || defined(__LIBCOMO__)
+#elif defined(__SGI_STL_PORT) || defined(_RWSTD_VER) || defined(__LIBCOMO__) || defined(_LIBCPP_VERSION)
    std::string s;
    real_concept_base_type d;
    is >> s;
@@ -325,7 +355,7 @@ namespace tools
 {
 
 template <>
-inline concepts::real_concept make_big_value<concepts::real_concept>(long double val, const char* , mpl::false_ const&, mpl::false_ const&)
+inline concepts::real_concept make_big_value<concepts::real_concept>(boost::math::tools::largest_float val, const char* , mpl::false_ const&, mpl::false_ const&)
 {
    return val;  // Can't use lexical_cast here, sometimes it fails....
 }
@@ -365,8 +395,8 @@ inline concepts::real_concept epsilon<concepts::real_concept>(BOOST_MATH_EXPLICI
 }
 
 template <>
-inline int digits<concepts::real_concept>(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(concepts::real_concept))
-{ 
+inline BOOST_MATH_CONSTEXPR int digits<concepts::real_concept>(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC(concepts::real_concept)) BOOST_NOEXCEPT
+{
    // Assume number of significand bits is same as real_concept_base_type,
    // unless std::numeric_limits<T>::is_specialized to provide digits.
    return tools::digits<concepts::real_concept_base_type>();
@@ -378,6 +408,26 @@ inline int digits<concepts::real_concept>(BOOST_MATH_EXPLICIT_TEMPLATE_TYPE_SPEC
 }
 
 } // namespace tools
+/*
+namespace policies {
+   namespace detail {
+
+      template <class T>
+      inline concepts::real_concept raise_rounding_error(
+         const char*,
+         const char*,
+         const T& val,
+         const concepts::real_concept&,
+         const  ::boost::math::policies::rounding_error< ::boost::math::policies::errno_on_error>&) BOOST_MATH_NOEXCEPT(T)
+      {
+         errno = ERANGE;
+         // This may or may not do the right thing, but the user asked for the error
+         // to be silent so here we go anyway:
+         return  val > 0 ? boost::math::tools::max_value<concepts::real_concept>() : -boost::math::tools::max_value<concepts::real_concept>();
+      }
+
+   }
+}*/
 
 #if defined(__SGI_STL_PORT) || defined(BOOST_NO_LIMITS_COMPILE_TIME_CONSTANTS)
 //
@@ -432,7 +482,7 @@ inline long double real_cast<long double, concepts::real_concept>(concepts::real
 
 #if BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
 //
-// For some strange reason ADL sometimes fails to find the 
+// For some strange reason ADL sometimes fails to find the
 // correct overloads, unless we bring these declarations into scope:
 //
 using concepts::itrunc;

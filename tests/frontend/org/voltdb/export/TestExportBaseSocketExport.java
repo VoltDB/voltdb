@@ -168,6 +168,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
+
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");

@@ -18,6 +18,7 @@
 #endif
 
 #include <boost/type_traits/detail/yes_no_type.hpp>
+#include <boost/type_traits/is_const.hpp>
 #include <boost/mpl/eval_if.hpp>
 #include <boost/mpl/identity.hpp>
 #include <boost/config.hpp>
@@ -68,6 +69,17 @@ namespace boost
             type;
     };
 
+    namespace ptr_container_detail
+    {
+        template< class T >
+        struct void_ptr
+        {
+            typedef BOOST_DEDUCED_TYPENAME 
+                mpl::if_c< boost::is_const< 
+                              BOOST_DEDUCED_TYPENAME boost::remove_nullable<T>::type >::value,
+                           const void*, void* >::type type;                                                       
+        };
+    }
 }
 
 #endif

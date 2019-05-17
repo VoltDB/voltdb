@@ -10,6 +10,7 @@
 #pragma once
 #endif
 
+#include <boost/math/special_functions/math_fwd.hpp>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/math/special_functions/beta.hpp>
 #include <boost/math/policies/error_handling.hpp>
@@ -26,12 +27,12 @@ T binomial_coefficient(unsigned n, unsigned k, const Policy& pol)
       return policies::raise_domain_error<T>(
          function, 
          "The binomial coefficient is undefined for k > n, but got k = %1%.",
-         k, pol);
+         static_cast<T>(k), pol);
    T result;
    if((k == 0) || (k == n))
-      return 1;
+      return static_cast<T>(1);
    if((k == 1) || (k == n-1))
-      return n;
+      return static_cast<T>(n);
 
    if(n <= max_factorial<T>::value)
    {

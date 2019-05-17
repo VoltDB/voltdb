@@ -402,7 +402,7 @@ AbstractExpression* MaterializedViewTriggerForInsert::parsePredicate(catalog::Ma
     if (domRoot.isNull()) {
         return NULL;
     }
-    PlannerDomValue expr = domRoot.rootObject();
+    PlannerDomValue expr = domRoot();
     return AbstractExpression::buildExpressionTree(expr);
 }
 

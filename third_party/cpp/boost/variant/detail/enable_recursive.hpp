@@ -13,25 +13,25 @@
 #ifndef BOOST_VARIANT_DETAIL_ENABLE_RECURSIVE_HPP
 #define BOOST_VARIANT_DETAIL_ENABLE_RECURSIVE_HPP
 
-#include "boost/variant/detail/enable_recursive_fwd.hpp"
-#include "boost/variant/variant_fwd.hpp"
+#include <boost/variant/detail/enable_recursive_fwd.hpp>
+#include <boost/variant/variant_fwd.hpp>
 
 #if !defined(BOOST_VARIANT_NO_FULL_RECURSIVE_VARIANT_SUPPORT)
-#   include "boost/mpl/apply.hpp"
-#   include "boost/mpl/eval_if.hpp"
-#   include "boost/mpl/lambda.hpp"
+#   include <boost/mpl/apply.hpp>
+#   include <boost/mpl/eval_if.hpp>
+#   include <boost/mpl/lambda.hpp>
 #endif
 
-#include "boost/variant/detail/substitute.hpp"
-#include "boost/mpl/aux_/config/ctps.hpp"
-#include "boost/mpl/bool_fwd.hpp"
-#include "boost/mpl/if.hpp"
-#include "boost/mpl/or.hpp"
-#include "boost/type_traits/is_pointer.hpp"
-#include "boost/type_traits/is_reference.hpp"
-#include "boost/type_traits/is_same.hpp"
+#include <boost/variant/detail/substitute.hpp>
+#include <boost/mpl/aux_/config/ctps.hpp>
+#include <boost/mpl/bool_fwd.hpp>
+#include <boost/mpl/if.hpp>
+#include <boost/mpl/or.hpp>
+#include <boost/type_traits/is_pointer.hpp>
+#include <boost/type_traits/is_reference.hpp>
+#include <boost/type_traits/is_same.hpp>
 
-#include "boost/variant/recursive_wrapper.hpp"
+#include <boost/variant/recursive_wrapper.hpp>
 
 namespace boost {
 namespace detail { namespace variant {
@@ -78,7 +78,6 @@ public:
 // See boost/variant/detail/enable_recursive_fwd.hpp for more information.
 //
 
-#if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
 
 template <typename T, typename RecursiveVariant, typename NoWrapper>
 struct enable_recursive
@@ -112,34 +111,6 @@ public: // metafunction result
 
 };
 
-#else // defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
-
-template <typename T, typename RecursiveVariant, typename NoWrapper>
-struct enable_recursive
-{
-private: // helpers, for metafunction result (below)
-
-    typedef typename BOOST_VARIANT_AUX_ENABLE_RECURSIVE_IMPL(
-          T, RecursiveVariant, ::boost::recursive_variant_
-        )::type t_;
-
-public: // metafunction result
-
-    // [Wrap with recursive_wrapper only if rebind really changed something:]
-    typedef typename mpl::if_<
-          mpl::or_<
-              NoWrapper
-            , is_same< t_,T >
-            , is_reference<t_>
-            , is_pointer<t_>
-            >
-        , t_
-        , boost::recursive_wrapper<t_>
-        >::type type;
-
-};
-
-#endif // BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION workaround
 
 ///////////////////////////////////////////////////////////////////////////////
 // (detail) metafunction class quoted_enable_recursive

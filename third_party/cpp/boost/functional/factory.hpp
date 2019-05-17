@@ -12,13 +12,17 @@
 #     include <boost/preprocessor/iteration/iterate.hpp>
 #     include <boost/preprocessor/repetition/enum_params.hpp>
 #     include <boost/preprocessor/repetition/enum_binary_params.hpp>
+#     include <boost/preprocessor/repetition/enum_trailing_params.hpp>
 
 #     include <new>
 #     include <boost/pointee.hpp>
-#     include <boost/none_t.hpp>
 #     include <boost/get_pointer.hpp>
 #     include <boost/non_type.hpp>
 #     include <boost/type_traits/remove_cv.hpp>
+
+#     if defined(BOOST_FUNCTIONAL_FACTORY_SUPPORT_NONE_T)
+#       include <boost/none_t.hpp>
+#     endif
 
 #     ifndef BOOST_FUNCTIONAL_FACTORY_MAX_ARITY
 #       define BOOST_FUNCTIONAL_FACTORY_MAX_ARITY 10
@@ -35,14 +39,20 @@ namespace boost
         factory_passes_alloc_to_smart_pointer
     };
 
+#if defined(BOOST_FUNCTIONAL_FACTORY_SUPPORT_NONE_T)
     template< typename Pointer, class Allocator = boost::none_t,
         factory_alloc_propagation AP = factory_alloc_for_pointee_and_deleter >
     class factory;
+#else
+    template< typename Pointer, class Allocator = void,
+        factory_alloc_propagation AP = factory_alloc_for_pointee_and_deleter >
+    class factory;
+#endif
 
     //----- ---- --- -- - -  -   -
 
     template< typename Pointer, factory_alloc_propagation AP >
-    class factory<Pointer, boost::none_t, AP> 
+    class factory<Pointer, void, AP>
     {
       public:
         typedef typename boost::remove_cv<Pointer>::type result_type;
@@ -56,17 +66,35 @@ namespace boost
 #     include BOOST_PP_ITERATE()
     };
 
+#if defined(BOOST_FUNCTIONAL_FACTORY_SUPPORT_NONE_T)
+    template< typename Pointer, factory_alloc_propagation AP >
+    class factory<Pointer, boost::none_t, AP>
+        : public factory<Pointer, void, AP>
+    {};
+#endif
+
     template< class Pointer, class Allocator, factory_alloc_propagation AP >
     class factory
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
         : private Allocator::template rebind< typename boost::pointee<
             typename boost::remove_cv<Pointer>::type >::type >::other
+#else
+        : private std::allocator_traits<Allocator>::template rebind_alloc<
+            typename boost::pointee< typename boost::remove_cv<Pointer>::type >::type >
+#endif
     {
       public:
         typedef typename boost::remove_cv<Pointer>::type result_type;
         typedef typename boost::pointee<result_type>::type value_type;
 
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
         typedef typename Allocator::template rebind<value_type>::other
             allocator_type;
+#else
+        typedef typename std::allocator_traits<Allocator>::template rebind_alloc<value_type>
+            allocator_type;
+        typedef std::allocator_traits<allocator_type> allocator_traits;
+#endif
 
         explicit factory(allocator_type const & a = allocator_type())
           : allocator_type(a)
@@ -89,9 +117,16 @@ namespace boost
 
             void operator()(value_type* ptr) const
             {
-                if (!! ptr) ptr->~value_type();
-                const_cast<allocator_type*>(static_cast<allocator_type const*>(
-                    this))->deallocate(ptr,1);
+                if (!! ptr) {
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
+                    ptr->~value_type();
+                    const_cast<allocator_type*>(static_cast<allocator_type const*>(
+                        this))->deallocate(ptr,1);
+#else
+                    allocator_traits::destroy(this->get_allocator(), ptr);
+                    allocator_traits::deallocate(this->get_allocator(),ptr,1);
+#endif
+                }
             }
         };
 
@@ -146,14 +181,30 @@ namespace boost
 #       endif
     inline result_type operator()(BOOST_PP_ENUM_BINARY_PARAMS(N,T,& a)) const
     {
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
         value_type* memory = this->get_allocator().allocate(1);
+#else
+        value_type* memory = allocator_traits::allocate(this->get_allocator(), 1);
+#endif
         try
-        { 
-            return make_pointer(
-                new(memory) value_type(BOOST_PP_ENUM_PARAMS(N,a)),
-                boost::non_type<factory_alloc_propagation,AP>() );
+        {
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
+            new(memory) value_type(BOOST_PP_ENUM_PARAMS(N,a));
+#else
+            allocator_traits::construct(this->get_allocator(), memory
+                BOOST_PP_ENUM_TRAILING_PARAMS(N,a));
+#endif
         }
-        catch (...) { this->get_allocator().deallocate(memory,1); throw; }
+        catch (...) {
+#if defined(BOOST_NO_CXX11_ALLOCATOR)
+            this->get_allocator().deallocate(memory,1);
+#else
+            allocator_traits::deallocate(this->get_allocator(), memory, 1);
+#endif
+            throw;
+        }
+
+        return make_pointer(memory, boost::non_type<factory_alloc_propagation,AP>());
     }
 #     endif
 #     undef N

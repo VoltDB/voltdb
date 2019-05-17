@@ -138,11 +138,25 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
-bool StreamedTable::shouldStreamToExport() {
-    //TODO: See if we can set wrapper to null or similar trick when streams are disabled
-    // to avoid the extra if check
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
-    return m_wrapper && ec->externalStreamsEnabled();
+void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type) {
+    if (m_executorContext->externalStreamsEnabled()) {
+        int64_t currSequenceNo = ++m_sequenceNo;
+        assert(m_columnNames.size() == source.columnCount());
+        size_t mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
+                                      m_executorContext->currentSpHandle(),
+                                      currSequenceNo,
+                                      m_executorContext->currentUniqueId(),
+                                      source,
+                                      partitionColumn(),
+                                      type);
+
+        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
+    }
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)
@@ -152,34 +166,13 @@ bool StreamedTable::insertTuple(TableTuple &source)
         throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
     }
 
-    size_t mark = 0;
-    if (shouldStreamToExport()) {
-        // handle any materialized views
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleInsert(source, true);
-        }
-        int64_t currSequenceNo = ++m_sequenceNo;
-        assert(m_columnNames.size() == source.columnCount());
-        mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
-                                      m_executorContext->currentSpHandle(),
-                                      currSequenceNo,
-                                      m_executorContext->currentUniqueId(),
-                                      source,
-                                      partitionColumn(),
-                                      ExportTupleStream::INSERT);
-
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        if (!uq) {
-            // With no active UndoLog, there is no undo support.
-            return true;
-        }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
+    // handle any materialized views
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleInsert(source, true);
     }
-    else {
-        // handle any materialized views even though we dont have any connector.
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleInsert(source, true);
-        }
+
+    if (m_wrapper) {
+        streamTuple(source, ExportTupleStream::INSERT);
     }
     return true;
 }
@@ -206,7 +199,7 @@ void StreamedTable::setGeneration(int64_t generation) {
 }
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
-    if (shouldStreamToExport()) {
+    if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples

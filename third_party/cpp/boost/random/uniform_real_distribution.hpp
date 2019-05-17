@@ -8,7 +8,7 @@
  *
  * See http://www.boost.org for most recent version including documentation.
  *
- * $Id: uniform_real_distribution.hpp 71018 2011-04-05 21:27:52Z steven_watanabe $
+ * $Id$
  *
  */
 
@@ -24,6 +24,7 @@
 #include <boost/random/detail/operators.hpp>
 #include <boost/random/detail/signed_unsigned_tools.hpp>
 #include <boost/type_traits/is_integral.hpp>
+#include <boost/mpl/bool.hpp>
 
 namespace boost {
 namespace random {
@@ -36,7 +37,6 @@ T generate_uniform_real(
 {
     for(;;) {
         typedef T result_type;
-        typedef typename Engine::result_type base_result;
         result_type numerator = static_cast<T>(eng() - (eng.min)());
         result_type divisor = static_cast<T>((eng.max)() - (eng.min)());
         BOOST_ASSERT(divisor > 0);
@@ -66,6 +66,8 @@ T generate_uniform_real(
 template<class Engine, class T>
 inline T generate_uniform_real(Engine& eng, T min_value, T max_value)
 {
+    if(max_value / 2 - min_value / 2 > (std::numeric_limits<T>::max)() / 2)
+        return 2 * generate_uniform_real(eng, T(min_value / 2), T(max_value / 2));
     typedef typename Engine::result_type base_result;
     return generate_uniform_real(eng, min_value, max_value,
         boost::is_integral<base_result>());
@@ -100,7 +102,7 @@ public:
                             RealType max_arg = RealType(1.0))
           : _min(min_arg), _max(max_arg)
         {
-            BOOST_ASSERT(_min <= _max);
+            BOOST_ASSERT(_min < _max);
         }
 
         /** Returns the minimum value of the distribution. */
@@ -154,7 +156,7 @@ public:
         RealType max_arg = RealType(1.0))
       : _min(min_arg), _max(max_arg)
     {
-        BOOST_ASSERT(min_arg <= max_arg);
+        BOOST_ASSERT(min_arg < max_arg);
     }
     /** Constructs a uniform_real_distribution from its parameters. */
     explicit uniform_real_distribution(const param_type& parm)
