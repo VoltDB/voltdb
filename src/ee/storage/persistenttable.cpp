@@ -1739,7 +1739,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
             throw;
         }
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
-                           shouldDRStreamRows, ignoreTupleLimit);
+                           shouldDRStreamRows, ignoreTupleLimit || elastic);
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
