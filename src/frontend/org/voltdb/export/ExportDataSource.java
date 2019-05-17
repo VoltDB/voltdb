@@ -763,6 +763,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
 
+            // Drop duplicate buffer
+            if (!m_gapTracker.isEmpty() && lastSequenceNumber <= m_gapTracker.getLastSeqNo()) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Dropping duplicate buffer. " +
+                            " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
+                            " tracker last seqNo: " + m_gapTracker.getLastSeqNo());
+                }
+                cont.discard();
+                return;
+            }
+
             // We should never try to push data on a source that is not in catalog
             if (!inCatalog()) {
                 exportLog.warn("Source not in catalog, dropping buffer. " +
