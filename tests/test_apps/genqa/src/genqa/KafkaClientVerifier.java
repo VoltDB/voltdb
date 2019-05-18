@@ -107,7 +107,7 @@ public class KafkaClientVerifier {
         Integer consumers = 1;
 
         @Option(desc = " max amount of seconds to wait before not receiving another kafka record")
-        Integer timeout = 120;
+        Integer timeout = 300;
 
         @Override
         public void validate() {
