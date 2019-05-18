@@ -20,9 +20,13 @@ package org.voltdb.plannerv2.rel.physical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -57,6 +61,19 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
 
     @Override public VoltPhysicalUnion copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         return new VoltPhysicalUnion(getCluster(), traitSet, inputs, all, m_splitCount);
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        // For unions, row count and cpu is a simple sum of children totals
+        return PlanCostUtil.computeSetOpCost(getInputs(), mq);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        double cpu = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override
