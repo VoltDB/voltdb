@@ -99,7 +99,7 @@ public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
                                       RelMetadataQuery mq) {
         double rowCount = getInput().estimateRowCount(mq);
 
-        rowCount = PlanCostUtil.discountRowCountSerialAggregate(rowCount, getGroupCount());
+        rowCount = PlanCostUtil.discountSerialAggregateRowCount(rowCount, getGroupCount());
         return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
@@ -157,10 +157,6 @@ public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
         super.explainTerms(pw);
         pw.item("type", "serial");
         return pw;
-    }
-
-    private boolean hasLimitOffset() {
-        return (m_limit != null || m_offset != null);
     }
 
     public RexNode getOffset() {

@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -29,10 +28,11 @@ import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
-import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
+
+import com.google.common.base.Preconditions;
 
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
@@ -111,13 +111,16 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double rowCount = estimateRowCount(mq);
-        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return getInput(0).estimateRowCount(mq);
+     }
 
-        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        //the worst-case time complexity is mandated to be O(nlogn)
+        double cpu = rowCount * Math.log(rowCount);
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override

@@ -17,10 +17,11 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -31,13 +32,13 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     private final boolean semiJoinDone;
@@ -82,6 +83,17 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
                 .itemIf("limit", m_limit, m_limit != null);
     }
 
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        double outerRowCount = getInput(0).estimateRowCount(mq);
+        double innerRowCount = getInput(1).estimateRowCount(mq);
+        // Give it a discount based on the number of join expressions
+        double rowCount = PlanCostUtil.discountJoinRowCount(outerRowCount * innerRowCount, condition);
+        // Give it a discount based on the limit / offset
+        rowCount = PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
+        return rowCount;
+    }
+
     abstract public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit);
 
     @Override
@@ -97,18 +109,6 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     @Override
     public int getSplitCount() {
         return 1;
-    }
-
-    @Override
-    public double estimateRowCount(RelMetadataQuery mq) {
-        return estimateRowCountImpl(mq);
-        // return ROW_COUNT_CACHE.get(mq);
-    }
-
-    protected double estimateRowCountImpl(RelMetadataQuery mq) {
-        // Give it a discount based on the number of equivalence expressions
-        return Math.min(getInput(0).estimateRowCount(mq), getInput(1).estimateRowCount(mq)) *
-                Math.pow(0.10, RelOptUtil.conjunctions(getCondition()).size());
     }
 
     protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
