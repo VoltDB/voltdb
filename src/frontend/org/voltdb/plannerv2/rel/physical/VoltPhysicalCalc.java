@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -33,6 +32,8 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Sub-class of {@link Calc}
@@ -91,13 +92,17 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     }
 
     @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        Preconditions.checkNotNull(mq);
+        double childRowCount = getInput(0).estimateRowCount(mq);
+        return PlanCostUtil.discountTableScanRowCount(childRowCount, getProgram());
+    }
+
+    @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
-
-        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
-
+        double cpu = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override

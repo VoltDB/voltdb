@@ -17,11 +17,10 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
+import java.util.Collections;
+
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -33,22 +32,18 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
-import org.voltdb.plannerv2.converter.RexConverter;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannerv2.VoltTable;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-
-import com.google_voltpatches.common.base.Preconditions;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannerv2.rules.physical.Constants;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}
@@ -58,12 +53,6 @@ import java.util.List;
  * @since 9.0
  */
 public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implements VoltPhysicalRel {
-
-    // If Limit ?, it's likely to be a small number. So pick up 50 here.
-    private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
-
-    static final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
-    static final int MAX_TABLE_ROW_COUNT = 1_000_000;
 
     protected final RexProgram m_program;
     protected final int m_splitCount;
@@ -156,26 +145,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         }
     }
 
-    /**
-     * Returns the cost of this plan (not including children).
-     * We will consider the row count as estimateRowCount,
-     * and the CPU cost as estimateRowCount+1.
-     * The IO cost is always 0 cause we are in-memory.
-     * The actual plan cost is depend on the planner implementation.
-     *
-     * @param planner Planner for cost calculation
-     * @param mq      Metadata query
-     * @return Cost of this plan (not including children)
-     */
-    @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double dRows = estimateRowCount(mq);
-        double dCpu = dRows + 1; // ensure non-zero cost
-        double dIo = 0;
-        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-    }
-
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
@@ -190,6 +159,19 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
         }
 
         return pw;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        Preconditions.checkNotNull(mq);
+        double rowCount = estimateInitialRowCount(mq);
+        rowCount = PlanCostUtil.discountTableScanRowCount(rowCount, m_program);
+        rowCount = PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
+        return rowCount;
+    }
+
+    protected double estimateInitialRowCount(RelMetadataQuery mq) {
+        return Constants.MAX_TABLE_ROW_COUNT;
     }
 
     public RexNode getLimitRexNode() {
@@ -251,46 +233,6 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
      * Returns a copy of this {@link AbstractVoltTableScan} but with a new traitSet and aggregate.
      */
     public abstract AbstractVoltTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
-
-
-    protected double estimateRowCountWithLimit(double rowCount) {
-        if (m_limit != null) {
-            int limitInt = getLimit();
-            // TODO: when could it be -1?
-            if (limitInt == -1) {
-                limitInt = DEFAULT_LIMIT_VALUE_PARAMETERIZED;
-            }
-
-            rowCount = Math.min(rowCount, limitInt);
-
-            if ((m_program == null || m_program.getCondition() == null) && m_offset == null) {
-                rowCount = limitInt;
-            }
-        }
-        return rowCount;
-    }
-
-    protected double  estimateRowCountWithPredicate(double rowCount) {
-        if (m_program != null && m_program.getCondition() != null) {
-            double discountFactor = 1.0;
-            // Eliminated filters discount the cost of processing tuples with a rapidly
-            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
-            // to a discount approaching 0.888... (=8/9) for many skipped filters.
-            final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
-            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
-            int condSize = RelOptUtil.conjunctions(m_program.getCondition()).size();
-            for (int i = 0; i < condSize; ++i) {
-                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
-            }
-            if (discountFactor < 1.0) {
-                rowCount *= discountFactor;
-                if (rowCount < 4) {
-                    rowCount = 4;
-                }
-            }
-        }
-        return rowCount;
-    }
 
 
     private boolean hasLimitOffset() {

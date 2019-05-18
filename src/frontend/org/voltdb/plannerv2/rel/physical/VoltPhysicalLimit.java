@@ -30,13 +30,12 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
-
-import com.google.common.base.Preconditions;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+
+import com.google.common.base.Preconditions;
 
 public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
@@ -103,33 +102,15 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        double limit = 0f;
-        // limit and offset can be question marks
-        if (m_limit != null && m_limit.getKind() != SqlKind.DYNAMIC_PARAM) {
-            limit = RexLiteral.intValue(m_limit);
-        }
-        if (m_offset != null && m_offset.getKind() != SqlKind.DYNAMIC_PARAM) {
-            limit += RexLiteral.intValue(m_offset);
-        }
-        double defaultLimit = super.estimateRowCount(mq);
-        if (limit == 0f || defaultLimit < limit) {
-            limit = defaultLimit;
-        }
-        return limit;
+        double childRowCount = getInput(0).estimateRowCount(mq);
+        return PlanCostUtil.discountLimitOffsetRowCount(childRowCount, m_offset, m_limit);
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        // Hack. Discourage Calcite from picking a plan with a Limit that has a RelDistributions.ANY
-        // distribution trait. This would make a "correct"
-        // VoltPhysicalLimit (Single) / DistributedExchange / VoltPhysicalLimit (Hash) plan
-        // less expensive than an "incorrect" VoltPhysicalLimit (Any) / DistributedExchange one.
-        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
-
-        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
+        double cpu = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override

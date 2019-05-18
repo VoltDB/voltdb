@@ -146,11 +146,11 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                 numOuterFieldsForJoin, true));
     }
 
-    private static RelNode toIndexJoin(VoltPhysicalJoin join, RelNode outerScan, RelNode innerChild, String indexName) {
+    private static RelNode toIndexJoin(VoltPhysicalJoin join, RelNode outerScan, RelNode innerChild, Index index, AccessPath accessPath) {
         return new VoltPhysicalNestLoopIndexJoin(
                 join.getCluster(), join.getTraitSet(), outerScan, innerChild, join.getCondition(),
                 join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-                ImmutableList.copyOf(join.getSystemFieldList()), indexName);
+                ImmutableList.copyOf(join.getSystemFieldList()), index, accessPath);
     }
 
     @Override
@@ -197,7 +197,7 @@ public class VoltPNestLoopToIndexJoinRule extends RelOptRule{
                             } else {
                                 innerChild = innerCalc.copy(innerCalc.getTraitSet(), indexScan, innerCalc.getProgram());
                             }
-                            equiv.put(toIndexJoin(join, outerScan, innerChild, index.getTypeName()), join);
+                            equiv.put(toIndexJoin(join, outerScan, innerChild, index, accessPath), join);
                         }));
         if (! equiv.isEmpty()) {
             call.transformTo(equiv.keySet().iterator().next(), equiv);

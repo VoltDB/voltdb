@@ -102,12 +102,16 @@ public class VoltRelOptCost implements RelOptCost {
 
     public boolean isLe(RelOptCost other) {
         VoltRelOptCost that = (VoltRelOptCost) other;
-        return this == that || this.rowCount <= that.rowCount;
+        int cpuCompare = Double.compare(this.cpu, that.cpu);
+        return this == that ||
+                ((cpuCompare < 0) || (cpuCompare == 0 && Double.compare(this.rowCount, that.rowCount) <= 0));
     }
 
     public boolean isLt(RelOptCost other) {
         VoltRelOptCost that = (VoltRelOptCost) other;
-        return this.rowCount < that.rowCount;
+        int cpuCompare = Double.compare(this.cpu, that.cpu);
+        return (cpuCompare < 0) ||
+                (cpuCompare == 0 && Double.compare(this.rowCount, that.rowCount) < 0);
     }
 
     public double getRows() {
@@ -121,9 +125,9 @@ public class VoltRelOptCost implements RelOptCost {
 
     public boolean equals(RelOptCost other) {
         return this == other || other instanceof VoltRelOptCost
-                && (this.rowCount == ((VoltRelOptCost) other).rowCount)
-                && (this.cpu == ((VoltRelOptCost) other).cpu)
-                && (this.io == ((VoltRelOptCost) other).io);
+                && (Double.compare(this.rowCount, ((VoltRelOptCost) other).rowCount) == 0)
+                && (Double.compare(this.cpu, ((VoltRelOptCost) other).cpu) == 0)
+                && (Double.compare(this.io, ((VoltRelOptCost) other).io) == 0);
     }
 
     public boolean isEqWithEpsilon(RelOptCost other) {
