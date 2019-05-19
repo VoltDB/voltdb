@@ -783,12 +783,14 @@ tr:hover{
             jira = self.get_jira_interface(user, passwd)
             logging.debug('    jira        : '+str(jira))
 
-        summary_partial_query = "summary ~ '" + "' AND summary ~ '".join(summary_keys)
-        labels_partial_query = ''
+        labels_partial_query = ""
         if labels:
             labels_partial_query = "' AND labels = '" + "' AND labels = '".join(labels)
-        full_jira_query = (summary_partial_query + labels_partial_query
-                           + "' AND project = '%s' AND status != Closed") % project
+        summary_partial_query = " AND summary ~ '" + "' AND summary ~ '".join(summary_keys)
+        full_jira_query = ("project = %s AND status != Closed"
+                           + summary_partial_query + labels_partial_query
+                           + "' ORDER BY key DESC"
+                           ) % str(project)
         tickets = []
         try:
             tickets = jira.search_issues(full_jira_query)
@@ -1012,12 +1014,15 @@ tr:hover{
                 logging.warn('Unable to connect to Slack!! (in create_jira_bug_ticket)')
 
             # Find all tickets within the same test suite and link them
+            labels_partial_query = ""
+            if labels:
+                labels_partial_query = " AND labels = '" + "' AND labels = '".join(labels) + "'"
+            full_jira_query = ("project = %s AND status != Closed AND summary ~ '%s'"
+                               + labels_partial_query
+                               ) % (str(project), str(test_suite))
             link_tickets = []
-            labels_partial_query = 'labels = ' + ' AND labels = '.join(labels)
             try:
-                link_tickets = jira.search_issues(("summary ~ '%s' AND " + labels_partial_query
-                                                   + " AND status != Closed AND reporter in (voltdbci)")
-                                                   % str(test_suite) )
+                link_tickets = jira.search_issues(full_jira_query)
             except TypeError as e:
                 logging.warn('Caught TypeError('+str(e)+'), in create_jira_bug_ticket, using:'
                              '\n    labels_partial_query: '+str(labels_partial_query)+
