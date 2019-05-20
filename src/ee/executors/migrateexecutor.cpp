@@ -133,11 +133,12 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 void *target_address = m_inputTuple.getNValue(0).castAsAddress();
                 targetTuple.move(target_address);
 
-                assert(targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull());
-                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                if (targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
+                    TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                    targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                                 indexesToUpdate, true, false, true);
-                migrated_tuples++;
+                    migrated_tuples++;
+                }
             }
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;
