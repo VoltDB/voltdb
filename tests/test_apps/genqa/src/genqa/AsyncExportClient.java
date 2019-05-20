@@ -86,7 +86,7 @@ public class AsyncExportClient
         String m_nonce;
         String m_txnLogPath;
         AtomicLong m_count = new AtomicLong(0);
-        AtomicLong m_row_count = new AtomicLong(0); // TBD: will app need to track row count as part of end decision and pass/fail condition?
+        AtomicLong m_migration_remain_count = new AtomicLong(0); // TBD: will app need to track row count as part of end decision and pass/fail condition?
 
         private Map<Integer,File> m_curFiles = new TreeMap<>();
         private Map<Integer,File> m_baseDirs = new TreeMap<>();
@@ -328,7 +328,7 @@ public class AsyncExportClient
                 @Override
                 public void run()
                 {
-                    printStatistics(periodicStatsContext,true);
+                    writer.m_migration_remain_count.set(printStatistics(periodicStatsContext,true));
                 }
             }
             , config.displayInterval*1000l
@@ -373,7 +373,17 @@ public class AsyncExportClient
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // We're done - stop the performance statistics display task
+            // We're done maybe - stop the performance statistics display task
+            long sleep_count = 0;
+            while (config.usemigrate && writer.m_migration_remain_count.get() > 0) {
+                Thread.sleep(10000);
+                System.out.println("Sleeping as migration drains");
+                System.out.println("\t sleep #" + ++sleep_count);
+                System.out.println("\t rows remaining in PARTITIONED_EXPORT_TABLE: " + writer.m_migration_remain_count.get());
+                if (sleep_count > 100) {
+                    break;
+                }
+            }
             timer.cancel();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -518,8 +528,9 @@ public class AsyncExportClient
      * periodically during a benchmark.
      **
      * If usemigrate, prints table row count per cycle as well.
+     * @return 
      */
-    static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
+    static private synchronized long printStatistics(ClientStatsContext context, boolean resetBaseline) {
         if (resetBaseline) {
             context = context.fetchAndResetBaseline();
         } else {
@@ -530,7 +541,7 @@ public class AsyncExportClient
                 .getStatsByProc()
                 .get(config.procedure);
 
-        if (stats == null) return;
+        if (stats == null) return 0;
 
         // long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         // switch from app's runtime to clock time so results line up
@@ -560,6 +571,7 @@ public class AsyncExportClient
             System.out.printf(" Migration progress rows remaining");
             while (rowcount.advanceRow()) {
                 System.out.printf(" %d\n", rowcount.getLong(0));
+                return rowcount.getLong(0);
             }
         }
 
