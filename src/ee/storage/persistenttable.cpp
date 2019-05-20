@@ -767,6 +767,10 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     }
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 /*
@@ -806,8 +810,10 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
-    // NOTE: it is safe to assume that when ConstraintFailureException occurs,
-    // no tuples had been added to target table.
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
@@ -1424,7 +1430,6 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
       target = lookupTupleForUndo(matchable);
    }
    if (target.isNullTuple()) {
-      // throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n", m_name.c_str());
       throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
             matchable.debugNoHeader().c_str());
    }
@@ -1464,16 +1469,14 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
                 return tableTuple;
             }
         }
-    }
-    else {
+    } else {
         size_t tuple_length;
         if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
             // Looking up a tuple by values should not include any internal
             // hidden column values, which are appended to the end of the
             // tuple.
             tuple_length = m_schema->offsetOfHiddenColumns();
-        }
-        else {
+        } else {
             tuple_length = m_schema->tupleLength();
         }
         // Do an inline tuple byte comparison
@@ -1602,8 +1605,7 @@ std::string PersistentTable::tableType() const { return "PersistentTable"; }
 bool PersistentTable::equals(PersistentTable* other) {
     if ( ! Table::equals(other)) {
         return false;
-    }
-    if (!(indexCount() == other->indexCount())) {
+    } else if (!(indexCount() == other->indexCount())) {
         return false;
     }
 
@@ -1654,12 +1656,8 @@ std::string PersistentTable::debug(const std::string& spacer) const {
  * Loads tuple data from the serialized table.
  * Used for snapshot restore and bulkLoad
  */
-void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
-                                             Pool *stringPool,
-                                             ReferenceSerializeOutput *uniqueViolationOutput,
-                                             bool shouldDRStreamRows,
-                                             bool ignoreTupleLimit,
-                                             bool elastic) {
+void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool *stringPool,
+      ReferenceSerializeOutput *uniqueViolationOutput, bool shouldDRStreamRows, bool ignoreTupleLimit, bool elastic) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();
@@ -1727,6 +1725,10 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
             deleteTupleStorage(target);
             throw;
         }
+        // TODO: we do not catch other types of exceptions, such as
+        // SQLException, etc. The assumption we held that no other
+        // exceptions should be thrown in the try-block is pretty
+        // daring and likely not correct.
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            shouldDRStreamRows, ignoreTupleLimit || elastic);
     }
@@ -1766,8 +1768,7 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
     } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
             throw;
-        }
-        if (serializedTupleCount == 0) {
+        } else if (serializedTupleCount == 0) {
             serializeColumnHeaderTo(*uniqueViolationOutput);
             tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
         }
@@ -1778,7 +1779,10 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
         deleteTupleStorage(tuple);
         throw;
     }
-
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 /** Prepare table for streaming from serialized data. */
@@ -1831,9 +1835,7 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
     m_tableStreamer = tableStreamer;
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
-        success = m_tableStreamer->activateStream(m_surgeon,
-                                                  streamType,
-                                                  predicateStrings);
+        success = m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
     }
     return success;
 }
@@ -1908,15 +1910,14 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_tableStreamer->notifyBlockWasCompactedAway(block);
-        return;
+    } else { // check that block is in pending snapshot container
+       assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     }
-    // else check that block is in pending snapshot container
-    assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
 }
 
 // Call-back from TupleBlock::merge() for each tuple moved.
 void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                          TableTuple& sourceTuple, TableTuple& targetTuple) {
+      TableTuple& sourceTuple, TableTuple& targetTuple) {
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
     }
@@ -2030,8 +2031,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector* bucketVector) 
             m_blocksNotPendingSnapshot.erase(lightest);
             m_blocksPendingSnapshot.erase(lightest);
             lightest->swapToBucket(TBBucketPtr());
-        }
-        else {
+        } else {
             int lightestBucketChange = bucketChanges.second;
             if (lightestBucketChange != NO_NEW_BUCKET_INDEX) {
                 lightest->swapToBucket((*bucketVector)[lightestBucketChange]);

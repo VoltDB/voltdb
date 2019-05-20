@@ -730,7 +730,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
-    public void testIndexFunction() {
+    public void testIndexFunction() throws IOException, ProcCallException {
         // Test that tuple insert that violates index functions should not succeed: ENG-16013
         final TestEnv env = new TestEnv("CREATE TABLE R3(i INTEGER NOT NULL, IPV6 VARCHAR(100));\n" +
                 "CREATE INDEX DIDR1 ON R3(INET6_ATON(IPV6));",
@@ -745,7 +745,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     Pair.of("INSERT INTO R3 VALUES(4, ':c::40:b47');", false),
                     Pair.of("INSERT INTO R3 VALUES(5, ':c::40:b47');", false),
                     Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0:0:8a2e:370:7334');", true),
-                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true))
+                    Pair.of("INSERT INTO R3 VALUES(7, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true),
+                    Pair.of("UPDATE R3 SET IPV6 = '2001:db8:85a3:0000:0000:8a2e:370:7334' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true),
+                    Pair.of("UPDATE R3 SET IPV6 = 'foobar' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true))
                     .forEachOrdered(queryAndStatus -> {
                         final String query = queryAndStatus.getFirst();
                         final boolean success = queryAndStatus.getSecond();
@@ -758,6 +760,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                             Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
                         }
                     });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{2});
         } finally {
             env.tearDown();
         }
@@ -780,7 +783,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     Pair.of("INSERT INTO R3 VALUES(4, ':c::40:b47');", false),
                     Pair.of("INSERT INTO R3 VALUES(5, ':c::40:b47');", false),
                     Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0:0:8a2e:370:7334');", true),
-                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true))
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true),
+                    Pair.of("UPDATE R3 SET IPV6 = '2001:db8:85a3:0000:0000:8a2e:370:7334' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true),
+                    Pair.of("UPDATE R3 SET IPV6 = 'foobar' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true))
                     .forEachOrdered(queryAndStatus -> {
                         final String query = queryAndStatus.getFirst();
                         final boolean success = queryAndStatus.getSecond();
@@ -793,6 +798,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                             Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
                         }
                     });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{2});
         } finally {
             env.tearDown();
         }
