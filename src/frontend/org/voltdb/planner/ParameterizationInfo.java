@@ -287,7 +287,7 @@ public class ParameterizationInfo {
     }
 
     public static Object valueForStringWithType(String value, VoltType type) {
-        if (type == VoltType.NULL) {
+        if (type == null || type == VoltType.NULL) {
             return null;
         }
 

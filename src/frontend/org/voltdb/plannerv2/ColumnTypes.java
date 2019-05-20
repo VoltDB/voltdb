@@ -22,10 +22,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * An adapter between {@link VoltType} and {@link SqlTypeName}}.
@@ -54,6 +55,7 @@ public class ColumnTypes {
         Map<VoltType, SqlTypeName> voltToCalc = new HashMap<>();
 
         Stream.of(  // one-to-one mappings get added to both maps
+            Pair.of(VoltType.NULL, SqlTypeName.NULL),
             Pair.of(VoltType.STRING, SqlTypeName.VARCHAR),
             Pair.of(VoltType.VARBINARY, SqlTypeName.VARBINARY),
 
