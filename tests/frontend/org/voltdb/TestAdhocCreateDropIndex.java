@@ -551,6 +551,43 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
     }
 
     @Test
+    public void testENG15742() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "VB VARBINARY NOT NULL\n" +
+                ");\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            // we don't allow using VARBINARY type in LIKE/STARTS WITH expression
+            Stream.of(
+                    "CREATE INDEX testIdx ON R21(VB) WHERE x'03' like VB;",
+                    "CREATE INDEX testIdx ON R21(VB) WHERE VB starts with x'03';")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            fail("We should not allow allow using VARBINARY type in LIKE/STARTS WITH expression");
+                        } catch (ProcCallException pce) {
+                            pce.printStackTrace();
+                            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+                            try {
+                                assertFalse(findIndexInSystemCatalogResults("testIdx"));
+                            } catch (Exception e) {
+                                fail(e.getMessage());
+                            }
+                        } catch (IOException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
     public void testENG15734() throws Exception {
         final VoltDB.Configuration config = new VoltDB.Configuration();
         final String ddl = "CREATE TABLE P4 (\n" +

@@ -102,12 +102,9 @@ public class ExpressionStartsWith extends ExpressionLogical {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (nodes[LEFT].dataType.isBinaryType()
-                   && nodes[RIGHT].dataType.isBinaryType()) {
-            startsWithObject.isBinary = true;
-        } else if (false == (nodes[LEFT].dataType.isBooleanType()
-                              && nodes[RIGHT].dataType.isBooleanType())
-                              && dataType.isBooleanType()) {
+        if (!(nodes[LEFT].dataType.isBooleanType()
+                && nodes[RIGHT].dataType.isBooleanType())
+                && dataType.isBooleanType()) {
             // If both argument nodes are boolean we have resolved
             // this before.  So, this is ok.  Otherwise, this is not
             // properly typed.

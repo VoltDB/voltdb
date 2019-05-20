@@ -42,6 +42,7 @@ JUNIT = os.environ.get('junit', None)
 # Jira credentials and info
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
+# TODO: change this back to 'ENG', before merging to master
 JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
 # Queries
@@ -322,7 +323,7 @@ class JenkinsBot(object):
         # This might only be required for listen()
         # Connect to real time messaging
         if not self.client.rtm_connect():
-            self.logger.info('Could not connect to real time messaging')
+            self.logger.info('Could not connect to real time messaging (Slack).')
             return False
 
         return True
@@ -736,10 +737,702 @@ tr:hover{
         else:
             self.response_html()
 
+
+    def get_jira_interface(self, username=JIRA_USER, password=JIRA_PASS):
+        """ TODO
+        """
+        if not (username and password):
+            self.logger.error('Did not provide either a Jira username ('
+                              +username+') or a Jira password ('+password+').')
+
+        try:
+            jira_interface = JIRA(server='https://issues.voltdb.com/', basic_auth=(username, password), options=dict(verify=False))
+#             jira_interface = JIRA(server='https://issues.voltdb.com/',
+#                                    basic_auth=(username, password),
+#                                    options=dict(verify=False))
+        except Exception as e:
+            self.logger.exception('Could not connect to Jira!!! Exception is:\n'+str(e))
+            return None
+        return jira_interface
+
+
+    def find_jira_bug_tickets(self, summary_keys, labels,
+                              jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                              project=JIRA_PROJECT):
+        """
+        Finds one or more existing, open bug tickets in Jira.
+        :param summary_keys: One or more substrings of the Summary, used to
+               find a related, open Jira ticket; typically the first one is the Test Suite in which the failed
+               test exists, and the second is the name of the test itself.
+        :param labels: The Labels to list in the Jira ticket.
+        :param jira: A JIRA access object, used to create a Jira ticket; if not
+               specified, the user and passwd will be used to create one.
+        :param user: The Jira Username used to access Jira.
+        :param passwd: The Jira Password for that User.
+        :param project: The Jira Project in which the Jira ticket should be created.
+        """
+        logging.debug('In find_jira_bug_tickets:')
+        logging.debug('    summary_keys: '+str(summary_keys))
+        logging.debug('    labels      : '+str(labels))
+        logging.debug('    jira        : '+str(jira))
+        logging.debug('    user        : '+str(user))
+        logging.debug('    passwd      : '+str(passwd))
+        logging.debug('    project     : '+str(project))
+
+        if not jira:
+            jira = self.get_jira_interface(user, passwd)
+            logging.debug('    jira        : '+str(jira))
+
+        labels_partial_query = ""
+        if labels:
+            labels_partial_query = "' AND labels = '" + "' AND labels = '".join(labels)
+        summary_partial_query = " AND summary ~ '" + "' AND summary ~ '".join(summary_keys)
+        full_jira_query = ("project = %s AND status != Closed"
+                           + summary_partial_query + labels_partial_query
+                           + "' ORDER BY key DESC"
+                           ) % str(project)
+        tickets = []
+        try:
+            tickets = jira.search_issues(full_jira_query)
+        except Exception as e:
+            logging.exception('Jira ticket query failed with Exception:'
+                              '\n    %s\n    using Jira query:\n    %s'
+                              % (str(e), full_jira_query) )
+
+        logging.debug('    summary_partial_query: '+summary_partial_query)
+        logging.debug('    full_jira_query:\n    '+str(full_jira_query))
+        logging.debug('    tickets     : '+str(tickets))
+
+        return tickets
+
+
+    def find_jira_bug_ticket(self, summary_keys, labels,
+                             jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                             project=JIRA_PROJECT):
+        """
+        Finds (exactly) one existing, open bug ticket in Jira.
+        :param summary_keys: One or more substrings of the Summary, used to
+               find a related, open Jira ticket; typically the first one is the Test Suite in which the failed
+               test exists, and the second is the name of the test itself.
+        :param labels: The Labels to list in the Jira ticket.
+        :param jira: A JIRA access object, used to create a Jira ticket; if not
+               specified, the user and passwd will be used to create one.
+        :param user: The Jira Username used to access Jira.
+        :param passwd: The Jira Password for that User.
+        :param project: The Jira Project in which the Jira ticket should be created.
+        """
+        logging.debug('In find_jira_bug_ticket:')
+        logging.debug('    summary_keys: '+str(summary_keys))
+        logging.debug('    labels      : '+str(labels))
+        logging.debug('    jira        : '+str(jira))
+        logging.debug('    user        : '+str(user))
+        logging.debug('    passwd      : '+str(passwd))
+        logging.debug('    project     : '+str(project))
+
+        ticket = None
+
+        existing_tickets = self.find_jira_bug_tickets(summary_keys, labels,
+                                                      jira, user, passwd, project)
+        if existing_tickets:
+            if len(existing_tickets) > 1:
+                logging.warn('More than 1 Jira ticket found; using first one:\n'
+                             +str(existing_tickets))
+                for et in existing_tickets:
+                    logging.warn("    %s: '%s'" % (et.key, et.fields.summary))
+
+            ticket = existing_tickets[0]
+
+        return ticket
+
+
+    def add_attachments(self, jira, ticket_id, attachments):
+        added_attachments = []
+        for file in attachments:
+            urlretrieve(attachments[file], file)
+            a = jira.add_attachment(ticket_id, os.getcwd() + '/' + file, file)
+            added_attachments.append(a)
+            os.unlink(file)
+        return added_attachments
+
+    def enforce_max_num_attachments(self, jira, ticket, max_num_attachments=10):
+        if len(ticket.fields.attachment) > max_num_attachments:
+            attachment_ids = [a.id for a in ticket.fields.attachment]
+            attachment_ids.sort(reverse=True)
+            for i in range(max_num_attachments, len(attachment_ids)):
+                jira.delete_attachment(attachment_ids[i])
+                logging.info('Deleted, from ticket %s, attachment: %s'
+                             % (str(ticket.key), str(attachment_ids[i])) )
+
+
+    def is_number(self, s):
+        try:
+            return float(s)
+        except ValueError:
+            return False
+
+
+    def get_jira_component_list(self, jira, component='Core',
+                                project=JIRA_PROJECT):
+        jira_component = component
+
+        components = jira.project_components(project)
+        for c in components:
+            if c.name == component:
+                jira_component = {
+                    'name': c.name,
+                    'id': c.id
+                }
+                break
+        return [jira_component]
+
+
+    def get_jira_version_list(self, jira, version='Backlog',
+                              project=JIRA_PROJECT):
+        jira_version = version
+
+        if not version.startswith('V') and self.is_number(version):
+            version = 'V' + version
+
+        versions = jira.project_versions(project)
+        for v in versions:
+            if str(v.name) == version.strip():
+                jira_version = {
+                    'name': v.name,
+                    'id': v.id
+                }
+                break
+        return [jira_version]
+
+
+    def create_jira_bug_ticket(self, channel, test_suite, summary,
+                               jenkins_job, build_number,
+                               description, version, labels,
+                               priority='Major', attachments={},
+                               jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                               project=JIRA_PROJECT, component='Core',
+                               DRY_RUN=False):
+        """
+        Creates a new bug ticket in Jira.
+        :param channel: A slack channel to be notified.
+        :param test_suite: The Test Suite in which the failed test exists;
+               used to find other bug tickets in the same Test Suite, which
+               are marked 'is related to'.
+        :param summary: The Summary to be used in the Jira ticket that is to
+               be created.
+        :param description: The Description to be used in the Jira ticket that
+               is to be created.
+        :param version: The (VoltDB) Version that this bug affects.
+        :param labels: The Labels to list in the Jira ticket.
+        :param priority: The Priority of the Jira ticket.
+        :param attachments: Any Attachments for the Jira ticket.
+        :param component: The Component to be used in the Jira ticket, i.e.,
+               the Component affected by this bug.
+        :param jira: A JIRA access object, used to create a Jira ticket; if not
+               specified, the user and passwd will be used to create one.
+        :param user: The Jira Username used to access Jira.
+        :param passwd: The Jira Password for that User.
+        :param project: The Jira Project in which the Jira ticket should be created.
+        :param DRY_RUN: When set to True, no Jira ticket will be created.
+        """
+
+        logging.debug('In create_jira_bug_ticket:')
+        logging.debug('  channel     : '+str(channel))
+        logging.debug('  test_suite  : '+str(test_suite))
+        logging.debug('  summary     : '+str(summary))
+        logging.debug('  description :\n'+str(description)+'\n')
+        logging.debug('  version     : '+str(version))
+        logging.debug('  labels      : '+str(labels))
+        logging.debug('  priority    : '+str(priority))
+        logging.debug('  attachments : '+str(attachments))
+        logging.debug('  component   : '+str(component))
+        logging.debug('  jira        : '+str(jira))
+        logging.debug('  project     : '+str(project))
+        logging.debug('  DRY_RUN     : '+str(DRY_RUN))
+
+        if not jira:
+            jira = self.get_jira_interface(user, passwd)
+            logging.debug('  jira        : '+str(jira))
+
+        issue_dict = {
+            'project': project,
+            'summary': summary,
+            'description': description,
+            'issuetype': {
+                'name': 'Bug'
+            },
+            'labels': labels
+        }
+
+        issue_dict['components'] = self.get_jira_component_list(jira, component, project)
+        issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
+
+        issue_dict['fixVersions'] = [{'name':'Backlog'}]
+        issue_dict['priority']    = {'name': priority}
+
+        logging.debug("Filing ticket with summary:\n%s" % summary)
+        logging.debug('  issue_dict  :\n    '+str(issue_dict))
+
+        if DRY_RUN:
+            new_issue = None
+        else:
+            try:
+                new_issue = jira.create_issue(fields=issue_dict)
+            except Exception as e:
+                logging.exception("Jira ticket creation failed with Exception:"
+                                  "\n    %s\n    using:\n    %s"
+                                  % (str(e), str(issue_dict)) )
+                return new_issue
+
+            # Add attachments to the Jira ticket
+            with_attachments = ''
+            if attachments:
+                try:
+                    new_attachments = self.add_attachments(jira, new_issue.id, attachments)
+                    with_attachments = ', with attachment(s)' + ' (with ID ' + ', '.join(
+                        new_attachments[i].id for i in range(len(new_attachments)) ) + ')'
+                except Exception as e:
+                    with_attachments = ', without specified attachment(s)'
+                    logging.warn("Unable (in create_jira_bug_ticket) to add attachments:"
+                                 "\n    '%s'\n  due to Exception:\n    %s"
+                                 % (str(attachments), str(e)) )
+
+            # Add a comment to the Jira ticket; and log a message
+            logging_message = ("Filed ticket %s (https://issues.voltdb.com/browse/%s)%s, "
+                               "with summary:\n    '%s'"
+                               % (new_issue.key, new_issue.key,
+                                  with_attachments, summary) )
+            comment = ("Filed ticket due to %s, build #%s%s."
+                       % (jenkins_job, build_number, with_attachments) )
+            jira.add_comment(new_issue.key, comment)
+            logging.info(logging_message)
+
+            # Post a message in the specified slack channel (if any)
+            try:
+                if channel and self.connect_to_slack():
+                    self.post_message(channel, logging_message)
+            except Exception as e:
+                logging.warn('Unable to connect to Slack!! (in create_jira_bug_ticket)')
+
+            # Find all tickets within the same test suite and link them
+            labels_partial_query = ""
+            if labels:
+                labels_partial_query = " AND labels = '" + "' AND labels = '".join(labels) + "'"
+            full_jira_query = ("project = %s AND status != Closed AND summary ~ '%s'"
+                               + labels_partial_query
+                               ) % (str(project), str(test_suite))
+            link_tickets = []
+            try:
+                link_tickets = jira.search_issues(full_jira_query)
+            except TypeError as e:
+                logging.warn('Caught TypeError('+str(e)+'), in create_jira_bug_ticket, using:'
+                             '\n    labels_partial_query: '+str(labels_partial_query)+
+                             '\n    test_suite          : '+str(test_suite) )
+
+            for ticket in link_tickets:
+                if ticket.key != new_issue.key:
+                    jira.create_issue_link('Related', new_issue.key, ticket)
+                    logging.debug('Linked ticket: %s' % str(ticket))
+
+        return new_issue
+
+
+    def get_modified_description(self, old_description, new_description_pieces,
+                                 num_chars_for_partial_match=12,
+                                 ignore_partial_match_for_last_n_pieces=1,
+                                 max_num_chars_per_description_piece=5000):
+        """Interweaves an old (Jira bug ticket) description with new description
+           pieces; essentially, parts of the old description that match new
+           description pieces will remain unchanged, but preceded first by parts
+           of the old description that preceded it and then by pieces of the new
+           description that preceded the matching piece.
+        """
+        # Original, very simple version, without interweaving:
+#         new_description = old_description
+# 
+#         for dp in new_description_pieces:
+#             if not (dp in old_description):
+#                 new_description = new_description + dp
+
+        logging.debug('In get_modified_description')
+        logging.debug('    old_description:\n'+str(old_description))
+        logging.debug('    new_description_pieces:\n'+str(new_description_pieces))
+
+        # Find the new_description_pieces that match parts of the old_description,
+        # both full and partial matches; the first num_chars_for_partial_match
+        # (~12) non-trivial characters are used for a partial match; for a partial
+        # match, the final ignore_partial_match_for_last_n_pieces (~1) elements of
+        # new_description_pieces are not checked, but just appended to the end of
+        # the new description (if they don't match fully)
+        matching_substring_indexes = []
+        for i in range(len(new_description_pieces)):
+            dp = new_description_pieces[i]
+            if dp in old_description:
+                start = old_description.index(dp)
+                end   = start + len(dp)
+                # keys: ndpi for 'new_description_pieces index';
+                # odsi for 'old_description start index';
+                # odei for 'old_description end index';
+                # full: True for a full (not partial) match
+                matching_substring_indexes.append({'ndpi':i,   'odsi':start,
+                                                   'odei':end, 'full':True })
+            elif i < len(new_description_pieces) - ignore_partial_match_for_last_n_pieces:
+                # In determining the number of characters to check for a partial
+                # match, don't count very common characters like '-', '\n', '\'
+                dpr = dp.replace('-', '').replace('\n', '').replace('\\', '')
+                if len(dpr) < 1:
+                    continue
+                dpi = dp.index(dpr[0]) + num_chars_for_partial_match
+                if dp[:dpi] in old_description:
+                    start = old_description.index(dp[:dpi])
+                    # keys: as above, but 'odei' is not used
+                    matching_substring_indexes.append({'ndpi':i, 'odsi':start,
+                                                       'odei':0, 'full':False })
+
+        # If every one of the new_description_pieces was found in the
+        # old_description, just return the old_description unaltered
+        if ( len(matching_substring_indexes) == len(new_description_pieces) and
+                all(msi['full'] for msi in matching_substring_indexes) ):
+            return old_description
+
+        # Interweave the non-matching and matching old_description parts
+        # and new_description_pieces
+        new_description = ''
+        old_desc_index = 0    # index in a string (of characters)
+        new_desc_index = 0    # index in a list (of strings)
+        for msi in matching_substring_indexes:
+            logging.debug('    msi: '+str(msi))
+
+            new_desc_end_index = msi['ndpi'] + 1
+            # Special case: if a partially matching new_description_piece is
+            # extremely long, skip it; this can sometimes avoid exceeding Jira's
+            # maximum description size (32,767 characters)
+            if ( not msi['full'] and len(new_description_pieces[msi['ndpi']])
+                                         > max_num_chars_per_description_piece ):
+                new_desc_end_index = msi['ndpi']
+
+            # Add in any parts of the old_description that we haven't used yet,
+            # and which precede the current match (full or partial); and elements
+            # of the new_description_pieces that we haven't used yet, up to and
+            # including the one that matches (fully or partially)
+            new_description = ( new_description
+                + old_description[old_desc_index:msi['odsi']]
+                + ''.join(new_description_pieces[i][:max_num_chars_per_description_piece]
+                          for i in range(new_desc_index, new_desc_end_index)) )
+            # henceforth, ignore the new_description_pieces that we've now used
+            new_desc_index = msi['ndpi'] + 1
+            # henceforth, ignore the parts of the old_description that we've now used...
+            if msi['full']:
+                old_desc_index = msi['odei']  # ... including a full match
+            else:
+                old_desc_index = msi['odsi']  # ... excluding a partial match
+            logging.debug('    old_desc_index, new_desc_index: '+str(old_desc_index)+', '+str(new_desc_index))
+
+        # Append any old_description parts and new_description_pieces after
+        # the last matching ones
+        new_description = (new_description
+            + old_description[old_desc_index:]
+            + ''.join(new_description_pieces[i] for i in range(new_desc_index, len(new_description_pieces) )) )
+        logging.debug('    new_description:\n'+str(new_description))
+
+        return new_description
+
+
+    def summary_differs_significantly(self, old_summary, new_summary):
+        """Determines whether the old and new (Jira ticket) summaries are
+           'significantly' different: if they are identical, or if they are
+           identical except for the failure percentage, returns False;
+           otherwise, returns True.
+        """
+        if old_summary == new_summary:
+            return False
+
+        percent_sign = '%'
+        if (percent_sign in old_summary and percent_sign in new_summary):
+            old_index = old_summary.index(percent_sign)
+            new_index = new_summary.index(percent_sign)
+            if (old_summary[0:max(0,old_index-3)] == new_summary[0:max(0,new_index-3)]
+                      and old_summary[old_index:] == new_summary[new_index:]):
+                return False
+
+        return True
+
+
+    def modify_jira_bug_ticket(self, channel, summary_keys, summary,
+                               jenkins_job, build_number,
+                               descriptions, version, labels,
+                               priority='Major', attachments={}, ticket_to_modify=None,
+                               jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                               project=JIRA_PROJECT, component='Core',
+                               max_num_attachments=10, DRY_RUN=False):
+        """
+        Modifies an existing bug ticket in Jira.
+        # TODO: finish this doc:
+        :param channel: A slack channel to be notified
+        :param summary_keys ????: One or more substrings of the Summary, used to
+               determine whether a Jira ticket already exists for this issue
+        :param summary: The Summary to be used in the Jira ticket that is to
+               be created or modified
+        :param jenkins_job ????: One or more substrings of the Summary, used to
+               determine whether a Jira ticket already exists for this issue
+        :param descriptions: One or more pieces of the Description to be added
+               to the Jira ticket; the pieces that already exist in the existing
+                ticket do not get added, to avoid redundancy.
+        :param version ???: The (VoltDB) Version that this bug affects
+        :param labels ??: The Labels to list in the Jira ticket
+        :param priority: The Priority of the Jira ticket
+        :param attachments: Any Attachments for the Jira ticket
+        :param component ??: The Component to be used in the Jira ticket, i.e.,
+               the Component affected by this bug
+        :param jira: A JIRA access object, used to modify a Jira ticket; if not
+               specified, the user and passwd will be used to create one.
+        :param user: The Jira Username used to access Jira.
+        :param passwd: The Jira Password for that User.
+        :param project: The Jira Project in which the Jira ticket should be modified
+        :param DRY_RUN: When set to True, no Jira ticket will be modified
+        """
+
+        logging.debug('In modify_jira_bug_ticket:')
+        logging.debug('  channel     : '+str(channel))
+        logging.debug('  summary_keys: '+str(summary_keys))
+        logging.debug('  summary     : '+str(summary))
+        logging.debug('  jenkins_job : '+str(jenkins_job))
+        logging.debug('  build_number: '+str(build_number))
+        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  version     : '+str(version))
+        logging.debug('  labels      : '+str(labels))
+        logging.debug('  priority    : '+str(priority))
+        logging.debug('  attachments : '+str(attachments))
+        logging.debug('  component   : '+str(component))
+        logging.debug('  jira        : '+str(jira))
+        logging.debug('  project     : '+str(project))
+        logging.debug('  max_num_attachments: '+str(max_num_attachments))
+        logging.debug('  DRY_RUN     : '+str(DRY_RUN))
+
+        if not jira:
+            jira = self.get_jira_interface(user, passwd)
+            logging.debug('    jira        : '+str(jira))
+
+        if not ticket_to_modify:
+            ticket_to_modify = self.find_jira_bug_ticket(summary_keys, labels,
+                                                         jira, user, passwd, project)
+            logging.debug('    ticket_to_modify: '+str(ticket_to_modify))
+
+        if ticket_to_modify and not DRY_RUN:
+            # Update the Jira ticket's summary, description, etc.
+            previous_summary = ticket_to_modify.fields.summary
+            old_description  = ticket_to_modify.fields.description
+            new_description  = self.get_modified_description(old_description, descriptions)
+            try:
+                ticket_to_modify.update(fields={'summary'    : summary,
+                                                'description': new_description,
+                                                'fixVersions': [{"set":[{"name" : version}]}],
+                                                'labels'     : labels,
+                                                'priority'   : {'name': priority}
+                                                })
+            except Exception as e:
+                logging.exception("Jira ticket update failed with Exception:\n    %s"
+                                  "\n    for Jira ticket %s, using:"
+                                  "\n    version '%s', priority '%s', labels %s;"
+                                  "\n    old and new summaries:\n    '%s'\n    '%s'"
+                                  "\n    old description:\n    %s"
+                                  "\n    new description pieces:\n    %s"
+                                  "\n    new (combined) description:\n    %s\n"
+                                  % (str(e), str(ticket_to_modify.key),
+                                     version, priority, str(labels),
+                                     previous_summary, summary, old_description,
+                                     str(descriptions), new_description) )
+                return ticket_to_modify
+
+            # Add attachments to the Jira ticket
+            with_attachments = ''
+            if attachments:
+                try:
+                    new_attachments = self.add_attachments(jira, ticket_to_modify.id, attachments)
+                    with_attachments = ', with attachment(s)' + ' (with ID ' + ', '.join(
+                        new_attachments[i].id for i in range(len(new_attachments)) ) + ')'
+                except Exception as e:
+                    with_attachments = ', without specified attachment(s)'
+                    logging.warn("Unable (in modify_jira_bug_ticket) to add attachments:"
+                                 "\n    '%s'\n  due to Exception:\n    %s"
+                                 % (str(attachments), str(e)) )
+                try:
+                    self.enforce_max_num_attachments(jira, ticket_to_modify,
+                                                     max_num_attachments - len(new_attachments) )
+                except Exception as e:
+                    logging.warn("Unable (in modify_jira_bug_ticket) to enforce max. number "
+                                 "of attachments (%d) for %s, due to Exception:\n    %s"
+                                 % (max_num_attachments, str(ticket_to_modify.key), str(e)) )
+
+            # Add a comment to the Jira ticket, if appropriate; and log a message
+            message1 = ("Modified ticket %s (https://issues.voltdb.com/browse/%s)"
+                        % (ticket_to_modify.key, ticket_to_modify.key) )
+            if previous_summary == summary:
+                logging_message = ("%s%s, with summary unchanged:\n    '%s'"
+                                   % (message1, with_attachments, summary))
+            else:
+                message2 = ("%s, with summary changed from/to:\n    '%s'\n    '%s'"
+                            % (with_attachments, previous_summary, summary) )
+                logging_message = message1 + message2
+                if self.summary_differs_significantly(previous_summary, summary):
+                    comment = ("Modified ticket due to %s, build #%s%s"
+                               % (jenkins_job, build_number, message2) )
+                    jira.add_comment(ticket_to_modify.key, comment)
+            logging.info(logging_message)
+
+            # Post a message in the specified slack channel (if any)
+            try:
+                if channel and self.connect_to_slack():
+                    self.post_message(channel, logging_message)
+            except Exception as e:
+                logging.warn('Unable to connect to Slack!! (in modify_jira_bug_ticket)')
+
+        return ticket_to_modify
+
+
+    def create_or_modify_jira_bug_ticket(self, channel, summary_keys, summary,
+                                         jenkins_job, build_number,
+                                         descriptions, version, labels,
+                                         priority='Major', attachments={}, existing_ticket=None,
+                                         jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                                         project=JIRA_PROJECT, component='Core',
+                                         max_num_attachments=10, DRY_RUN=False):
+        """
+        Creates a new bug ticket in Jira, or modifies an existing one.
+        :param channel: A slack channel to be notified.
+        :param summary_keys: One or more substrings of the Summary, used to
+               determine whether a Jira ticket already exists for this issue;
+               typically the first one is the Test Suite in which the failed
+               test exists, and the second is the name of the test itself.
+        :param summary: The Summary to be used in the Jira ticket that is to
+               be created or modified.
+        :param jenkins_job ????
+        :param descriptions: One or more pieces of the Description to be used
+               in (or added to) the Jira ticket; if there is an existing bug
+               ticket that gets modified, the pieces that already exist in the
+               existing ticket do not get added, to avoid redundancy.
+        :param version: The (VoltDB) Version that this bug affects.
+        :param labels: The Labels to list in the Jira ticket.
+        :param priority: The Priority of the Jira ticket.
+        :param attachments: Any Attachments for the Jira ticket.
+        :param component: The Component to be used in the Jira ticket, i.e.,
+               the Component affected by this bug.
+        :param jira: A JIRA access object, used to create a Jira ticket; if not
+               specified, the user and passwd will be used to create one.
+        :param user: The Jira Username used to access Jira.
+        :param passwd: The Jira Password for that User.
+        :param project: The Jira Project in which the Jira ticket should be reported.
+        :param DRY_RUN: When set to True, no Jira ticket will be created or modified.
+        """
+        logging.debug('In create_or_modify_jira_bug_ticket:')
+
+        if not project:
+            self.logger.error('Did not provide a Jira project ('+project+').')
+            return
+
+        if not jira:
+            jira = self.get_jira_interface(user, passwd)
+            logging.debug('  jira        : '+str(jira))
+
+        logging.debug('  channel     : '+str(channel))
+        logging.debug('  summary_keys: '+str(summary_keys))
+        logging.debug('  summary     : '+str(summary))
+        logging.debug('  jenkins_job : '+str(jenkins_job))
+        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  version     : '+str(version))
+        logging.debug('  labels      : '+str(labels))
+        logging.debug('  priority    : '+str(priority))
+        logging.debug('  attachments : '+str(attachments))
+        logging.debug('  component   : '+str(component))
+        logging.debug('  user        : '+str(user))
+        logging.debug('  passwd      : '+str(passwd))
+        logging.debug('  project     : '+str(project))
+        logging.debug('  DRY_RUN     : '+str(DRY_RUN))
+
+        # Check for existing tickets for the same issue; if there are any,
+        # we'll modify the existing ticket, rather than creating a new one
+        if len(summary_keys) < 1:
+            self.logger.exception('No summary_keys ('+summary_keys+') specified')
+            return None
+
+        if not existing_ticket:
+            existing_ticket = self.find_jira_bug_ticket(summary_keys, labels,
+                                                        jira, user, passwd, project)
+            logging.debug('  existing_ticket: '+str(existing_ticket))
+
+        # There is an existing ticket, so modify it
+        if existing_ticket:
+            self.logger.debug("Found open issue(s) for " + str(summary_keys) + "': "
+                             + str(existing_ticket))
+
+            return self.modify_jira_bug_ticket(channel, summary_keys, summary,
+                                               jenkins_job, build_number,
+                                               descriptions, version, labels,
+                                               priority, attachments, existing_ticket,
+                                               jira, user, passwd,
+                                               project, component,
+                                               max_num_attachments, DRY_RUN)
+
+        # There is no existing ticket, so create one
+        else:
+            self.logger.debug("Found no open issues for " + str(summary_keys))
+
+            return self.create_jira_bug_ticket(channel, summary_keys[0], summary,
+                                               jenkins_job, build_number,
+                                               ''.join(descriptions), version, labels,
+                                               priority, attachments,
+                                               jira, user, passwd,
+                                               project, component, DRY_RUN)
+
+
+    def close_jira_bug_ticket(self, channel, summary_keys,
+                              jenkins_job, build_number,
+                              labels, ticket_to_close=None,
+                              jira=None, user=JIRA_USER, passwd=JIRA_PASS,
+                              project=JIRA_PROJECT, DRY_RUN=False):
+
+        if not jira:
+            jira = self.get_jira_interface(user, passwd)
+            logging.debug('    jira        : '+str(jira))
+
+        if not ticket_to_close:
+            ticket_to_close = self.find_jira_bug_ticket(summary_keys, labels,
+                                                        jira, user, passwd, project)
+            logging.debug('    ticket_to_close: '+str(ticket_to_close))
+
+        if ticket_to_close and not DRY_RUN:
+            transitions = jira.transitions(ticket_to_close)
+            logging.info("Available transitions for ticket '"+str(ticket_to_close)+"':\n"+str(transitions))
+            try:
+                jira.transition_issue(ticket_to_close, transition='Close Issue')
+            except Exception as e:
+                logging.exception("Closing Jira ticket %s failed with Exception:\n    %s"
+                                  % (str(ticket_to_close.key), str(e)) )
+                return ticket_to_close
+
+            logging_message = ("Closed ticket %s (https://issues.voltdb.com/browse/%s), "
+                               "with summary:\n    '%s'"
+                               % (ticket_to_close.key, ticket_to_close.key,
+                                  ticket_to_close.field.summary) )
+            comment = ("Closed ticket after %s, build #%s."
+                       % (jenkins_job, build_number) )
+            jira.add_comment(ticket_to_close.key, comment)
+            logging.info(logging_message)
+
+            # Post a message in the specified slack channel (if any)
+            try:
+                if channel and self.connect_to_slack():
+                    self.post_message(channel, message)
+            except Exception as e:
+                logging.warn('Unable to connect to Slack!! (in close_jira_bug_ticket)')
+
+        return ticket_to_close
+
+
+    # TODO: this may be obsolete, but I'm not sure yet
     def create_bug_issue(self, channel, summary, description, component, version, labels, attachments={},
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT, DRY_RUN=False):
         """
-        Creates a bug issue on Jira
+        Creates a bug ticket in Jira
         :param channel: The channel to notify
         :param summary: The title summary
         :param description: Description field
@@ -832,7 +1525,7 @@ tr:hover{
             issue_dict['versions'] = ['DEPLOY-Integration']
 
         issue_dict['fixVersions'] = [{'name':'Backlog'}]
-        issue_dict['priority'] = {'name': 'Blocker'}
+        issue_dict['priority'] = {'name': 'Critical'}
 
         self.logger.info("Filing ticket: %s" % summary)
         if not DRY_RUN:
