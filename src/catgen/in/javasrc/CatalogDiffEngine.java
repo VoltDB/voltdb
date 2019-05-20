@@ -613,7 +613,8 @@ public class CatalogDiffEngine {
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
             }
-            boolean isStreamOrStreamView = CatalogUtil.isTableExportOnly((Database)table.getParent(), table);
+            boolean isStreamOrStreamView = CatalogUtil.isTableExportOnly((Database)table.getParent(), table)
+                    || TableType.needsShadowStream(table.getTabletype());
             if (isStreamOrStreamView) {
                 m_requiresNewExportGeneration = true;
             }
