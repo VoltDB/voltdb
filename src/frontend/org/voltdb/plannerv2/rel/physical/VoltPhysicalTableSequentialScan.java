@@ -17,7 +17,11 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -29,14 +33,10 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-import org.voltdb.plannerv2.rel.util.PlanCostUtil;
-import org.voltdb.plannerv2.rules.physical.Constants;
-
-import com.google.common.base.Preconditions;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 /**
  * The relational expression that represent a sequential VoltDB physical table scan.
@@ -62,17 +62,23 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
     }
 
+    /**
+     * Returns the cost of this plan (not including children).
+     * We will consider the row count as estimateRowCount,
+     * and the CPU cost as estimateRowCount+1.
+     * The IO cost is always 0 cause we are in-memory.
+     *
+     * @param planner Planner for cost calculation
+     * @param mq      Metadata query
+     * @return Cost of this plan (not including children)
+     */
     @Override
-    public double estimateRowCount(RelMetadataQuery mq) {
-        Preconditions.checkNotNull(mq);
-        double rowCount = Constants.MAX_TABLE_ROW_COUNT;
-        rowCount = PlanCostUtil.discountRowCountTableScan(rowCount, m_program);
-        // SeqScanPlanNode does not pay attention to limit
-
-        // If table is distributed divide the row count by the split count.
-        // The exchange node would combine individual fragments counts into a total.
-        int splitCount = mq.splitCount(this);
-        return rowCount / splitCount;
+    public RelOptCost computeSelfCost(RelOptPlanner planner,
+                                      RelMetadataQuery mq) {
+        double dRows = estimateRowCount(mq);
+        double dCpu = dRows;
+        double dIo = 0;
+        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
     }
 
     @Override

@@ -69,7 +69,7 @@ create table RI4 (
     i integer,
     ii integer);
 
-CREATE UNIQUE INDEX RI4_IND1_HASH ON RI4 (i);
+CREATE UNIQUE INDEX RI4_IND1 ON RI4 (i);
 CREATE INDEX RI4_IND2 ON RI4 (i);
 CREATE INDEX RI4_IND3 ON RI4 (i + ii);
 

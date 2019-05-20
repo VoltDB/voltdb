@@ -19,7 +19,6 @@ package org.voltdb.plannerv2.rel.physical;
 
 import java.util.Set;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -39,6 +38,7 @@ import org.voltdb.plannodes.MergeJoinPlanNode;
 import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
 
@@ -89,12 +89,16 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         return pw;
     }
 
-    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
-            RelMetadataQuery mq) {
-        final double dRows = estimateRowCount(mq);
-        final double dCpu = dRows + 1; // ensure non-zero cost
-        final double dIo = 0;
-        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+
+        double outerRowCount = getInput(0).estimateRowCount(mq);
+        double innerRowCount = getInput(1).estimateRowCount(mq);
+        // Since we support only equality join conditions for a Merje Join (equi join)
+        // and its inputs are guaranteed to be sorted, the MJ cost is simply M + N
+        double cpu = outerRowCount + innerRowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override
