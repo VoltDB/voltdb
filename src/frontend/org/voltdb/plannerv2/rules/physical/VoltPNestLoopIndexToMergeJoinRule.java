@@ -359,7 +359,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
     @Override
     public boolean matches(RelOptRuleCall call) {
         // An index must be scannable to produce sorted result; and the join must be an equi-join
-        return IndexType.isScannable(m_matchType.getInnerIndexScan(call).getIndex().getType()) &&
+        return isIndexScannable(m_matchType.getInnerIndexScan(call).getIndex()) &&
                 isEquijoin(call.rel(0));
     }
 
@@ -552,7 +552,7 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
                 .map(index -> IndexUtil.getCalciteRelevantAccessPathForIndex(
                         table, columns, joinCondition, outerProgram,
                         index, SortDirectionType.INVALID, numOuterFieldsForJoin, false))
-                .filter(accessPath -> accessPath != null && IndexType.isScannable(accessPath.getIndex().getType()))
+                .filter(accessPath -> accessPath != null && isIndexScannable(accessPath.getIndex()))
                 .map(accessPath -> {
                     try {
                         return Pair.of(VoltRexUtil.createIndexCollation(
@@ -580,5 +580,13 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
         // Extract (outer, inner) field indexes from the equi-join expression
         return VoltRexUtil.extractFieldIndexes(outerChildJoin.getCondition(),
                 outerChildJoin.getInputs().get(0).getRowType().getFieldCount());
+    }
+
+    private boolean isIndexScannable(Index index) {
+        int indexType = index.getType();
+        // HASH indexes are not supported and replaced by TREE based ones
+        return indexType == IndexType.BALANCED_TREE.getValue() ||
+                indexType == IndexType.BTREE.getValue() ||
+                indexType == IndexType.HASH_TABLE.getValue();
     }
 }

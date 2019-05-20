@@ -170,11 +170,17 @@ public final class PlanCostUtil {
     public static double computeIndexCost(Index index, AccessPath accessPath, double rowCount, RelMetadataQuery mq) {
 
         // HOW WE COST INDEXES
-        // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered
-        // otherwise, count non-equality scans as -0.5 coverage
-        // prefer hash index to tree, all else being equal
-        // prefer partial index, all else being equal
+        // Since Volt only supports TREE based indexes the cost can be approximated as following
+        // log(N / Sparsity)  + Sparsity  - 1
+        // where N is number of rows in a table and Sparsity represents the number of identical rows -
+        // Sparsity is 10 if 1 out 10 rows is a duplicate
+        // For a UNIQUE index Sparcity is 1
+        // To account for a multicolumn indexes and partial coverage, Sparsity is adjusted to be
+        // Adjusted Sparsity = Sparsity ** (Index Column Count - Key Width + 1)
+        // where the Index Column Count denotes number of columns / expressions in the index
+        // and Key Width denotes the number of Index columns / expressions covered by a given access path
+        // "Covering cell" indexes get a special adjustment to make them look more favorable
+        // Partial Indexes are discounted further
 
         // get the width of the index - number of columns or expression included in the index
         // need doubles for math
@@ -182,66 +188,18 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
-        // Estimate the cost of the scan (AND each projection and sort thereafter).
-        // This "tuplesToRead" is not strictly speaking an expected count of tuples.
-        // It's a vague measure of the cost of the scan whose accuracy depends a lot
-        // on what kind of post-filtering needs to happen.
-        // The tuplesRead value is also used here to estimate the number of RESULT rows.
-        // This value is estimated without regard to any post-filtering effect there might be
-        // -- as if all rows found in the index passed any additional post-filter conditions.
-        // This ignoring of post-filter effects is at least consistent with the SeqScanPlanNode.
-        // In effect, it gives index scans an "unfair" advantage
-        // -- follow-on sorts (etc.) are costed lower as if they are operating on fewer rows
-        // than would have come out of the seqscan, though that's nonsense.
-        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but
-        // IndexScanPlanNode costing only ignores post-filters.
-        // In any case, it's important to keep this code roughly in synch with any changes to
-        // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
-        double tuplesToRead = 0.;
+        int sparcity = (index.getUnique() || index.getAssumeunique()) ?
+                1 : TABLE_COLUMN_SPARCITY;
+        double adjustedSparcity = Math.pow(sparcity, colCount - keyWidth + 1);
+        double tuplesToRead = Math.log(rowCount / adjustedSparcity) + adjustedSparcity - 1;
 
-        // Assign minor priorities for different index types (tiebreakers).
-        if (index.getType() == IndexType.HASH_TABLE.getValue()) {
-            tuplesToRead = 2.;
-        } else if ((index.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                (index.getType() == IndexType.BTREE.getValue())) {
-            tuplesToRead = 3.;
-        } else if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
-            // "Covering cell" indexes get further special treatment below that tries to
-            // properly credit their benefit even when they do not actually eliminate
-            // the expensive exact contains post-filter.
-            tuplesToRead = 3.;
-        }
-        Preconditions.checkState(tuplesToRead > 0);
-
-        // special case a unique match for the output count
-        if (index.getUnique() && (colCount == keyWidth)) {
-            tuplesToRead = 1.;
-        } else {
-            // If not a unique, covering index, then it is a TREE based index with a complexity of
-            // log((N / Sparsity)**(keywidth - colCount + 1))  + Sparsity**(keywidth - colCount +1)  - 1
-            tuplesToRead = (keyWidth - colCount + 1) * Math.log(rowCount / TABLE_COLUMN_SPARCITY) +
-                    Math.pow(TABLE_COLUMN_SPARCITY, keyWidth - colCount + 1) - 1;
-
-            // "Covering cell" indexes get a special adjustment to make them look more favorable
-            // than non-unique range filters in particular.
-            // I can't quite justify that rationally, but it "seems reasonable". --paul
-            if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
-                final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
-                tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
-            }
-
-            // With all this discounting, make sure that any non-"covering unique" index scan costs more
-            // than any "covering unique" one, no matter how many indexed column filters get piled on.
-            // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
-            // indexed column filters statistically selects fewer (fractional) rows per scan
-            // than a unique index, but we favor the unique index anyway because:
-            // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
-            // -- the per-indexed-column selectivity factors used above are highly fictionalized
-            //    -- actual cardinality for individual components of compound indexes MIGHT be very low,
-            //       making them much less selective than estimated.
-            if (tuplesToRead < 4) {
-                tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
-            }
+        // "Covering cell" indexes get further special treatment below that tries to
+        // properly credit their benefit even when they do not actually eliminate
+        // the expensive exact contains post-filter.
+        // I can't quite justify that rationally, but it "seems reasonable". --paul
+        if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+            final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
+            tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
         }
 
         // @TODO Need to discount dCpu for a partial index
