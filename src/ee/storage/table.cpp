@@ -276,9 +276,9 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
        bug in tables of single integers, make sure that's correct.
     */
 
-    assert((m_columnHeaderSize == -1) == (m_columnHeaderData == nullptr));
     // use a cache
     if (m_columnHeaderData) {
+        assert(m_columnHeaderSize != -1);
         serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
         return;
     }
@@ -317,8 +317,8 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
 
 
     // write the header size which is a non-inclusive int
-    size_t const position = serialOutput.position();
-    m_columnHeaderSize = static_cast<int32_t>(position - start);
+    getColumnHeaderSizeToSerialize();
+    assert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
     serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
 
