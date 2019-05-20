@@ -1419,36 +1419,36 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple& target) {
  *     can be used directly.
  */
 void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
-   TableTuple matchable(tupleData, m_schema);
-   TableTuple target(tupleData, m_schema);
-   //* enable for debug */ std::cout << "DEBUG: undoing "
-   //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-   //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-   if (!skipLookup) {
-      // The UndoInsertAction got a pooled copy of the tupleData.
-      // Relocate the original tuple actually in the table.
-      target = lookupTupleForUndo(matchable);
-   }
-   if (target.isNullTuple()) {
-      throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
-            matchable.debugNoHeader().c_str());
-   }
-   //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
-   //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-   //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+    TableTuple matchable(tupleData, m_schema);
+    TableTuple target(tupleData, m_schema);
+    //* enable for debug */ std::cout << "DEBUG: undoing "
+    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+    if (!skipLookup) {
+        // The UndoInsertAction got a pooled copy of the tupleData.
+        // Relocate the original tuple actually in the table.
+        target = lookupTupleForUndo(matchable);
+    }
+    if (target.isNullTuple()) {
+        throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
+              matchable.debugNoHeader().c_str());
+    }
+    //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
+    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
 
-   // Make sure that they are not trying to delete the same tuple twice
-   assert(target.isActive());
-   deleteFromAllIndexes(&target);
+    // Make sure that they are not trying to delete the same tuple twice
+    assert(target.isActive());
+    deleteFromAllIndexes(&target);
 
-   // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
-   if (isTableWithMigrate(m_tableType)) {
-      NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
-      if(!txnId.isNull()){
-         migratingRemove(ValuePeeker::peekBigInt(txnId), target);
-      }
-   }
-   deleteTupleFinalize(target); // also frees object columns
+    // The inserted tuple could have been migrated from stream snapshot/rejoin, undo the migrating indexes
+    if (isTableWithMigrate(m_tableType)) {
+        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+        if(!txnId.isNull()){
+            migratingRemove(ValuePeeker::peekBigInt(txnId), target);
+        }
+    }
+    deleteTupleFinalize(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType) {

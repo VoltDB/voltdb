@@ -717,9 +717,9 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
 }
 
 void VoltDBEngine::undoUndoToken(int64_t undoToken) {
-   m_currentUndoQuantum = NULL;
-   m_executorContext->setupForPlanFragments(NULL);
-   m_undoLog.undo(undoToken);
+    m_currentUndoQuantum = NULL;
+    m_executorContext->setupForPlanFragments(NULL);
+    m_undoLog.undo(undoToken);
 }
 
 void VoltDBEngine::serializeException(const SerializableEEException& e) {

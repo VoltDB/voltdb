@@ -261,30 +261,29 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             if (newValue.isNull()) {
                 newValue = existingValue;
             } else {
-               switch(m_aggTypes[aggIndex]) {
-                  case EXPRESSION_TYPE_AGGREGATE_SUM:
-                     if (!existingValue.isNull()) {
-                        newValue = existingValue.op_add(newValue);
-                     }
-                     break;
-                  case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                     newValue = existingValue.op_increment();
-                     break;
-                  case EXPRESSION_TYPE_AGGREGATE_MIN:
-                     // ignore any new value that is not strictly an improvement
-                     if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
-                        newValue = existingValue;
-                     }
-                     break;
-                  case EXPRESSION_TYPE_AGGREGATE_MAX:
-                     // ignore any new value that is not strictly an improvement
-                     if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
-                        newValue = existingValue;
-                     }
-                     break;
-                  default:
-                     assert(false); // Should have been caught when the matview was loaded.
-                     // no break
+                switch(m_aggTypes[aggIndex]) {
+                   case EXPRESSION_TYPE_AGGREGATE_SUM:
+                       if (!existingValue.isNull()) {
+                          newValue = existingValue.op_add(newValue);
+                       }
+                       break;
+                   case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                       newValue = existingValue.op_increment();
+                       break;
+                   case EXPRESSION_TYPE_AGGREGATE_MIN:
+                       // ignore any new value that is not strictly an improvement
+                       if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
+                          newValue = existingValue;
+                       }
+                       break;
+                   case EXPRESSION_TYPE_AGGREGATE_MAX:
+                       // ignore any new value that is not strictly an improvement
+                       if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
+                          newValue = existingValue;
+                       }
+                       break;
+                   default:
+                       assert(false); // Should have been caught when the matview was loaded.
                }
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);

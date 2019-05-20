@@ -392,17 +392,17 @@ public:
 
     /** Get the value of a specified column (const). */
     inline const NValue getNValue(const int idx) const {
-       assert(m_schema);
-       assert(m_data);
-       assert(idx < m_schema->totalColumnCount());   // column index might point to a hidden column of migrating table
+        assert(m_schema);
+        assert(m_data);
+        assert(idx < m_schema->totalColumnCount());   // column index might point to a hidden column of migrating table
 
-       const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-       const voltdb::ValueType columnType = columnInfo->getVoltType();
-       const char* dataPtr = getDataPtr(columnInfo);
-       const bool isInlined = columnInfo->inlined;
-       const bool isVolatile = inferVolatility(columnInfo);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+        const bool isVolatile = inferVolatility(columnInfo);
 
-       return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined, isVolatile);
     }
 
     /** Like the above method but for hidden columns. */
