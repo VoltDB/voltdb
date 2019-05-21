@@ -150,8 +150,7 @@ class Distributer {
     private final long m_procedureCallTimeoutNanos;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutNanos;
-    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
-        new HashMap<>();
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats = new HashMap<>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
@@ -159,7 +158,6 @@ class Distributer {
     private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
     private boolean m_topologyChangeAware;
 
-    //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
         Executors.newSingleThreadScheduledExecutor(
                 CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
@@ -190,6 +188,9 @@ class Distributer {
 
     // executor service for ssl encryption/decryption, if ssl is enabled.
     private CipherExecutor m_cipherService;
+
+    // Indicate shutting down if it is true
+    private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     /**
      * Handles topology updates for client affinity
@@ -257,16 +258,19 @@ class Distributer {
                 }
                 return;
             }
-            //Fast path subscribing retry if the connection was lost before getting a response
-            if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
-                subscribeToNewNode();
+            if (m_shutdown.get()) {
                 return;
-            } else if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+            }
+            //Fast path subscribing retry if the connection was lost before getting a response
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST ) {
+                if (!m_connections.isEmpty()) {
+                    subscribeToNewNode();
+                }
                 return;
             }
 
             //Slow path, god knows why it didn't succeed, server could be paused and in admin mode. Don't firehose attempts.
-            if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
+            if (response.getStatus() != ClientResponse.SUCCESS && !m_shutdown.get()) {
                 //Retry on the off chance that it will work the Nth time, or work at a different node
                 m_ex.schedule(new Runnable() {
                     @Override
@@ -813,7 +817,7 @@ class Distributer {
                 if (m_useClientAffinity &&
                     m_subscribedConnection == this &&
                     m_subscriptionRequestPending == false &&
-                    !m_ex.isShutdown()) {
+                    !m_shutdown.get()) {
                     //Don't subscribe to a new node immediately
                     //to somewhat prevent a thundering herd
                     try {
@@ -1080,6 +1084,9 @@ class Distributer {
                 return;
             }
         }
+        if (m_shutdown.get()) {
+            return;
+        }
         try {
 
             //Subscribe to topology updates before retrieving the current topo
@@ -1285,11 +1292,13 @@ class Distributer {
      * @throws InterruptedException
      */
     final void shutdown() throws InterruptedException {
-        // stop the old proc call reaper
-        m_timeoutReaperHandle.cancel(false);
+        m_shutdown.set(true);
         if (CoreUtils.isJunitTest()) {
+            m_timeoutReaperHandle.cancel(true);
             m_ex.shutdownNow();
         } else {
+            // stop the old proc call reaper
+            m_timeoutReaperHandle.cancel(false);
             m_ex.shutdown();
             m_ex.awaitTermination(365, TimeUnit.DAYS);
         }
