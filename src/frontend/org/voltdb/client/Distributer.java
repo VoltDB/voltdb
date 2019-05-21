@@ -1153,6 +1153,10 @@ class Distributer {
         NodeConnection cxn = null;
         boolean backpressure = true;
 
+        // Shutting down, no more tasks
+        if (m_shutdown.get()) {
+            return false;
+        }
         /*
          * Synchronization is necessary to ensure that m_connections is not modified
          * as well as to ensure that backpressure is reported correctly
