@@ -18,7 +18,6 @@
 package org.voltdb.plannerv2.rel.physical;
 
 import java.util.List;
-import java.util.stream.IntStream;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
@@ -33,6 +32,8 @@ import com.google.common.base.Preconditions;
 
 /**
  * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical calling convention.
+ *
+ * Set operations: intersect, union, except.
  *
  * @author Mike Alexeev
  * @since 9.0
@@ -50,11 +51,7 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalIntersect(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
@@ -72,10 +69,10 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         Preconditions.checkState(getInputs().size() > 1);
-        double minChildRowCount = getInputs().stream()
-                .map(child -> child.estimateRowCount(mq))
-                .reduce(1., (minCount, childCount) -> Math.min(minCount, childCount));
-        return minChildRowCount * Math.pow(PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
+        final double allChildRowCount = getInputs().stream()
+                .mapToDouble(child -> child.estimateRowCount(mq))
+                .sum();     // Conservatively, UNION could add all rows from each input query.
+        return allChildRowCount * Math.pow(PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
     }
 
     @Override

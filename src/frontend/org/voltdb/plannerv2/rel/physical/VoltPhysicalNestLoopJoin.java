@@ -58,7 +58,6 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-
         double outerRowCount = getInput(0).estimateRowCount(mq);
         double innerRowCount = getInput(1).estimateRowCount(mq);
         double cpu = outerRowCount * innerRowCount;

@@ -73,8 +73,7 @@ public class VoltPhysicalTableSequentialScan extends VoltPhysicalTableScan {
      * @return Cost of this plan (not including children)
      */
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double dRows = estimateRowCount(mq);
         double dCpu = dRows;
         double dIo = 0;
