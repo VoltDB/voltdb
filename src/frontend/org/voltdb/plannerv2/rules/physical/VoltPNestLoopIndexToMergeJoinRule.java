@@ -583,10 +583,16 @@ public class VoltPNestLoopIndexToMergeJoinRule extends RelOptRule {
     }
 
     private boolean isIndexScannable(Index index) {
-        int indexType = index.getType();
-        // HASH indexes are not supported and replaced by TREE based ones
-        return indexType == IndexType.BALANCED_TREE.getValue() ||
-                indexType == IndexType.BTREE.getValue() ||
-                indexType == IndexType.HASH_TABLE.getValue();
+        switch (IndexType.get(index.getType())) {
+            case BALANCED_TREE:
+            case BTREE:
+            case HASH_TABLE:
+                // HASH indexes are not supported and replaced by TREE based ones
+                return true;
+            case COVERING_CELL_INDEX:
+            case INVALID:
+                default:
+                return false;
+        }
     }
 }

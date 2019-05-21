@@ -49,11 +49,7 @@ public class VoltPhysicalUnion extends Union implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalUnion(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
