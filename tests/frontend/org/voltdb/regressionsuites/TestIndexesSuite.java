@@ -1207,12 +1207,14 @@ public class TestIndexesSuite extends RegressionSuite {
         // no match
         sql = "select varb2 from varbinaryTableTree where varb2 = x'0101'";
         checkQueryPlan(client, sql, explainPlanStr);
-        validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
+        // ENG-16121 (when this ticket is fixed, uncomment the test case next)
+        //validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
 
         // greater than
         sql = "select varb2 from varbinaryTableTree where varb2 > x'0101' order by varb2";
         checkQueryPlan(client, sql, explainPlanStr);
-        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
+        // ENG-16121 (when this ticket is fixed, uncomment the test case next)
+        //validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
 
         // ENG-9032 (when this ticket is fixed, uncomment the test case next)
 //        sql = "select varb2 from varbinaryTableTree where varb2 < x'ACEF' order by varb2";
