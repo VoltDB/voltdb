@@ -195,8 +195,9 @@ public class ExportCoordinator {
          */
         private void invokeNext() {
 
-            // Let invocations pass when initializing or initialized
-            if (!isActive()) {
+            // Do not try to acquire the distributed lock until
+            // completely initialized
+            if (!isCoordinatorInitialized()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Uninitialized, skip invocation");
                 }
@@ -753,8 +754,9 @@ public class ExportCoordinator {
 
     }
 
-    //.the coordinator is active and must be shut down as soon as we have started initializing it
-    private boolean isActive() {
+    // Coordinator must be shut down whenever it has started initializing; the
+    // shutdown will occur only after the coordinator is completely initialized.
+    private boolean mustBeShutdown() {
         return m_state == State.INITIALIZED || m_state == State.INITIALIZING;
     }
 
@@ -826,7 +828,7 @@ public class ExportCoordinator {
      */
     public void shutdown() throws InterruptedException {
 
-        if (!isActive()) {
+        if (!mustBeShutdown()) {
             // Nothing to shut down, notify EDS it can shut down
             m_eds.onCoordinatorShutdown();
             return;
