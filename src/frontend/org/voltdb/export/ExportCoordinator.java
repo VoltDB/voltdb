@@ -195,6 +195,8 @@ public class ExportCoordinator {
          */
         private void invokeNext() {
 
+            // Do not try to acquire the distributed lock until
+            // completely initialized
             if (!isCoordinatorInitialized()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Uninitialized, skip invocation");
@@ -751,6 +753,13 @@ public class ExportCoordinator {
         return tableName + "_" + partitionId;
 
     }
+
+    // Coordinator must be shut down whenever it has started initializing; the
+    // shutdown will occur only after the coordinator is completely initialized.
+    private boolean mustBeShutdown() {
+        return m_state == State.INITIALIZED || m_state == State.INITIALIZING;
+    }
+
     /**
      * @return true if coordinator is initialized
      *
@@ -819,8 +828,9 @@ public class ExportCoordinator {
      */
     public void shutdown() throws InterruptedException {
 
-        if (!isCoordinatorInitialized()) {
-            // Nothing to shut down
+        if (!mustBeShutdown()) {
+            // Nothing to shut down, notify EDS it can shut down
+            m_eds.onCoordinatorShutdown();
             return;
         }
         exportLog.info("Export coordinator requesting shutdown: clearing pending invocations");
