@@ -40,18 +40,13 @@ import com.google.common.base.Preconditions;
 public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     // TODO: limit / offset as expressions or parameters
-    private RexNode m_offset;
-    private RexNode m_limit;
+    private final RexNode m_offset;
+    private final RexNode m_limit;
 
     private final int m_splitCount;
 
     public VoltPhysicalLimit(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexNode offset,
-            RexNode limit,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
         super(cluster, traitSet, input);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
@@ -59,20 +54,13 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         m_splitCount = splitCount;
     }
 
-    public VoltPhysicalLimit copy(RelTraitSet traitSet, RelNode input,
-                                  RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalLimit(
-                getCluster(),
-                traitSet,
-                input,
-                offset,
-                limit,
-                splitCount);
+    public VoltPhysicalLimit copy(
+            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
+        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, splitCount);
     }
 
     @Override
-    public VoltPhysicalLimit copy(RelTraitSet traitSet,
-                                  List<RelNode> inputs) {
+    public VoltPhysicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
         return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
     }
 
@@ -108,6 +96,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        // row count and cpu cost are the same
         double rowCount = estimateRowCount(mq);
         double cpu = rowCount;
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
@@ -120,8 +109,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-
-        LimitPlanNode lpn = new LimitPlanNode();
+        final LimitPlanNode lpn = new LimitPlanNode();
         if (m_limit != null) {
             lpn.setLimit(RexLiteral.intValue(m_limit));
         }
@@ -139,7 +127,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     }
 
     public static LimitPlanNode toPlanNode(RexNode limit, RexNode offset) {
-        LimitPlanNode lpn = new LimitPlanNode();
+        final LimitPlanNode lpn = new LimitPlanNode();
         if (limit != null) {
             if (limit instanceof RexDynamicParam) {
                 lpn.setLimit(-1);

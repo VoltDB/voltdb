@@ -306,12 +306,12 @@ public class PlannerTool {
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO: enable when we are ready
         throw new PlannerFallbackException("planSqlCalcite not ready");
-//        return new AdHocPlannedStatement(plan, core);
+        //return new AdHocPlannedStatement(plan, core);
     }
 
-    public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
-                                                      boolean isExplainMode, final Object[] userParams,
-                                                      boolean isSwapTables, boolean isLargeQuery) {
+    public synchronized AdHocPlannedStatement planSql(
+            String sql, StatementPartitioning partitioning, boolean isExplainMode, final Object[] userParams,
+            boolean isSwapTables, boolean isLargeQuery) {
         // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
         // a certain percentage of the time
         if (m_largeModeRatio > 0 && !isLargeQuery) {

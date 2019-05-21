@@ -21,12 +21,14 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -39,56 +41,27 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     private final int m_splitCount;
 
     public VoltPhysicalSort(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RelCollation collation,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, int splitCount) {
         this(cluster, traitSet, input, collation, null, null, splitCount);
     }
 
     private VoltPhysicalSort(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RelCollation collation,
-            RexNode offset,
-            RexNode limit,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset,
+            RexNode limit, int splitCount) {
         super(cluster, traitSet, input, collation, offset, limit);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
     }
 
     @Override
-    public VoltPhysicalSort copy(RelTraitSet traitSet,
-                                 RelNode input,
-                                 RelCollation collation,
-                                 RexNode offset,
-                                 RexNode limit) {
-        return copy(
-                traitSet,
-                input,
-                collation,
-                offset,
-                limit,
-                m_splitCount);
+    public VoltPhysicalSort copy(
+            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit) {
+        return copy(traitSet, input, collation, offset, limit, m_splitCount);
     }
 
-    public VoltPhysicalSort copy(RelTraitSet traitSet,
-                                 RelNode input,
-                                 RelCollation collation,
-                                 RexNode offset,
-                                 RexNode limit,
-                                 int splitCount) {
-        return new VoltPhysicalSort(
-                getCluster(),
-                traitSet,
-                input,
-                collation,
-                offset,
-                limit,
-                splitCount);
+    public VoltPhysicalSort copy(
+            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode limit, int splitCount) {
+        return new VoltPhysicalSort(getCluster(), traitSet, input, collation, offset, limit, splitCount);
     }
 
     @Override
@@ -119,35 +92,32 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
         //the worst-case time complexity is mandated to be O(nlogn)
+        // TODO: should we set it to 1 when index is available?
         double cpu = rowCount * Math.log(rowCount);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        AbstractPlanNode child = this.inputRelNodeToPlanNode(this, 0);
-
-        LimitPlanNode lpn = null;
+        final AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
+        final LimitPlanNode lpn;
         if (fetch != null || offset != null) {
             lpn = VoltPhysicalLimit.toPlanNode(fetch, offset);
+        } else {
+            lpn = null;
         }
-        OrderByPlanNode opn = null;
-        RelCollation collation = getCollation();
+        final RelCollation collation = getCollation();
         if (collation != null) {
-            opn = VoltRexUtil.collationToOrderByNode(collation, fieldExps);
-        }
-        AbstractPlanNode result;
-        if (opn != null) {
+            final OrderByPlanNode opn = VoltRexUtil.collationToOrderByNode(collation, fieldExps);
             opn.addAndLinkChild(child);
-            result = opn;
             if (lpn != null) {
                 opn.addInlinePlanNode(lpn);
             }
+            return opn;
         } else {
-            assert(lpn != null);
+            assert lpn != null;
             lpn.addAndLinkChild(child);
-            result = lpn;
+            return lpn;
         }
-        return result;
     }
 }

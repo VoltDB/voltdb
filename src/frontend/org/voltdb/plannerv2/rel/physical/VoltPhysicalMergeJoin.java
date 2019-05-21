@@ -92,7 +92,6 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-
         double outerRowCount = getInput(0).estimateRowCount(mq);
         double innerRowCount = getInput(1).estimateRowCount(mq);
         // Since we support only equality join conditions for a Merje Join (equi join)

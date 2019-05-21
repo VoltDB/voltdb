@@ -49,11 +49,7 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalMinus(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
@@ -67,7 +63,7 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
     public double estimateRowCount(RelMetadataQuery mq) {
         Preconditions.checkState(getInputs().size() > 1);
         double firstChildRowCount = getInput(0).estimateRowCount(mq);
-        return firstChildRowCount * Math.pow((1. - PlanCostUtil.SET_OP_OVERLAP), getInputs().size() - 1);
+        return firstChildRowCount * Math.pow(1 - PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
     }
 
     @Override

@@ -46,8 +46,8 @@ public final class PlanCostUtil {
     private static final double MAX_PER_COLLATION_DISCOUNT = 0.1;
 
     // A factor to denote an average column value repetition -
-    // 1/TABLE_COLUMN_SPARCITY of all rows has distinct values
-    private static final int TABLE_COLUMN_SPARCITY = 10;
+    // 1/TABLE_COLUMN_SPARSITY of all rows has distinct values
+    private static final int TABLE_COLUMN_SPARSITY = 10;
 
     // Join filters
     private static final double MAX_EQ_FILTER_DISCOUNT = 0.09;
@@ -58,6 +58,12 @@ public final class PlanCostUtil {
 
     // SetOP overlap
     public static final double SET_OP_OVERLAP = 0.2;
+
+    // "Covering cell" indexes get further special treatment below that tries to
+    // properly credit their benefit even when they do not actually eliminate
+    // the expensive exact contains post-filter.
+    // I can't quite justify that rationally, but it "seems reasonable". --paul
+    private static final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
 
     private PlanCostUtil() {
     }
@@ -101,11 +107,7 @@ public final class PlanCostUtil {
                 }
             }
         }
-        if (Double.compare(0., rowCount) == 0) {
-            // Ensure non-zero cost
-            rowCount += 1.;
-        }
-        return rowCount;
+        return rowCount == 0 ? 1 : rowCount;
     }
 
     public static double discountSerialAggregateRowCount(double rowCount, int groupCount) {
@@ -122,8 +124,7 @@ public final class PlanCostUtil {
         for (int i = 0; i < groupCount; ++i) {
             discountFactor -= Math.pow(MAX_PER_COLLATION_DISCOUNT, i + 1);
         }
-        rowCount *= discountFactor;
-        return rowCount;
+        return rowCount * discountFactor;
     }
 
     /**
@@ -137,9 +138,10 @@ public final class PlanCostUtil {
     public static double adjustRowCountOnRelDistribution(double rowCount, RelTraitSet traitSet) {
         if (traitSet.getTrait(RelDistributionTraitDef.INSTANCE) != null &&
                 RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-            rowCount *= 10000;
+            return rowCount * 10000;
+        } else {
+            return rowCount;
         }
-        return rowCount;
     }
 
     /**
@@ -188,17 +190,11 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
-        int sparcity = (index.getUnique() || index.getAssumeunique()) ?
-                1 : TABLE_COLUMN_SPARCITY;
-        double adjustedSparcity = Math.pow(sparcity, colCount - keyWidth + 1);
+        final int sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
+        final double adjustedSparcity = Math.pow(sparsity, colCount - keyWidth + 1);
         double tuplesToRead = Math.log(rowCount / adjustedSparcity) + adjustedSparcity - 1;
 
-        // "Covering cell" indexes get further special treatment below that tries to
-        // properly credit their benefit even when they do not actually eliminate
-        // the expensive exact contains post-filter.
-        // I can't quite justify that rationally, but it "seems reasonable". --paul
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
-            final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
         }
 

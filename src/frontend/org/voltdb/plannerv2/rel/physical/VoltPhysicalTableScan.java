@@ -164,10 +164,8 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         Preconditions.checkNotNull(mq);
-        double rowCount = estimateInitialRowCount(mq);
-        rowCount = PlanCostUtil.discountTableScanRowCount(rowCount, m_program);
-        rowCount = PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
-        return rowCount;
+        double rowCount = PlanCostUtil.discountTableScanRowCount(estimateInitialRowCount(mq), m_program);
+        return PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
     }
 
     protected double estimateInitialRowCount(RelMetadataQuery mq) {

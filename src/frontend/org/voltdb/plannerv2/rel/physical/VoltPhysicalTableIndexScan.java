@@ -139,7 +139,6 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-
         double cpu = PlanCostUtil.computeIndexCost(m_index, m_accessPath, estimateInitialRowCount(mq), mq);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0.);
     }

@@ -55,21 +55,11 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
 
     @Override
     public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
-        return new VoltPhysicalCalc(
-                getCluster(),
-                traitSet,
-                child,
-                program,
-                m_splitCount);
+        return new VoltPhysicalCalc(getCluster(), traitSet, child, program, m_splitCount);
     }
 
     public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program, int splitCount) {
-        return new VoltPhysicalCalc(
-                getCluster(),
-                traitSet,
-                child,
-                program,
-                splitCount);
+        return new VoltPhysicalCalc(getCluster(), traitSet, child, program, splitCount);
     }
 
     @Override
@@ -94,8 +84,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         Preconditions.checkNotNull(mq);
-        double childRowCount = getInput(0).estimateRowCount(mq);
-        return PlanCostUtil.discountTableScanRowCount(childRowCount, getProgram());
+        return PlanCostUtil.discountTableScanRowCount(getInput(0).estimateRowCount(mq), getProgram());
     }
 
     @Override

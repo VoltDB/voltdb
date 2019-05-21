@@ -88,10 +88,9 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
         double outerRowCount = getInput(0).estimateRowCount(mq);
         double innerRowCount = getInput(1).estimateRowCount(mq);
         // Give it a discount based on the number of join expressions
-        double rowCount = PlanCostUtil.discountJoinRowCount(outerRowCount * innerRowCount, condition);
+        double rowCount = PlanCostUtil.discountJoinRowCount(outerRowCount * innerRowCount, getCondition());
         // Give it a discount based on the limit / offset
-        rowCount = PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
-        return rowCount;
+        return PlanCostUtil.discountLimitOffsetRowCount(rowCount, m_offset, m_limit);
     }
 
     abstract public VoltPhysicalJoin copyWithLimitOffset(RelTraitSet traits, RexNode offset, RexNode limit);
