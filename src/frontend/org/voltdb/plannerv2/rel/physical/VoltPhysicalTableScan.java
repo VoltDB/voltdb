@@ -85,7 +85,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             int splitCount) {
         super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
-        Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltPhysicalAggregate);
+        Preconditions.checkArgument(aggregate == null || aggregate instanceof VoltPhysicalAggregate);
         Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0, "Column count can not be 0.");
         m_program = program;
         m_offset = offset;
@@ -300,7 +300,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
     protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
         if (m_aggregate != null) {
             Preconditions.checkNotNull(m_preAggregateRowType);
-            final AbstractPlanNode aggr = ((AbstractVoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
+            final AbstractPlanNode aggr = ((VoltPhysicalAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
             aggr.clearChildren();
             node.addInlinePlanNode(aggr);
             node.setOutputSchema(aggr.getOutputSchema());

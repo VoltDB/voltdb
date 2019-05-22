@@ -17,7 +17,8 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -40,9 +41,9 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
-public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements VoltPhysicalRel {
+public abstract class VoltPhysicalAggregate extends Aggregate implements VoltPhysicalRel {
 
     // HAVING expression
     final private RexNode m_postPredicate;
@@ -69,7 +70,7 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
      * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      */
-    protected AbstractVoltPhysicalAggregate(
+    protected VoltPhysicalAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -107,10 +108,29 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double rowCount = getInput().estimateRowCount(mq);
-        return planner.getCostFactory().makeCost(rowCount, 0, 0);
+    public double estimateRowCount(RelMetadataQuery mq) {
+        Preconditions.checkNotNull(mq);
+
+        // Adopted from Calicte's Aggregate.estimateRowCount
+        // Assume that each GROUP BY column has 50% of the value count.
+        // Therefore one GROUP BY column has .5 * rowCount,
+        // 2 sort columns give .75 * rowCount.
+        // Zero GROUP BY columns yields 1 row (or 0 if the input is empty).
+        final int groupCount = groupSet.cardinality();
+        if (groupCount == 0) {
+            return 1;
+        } else {
+            double childRowCount = getInput(0).estimateRowCount(mq);
+            double rowCount = childRowCount * 1.0 - Math.pow(.5, groupCount);
+            return rowCount;
+        }
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        double cpu = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     /**
@@ -127,9 +147,9 @@ public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements
      * @param havingExpression HAVING expression
      * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
-     * @return A cloned {@link AbstractVoltPhysicalAggregate}.
+     * @return A cloned {@link VoltPhysicalAggregate}.
      */
-    public abstract AbstractVoltPhysicalAggregate copy(
+    public abstract VoltPhysicalAggregate copy(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,

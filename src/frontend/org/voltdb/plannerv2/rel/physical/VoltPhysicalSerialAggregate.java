@@ -32,7 +32,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 
 import java.util.List;
 
-public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
+public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
 
     // Inline Rels
     final private RexNode m_offset;
