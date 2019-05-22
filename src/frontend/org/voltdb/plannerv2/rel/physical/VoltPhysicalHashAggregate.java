@@ -29,7 +29,7 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 
 import java.util.List;
 
-public class VoltPhysicalHashAggregate extends AbstractVoltPhysicalAggregate {
+public class VoltPhysicalHashAggregate extends VoltPhysicalAggregate {
 
     /**
      * Constructor

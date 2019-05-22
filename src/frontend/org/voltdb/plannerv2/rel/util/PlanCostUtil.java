@@ -48,7 +48,7 @@ public final class PlanCostUtil {
 
     // A factor to denote an average column value repetition -
     // 1/TABLE_COLUMN_SPARSITY of all rows has distinct values
-    private static final int TABLE_COLUMN_SPARSITY = 10;
+    private static final double TABLE_COLUMN_SPARSITY = 0.1;
 
     // Join filters
     private static final double MAX_EQ_FILTER_DISCOUNT = 0.09;
@@ -173,16 +173,28 @@ public final class PlanCostUtil {
     public static double computeIndexCost(Index index, AccessPath accessPath, double rowCount, RelMetadataQuery mq) {
 
         // HOW WE COST INDEXES
-        // Since Volt only supports TREE based indexes the cost can be approximated as following
-        // log(N / Sparsity)  + Sparsity  - 1
-        // where N is number of rows in a table and Sparsity represents the number of identical rows -
-        // Sparsity is 10 if 1 out 10 rows is a duplicate
-        // For a UNIQUE index Sparcity is 1
-        // To account for a multicolumn indexes and partial coverage, Sparsity is adjusted to be
-        // Adjusted Sparsity = Sparsity ** (Index Column Count - Key Width + 1)
+        // Since Volt only supports TREE based indexes, the CPU cost can be approximated as following
+        // log(e - 1 + N * sparsity) / sparsity
+        // where N is number of rows in a table and Sparsity represents the reciprocal of number of identical rows -
+        // sparsity is 0.1 if on average, 10 rows have identical values on the column(s) of the index.
+        // For a UNIQUE index, sparsity is 1.
+        //
+        // The above formula favors sparser cases, UNIQUE index being an extreme in that direction. The extreme in
+        // the opposite direction is sparsity == 1/N, where the cost becomes N, and index is not useful at all!
+        //
+        // To account for a multi-column indexes and partial coverage, Sparsity is adjusted to be
+        // Adjusted sparsity = sparsity * log(|Index Column Count - Key Width + 1|)
         // where the Index Column Count denotes number of columns / expressions in the index
-        // and Key Width denotes the number of Index columns / expressions covered by a given access path
-        // "Covering cell" indexes get a special adjustment to make them look more favorable
+        // and Key Width denotes the number of Index columns / expressions covered by a given access path.
+        // The motivation is that we favor fuller coverage of an index, by dis-favoring more partial coverage that
+        // decreases sparsity. The favoring/disfavoring goes symmetric in both coverage directions, so for query:
+        // SELECT a, b FROM t ORDER BY a, b;
+        // and index1(a), index2(a, b), index3(a, b, c),
+        // the cost for index2 wins, and cost of index1 and index2 should equally be dis-favored.
+        //
+        // This adjusted sparsity is then substituted into the first expression with log().
+        //
+        // "Covering cell" indexes get a special adjustment to make them look more favorable.
         // Partial Indexes are discounted further
 
         // get the width of the index - number of columns or expression included in the index
@@ -191,9 +203,9 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
-        final int sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
-        final double adjustedSparcity = Math.pow(sparsity, (colCount - keyWidth + 1) / colCount);
-        double tuplesToRead = Math.log(rowCount / adjustedSparcity) + adjustedSparcity - 1;
+        double sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
+        sparsity *= Math.log(Math.abs(colCount - keyWidth + 1));
+        double tuplesToRead = Math.log(Math.exp(1) - 1 + rowCount * sparsity) / sparsity;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
