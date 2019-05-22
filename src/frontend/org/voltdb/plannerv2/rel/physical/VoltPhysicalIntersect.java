@@ -31,9 +31,8 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import com.google.common.base.Preconditions;
 
 /**
- * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical calling convention.
- *
- * Set operations: intersect, union, except.
+ * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical INTERSECTION setop
+ * calling convention.
  *
  * @author Mike Alexeev
  * @since 9.0
@@ -71,7 +70,8 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
         Preconditions.checkState(getInputs().size() > 1);
         final double allChildRowCount = getInputs().stream()
                 .mapToDouble(child -> child.estimateRowCount(mq))
-                .sum();     // Conservatively, UNION could add all rows from each input query.
+                .min()
+                .orElse(0);
         return allChildRowCount * Math.pow(PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
     }
 

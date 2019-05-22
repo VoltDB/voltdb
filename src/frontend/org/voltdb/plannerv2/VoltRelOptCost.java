@@ -108,7 +108,9 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
     }
 
     @Override public boolean isLt(RelOptCost other) {
-        return compare(this, (VoltRelOptCost) other) < 0;
+        // TODO: Fix the cost calculation!
+        //return compare(this, (VoltRelOptCost) other) < 0;
+        return getRows() < other.getRows();
     }
 
     @Override public boolean equals(RelOptCost other) {
