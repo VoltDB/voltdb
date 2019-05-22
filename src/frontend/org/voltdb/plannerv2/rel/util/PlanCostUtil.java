@@ -18,6 +18,7 @@
 package org.voltdb.plannerv2.rel.util;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
@@ -191,14 +192,13 @@ public final class PlanCostUtil {
         Preconditions.checkState(keyWidth <= colCount);
 
         final int sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
-        final double adjustedSparcity = Math.pow(sparsity, colCount - keyWidth + 1);
+        final double adjustedSparcity = Math.pow(sparsity, (colCount - keyWidth + 1) / colCount);
         double tuplesToRead = Math.log(rowCount / adjustedSparcity) + adjustedSparcity - 1;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
         }
 
-        // @TODO Need to discount dCpu for a partial index
         // Apply discounts similar to the keyWidth one for the additional post-filters that get
         // eliminated by exactly matched partial index filters. The existing discounts are not
         // supposed to give a "full refund" of the optimized-out post filters, because there is
@@ -206,9 +206,17 @@ public final class PlanCostUtil {
         // be lower (order log(smaller n)) for partial indexes, but it's not clear what the typical
         // relative costs are of a partial index with x key components and y partial index predicates
         // vs. a full or partial index with x+n key components and y-m partial index predicates.
-        //
-
-        return tuplesToRead;
+        double discountFactor = 1;
+        // Eliminated filters discount the cost of processing tuples with a rapidly
+        // diminishing effect that ranges from a discount of 0.9 for one skipped filter
+        // to a discount approaching 0.888... (=8/9) for many skipped filters.
+        if (!accessPath.getEliminatedPostExpressions().isEmpty() && tuplesToRead > 1) {
+            discountFactor -= IntStream.range(0, accessPath.getEliminatedPostExpressions().size())
+                    .mapToDouble(i -> Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1))
+                    .sum();
+        }
+        Preconditions.checkState(discountFactor > 0);
+        return Math.max(1., tuplesToRead * discountFactor);
     }
 
     private static double getSearchExpressionKeyWidth(AccessPath accessPath, final double colCount) {
