@@ -25,20 +25,27 @@
 namespace boost
 {
 
+template<bool Eq> struct _arg_eq
+{
+};
+
+template<> struct _arg_eq<true>
+{
+    typedef void type;
+};
+
 template< int I > struct arg
 {
-    arg()
+    BOOST_CONSTEXPR arg()
     {
     }
 
-    template< class T > arg( T const & /* t */ )
+    template< class T > BOOST_CONSTEXPR arg( T const & /* t */, typename _arg_eq< I == is_placeholder<T>::value >::type * = 0 )
     {
-        // static assert I == is_placeholder<T>::value
-        typedef char T_must_be_placeholder[ I == is_placeholder<T>::value? 1: -1 ];
     }
 };
 
-template< int I > bool operator==( arg<I> const &, arg<I> const & )
+template< int I > BOOST_CONSTEXPR bool operator==( arg<I> const &, arg<I> const & )
 {
     return true;
 }

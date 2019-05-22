@@ -24,10 +24,13 @@
 package org.voltdb.export;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
@@ -59,8 +62,9 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
@@ -103,7 +107,7 @@ public class TestExportDataSource extends TestCase {
     class TestGeneration implements Generation {
 
         @Override
-        public void acceptMastership(int partitionId) {
+        public void becomeLeader(int partitionId) {
         }
 
         @Override
@@ -143,8 +147,31 @@ public class TestExportDataSource extends TestCase {
             return 0;
         }
 
+        @Override
         public void updateGenerationId(long genId) {
         }
+    }
+
+    // Define a class derived from {@code ExportDataSource} allowing mocking
+    // the {@code ExportCoordinator}
+    class MockExportDataSource extends ExportDataSource {
+
+        public MockExportDataSource(Generation generation, ExportDataProcessor processor, String db, String tableName,
+                int partitionId, int siteId, long genId, CatalogMap<Column> catalogMap, Column partitionColumn,
+                String overflowPath) throws IOException {
+            super(generation, processor, db, tableName, partitionId, siteId, genId, catalogMap, partitionColumn, overflowPath);
+            setMockCoordination();
+        }
+
+        void setMockCoordination() {
+            m_coordinator = mock(ExportCoordinator.class);
+            when(m_coordinator.isCoordinatorInitialized()).thenReturn(true);
+            when(m_coordinator.isPartitionLeader()).thenReturn(true);
+            when(m_coordinator.isMaster()).thenReturn(true);
+            when(m_coordinator.isSafePoint(anyLong())).thenReturn(true);
+            when(m_coordinator.isExportMaster(anyLong())).thenReturn(true);
+        }
+
     }
 
     @Override
@@ -196,12 +223,20 @@ public class TestExportDataSource extends TestCase {
         return processor;
     }
 
+    private void waitForMaster(ExportDataSource s) throws InterruptedException {
+        int i = 0;
+        while (!s.isMaster()) {
+            assertFalse(++i > 2);
+            Thread.sleep(500);
+        }
+    }
+
     public void testExportDataSource() throws Exception {
         System.out.println("Running testExportDataSource");
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+            ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
@@ -222,7 +257,7 @@ public class TestExportDataSource extends TestCase {
     public void testPollV2() throws Exception{
         System.out.println("Running testPollV2");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -231,17 +266,9 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
-
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter);
-            s.acceptMastership();
-            cdl.await();
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
@@ -320,7 +347,7 @@ public class TestExportDataSource extends TestCase {
     public void testDoublePoll() throws Exception{
         System.out.println("Running testDoublePoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -329,19 +356,12 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
 
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter);
-            s.acceptMastership();
             // Set ready for polling to enable satisfying fut on push
             s.setReadyForPolling(true);
-            cdl.await();
 
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
 
@@ -397,7 +417,7 @@ public class TestExportDataSource extends TestCase {
     public void testReplicatedPoll() throws Exception {
         System.out.println("Running testReplicatedPoll");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -406,13 +426,6 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-        final CountDownLatch cdl = new CountDownLatch(1);
-        Runnable cdlWaiter = new Runnable() {
-            @Override
-            public void run() {
-                cdl.countDown();
-            }
-        };
         Mailbox mockedMbox = Mockito.mock(Mailbox.class);
         final AtomicReference<CountDownLatch> refSendCdl = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
         doAnswer(new Answer<Void>() {
@@ -425,9 +438,9 @@ public class TestExportDataSource extends TestCase {
 
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
-        s.setOnMastership(cdlWaiter);
-        s.acceptMastership();
-        cdl.await();
+        s.setReadyForPolling(true);
+        s.becomeLeader();
+        waitForMaster(s);
 
         ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
@@ -502,7 +515,7 @@ public class TestExportDataSource extends TestCase {
     public void testReleaseExportBytes() throws Exception {
         System.out.println("Running testReleaseExportBytes");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -511,6 +524,8 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
+            s.setReadyForPolling(true);
+
             //Ack before push
             s.remoteAck(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
@@ -548,16 +563,8 @@ public class TestExportDataSource extends TestCase {
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter);
-            s.acceptMastership();
-            cdl.await();
+            s.becomeLeader();
+            waitForMaster(s);
 
             //Poll and check before and after discard segment files.
             AckingContainer cont = s.poll(false).get();
@@ -567,8 +574,6 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
-
-            s.unacceptMastership();
 
             //Last segment is always kept.
             s.remoteAck(2000);
@@ -586,7 +591,7 @@ public class TestExportDataSource extends TestCase {
     public void testGapRelease() throws Exception{
         System.out.println("Running testGapRelease");
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -595,17 +600,9 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-            final CountDownLatch cdl = new CountDownLatch(1);
-            Runnable cdlWaiter = new Runnable() {
-
-                @Override
-                public void run() {
-                    cdl.countDown();
-                }
-            };
-            s.setOnMastership(cdlWaiter);
-            s.acceptMastership();
-            cdl.await();
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
 
             // Push 2 buffers with contiguous sequence numbers
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
@@ -647,7 +644,8 @@ public class TestExportDataSource extends TestCase {
 
             // Verify we can poll the 2 buffers past the gap
             try {
-                cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                // cont = fut1.get(100,TimeUnit.MILLISECONDS);
+                cont = fut1.get(100,TimeUnit.DAYS);
             }
             catch( TimeoutException to) {
                 fail("did not expect timeout");
@@ -659,6 +657,71 @@ public class TestExportDataSource extends TestCase {
             cont = s.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals(11, cont.m_lastSeqNo);
+            cont.discard();
+
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testPendingContainer() throws Exception{
+        System.out.println("Running testPendingContainer");
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new MockExportDataSource(null, m_processor, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                0,
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            s.setReadyForPolling(true);
+            s.becomeLeader();
+            waitForMaster(s);
+
+            // Push 4 buffers with contiguous sequence numbers
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, 1, 0, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 2, 1, 0, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(3, 3, 1, 0, 0, foo);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(4, 4, 1, 0, 0, foo);
+
+            // Poll the 2 first buffers
+            AckingContainer cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 1, cont.m_lastSeqNo);
+            cont.discard();
+
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 2, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll 3rd buffer but set it pending
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            s.setPendingContainer(cont);
+
+            // Poll 3rd buffer once more
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 3, cont.m_lastSeqNo);
+            cont.discard();
+
+            // Poll last buffer
+            cont = s.poll(false).get();
+            cont.updateStartTime(System.currentTimeMillis());
+            assertEquals( 4, cont.m_lastSeqNo);
             cont.discard();
 
         } finally {

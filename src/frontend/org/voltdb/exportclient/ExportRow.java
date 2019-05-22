@@ -56,6 +56,8 @@ public class ExportRow {
     public String tableName;
     public final long generation;
     public static final int INTERNAL_FIELD_COUNT = 6;
+    public static final int INTERNAL_OPERATION_COLUMN = 5;
+    public enum ROW_OPERATION { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE };
 
     public ExportRow(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,
             Object[] vals, Object pval, int partitionColIndex, int pid, long generation) {
@@ -76,6 +78,10 @@ public class ExportRow {
              return names.get(partitionColIndex);
          }
         return "";
+    }
+
+    public ROW_OPERATION getOperation() {
+        return ROW_OPERATION.values()[(byte)values[INTERNAL_OPERATION_COLUMN]];
     }
 
     public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize,

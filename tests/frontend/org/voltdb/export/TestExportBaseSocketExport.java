@@ -52,6 +52,7 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.RegressionSuite;
+import org.voltdb_testprocs.regressionsuites.exportprocs.InsertAddedStream;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -168,6 +169,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
+
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");
@@ -273,18 +275,24 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             new ProcedureInfo(Update_Export.class,
                     new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
-    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
-            new ProcedureInfo(Loopback.class,
-                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY"), new String[] { "proc" })};
 
-    public static final ProcedureInfo[] PROCEDURES2 = {
+    public static final ProcedureInfo[] ALLOWNULL_PROCEDURES = {
             new ProcedureInfo(Update_Export.class,
                     new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
-    public static final ProcedureInfo[] PROCEDURES3 = {
+    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
+            new ProcedureInfo(Loopback.class,
+                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY"), new String[] { "proc" })};
+
+    public static final ProcedureInfo[] ADDTABLE_PROCEDURES = {
             new ProcedureInfo(InsertAddedTable.class,
                     new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
+    };
+
+    public static final ProcedureInfo[] ADDSTREAM_PROCEDURES = {
+            new ProcedureInfo(InsertAddedStream.class,
+                    new ProcedurePartitionData ("ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
     };
 
     /**

@@ -73,6 +73,8 @@ public interface VoltDBInterface
     public String getLargeQuerySwapPath();
 
     public boolean isBare();
+    public boolean isClusterComplete();
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.

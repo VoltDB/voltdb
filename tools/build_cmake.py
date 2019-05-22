@@ -89,6 +89,12 @@ def makeParser():
                         help='''
                         Turns on conditionally compiled code to verify usage of memory
                         pools in the EE.''')
+    parser.add_argument('--trace-pools',
+                        action=OnOffAction,
+                        default='OFF',
+                        help='''
+                        Turns on conditionally compiled code to save stack traces for memory
+                        pool allocations in the EE.''')
     parser.add_argument('--timer-enabled',
                         action=OnOffAction,
                         default='OFF',
@@ -300,6 +306,7 @@ def configureCommandString(config):
             '-DVOLTDB_USE_PROFILING=%s '  # profile
             '-DVOLT_LOG_LEVEL=%s '        # config.log_level
             '-DVOLT_POOL_CHECKING=%s '    # pool_checking
+            '-DVOLT_TRACE_ALLOCATIONS=%s '# trace_pools
             '-DVOLT_TIMER_ENABLED=%s '    # timer_enabled
             '-DVOLTDB_CORE_COUNT=%d '     # number of processors
             '%s')                         # config.srcdir
@@ -311,6 +318,7 @@ def configureCommandString(config):
                 profile,
                 config.log_level,
                 config.pool_checking,
+                config.trace_pools,
                 config.timer_enabled,
                 getNumberProcessors(config),
                 config.srcdir))

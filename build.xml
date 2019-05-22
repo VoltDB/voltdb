@@ -155,6 +155,11 @@
     <not><isset property="VOLT_POOL_CHECKING"/></not>
 </condition>
 
+<!-- By default, do not do record stack traces for each EE memory pool allocation  -->
+<condition property="VOLT_TRACE_ALLOCATIONS" value="false">
+    <not><isset property="VOLT_TRACE_ALLOCATIONS"/></not>
+</condition>
+
 <!-- By default, do not do execution timings  -->
 <condition property="VOLT_TIMER_ENABLED" value="false">
     <not><isset property="VOLT_TIMER_ENABLED"/></not>
@@ -1527,6 +1532,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1548,6 +1554,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1567,6 +1574,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1586,6 +1594,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1606,6 +1615,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />

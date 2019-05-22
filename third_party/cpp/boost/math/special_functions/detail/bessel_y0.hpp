@@ -8,6 +8,8 @@
 
 #ifdef _MSC_VER
 #pragma once
+#pragma warning(push)
+#pragma warning(disable:4702) // Unreachable code (release mode only warning)
 #endif
 
 #include <boost/math/special_functions/detail/bessel_j0.hpp>
@@ -16,6 +18,16 @@
 #include <boost/math/tools/big_constant.hpp>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/assert.hpp>
+
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
 
 // Bessel function of the second kind of order zero
 // x <= 8, minimax rational approximations on root-bracketing intervals
@@ -199,7 +211,7 @@ T bessel_y0(T x, const Policy& pol)
         T y2 = y * y;
         rc = evaluate_rational(PC, QC, y2);
         rs = evaluate_rational(PS, QS, y2);
-        factor = sqrt(2 / (x * pi<T>()));
+        factor = constants::one_div_root_pi<T>() / sqrt(x);
         //
         // The following code is really just:
         //
@@ -207,18 +219,22 @@ T bessel_y0(T x, const Policy& pol)
         // value = factor * (rc * sin(z) + y * rs * cos(z));
         //
         // But using the sin/cos addition formulae and constant values for
-        // sin/cos of PI/4:
+        // sin/cos of PI/4 which then cancel part of the "factor" term as they're all
+        // 1 / sqrt(2):
         //
         T sx = sin(x);
         T cx = cos(x);
-        value = factor * (rc * (sx * constants::one_div_root_two<T>() - cx * constants::half_root_two<T>()) 
-           + y * rs * (cx * constants::one_div_root_two<T>() + sx * constants::half_root_two<T>()));
+        value = factor * (rc * (sx - cx) + y * rs * (cx + sx));
     }
 
     return value;
 }
 
 }}} // namespaces
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // BOOST_MATH_BESSEL_Y0_HPP
 

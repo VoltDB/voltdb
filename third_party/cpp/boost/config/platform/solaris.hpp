@@ -14,7 +14,7 @@
 
 // boilerplate code:
 #define BOOST_HAS_UNISTD_H
-#include <boost/config/posix_features.hpp>
+#include <boost/config/detail/posix_features.hpp>
 
 //
 // pthreads don't actually work with gcc unless _PTHREADS is defined:
@@ -23,6 +23,9 @@
 # undef BOOST_HAS_PTHREADS
 #endif
 
-
+#define BOOST_HAS_STDINT_H 
+#define BOOST_HAS_PTHREAD_MUTEXATTR_SETTYPE 
+#define BOOST_HAS_LOG1P 
+#define BOOST_HAS_EXPM1
 
 

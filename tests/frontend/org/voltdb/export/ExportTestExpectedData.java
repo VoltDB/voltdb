@@ -106,8 +106,9 @@ public class ExportTestExpectedData {
                 if (m_replicated) {
                     assertEquals(m_copies, f.getValue().getCount(rowSeq));
                 }
-
-                assertThat( next, verifier.isExpectedRow(m_verifySequenceNumber));
+                if (verifier != null) {
+                    assertThat( next, verifier.isExpectedRow(m_verifySequenceNumber));
+                }
             }
         }
     }

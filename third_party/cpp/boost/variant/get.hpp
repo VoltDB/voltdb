@@ -3,8 +3,8 @@
 // See http://www.boost.org for updates, documentation, and revision history.
 //-----------------------------------------------------------------------------
 //
-// Copyright (c) 2003
-// Eric Friedman, Itay Maman
+// Copyright (c) 2003 Eric Friedman, Itay Maman
+// Copyright (c) 2014-2019 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -15,39 +15,46 @@
 
 #include <exception>
 
-#include "boost/config.hpp"
-#include "boost/detail/workaround.hpp"
-#include "boost/utility/addressof.hpp"
-#include "boost/variant/variant_fwd.hpp"
+#include <boost/config.hpp>
+#include <boost/detail/workaround.hpp>
+#include <boost/static_assert.hpp>
+#include <boost/throw_exception.hpp>
+#include <boost/utility/addressof.hpp>
+#include <boost/variant/variant_fwd.hpp>
+#include <boost/variant/detail/element_index.hpp>
+#include <boost/variant/detail/move.hpp>
 
-#include "boost/type_traits/add_reference.hpp"
-#include "boost/type_traits/add_pointer.hpp"
-
-#if BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-#   include "boost/mpl/bool.hpp"
-#   include "boost/mpl/or.hpp"
-#   include "boost/type_traits/is_same.hpp"
-#endif
+#include <boost/type_traits/add_reference.hpp>
+#include <boost/type_traits/add_pointer.hpp>
+#include <boost/type_traits/is_lvalue_reference.hpp>
 
 namespace boost {
 
+#if defined(BOOST_CLANG)
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wweak-vtables"
+#endif
 //////////////////////////////////////////////////////////////////////////
 // class bad_get
 //
 // The exception thrown in the event of a failed get of a value.
 //
-class bad_get
+class BOOST_SYMBOL_VISIBLE bad_get
     : public std::exception
 {
 public: // std::exception implementation
 
-    virtual const char * what() const throw()
+    virtual const char * what() const BOOST_NOEXCEPT_OR_NOTHROW
     {
         return "boost::bad_get: "
                "failed value get using boost::get";
     }
 
 };
+#if defined(BOOST_CLANG)
+#   pragma clang diagnostic pop
+#endif
+
 
 //////////////////////////////////////////////////////////////////////////
 // function template get<T>
@@ -77,71 +84,39 @@ public: // visitor typedefs
 
 public: // visitor interfaces
 
-#if !BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-
-    pointer operator()(reference operand) const
+    pointer operator()(reference operand) const BOOST_NOEXCEPT
     {
         return boost::addressof(operand);
     }
 
     template <typename U>
-    pointer operator()(const U&) const
+    pointer operator()(const U&) const BOOST_NOEXCEPT
     {
         return static_cast<pointer>(0);
     }
-
-#else // MSVC6
-
-private: // helpers, for visitor interfaces (below)
-
-    pointer execute_impl(reference operand, mpl::true_) const
-    {
-        return boost::addressof(operand);
-    }
-
-    template <typename U>
-    pointer execute_impl(const U& operand, mpl::false_) const
-    {
-        return static_cast<pointer>(0);
-    }
-
-public: // visitor interfaces
-
-    template <typename U>
-    pointer operator()(U& operand) const
-    {
-        // MSVC6 finds normal implementation (above) ambiguous,
-        // so we must explicitly disambiguate
-
-        typedef typename mpl::or_<
-              is_same<U, T>
-            , is_same<const U, T>
-            >::type U_is_T;
-
-        return execute_impl(operand, U_is_T());
-    }
-
-#endif // MSVC6 workaround
-
 };
 
 }} // namespace detail::variant
 
-#if !BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x0551))
-#   define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
-    BOOST_APPEND_EXPLICIT_TEMPLATE_TYPE(t)
-#else
-#   define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
-    , t* = 0
+#ifndef BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE
+#   if !BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x0551))
+#       define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)
+#   else
+#       define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
+        , t* = 0
+#   endif
 #endif
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// relaxed_get<U>(variant) methods
+//
 template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
 inline
     typename add_pointer<U>::type
-get(
+relaxed_get(
       boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
       BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
-    )
+    ) BOOST_NOEXCEPT
 {
     typedef typename add_pointer<U>::type U_ptr;
     if (!operand) return static_cast<U_ptr>(0);
@@ -153,10 +128,10 @@ get(
 template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
 inline
     typename add_pointer<const U>::type
-get(
+relaxed_get(
       const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
       BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
-    )
+    ) BOOST_NOEXCEPT
 {
     typedef typename add_pointer<const U>::type U_ptr;
     if (!operand) return static_cast<U_ptr>(0);
@@ -168,17 +143,207 @@ get(
 template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
 inline
     typename add_reference<U>::type
-get(
+relaxed_get(
       boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >& operand
       BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
     )
 {
     typedef typename add_pointer<U>::type U_ptr;
-    U_ptr result = get<U>(&operand);
+    U_ptr result = relaxed_get<U>(boost::addressof(operand));
 
     if (!result)
-        throw bad_get();
+        boost::throw_exception(bad_get());
     return *result;
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_reference<const U>::type
+relaxed_get(
+      const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+    typedef typename add_pointer<const U>::type U_ptr;
+    U_ptr result = relaxed_get<const U>(boost::addressof(operand));
+
+    if (!result)
+        boost::throw_exception(bad_get());
+    return *result;
+}
+
+#ifndef BOOST_NO_CXX11_RVALUE_REFERENCES
+
+#if defined(BOOST_MSVC) && (_MSC_VER < 1900) // MSVC-2014 has fixed the incorrect diagnostics.
+#   pragma warning(push)
+#   pragma warning(disable: 4172) // returning address of local variable or temporary
+#endif
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    U&&
+relaxed_get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >&& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+    typedef typename add_pointer<U>::type U_ptr;
+    U_ptr result = relaxed_get<U>(boost::addressof(operand));
+
+    if (!result)
+        boost::throw_exception(bad_get());
+    return static_cast<U&&>(*result);
+}
+
+#if defined(BOOST_MSVC) && (_MSC_VER < 1900)
+#   pragma warning(pop)
+#endif
+
+#endif
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// strict_get<U>(variant) methods
+//
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_pointer<U>::type
+strict_get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    ) BOOST_NOEXCEPT
+{
+    BOOST_STATIC_ASSERT_MSG(
+        (boost::detail::variant::holds_element<boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >, U >::value),
+        "boost::variant does not contain specified type U, "
+        "call to boost::get<U>(boost::variant<T...>*) will always return NULL"
+    );
+
+    return relaxed_get<U>(operand);
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_pointer<const U>::type
+strict_get(
+      const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    ) BOOST_NOEXCEPT
+{
+    BOOST_STATIC_ASSERT_MSG(
+        (boost::detail::variant::holds_element<boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >, const U >::value),
+        "boost::variant does not contain specified type U, "
+        "call to boost::get<U>(const boost::variant<T...>*) will always return NULL"
+    );
+
+    return relaxed_get<U>(operand);
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_reference<U>::type
+strict_get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+    BOOST_STATIC_ASSERT_MSG(
+        (boost::detail::variant::holds_element<boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >, U >::value),
+        "boost::variant does not contain specified type U, "
+        "call to boost::get<U>(boost::variant<T...>&) will always throw boost::bad_get exception"
+    );
+
+    return relaxed_get<U>(operand);
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_reference<const U>::type
+strict_get(
+      const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+    BOOST_STATIC_ASSERT_MSG(
+        (boost::detail::variant::holds_element<boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >, const U >::value),
+        "boost::variant does not contain specified type U, "
+        "call to boost::get<U>(const boost::variant<T...>&) will always throw boost::bad_get exception"
+    );
+
+    return relaxed_get<U>(operand);
+}
+
+#ifndef BOOST_NO_CXX11_RVALUE_REFERENCES
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    U&&
+strict_get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >&& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+    BOOST_STATIC_ASSERT_MSG(
+        (!boost::is_lvalue_reference<U>::value),
+        "remove ampersand '&' from template type U in boost::get<U>(boost::variant<T...>&&) "
+    );
+
+    BOOST_STATIC_ASSERT_MSG(
+        (boost::detail::variant::holds_element<boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >, U >::value),
+        "boost::variant does not contain specified type U, "
+        "call to boost::get<U>(const boost::variant<T...>&) will always throw boost::bad_get exception"
+    );
+
+    return relaxed_get<U>(detail::variant::move(operand));
+}
+#endif
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// get<U>(variant) methods
+//
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_pointer<U>::type
+get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    ) BOOST_NOEXCEPT
+{
+#ifdef BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
+    return relaxed_get<U>(operand);
+#else
+    return strict_get<U>(operand);
+#endif
+
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_pointer<const U>::type
+get(
+      const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >* operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    ) BOOST_NOEXCEPT
+{
+#ifdef BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
+    return relaxed_get<U>(operand);
+#else
+    return strict_get<U>(operand);
+#endif
+}
+
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    typename add_reference<U>::type
+get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+#ifdef BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
+    return relaxed_get<U>(operand);
+#else
+    return strict_get<U>(operand);
+#endif
 }
 
 template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
@@ -189,13 +354,29 @@ get(
       BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
     )
 {
-    typedef typename add_pointer<const U>::type U_ptr;
-    U_ptr result = get<const U>(&operand);
-
-    if (!result)
-        throw bad_get();
-    return *result;
+#ifdef BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
+    return relaxed_get<U>(operand);
+#else
+    return strict_get<U>(operand);
+#endif
 }
+
+#ifndef BOOST_NO_CXX11_RVALUE_REFERENCES
+template <typename U, BOOST_VARIANT_ENUM_PARAMS(typename T) >
+inline
+    U&&
+get(
+      boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >&& operand
+      BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(U)
+    )
+{
+#ifdef BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
+    return relaxed_get<U>(detail::variant::move(operand));
+#else
+    return strict_get<U>(detail::variant::move(operand));
+#endif
+}
+#endif
 
 } // namespace boost
 

@@ -27,6 +27,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -62,7 +65,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportMatchers.AckPayloadMessage;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.messaging.LocalMailbox;
@@ -125,7 +127,7 @@ public class TestExportGeneration {
     int m_part = 2;
 
     final AtomicReference<CountDownLatch> m_mbxNotifyCdlRef =
-            new AtomicReference<>(new CountDownLatch(1));
+            new AtomicReference<>(null);
     final AtomicReference<Matcher<VoltMessage>> m_ackMatcherRef =
             new AtomicReference<>();
     LocalMailbox m_mbox;
@@ -143,6 +145,9 @@ public class TestExportGeneration {
         config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
+        // Do NOT start the actual processor as we don't have an actual
+        // export client
+        // processor.startPolling();
         return processor;
     }
 
@@ -167,6 +172,9 @@ public class TestExportGeneration {
 
         m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
 
+        ExportDataProcessor processor = getProcessor();
+        processor.setExportGeneration(m_exportGeneration);
+
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
                 ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))), false);
@@ -174,6 +182,7 @@ public class TestExportGeneration {
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                long seqNo = -1L;
                 if (message instanceof BinaryPayloadMessage) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
                     ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
@@ -182,6 +191,11 @@ public class TestExportGeneration {
                     if (msgType != ExportManager.RELEASE_BUFFER) {
                         return;
                     }
+                    final int partition = buf.getInt();
+                    final int length = buf.getInt();
+                    byte stringBytes[] = new byte[length];
+                    buf.get(stringBytes);
+                    seqNo = buf.getLong();
                 }
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
@@ -208,7 +222,24 @@ public class TestExportGeneration {
         }
 
         m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
+
+        // Assign a mock {@code ExportCoordinator}
+        m_expDs.m_coordinator = getMockCoordinator();
+
+        // Make sure the test EDS is always ready for polling
+        m_expDs.setReadyForPolling(true);
+
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
+    }
+
+    private ExportCoordinator getMockCoordinator() {
+        ExportCoordinator mock = mock(ExportCoordinator.class);
+        when(mock.isCoordinatorInitialized()).thenReturn(true);
+        when(mock.isPartitionLeader()).thenReturn(true);
+        when(mock.isMaster()).thenReturn(true);
+        when(mock.isSafePoint(anyLong())).thenReturn(true);
+        when(mock.isExportMaster(anyLong())).thenReturn(true);
+        return mock;
     }
 
     @After
@@ -221,17 +252,16 @@ public class TestExportGeneration {
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
-        final CountDownLatch promoted = new CountDownLatch(1);
+
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName).setOnMastership(promoted::countDown);
-        m_exportGeneration.acceptMastership(m_part);
-        promoted.await(5, TimeUnit.SECONDS);
+        m_exportGeneration.becomeLeader(m_part);
 
         int retries = 4000;
         long seqNo = 1L;
         boolean active = false;
 
         while( --retries >= 0 && ! active) {
+
             m_exportGeneration.pushExportBuffer(
                     m_part,
                     m_streamName,
@@ -245,8 +275,8 @@ public class TestExportGeneration {
             AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
 
             cont.discard();
 

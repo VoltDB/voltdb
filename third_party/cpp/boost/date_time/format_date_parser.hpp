@@ -7,7 +7,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2012-09-30 16:25:22 -0700 (Sun, 30 Sep 2012) $
+ * $Date$
  */
 
 
@@ -63,7 +63,7 @@ fixed_string_to_int(std::istreambuf_iterator<charT>& itr,
     itr++;
     j++;
   }
-  int_type i = -1;
+  int_type i = static_cast<int_type>(-1);
   // mr.cache will hold leading zeros. size() tells us when input is too short.
   if(mr.cache.size() < length) {
     return i;
@@ -111,7 +111,7 @@ var_string_to_int(std::istreambuf_iterator<charT>& itr,
     ++itr;
     ++j;
   }
-  int_type i = -1;
+  int_type i = static_cast<int_type>(-1);
   if(!s.empty()) {
     i = boost::lexical_cast<int_type>(s);
   }
@@ -271,7 +271,8 @@ class format_date_parser
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        itr++;
+        if ( ++itr == format_str.end())
+        	break;
         if (*itr != '%') {
           switch(*itr) {
           case 'a': 
@@ -470,14 +471,14 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
-    charT current_char = *sitr;
 
     short month(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        itr++;
+        if ( ++itr == format_str.end())
+        	break;
         if (*itr != '%') {
           switch(*itr) {
           case 'b': 
@@ -485,7 +486,6 @@ class format_date_parser
               mr = m_month_short_names.match(sitr, stream_end);
               month = mr.current_match;
               if (mr.has_remaining()) {
-                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -495,7 +495,6 @@ class format_date_parser
               mr = m_month_long_names.match(sitr, stream_end);
               month = mr.current_match;
               if (mr.has_remaining()) {
-                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -523,7 +522,6 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
-          current_char = *sitr;
         }
         else {
           sitr++;
@@ -575,14 +573,14 @@ class format_date_parser
     
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
-    charT current_char = *sitr;
 
     short wkday(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        itr++;
+        if ( ++itr == format_str.end())
+        	break;
         if (*itr != '%') {
           switch(*itr) {
           case 'a': 
@@ -594,7 +592,6 @@ class format_date_parser
               mr = m_weekday_short_names.match(sitr, stream_end);
               wkday = mr.current_match;
               if (mr.has_remaining()) {
-                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -608,7 +605,6 @@ class format_date_parser
               mr = m_weekday_long_names.match(sitr, stream_end);
               wkday = mr.current_match;
               if (mr.has_remaining()) {
-                current_char = mr.last_char();
                 use_current_char = true;
               }
               break;
@@ -635,7 +631,6 @@ class format_date_parser
         itr++;
         if (use_current_char) {
           use_current_char = false;
-          current_char = *sitr;
         }
         else {
           sitr++;
@@ -664,18 +659,16 @@ class format_date_parser
              string_type format_str,
              match_results& mr) const
   {
-    bool use_current_char = false;
-    
     // skip leading whitespace
     while(std::isspace(*sitr) && sitr != stream_end) { ++sitr; } 
-    charT current_char = *sitr;
 
     unsigned short year(0);
     
     const_itr itr(format_str.begin());
     while (itr != format_str.end() && (sitr != stream_end)) {
       if (*itr == '%') {
-        itr++;
+        if ( ++itr == format_str.end())
+        	break;
         if (*itr != '%') {
           //match_results mr;
           switch(*itr) {
@@ -706,13 +699,7 @@ class format_date_parser
       }
       else {  //skip past chars in format and in buffer
         itr++;
-        if (use_current_char) {
-          use_current_char = false;
-          current_char = *sitr;
-        }
-        else {
-          sitr++;
-        }
+        sitr++;
       }
     }
     

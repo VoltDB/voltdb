@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author:  Martin Andrian, Jeff Garland, Bart Garst
- * $Date: 2012-09-30 16:25:22 -0700 (Sun, 30 Sep 2012) $
+ * $Date$
  */
 
 #include <locale>
@@ -46,7 +46,7 @@ namespace boost { namespace date_time {
   template <class date_type,
             class CharT,
             class OutItrT = std::ostreambuf_iterator<CharT, std::char_traits<CharT> > >
-  class date_facet : public std::locale::facet {
+  class BOOST_SYMBOL_VISIBLE date_facet : public std::locale::facet {
   public:
     typedef typename date_type::duration_type duration_type;
     // greg_weekday is gregorian_calendar::day_of_week_type
@@ -408,7 +408,7 @@ namespace boost { namespace date_time {
   template <class date_type,
             class CharT,
             class InItrT = std::istreambuf_iterator<CharT, std::char_traits<CharT> > >
-  class date_input_facet : public std::locale::facet {
+  class BOOST_SYMBOL_VISIBLE date_input_facet : public std::locale::facet {
   public:
     typedef typename date_type::duration_type duration_type;
     // greg_weekday is gregorian_calendar::day_of_week_type

@@ -774,6 +774,22 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
     }
 
+    public void testPeristentExport() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) EXPORT TO TARGET FOO ON(INSERT);");
+        builder.addPartitionInfo("A", "C1");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testPeristentExport1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testPeristentExport1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A EXPORT TO TARGET FOO ON(DELETE);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testPeristentExport2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testPeristentExport2.jar");
+        verifyDiff(catOriginal, catUpdated, false, null, true, true, true);
+    }
+
     public void testAlterStreamTTL() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 

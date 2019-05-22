@@ -58,7 +58,7 @@
 #include <ostream>
 #include <iostream>
 #include <vector>
-#include <jsoncpp/jsoncpp.h>
+#include <json/json.h>
 
 #ifndef NDEBUG
 #include "debuglog.h"
@@ -444,16 +444,11 @@ public:
 
     std::string toJsonArray() const {
         int totalColumns = columnCount();
-        Json::Value array(Json::arrayValue);
-
-        array.resize(totalColumns);
+        Json::Value array;
         for (int i = 0; i < totalColumns; i++) {
-            array[i] = getNValue(i).toString();
+           array.append({getNValue(i).toString()});
         }
-
-        std::string retval = Json::FastWriter().write(array);
-        // The FastWritter always writes a newline at the end, ignore it
-        return std::string(retval, 0, retval.length() - 1);
+        return writeJson(array);
     }
 
     std::string toJsonString(const std::vector<std::string>& columnNames) const {
@@ -461,9 +456,7 @@ public:
         for (int i = 0; i < columnCount(); i++) {
             object[columnNames[i]] = getNValue(i).toString();
         }
-        std::string retval = Json::FastWriter().write(object);
-        // The FastWritter always writes a newline at the end, ignore it
-        return std::string(retval, 0, retval.length() - 1);
+        return writeJson(object);
     }
 
     /** Copy values from one tuple into another.  Any non-inlined
@@ -512,6 +505,12 @@ public:
     size_t hashCode() const;
 
 private:
+    static string writeJson(Json::Value const& val) {
+       // ENG-15989: FastWriter is not thread-safe, and therefore cannot be made static.
+       Json::FastWriter writer;
+       writer.omitEndingLineFeed();
+       return writer.write(val);
+    }
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);

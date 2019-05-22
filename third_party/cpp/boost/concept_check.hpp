@@ -19,18 +19,23 @@
 
 # include <boost/concept/assert.hpp>
 
-# include <boost/iterator.hpp>
+# include <iterator>
 # include <boost/type_traits/conversion_traits.hpp>
 # include <utility>
 # include <boost/type_traits/is_same.hpp>
 # include <boost/type_traits/is_void.hpp>
-# include <boost/mpl/assert.hpp>
-# include <boost/mpl/bool.hpp>
-# include <boost/detail/workaround.hpp>
-# include <boost/detail/iterator.hpp>
+# include <boost/static_assert.hpp>
+# include <boost/type_traits/integral_constant.hpp>
+# include <boost/config/workaround.hpp>
 
 # include <boost/concept/usage.hpp>
 # include <boost/concept/detail/concept_def.hpp>
+
+#if (defined _MSC_VER)
+# pragma warning( push )
+# pragma warning( disable : 4510 ) // default constructor could not be generated
+# pragma warning( disable : 4610 ) // object 'class' can never be instantiated - user-defined constructor required
+#endif
 
 namespace boost
 {
@@ -175,11 +180,6 @@ namespace boost
     TT b;
   };
 
-#if (defined _MSC_VER)
-# pragma warning( push )
-# pragma warning( disable : 4510 ) // default constructor could not be generated
-# pragma warning( disable : 4610 ) // object 'class' can never be instantiated - user-defined constructor required
-#endif
   // The SGI STL version of Assignable requires copy constructor and operator=
   BOOST_concept(SGIAssignable,(TT))
   {
@@ -202,9 +202,6 @@ namespace boost
     TT a;
     TT b;
   };
-#if (defined _MSC_VER)
-# pragma warning( pop )
-#endif
 
   BOOST_concept(Convertible,(X)(Y))
   {
@@ -304,14 +301,14 @@ namespace boost
       BOOST_CONCEPT_USAGE(Generator) { test(is_void<Return>()); }
 
    private:
-      void test(boost::mpl::false_)
+      void test(boost::false_type)
       {
           // Do we really want a reference here?
           const Return& r = f();
           ignore_unused_variable_warning(r);
       }
 
-      void test(boost::mpl::true_)
+      void test(boost::true_type)
       {
           f();
       }
@@ -324,22 +321,22 @@ namespace boost
       BOOST_CONCEPT_USAGE(UnaryFunction) { test(is_void<Return>()); }
 
    private:
-      void test(boost::mpl::false_)
+      void test(boost::false_type)
       {
           f(arg);               // "priming the pump" this way keeps msvc6 happy (ICE)
           Return r = f(arg);
           ignore_unused_variable_warning(r);
       }
 
-      void test(boost::mpl::true_)
+      void test(boost::true_type)
       {
           f(arg);
       }
 
 #if (BOOST_WORKAROUND(__GNUC__, BOOST_TESTED_AT(4) \
                       && BOOST_WORKAROUND(__GNUC__, > 3)))
-      // Declare a dummy construktor to make gcc happy.
-      // It seems the compiler can not generate a sensible constructor when this is instantiated with a refence type.
+      // Declare a dummy constructor to make gcc happy.
+      // It seems the compiler can not generate a sensible constructor when this is instantiated with a reference type.
       // (warning: non-static reference "const double& boost::UnaryFunction<YourClassHere>::arg"
       // in class without a constructor [-Wuninitialized])
       UnaryFunction();
@@ -353,14 +350,14 @@ namespace boost
   {
       BOOST_CONCEPT_USAGE(BinaryFunction) { test(is_void<Return>()); }
    private:
-      void test(boost::mpl::false_)
+      void test(boost::false_type)
       {
           f(first,second);
           Return r = f(first, second); // require operator()
           (void)r;
       }
 
-      void test(boost::mpl::true_)
+      void test(boost::true_type)
       {
           f(first,second);
       }
@@ -368,7 +365,7 @@ namespace boost
 #if (BOOST_WORKAROUND(__GNUC__, BOOST_TESTED_AT(4) \
                       && BOOST_WORKAROUND(__GNUC__, > 3)))
       // Declare a dummy constructor to make gcc happy.
-      // It seems the compiler can not generate a sensible constructor when this is instantiated with a refence type.
+      // It seems the compiler can not generate a sensible constructor when this is instantiated with a reference type.
       // (warning: non-static reference "const double& boost::BinaryFunction<YourClassHere>::arg"
       // in class without a constructor [-Wuninitialized])
       BinaryFunction();
@@ -388,7 +385,7 @@ namespace boost
 #if (BOOST_WORKAROUND(__GNUC__, BOOST_TESTED_AT(4) \
                       && BOOST_WORKAROUND(__GNUC__, > 3)))
       // Declare a dummy constructor to make gcc happy.
-      // It seems the compiler can not generate a sensible constructor when this is instantiated with a refence type.
+      // It seems the compiler can not generate a sensible constructor when this is instantiated with a reference type.
       // (warning: non-static reference "const double& boost::UnaryPredicate<YourClassHere>::arg"
       // in class without a constructor [-Wuninitialized])
       UnaryPredicate();
@@ -407,7 +404,7 @@ namespace boost
 #if (BOOST_WORKAROUND(__GNUC__, BOOST_TESTED_AT(4) \
                       && BOOST_WORKAROUND(__GNUC__, > 3)))
       // Declare a dummy constructor to make gcc happy.
-      // It seems the compiler can not generate a sensible constructor when this is instantiated with a refence type.
+      // It seems the compiler can not generate a sensible constructor when this is instantiated with a reference type.
       // (warning: non-static reference "const double& boost::BinaryPredicate<YourClassHere>::arg"
       // in class without a constructor [-Wuninitialized])
       BinaryPredicate();
@@ -432,7 +429,7 @@ namespace boost
 #if (BOOST_WORKAROUND(__GNUC__, BOOST_TESTED_AT(4) \
                       && BOOST_WORKAROUND(__GNUC__, > 3)))
       // Declare a dummy constructor to make gcc happy.
-      // It seems the compiler can not generate a sensible constructor when this is instantiated with a refence type.
+      // It seems the compiler can not generate a sensible constructor when this is instantiated with a reference type.
       // (warning: non-static reference "const double& boost::Const_BinaryPredicate<YourClassHere>::arg"
       // in class without a constructor [-Wuninitialized])
       Const_BinaryPredicate();
@@ -506,11 +503,11 @@ namespace boost
     : Assignable<TT>
     , EqualityComparable<TT>
   {
-      typedef typename boost::detail::iterator_traits<TT>::value_type value_type;
-      typedef typename boost::detail::iterator_traits<TT>::difference_type difference_type;
-      typedef typename boost::detail::iterator_traits<TT>::reference reference;
-      typedef typename boost::detail::iterator_traits<TT>::pointer pointer;
-      typedef typename boost::detail::iterator_traits<TT>::iterator_category iterator_category;
+      typedef typename std::iterator_traits<TT>::value_type value_type;
+      typedef typename std::iterator_traits<TT>::difference_type difference_type;
+      typedef typename std::iterator_traits<TT>::reference reference;
+      typedef typename std::iterator_traits<TT>::pointer pointer;
+      typedef typename std::iterator_traits<TT>::iterator_category iterator_category;
 
       BOOST_CONCEPT_USAGE(InputIterator)
       {
@@ -562,10 +559,10 @@ namespace boost
     : ForwardIterator<TT>
   {
       BOOST_CONCEPT_USAGE(Mutable_ForwardIterator) {
-        *i++ = *i;         // require postincrement and assignment
+        *i++ = *j;         // require postincrement and assignment
       }
    private:
-      TT i;
+      TT i, j;
   };
 
   BOOST_concept(BidirectionalIterator,(TT))
@@ -591,10 +588,10 @@ namespace boost
   {
       BOOST_CONCEPT_USAGE(Mutable_BidirectionalIterator)
       {
-          *i-- = *i;                  // require postdecrement and assignment
+          *i-- = *j;                  // require postdecrement and assignment
       }
    private:
-      TT i;
+      TT i, j;
   };
 
   BOOST_concept(RandomAccessIterator,(TT))
@@ -619,7 +616,7 @@ namespace boost
    private:
     TT a, b;
     TT i, j;
-      typename boost::detail::iterator_traits<TT>::difference_type n;
+      typename std::iterator_traits<TT>::difference_type n;
   };
 
   BOOST_concept(Mutable_RandomAccessIterator,(TT))
@@ -632,7 +629,7 @@ namespace boost
       }
    private:
     TT i;
-    typename boost::detail::iterator_traits<TT>::difference_type n;
+    typename std::iterator_traits<TT>::difference_type n;
   };
 
   //===========================================================================
@@ -737,8 +734,8 @@ namespace boost
    private:
       void const_constraints(const C& cc)
       {
-          const_reverse_iterator i = cc.rbegin();
-          i = cc.rend();
+          const_reverse_iterator _i = cc.rbegin();
+          _i = cc.rend();
       }
       C c;
   };
@@ -820,9 +817,8 @@ namespace boost
       BOOST_CONCEPT_USAGE(Sequence)
       {
           S
-              c(n),
-              c2(n, t),
-              c3(first, last);
+              c(n, t),
+              c2(first, last);
 
           c.insert(p, t);
           c.insert(p, n, t);
@@ -835,7 +831,6 @@ namespace boost
 
           ignore_unused_variable_warning(c);
           ignore_unused_variable_warning(c2);
-          ignore_unused_variable_warning(c3);
           ignore_unused_variable_warning(r);
           const_constraints(c);
       }
@@ -880,7 +875,7 @@ namespace boost
           typename BackInsertionSequence::const_reference
               r = cc.back();
           ignore_unused_variable_warning(r);
-      };
+      }
       S c;
       typename S::value_type t;
   };
@@ -971,7 +966,7 @@ namespace boost
       {
           typedef typename C::key_type key_type;
           typedef typename C::value_type value_type;
-          BOOST_MPL_ASSERT((boost::is_same<key_type,value_type>));
+          BOOST_STATIC_ASSERT((boost::is_same<key_type,value_type>::value));
       }
   };
 
@@ -984,7 +979,7 @@ namespace boost
           typedef typename C::value_type value_type;
           typedef typename C::mapped_type mapped_type;
           typedef std::pair<const key_type, mapped_type> required_value_type;
-          BOOST_MPL_ASSERT((boost::is_same<value_type,required_value_type>));
+          BOOST_STATIC_ASSERT((boost::is_same<value_type,required_value_type>::value));
       }
   };
 
@@ -1076,6 +1071,10 @@ namespace boost
       size_type n;
   };
 } // namespace boost
+
+#if (defined _MSC_VER)
+# pragma warning( pop )
+#endif
 
 # include <boost/concept/detail/concept_undef.hpp>
 

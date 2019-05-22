@@ -1455,8 +1455,6 @@ public abstract class CatalogUtil {
             throw new DeploymentCheckException("Unable to instantiate export processor", e);
         }
         try {
-            processor.addLogger(hostLog);
-
             processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();

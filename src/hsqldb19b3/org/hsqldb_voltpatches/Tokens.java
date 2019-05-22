@@ -343,7 +343,10 @@ public class Tokens {
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
     // A VoltDB extension NIBBLE EXPORT
+    static final String        T_EXPORT            = "EXPORT";
     static final String        T_TARGET            = "TARGET";
+    static final String        T_UPDATEOLD         = "UPDATE_OLD";
+    static final String        T_UPDATENEW         = "UPDATE_NEW";
     // End of VoltDB extension
     static final String        T_THEN              = "THEN";
     public static final String T_TIME              = "TIME";
@@ -1123,6 +1126,9 @@ public class Tokens {
     public static final int STREAM                           = 1305;
     public static final int MIGRATE                          = 1400;
     public static final int TARGET                           = 1401;
+    public static final int EXPORT                           = 1402;
+    public static final int UPDATEOLD                        = 1403;
+    public static final int UPDATENEW                        = 1404;
     // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
@@ -1942,6 +1948,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_STREAM, STREAM);
         reservedKeys.put(Tokens.T_MIGRATE, MIGRATE);
         reservedKeys.put(Tokens.T_TARGET, TARGET);
+        reservedKeys.put(Tokens.T_EXPORT, EXPORT);
+        reservedKeys.put(Tokens.T_UPDATEOLD, UPDATEOLD);
+        reservedKeys.put(Tokens.T_UPDATENEW, UPDATENEW);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);

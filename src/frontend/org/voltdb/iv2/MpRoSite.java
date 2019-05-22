@@ -770,4 +770,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public boolean externalStreamsEnabled() {
         throw new RuntimeException("externalStreamsEnabled should not be called on MpRoSite");
     }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE / MpRoSitePool.MAX_POOL_SIZE;
+    }
 }

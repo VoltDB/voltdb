@@ -1287,10 +1287,10 @@ class Distributer {
     final void shutdown() throws InterruptedException {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
-        m_ex.shutdown();
         if (CoreUtils.isJunitTest()) {
-            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+            m_ex.shutdownNow();
         } else {
+            m_ex.shutdown();
             m_ex.awaitTermination(365, TimeUnit.DAYS);
         }
 

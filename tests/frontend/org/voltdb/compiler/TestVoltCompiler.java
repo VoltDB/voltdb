@@ -90,8 +90,35 @@ public class TestVoltCompiler extends TestCase {
         File tjar = new File(testout_jar);
         tjar.delete();
     }
+    public void testExportTarget() throws Exception {
+        String ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE);\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-    /*public void testDDLCompilerTTL() throws Exception {
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(INSERT,DELETE,UPDATE,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD,UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo (a integer NOT NULL, b integer, PRIMARY KEY(a)) EXPORT TO TARGET foo ON(UPDATE_OLD);\n" +
+        "alter table foo EXPORT TO TARGET foo ON(UPDATE_NEW);\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+    }
+
+    public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
                      "alter table ttl USING TTL 20 ON COLUMN a;\n" +
@@ -120,7 +147,7 @@ public class TestVoltCompiler extends TestCase {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
-    }*/
+    }
 
     public void testDDLFiltering() {
 
@@ -3652,7 +3679,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    /*public void testDDLCompilerStreamType() {
+    public void testDDLCompilerStreamType() {
         String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
                 " USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET TEST;\n" +
                 "partition table ttl on column a;" +
@@ -3663,7 +3690,7 @@ public class TestVoltCompiler extends TestCase {
                 ddl
                 );
         Table t = getTableInfoFor(db, "e");
-        assert(t.getTabletype() == TableType.STREAM_VIEW_ONLY.get());
+        assert(t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get());
 
         t = getTableInfoFor(db, "e1");
         assert(t.getTabletype() == TableType.STREAM.get());
@@ -3671,7 +3698,7 @@ public class TestVoltCompiler extends TestCase {
         t = getTableInfoFor(db, "ttl");
         assert(t.getTabletype() == TableType.PERSISTENT_MIGRATE.get());
 
-    }*/
+    }
     public void testBadDropStream() throws Exception {
         // non-existent stream
         badDDLAgainstSimpleSchema(".+object not found: E1.*",
@@ -3921,7 +3948,7 @@ public class TestVoltCompiler extends TestCase {
                                    "create index faulty on alpha(id = (select id + id from alpha));");
     }
 
-    /*public void testDDLCompilerNibbleExport() throws Exception {
+    public void testDDLCompilerNibbleExport() throws Exception {
         String ddl = "create table ttl (a integer not null, b integer, PRIMARY KEY(a)) " +
                 " USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3 MIGRATE TO TARGET TEST;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
@@ -3992,7 +4019,7 @@ public class TestVoltCompiler extends TestCase {
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
-    }*/
+    }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
