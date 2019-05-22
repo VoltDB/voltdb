@@ -1007,9 +1007,7 @@ public class ExportCoordinator {
                 m_safePoint = gap.getFirst() - 1;
             }
 
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
-            }
+            exportLog.info("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
             return m_isMaster;
         }
 
@@ -1055,7 +1053,7 @@ public class ExportCoordinator {
         if (!replicaId.equals(NO_HOST_ID)) {
             m_isMaster = m_hostId.equals(replicaId);
             m_safePoint = Math.min(leaderNextSafePoint, replicaSafePoint);
-            exportLog.debug("Replica host " + replicaId + " fills gap [" + gap.getFirst()
+            exportLog.info("Replica host " + replicaId + " fills gap [" + gap.getFirst()
             + ", " + gap.getSecond() + "], until safe point " + m_safePoint);
             return m_isMaster;
         }
@@ -1063,9 +1061,8 @@ public class ExportCoordinator {
         // If no replicas were found, the leader is Export Master and will become BLOCKED
         m_safePoint = gap.getFirst();
         m_isMaster = isPartitionLeader();
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Leader host " + m_leaderHostId + " is Export Master and will be blocked");
-        }
+        exportLog.info("Leader host " + m_leaderHostId
+                + " is Export Master and will be blocked at safe point " + m_safePoint);
         return m_isMaster;
     }
 
