@@ -108,6 +108,8 @@ public:
         return m_openUniqueId;
     }
 
+    static size_t getDRLogHeaderSize();
+
 private:
     bool transactionChecks(int64_t spHandle, int64_t uniqueId);
 
