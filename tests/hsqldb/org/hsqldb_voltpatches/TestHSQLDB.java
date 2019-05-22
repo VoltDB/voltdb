@@ -329,6 +329,8 @@ public class TestHSQLDB extends TestCase {
     public void testDeleteTableAliasPass() {
         HSQLInterface hsql = setupTPCCDDL();
 
+        // Test cases where the usages of table alias in delete statement are valid
+
         // Parsed result without a table alias
         String no_alias = "";
 
@@ -365,8 +367,6 @@ public class TestHSQLDB extends TestCase {
             // i.e. For this particular statement, the parsed result without table alias should be "...table=\"ORDERS\"..."
             // the parsed result with table alias should be "...table=\"ORDERS\"...tablealias=\"O\"..."
             assertTrue(no_alias.replaceAll("[\\s+\n+]", "").equals(alias_modified.replaceAll("[\\s+\\n+]", "")));
-
-
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
             fail();
@@ -417,6 +417,8 @@ public class TestHSQLDB extends TestCase {
 
     public void testDeleteTableAliasFail() {
         HSQLInterface hsql = setupTPCCDDL();
+
+        // Test cases where the usages of table alias in delete statement are invalid
 
         // Aliasing in FROM without AS, refer to a column in WHERE with the original table
         expectFailStmt(hsql,  "DELETE FROM ORDERS O WHERE ORDERS.O_W_ID = ?;",
