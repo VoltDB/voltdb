@@ -208,6 +208,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_functionManager.loadFunctions(catalogContext);
     }
 
+    public UserDefinedFunctionManager getUDFM() {
+        return m_functionManager;
+    }
+
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
         m_dirty = false;

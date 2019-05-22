@@ -52,6 +52,9 @@ import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.Type;
+import org.voltdb.UserDefinedFunctionManager;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.iv2.Site;
 
 /**
  * Parser for DQL statements
@@ -2149,7 +2152,10 @@ public class ParserDQL extends ParserBase {
             default :
                 if (isCoreReservedKey()) {
                     throw unexpectedToken();
-                }
+                } 
+                /*else if () {
+                	
+                }*/
         }
 
         return readColumnOrFunctionExpression();

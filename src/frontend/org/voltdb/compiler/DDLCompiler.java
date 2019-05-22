@@ -61,6 +61,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
+import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
 import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
@@ -208,7 +209,8 @@ public class DDLCompiler {
         m_classLoader = classLoader;
         m_mvProcessor = new MaterializedViewProcessor(m_compiler, m_hsql);
         m_voltStatementProcessor = new VoltDBStatementProcessor(this);
-        m_voltStatementProcessor.addNextProcessor(new CreateProcedureFromClass(this))
+        m_voltStatementProcessor.addNextProcessor(new CreateAggregateFunctionFromClass(this))
+        						.addNextProcessor(new CreateProcedureFromClass(this))
                                 .addNextProcessor(new CreateProcedureAsScript(this))
                                 .addNextProcessor(new CreateProcedureAsSQL(this))
                                 .addNextProcessor(new CreateFunctionFromMethod(this))
@@ -313,6 +315,7 @@ public class DDLCompiler {
         protected static final String REPLICATE = "REPLICATE";
         protected static final String ROLE = "ROLE";
         protected static final String DR = "DR";
+        protected static final String AGGREGATE = "AGGREGATE";
     }
 
     public void loadSchemaWithFiltering(Reader reader, final Database db, final DdlProceduresToLoad whichProcs, SQLParser.FileInfo fileInfo)
@@ -2257,7 +2260,8 @@ public class DDLCompiler {
 
         try {
             // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-            // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
+            // CREATE PROCEDURE, CREATE FUNCTION, CREATE ROLE, 
+        	// and CREATE AGGREGATE FUNCTION.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
         } catch (VoltCompilerException e) {
             // Reformat the message thrown by VoltDB DDL processing to have a line number.

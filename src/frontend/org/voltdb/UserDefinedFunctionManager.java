@@ -54,9 +54,14 @@ public class UserDefinedFunctionManager {
             "in the catalog jarfile and will now exit.";
 
     ImmutableMap<Integer, UserDefinedFunctionRunner> m_udfs = ImmutableMap.<Integer, UserDefinedFunctionRunner>builder().build();
-
+    ImmutableMap<Integer, UserDefinedAggregateFunctionRunner> m_udafs = ImmutableMap.<Integer, UserDefinedAggregateFunctionRunner>builder().build();
+    
     public UserDefinedFunctionRunner getFunctionRunnerById(int functionId) {
         return m_udfs.get(functionId);
+    }
+    
+    public UserDefinedAggregateFunctionRunner getAggregateRunnerById(int functionId) {
+    	return m_udafs.get(functionId);
     }
 
     // Load all the UDFs recorded in the catalog. Instantiate and register them in the system.
@@ -114,7 +119,16 @@ public class UserDefinedFunctionManager {
         }
     }
 
-
+    /**
+     * This class maintains the necessary information for each UDAF including the class instance
+     * and the method ID for the UDAF implementation. We run UDAFs from this runner.
+     * @author russelhu
+     *
+     */
+    public static class UserDefinedAggregateFunctionRunner {
+    	
+    }
+    
     /**
      * This class maintains the necessary information for each UDF including the class instance and
      * the method ID for the UDF implementation. We run UDFs from this runner.
