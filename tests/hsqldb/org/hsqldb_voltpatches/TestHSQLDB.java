@@ -363,9 +363,11 @@ public class TestHSQLDB extends TestCase {
             // Create a new string that have tablealias entries replaced by whitespaces
             String alias_modified = alias_ref.replace("tablealias=\"O\"", " ");
 
-            // The parsed results with and without a table alias should only be different by the tablealias field.
-            // i.e. For this particular statement, the parsed result without table alias should be "...table=\"ORDERS\"..."
-            // the parsed result with table alias should be "...table=\"ORDERS\"...tablealias=\"O\"..."
+            // The parsed results with and without a table alias should only be different
+            // by the tablealias field.
+            // i.e. For this particular statement, the parsed result without table alias
+            // should be "...table=\"ORDERS\"...". The parsed result with table alias
+            // should be "...table=\"ORDERS\"...tablealias=\"O\"..."
             assertTrue(no_alias.replaceAll("[\\s+\n+]", "").equals(alias_modified.replaceAll("[\\s+\\n+]", "")));
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
@@ -379,7 +381,8 @@ public class TestHSQLDB extends TestCase {
             xml = hsql.getXMLCompiledStatement(sql);
             assertNotNull(xml);
 
-            // All statements that have a table alias should be parsed into the same result
+            // All delete statements that have a table alias should be parsed into the
+            // same result
             assertTrue(xml.toString().equals(alias_ref));
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
@@ -393,7 +396,8 @@ public class TestHSQLDB extends TestCase {
             xml = hsql.getXMLCompiledStatement(sql);
             assertNotNull(xml);
 
-            // All statements that have a table alias should be parsed into the same result
+            // All delete statements that have a table alias should be parsed into the
+            // same result
             assertTrue(xml.toString().equals(alias_ref));
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
@@ -407,7 +411,8 @@ public class TestHSQLDB extends TestCase {
             xml = hsql.getXMLCompiledStatement(sql);
             assertNotNull(xml);
 
-            // All statements that have a table alias should be parsed into the same result
+            // All delete statements that have a table alias should be parsed into the
+            // same result
             assertTrue(xml.toString().equals(alias_ref));
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
