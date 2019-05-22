@@ -154,11 +154,13 @@ public class JDBCExportClient extends ExportClientBase {
         private Connection m_conn = null;
         private PreparedStatement pstmt = null;
         private final ListeningExecutorService m_es;
+        DatabaseType m_dbType = null;
         private String m_preparedStmtStr = null;
+        private String m_createTableStr = null;
         private boolean m_supportsUpsert = false;
         private boolean m_warnedOfUnsupportedOperation = false;
         private boolean m_supportsBatchUpdates;
-        private boolean m_enableAutoCommits = true;
+        private boolean m_disableAutoCommits = true;
 
         private final RefCountedDS m_ds;
 
@@ -185,8 +187,162 @@ public class JDBCExportClient extends ExportClientBase {
 
         }
 
-        private void initialize(long generation, String stableName, List<String> columnNames, List<VoltType> columnTypes,
-                    List<Integer> columnLengths) throws SQLException {
+        private String createTableString(DatabaseType dbType, String schemaAndTable, String identifierQuote,
+                List<String> columnNames, List<Integer> columnLengths, List<VoltType> columnTypes) {
+            int totalRowSize = 0;
+            for (int ii = firstField; ii < columnLengths.size(); ii++) {
+                totalRowSize += columnLengths.get(ii);
+            }
+            boolean jumboRow = totalRowSize > 64000;
+            /*
+             * Vertica supports 8 meg rows, so no total m_row size issues
+             */
+            if (dbType == DatabaseType.VERTICA) {
+                jumboRow = false;
+            }
+            String tableNotExistsClause = " IF NOT EXISTS ";
+            StringBuilder createTableQuery = new StringBuilder();
+            createTableQuery.append("CREATE TABLE " +
+                 (supportsIfNotExists.contains(dbType) ? tableNotExistsClause : "")
+                 + schemaAndTable +
+                 " (");
+
+            for (int i = firstField; i < columnNames.size(); i++) {
+                if (i != firstField) {
+                    createTableQuery.append(", ");
+                }
+
+                VoltType type = columnTypes.get(i);
+                final int columnLength = columnLengths.get(i);
+                final String columnName = m_lowercaseNames ? columnNames.get(i).toLowerCase() : columnNames.get(i);
+
+                final String quotedColumnName = identifierQuote + columnName +  identifierQuote;
+                createTableQuery.append(quotedColumnName + " ");
+
+                if (type == VoltType.TINYINT) {
+                    switch (dbType) {
+                    case POSTGRES:
+                        createTableQuery.append("SMALLINT " +
+                                "CONSTRAINT " + identifierQuote + columnName +
+                                "_tinyint" + identifierQuote + " CHECK (-128 <= " +
+                                quotedColumnName +
+                                " AND " + quotedColumnName + " <= 127)");
+                        break;
+                    case ORACLE:
+                        createTableQuery.append("NUMBER(3)");
+                        break;
+                    case NETEZZA:
+                        createTableQuery.append("BYTEINT");
+                        break;
+                    case VERTICA:
+                    case MYSQL:
+                    case VOLTDB:
+                        createTableQuery.append("TINYINT");
+                        break;
+                    case TERADATA:
+                        createTableQuery.append("BYTEINT");
+                        break;
+                    default:
+                        createTableQuery.append("SMALLINT");
+                        break;
+                    }
+                } else if(columnTypes.get(i) == VoltType.TIMESTAMP) {
+                    switch (dbType) {
+                    case POSTGRES:
+                    case ORACLE:
+                    case VERTICA:
+                        createTableQuery.append("TIMESTAMP WITH TIME ZONE");
+                        break;
+                    case SQLSERVER:
+                        createTableQuery.append("DATETIMEOFFSET");
+                        break;
+                    default:
+                        createTableQuery.append("TIMESTAMP");
+                        break;
+                    }
+                } else if (columnTypes.get(i) == VoltType.STRING) {
+                    appendStringColumn(dbType, createTableQuery, columnLength, jumboRow);
+                } else if (columnTypes.get(i) == VoltType.DECIMAL) {
+                    // Same deal as STRING, but currently DECIMAL's
+                    // precision and scale cannot be changed, so
+                    // it's not horrible to do it this way.
+                    createTableQuery.append("DECIMAL(" +
+                        VoltDecimalHelper.kDefaultPrecision +
+                        "," + VoltDecimalHelper.kDefaultScale + ")");
+                } else if (columnTypes.get(i) == VoltType.FLOAT) {
+                    createTableQuery.append("DOUBLE PRECISION");
+                } else if (columnTypes.get(i) == VoltType.VARBINARY) {
+                    switch (dbType) {
+                    case VERTICA:
+                        if (columnLength > 65000) {
+                            throw new RuntimeException("Vertica only supports VARBINARY up to 65000");
+                        }
+                        createTableQuery.append("VARBINARY(" + columnLength + ")");
+                        break;
+                    case POSTGRES:
+                        createTableQuery.append("BYTEA");
+                        break;
+                    case MYSQL:
+                        if (jumboRow) {
+                            createTableQuery.append("MEDIUMBLOB");
+                        } else {
+                            createTableQuery.append("VARBINARY(" + columnLength + ")");
+                        }
+                        break;
+                    case NETEZZA:
+                        throw new RuntimeException("Netezza doesn't support a binary type");
+                    case ORACLE:
+                        createTableQuery.append("BLOB");
+                        break;
+                    case SQLSERVER:
+                        if (columnLength < 8000) {
+                            createTableQuery.append("VARBINARY(" + columnLength + ")");
+                        } else {
+                            createTableQuery.append("VARBINARY(max)");
+                        }
+                        break;
+                    case TERADATA:
+                        createTableQuery.append("VARBYTE(" + columnLength + ")");
+                        break;
+                    case VOLTDB:
+                        createTableQuery.append("VARBINARY(" + columnLength + ")");
+                        break;
+                    default:
+                        //Seems like most systems don't support VARBINARY beyond 64000, and there are m_row limits
+                        //beyond that as well
+                        if (jumboRow) {
+                            createTableQuery.append("BLOB(" + columnLength + ")");
+                        } else {
+                            createTableQuery.append("VARBINARY(" + columnLength + ")");
+                        }
+                        break;
+                    }
+                } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
+                    appendStringColumn(dbType, createTableQuery, GeographyPointValue.getValueDisplaySize(), jumboRow);
+                } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
+                    appendStringColumn(dbType, createTableQuery, GeographyValue.getValueDisplaySize(columnLength), jumboRow);
+                } else {
+                    if (dbType == DatabaseType.ORACLE) {
+                        if (type == VoltType.SMALLINT) {
+                            createTableQuery.append("NUMBER(5)");
+                        } else if (type == VoltType.INTEGER) {
+                            createTableQuery.append("NUMBER(10)");
+                        } else if (type == VoltType.BIGINT) {
+                            createTableQuery.append("NUMBER(19)");
+                        } else {
+                            createTableQuery.append(type.name());
+                        }
+                    } else {
+                        createTableQuery.append(type.name());
+                    }
+                }
+            }
+            createTableQuery.append(")");
+            return createTableQuery.toString();
+        }
+
+        private void initialize(long generation, String stableName, List<String> columnNames,
+                List<VoltType> columnTypes, List<Integer> columnLengths) throws SQLException {
             boolean supportsBatchUpdatesTmp;
             String identifierQuoteTemp = "";
             DatabaseMetaData md = m_conn.getMetaData();
@@ -194,36 +350,35 @@ public class JDBCExportClient extends ExportClientBase {
             String dbName = md.getDatabaseProductName();
             boolean supportsDuplicateKey = false;
             boolean supportsUpsert = false;
-            DatabaseType dbType = null;
             if (dbName.equals("MySQL")) {
-                dbType = DatabaseType.MYSQL;
+                m_dbType = DatabaseType.MYSQL;
                 identifierQuoteTemp = "`";
                 supportsDuplicateKey = true;
             } else if (dbName.equals("PostgreSQL")) {
-                dbType = DatabaseType.POSTGRES;
+                m_dbType = DatabaseType.POSTGRES;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("Oracle")) {
-                dbType = DatabaseType.ORACLE;
+                m_dbType = DatabaseType.ORACLE;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("Netezza NPS")) {
-                dbType = DatabaseType.NETEZZA;
+                m_dbType = DatabaseType.NETEZZA;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("Microsoft SQL Server")) {
-                dbType = DatabaseType.SQLSERVER;
+                m_dbType = DatabaseType.SQLSERVER;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("Vertica Database")) {
-                dbType = DatabaseType.VERTICA;
+                m_dbType = DatabaseType.VERTICA;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("Teradata")) {
-                dbType = DatabaseType.TERADATA;
+                m_dbType = DatabaseType.TERADATA;
                 identifierQuoteTemp = "\"";
             } else if (dbName.equals("VoltDB")) {
-                dbType = DatabaseType.VOLTDB;
+                m_dbType = DatabaseType.VOLTDB;
                 identifierQuoteTemp = "";
                 supportsUpsert = true;
-                m_enableAutoCommits = false;
-            } else if (dbType == null) {
-                dbType = DatabaseType.UNRECOGNIZED;
+                m_disableAutoCommits = false;
+            } else if (m_dbType == null) {
+                m_dbType = DatabaseType.UNRECOGNIZED;
                 identifierQuoteTemp = "\"";
             }
 
@@ -238,7 +393,8 @@ public class JDBCExportClient extends ExportClientBase {
 
             firstField = ExportRow.getFirstField(skipInternals);
             if (m_createTable){
-                createTable(dbType, schemaAndTable, identifierQuote, columnNames, columnLengths, columnTypes);
+                m_createTableStr = createTableString(m_dbType, schemaAndTable,
+                        identifierQuote, columnNames, columnLengths, columnTypes);
             }
 
             String pstmtStringTmp = "INSERT INTO " + schemaAndTable + " (";
@@ -278,175 +434,24 @@ public class JDBCExportClient extends ExportClientBase {
             }
         }
 
-        private void createTable(DatabaseType dbType, String schemaAndTable, String identifierQuote,
-                List<String> columnNames, List<Integer> columnLengths, List<VoltType> columnTypes) {
+        private void createTable() {
             Statement stmt = null;
             try {
                 stmt = m_conn.createStatement();
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-            int totalRowSize = 0;
-            for (int ii = firstField; ii < columnLengths.size(); ii++) {
-                totalRowSize += columnLengths.get(ii);
-            }
-            boolean jumboRow = totalRowSize > 64000;
-            /*
-             * Vertica supports 8 meg rows, so no total m_row size issues
-             */
-            if (dbType == DatabaseType.VERTICA) {
-                jumboRow = false;
-            }
             try {
-                String tableNotExistsClause = " IF NOT EXISTS ";
-                StringBuilder createTableQuery = new StringBuilder();
-                createTableQuery.append("CREATE TABLE " +
-                     (supportsIfNotExists.contains(dbType) ? tableNotExistsClause : "")
-                     + schemaAndTable +
-                     " (");
-
-                for (int i = firstField; i < columnNames.size(); i++) {
-                    if (i != firstField) {
-                        createTableQuery.append(", ");
-                    }
-
-                    VoltType type = columnTypes.get(i);
-                    final int columnLength = columnLengths.get(i);
-                    final String columnName = m_lowercaseNames ? columnNames.get(i).toLowerCase() : columnNames.get(i);
-
-                    final String quotedColumnName = identifierQuote + columnName +  identifierQuote;
-                    createTableQuery.append(quotedColumnName + " ");
-
-                    if (type == VoltType.TINYINT) {
-                        switch (dbType) {
-                        case POSTGRES:
-                            createTableQuery.append("SMALLINT " +
-                                    "CONSTRAINT " + identifierQuote + columnName +
-                                    "_tinyint" + identifierQuote + " CHECK (-128 <= " +
-                                    quotedColumnName +
-                                    " AND " + quotedColumnName + " <= 127)");
-                            break;
-                        case ORACLE:
-                            createTableQuery.append("NUMBER(3)");
-                            break;
-                        case NETEZZA:
-                            createTableQuery.append("BYTEINT");
-                            break;
-                        case VERTICA:
-                        case MYSQL:
-                        case VOLTDB:
-                            createTableQuery.append("TINYINT");
-                            break;
-                        case TERADATA:
-                            createTableQuery.append("BYTEINT");
-                            break;
-                        default:
-                            createTableQuery.append("SMALLINT");
-                            break;
-                        }
-                    } else if(columnTypes.get(i) == VoltType.TIMESTAMP) {
-                        switch (dbType) {
-                        case POSTGRES:
-                        case ORACLE:
-                        case VERTICA:
-                            createTableQuery.append("TIMESTAMP WITH TIME ZONE");
-                            break;
-                        case SQLSERVER:
-                            createTableQuery.append("DATETIMEOFFSET");
-                            break;
-                        default:
-                            createTableQuery.append("TIMESTAMP");
-                            break;
-                        }
-                    } else if (columnTypes.get(i) == VoltType.STRING) {
-                        appendStringColumn(dbType, createTableQuery, columnLength, jumboRow);
-                    } else if (columnTypes.get(i) == VoltType.DECIMAL) {
-                        // Same deal as STRING, but currently DECIMAL's
-                        // precision and scale cannot be changed, so
-                        // it's not horrible to do it this way.
-                        createTableQuery.append("DECIMAL(" +
-                            VoltDecimalHelper.kDefaultPrecision +
-                            "," + VoltDecimalHelper.kDefaultScale + ")");
-                    } else if (columnTypes.get(i) == VoltType.FLOAT) {
-                        createTableQuery.append("DOUBLE PRECISION");
-                    } else if (columnTypes.get(i) == VoltType.VARBINARY) {
-                        switch (dbType) {
-                        case VERTICA:
-                            if (columnLength > 65000) {
-                                throw new RuntimeException("Vertica only supports VARBINARY up to 65000");
-                            }
-                            createTableQuery.append("VARBINARY(" + columnLength + ")");
-                            break;
-                        case POSTGRES:
-                            createTableQuery.append("BYTEA");
-                            break;
-                        case MYSQL:
-                            if (jumboRow) {
-                                createTableQuery.append("MEDIUMBLOB");
-                            } else {
-                                createTableQuery.append("VARBINARY(" + columnLength + ")");
-                            }
-                            break;
-                        case NETEZZA:
-                            throw new RuntimeException("Netezza doesn't support a binary type");
-                        case ORACLE:
-                            createTableQuery.append("BLOB");
-                            break;
-                        case SQLSERVER:
-                            if (columnLength < 8000) {
-                                createTableQuery.append("VARBINARY(" + columnLength + ")");
-                            } else {
-                                createTableQuery.append("VARBINARY(max)");
-                            }
-                            break;
-                        case TERADATA:
-                            createTableQuery.append("VARBYTE(" + columnLength + ")");
-                            break;
-                        case VOLTDB:
-                            createTableQuery.append("VARBINARY(" + columnLength + ")");
-                            break;
-                        default:
-                            //Seems like most systems don't support VARBINARY beyond 64000, and there are m_row limits
-                            //beyond that as well
-                            if (jumboRow) {
-                                createTableQuery.append("BLOB(" + columnLength + ")");
-                            } else {
-                                createTableQuery.append("VARBINARY(" + columnLength + ")");
-                            }
-                            break;
-                        }
-                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY_POINT) {
-                        appendStringColumn(dbType, createTableQuery, GeographyPointValue.getValueDisplaySize(), jumboRow);
-                    } else if (columnTypes.get(i) == VoltType.GEOGRAPHY) {
-                        appendStringColumn(dbType, createTableQuery, GeographyValue.getValueDisplaySize(columnLength), jumboRow);
-                    } else {
-                        if (dbType == DatabaseType.ORACLE) {
-                            if (type == VoltType.SMALLINT) {
-                                createTableQuery.append("NUMBER(5)");
-                            } else if (type == VoltType.INTEGER) {
-                                createTableQuery.append("NUMBER(10)");
-                            } else if (type == VoltType.BIGINT) {
-                                createTableQuery.append("NUMBER(19)");
-                            } else {
-                                createTableQuery.append(type.name());
-                            }
-                        } else {
-                            createTableQuery.append(type.name());
-                        }
-                    }
-                }
-
-                createTableQuery.append(")");
-                m_logger.info("Creating table with statement: " + createTableQuery);
-                stmt.execute(createTableQuery.toString());
-                createTableQuery = null;
-                if (m_enableAutoCommits) {
+                m_logger.info("Creating table with statement: " + m_createTableStr);
+                stmt.execute(m_createTableStr.toString());
+                m_createTableStr = null;
+                if (m_disableAutoCommits) {
                     m_conn.commit();
                 }
             } catch (SQLException e) {
                 m_logger.warn("SQL Exception when creating table.",e);
                 try {
-                    if (m_enableAutoCommits) {
+                    if (m_disableAutoCommits) {
                         m_conn.rollback();
                     }
                 } catch (SQLException e1) {
@@ -454,8 +459,8 @@ public class JDBCExportClient extends ExportClientBase {
                 }
                 if (!e.getSQLState().equals(SQLSTATE_UNIQUE_VIOLATION) &&
                         //Todo, this predicate is broken, the regex doesn't work
-                        !(dbType == DatabaseType.NETEZZA && !e.getMessage().matches(".+Relation\\s+'[^']+'\\s+already\\s+exists.+")) &&
-                        (dbType == DatabaseType.ORACLE && !e.getMessage().contains("ORA-00955"))) {
+                        !(m_dbType == DatabaseType.NETEZZA && !e.getMessage().matches(".+Relation\\s+'[^']+'\\s+already\\s+exists.+")) &&
+                        (m_dbType == DatabaseType.ORACLE && !e.getMessage().contains("ORA-00955"))) {
                     //Crappy hack around the fact that create if not exists is racy in postgres
                     throw new RuntimeException(e);
                 }
@@ -553,7 +558,7 @@ public class JDBCExportClient extends ExportClientBase {
                 if (m_supportsBatchUpdates) {
                     pstmt.executeBatch();
                 }
-                if (m_enableAutoCommits) {
+                if (m_disableAutoCommits) {
                     m_conn.commit();
                 }
             } catch(BatchUpdateException e){
@@ -632,12 +637,27 @@ public class JDBCExportClient extends ExportClientBase {
                 throw new RestartBlockException(true);
             }
             if (pstmt == null) {
+                if (m_disableAutoCommits) {
+                    try {
+                        m_conn.setAutoCommit(false);
+                    } catch (Exception e) {
+                        m_logger.warn("JDBC export failed to reset AutoCommit in target database", e);
+                        closeConnection();
+                        throw new RestartBlockException(true);
+                    }
+                }
+                if (m_createTable && m_createTableStr != null) {
+                    try {
+                        createTable();
+                    } catch (Exception e) {
+                        m_logger.warn("JDBC export unable to create table in target database", e);
+                        closeConnection();
+                        throw new RestartBlockException(true);
+                    }
+                }
                 try {
                     if (m_logger.isDebugEnabled()) {
                         m_logger.debug(m_preparedStmtStr);
-                    }
-                    if (m_enableAutoCommits) {
-                        m_conn.setAutoCommit(false);
                     }
                     pstmt = m_conn.prepareStatement(m_preparedStmtStr);
                 } catch (Exception e) {

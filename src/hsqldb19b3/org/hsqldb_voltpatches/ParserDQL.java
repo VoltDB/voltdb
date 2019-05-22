@@ -1493,18 +1493,17 @@ public class ParserDQL extends ParserBase {
         Table      table = readTableName();
         SimpleName alias = null;
 
-        if (operation != StatementTypes.DELETE_WHERE) {
-            if (token.tokenType == Tokens.AS) {
-                read();
-                checkIsNonCoreReservedIdentifier();
-            }
+        //if (operation != StatementTypes.DELETE_WHERE) {
+        if (token.tokenType == Tokens.AS) {
+            read();
+            checkIsNonCoreReservedIdentifier();
+        }
 
-            if (isNonCoreReservedIdentifier()) {
-                alias = HsqlNameManager.getSimpleName(token.tokenString,
-                                                      isDelimitedIdentifier());
+        if (isNonCoreReservedIdentifier()) {
+            alias = HsqlNameManager.getSimpleName(token.tokenString,
+                                                  isDelimitedIdentifier());
 
-                read();
-            }
+            read();
         }
 
         if (table.isView) {
