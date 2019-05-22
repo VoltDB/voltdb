@@ -1115,7 +1115,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             }
             for (int i = 0; i < 2; ++i) {
                 lc.killSingleHost(i);
-                lc.rejoinOne(i);
+                lc.recoverOne(i, (i + 1) % 2, "");
             }
 
             client.close();
