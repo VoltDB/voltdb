@@ -326,6 +326,78 @@ public class TestHSQLDB extends TestCase {
         }
     }
 
+    public void testDeleteTableAliasPass() {
+        HSQLInterface hsql = setupTPCCDDL();
+
+        // No aliasing
+        String sql = "DELETE FROM ORDERS WHERE O_W_ID = ?;";
+        VoltXMLElement xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+
+        // Aliasing in FROM without AS, refer to a column in WHERE without the alias
+        sql = "DELETE FROM ORDERS O WHERE O_W_ID = ?;";
+        xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the alias
+        sql = "DELETE FROM ORDERS AS O WHERE O.O_W_ID = ?;";
+        xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+
+        // Aliasing in FROM without AS, refer to a column in WHERE without the alias
+        sql = "DELETE FROM ORDERS O WHERE O_W_ID = ?;";
+        xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the alias
+        sql = "DELETE FROM ORDERS AS O WHERE O.O_W_ID = ?;";
+        xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
+        }
+    }
+
+    public void testDeleteTableAliasFail() {
+        HSQLInterface hsql = setupTPCCDDL();
+
+        // Aliasing in FROM without AS, refer to a column in WHERE with the original table
+        expectFailStmt(hsql,  "DELETE FROM ORDERS O WHERE ORDERS.O_W_ID = ?;",
+                "object not found: ORDERS.O_W_ID");
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the original table
+        expectFailStmt(hsql,  "DELETE FROM ORDERS AS O WHERE ORDERS.O_W_ID = ?;",
+                "object not found: ORDERS.O_W_ID");
+
+    }
+
     /*public void testSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
 
