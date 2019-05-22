@@ -171,12 +171,12 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
                         m_wrapper->getUso() - m_migrateTxnSizeGuard.uso - ExportTupleStream::getExportMetaHeaderSize();
                 m_migrateTxnSizeGuard.estimatedDRLogSize +=
                         rawExportBufSizePlusNullArray + DRTupleStream::getDRLogHeaderSize();
-                if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                      "Migrate transaction failed, exceeding 50MB DR buffer size limit.");
-                }
             }
             m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
+            if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  "Migrate transaction failed, exceeding 50MB DR buffer size limit.");
+            }
         }
     }
 }
@@ -226,8 +226,8 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
         m_wrapper->rollbackExportTo(mark, seqNo);
         if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
             m_migrateTxnSizeGuard.estimatedDRLogSize -=
-                    m_migrateTxnSizeGuard.uso - mark +
-                    ExportTupleStream::getExportMetaHeaderSize() - DRTupleStream::getDRLogHeaderSize();
+                    m_migrateTxnSizeGuard.uso - mark -
+                    ExportTupleStream::getExportMetaHeaderSize() + DRTupleStream::getDRLogHeaderSize();
             assert (m_migrateTxnSizeGuard.estimatedDRLogSize >= 0);
             m_migrateTxnSizeGuard.uso = mark;
         }
