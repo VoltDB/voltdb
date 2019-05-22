@@ -1072,6 +1072,9 @@ class Distributer {
      * failure. If the cluster hasn't finished resolving the failure it is fine, we will get the new topo through\
      */
     private void subscribeToNewNode() {
+        if (m_shutdown.get()) {
+            return;
+        }
         //Technically necessary to synchronize for safe publication of this store
         NodeConnection cxn = null;
         synchronized (Distributer.this) {
@@ -1084,9 +1087,7 @@ class Distributer {
                 return;
             }
         }
-        if (m_shutdown.get()) {
-            return;
-        }
+
         try {
 
             //Subscribe to topology updates before retrieving the current topo
@@ -1147,16 +1148,17 @@ class Distributer {
             ProcedureCallback cb,
             final boolean ignoreBackpressure, final long nowNanos, final long timeoutNanos)
             throws NoConnectionsException {
+        // Shutting down, no more tasks
+        if (m_shutdown.get()) {
+            return false;
+        }
+
         assert(invocation != null);
         assert(cb != null);
 
         NodeConnection cxn = null;
         boolean backpressure = true;
 
-        // Shutting down, no more tasks
-        if (m_shutdown.get()) {
-            return false;
-        }
         /*
          * Synchronization is necessary to ensure that m_connections is not modified
          * as well as to ensure that backpressure is reported correctly
