@@ -235,7 +235,9 @@ public class VoltXMLElement {
 
     private void toMinString(Hasher hasher) {
         hasher.putInt(name.hashCode());
-        hasher.putInt(attributes.hashCode());
+        for (Entry<String, String> entry : attributes.entrySet()) {
+            hasher.putInt(entry.hashCode());
+        }
         for (VoltXMLElement e : children) {
             e.toMinString(hasher);
         }
