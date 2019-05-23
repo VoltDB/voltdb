@@ -80,6 +80,7 @@ public class ExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     public final File m_directory;
 
@@ -684,7 +685,7 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            exportLogLimited.log("PUSH Could not find export data source for partition " + partitionId +
+            exportLogLimitedPush.log("PUSH Could not find export data source for partition " + partitionId +
                     " Signature " + signature + ". The export data is being discarded.",
                     EstTime.currentTimeMillis());
             if (buffer != null) {

@@ -87,7 +87,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
