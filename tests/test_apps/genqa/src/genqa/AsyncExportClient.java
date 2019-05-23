@@ -86,7 +86,6 @@ public class AsyncExportClient
         String m_nonce;
         String m_txnLogPath;
         AtomicLong m_count = new AtomicLong(0);
-        AtomicLong m_migration_remain_count = new AtomicLong(0);
 
         private Map<Integer,File> m_curFiles = new TreeMap<>();
         private Map<Integer,File> m_baseDirs = new TreeMap<>();
@@ -328,7 +327,7 @@ public class AsyncExportClient
                 @Override
                 public void run()
                 {
-                    writer.m_migration_remain_count.set(printStatistics(periodicStatsContext,true));
+                    printStatistics(periodicStatsContext,true);
                 }
             }
             , config.displayInterval*1000l
@@ -373,17 +372,7 @@ public class AsyncExportClient
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // We're done maybe - stop the performance statistics display task
-            long sleep_count = 0;
-            while (config.usemigrate && writer.m_migration_remain_count.get() > 0) {
-                Thread.sleep(10000);
-                System.out.println("Sleeping as migration drains");
-                System.out.println("\t sleep #" + ++sleep_count);
-                System.out.println("\t rows remaining in PARTITIONED_EXPORT_TABLE: " + writer.m_migration_remain_count.get());
-                if (sleep_count > 100) {
-                    break;
-                }
-            }
+            // We're done - stop the performance statistics display task
             timer.cancel();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -462,11 +451,9 @@ public class AsyncExportClient
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = config.parsedServers;
-        // final CountDownLatch connections = new CountDownLatch(serverArray.length);
         Client client = clientRef.get();
-        // use a new thread to connect to each server
         for (final String server : serverArray) {
-            // int sleep = 1000;
+        // connect to the first server in list; with TopologyChangeAware set, no need for more
             try {
                 client.createConnection(server, config.port);
                 break;
@@ -474,43 +461,6 @@ public class AsyncExportClient
                 System.err.printf("Connection to " + server + " failed.\n");
             }
         }
-        /*
-         * new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server, config.port);
-                    connections.countDown();
-                }
-            }).start();
-        }
-        // block until all have connected
-        connections.await();
-        */
-    }
-
-    /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
-     *
-     * @param client The client to use for this server
-     * @param server hostname:port or just hostname (hostname can be ip).
-     */
-    static void connectToOneServerWithRetry(String server, int port) {
-        Client client = clientRef.get();
-        int sleep = 1000;
-        while (true) {
-            try {
-                client.createConnection(server, port);
-                break;
-            }
-            catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
-            }
-        }
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     static Client createClient() {
@@ -539,10 +489,9 @@ public class AsyncExportClient
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      **
-     * If usemigrate, prints table row count per cycle as well.
      * @return 
      */
-    static private synchronized long printStatistics(ClientStatsContext context, boolean resetBaseline) {
+    static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
         if (resetBaseline) {
             context = context.fetchAndResetBaseline();
         } else {
@@ -552,8 +501,6 @@ public class AsyncExportClient
         ClientStats stats = context
                 .getStatsByProc()
                 .get(config.procedure);
-
-        if (stats == null) return 0;
 
         // long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
         // switch from app's runtime to clock time so results line up
@@ -569,24 +516,6 @@ public class AsyncExportClient
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
-
-        if (config.usemigrate) {
-            VoltTable rowcount = null;
-            try {
-                rowcount = clientRef.get().callProcedure("MigrateCount").getResults()[0];
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-            }
-            System.out.printf(time.format(formatter));
-            // System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-            System.out.printf(" Migration progress rows remaining");
-            while (rowcount.advanceRow()) {
-                System.out.printf(" %d\n", rowcount.getLong(0));
-                return rowcount.getLong(0);
-            }
-        }
-        return 0;
     }
 
     /**
