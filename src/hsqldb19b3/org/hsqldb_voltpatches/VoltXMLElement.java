@@ -99,13 +99,7 @@ public class VoltXMLElement {
     }
 
     private String indentXML(String head, int indent, String tail) {
-        StringBuffer sb = new StringBuffer();
-        sb.append(head);
-        for (int idx = 0; idx < indent; idx += 1) {
-            sb.append(" ");
-        }
-        sb.append(tail);
-        return sb.toString();
+        return head + Strings.repeat(" ", indent) + tail;
     }
 
     private void toXML(StringBuilder sb, int indent) {
