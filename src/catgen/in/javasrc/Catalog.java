@@ -21,12 +21,8 @@
 
 package org.voltdb.catalog;
 
-import java.io.IOException;
-import java.io.StringReader;
-
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
-import com.google_voltpatches.common.io.LineReader;
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of
@@ -86,26 +82,18 @@ public class Catalog extends CatalogType {
      * newlines
      */
     public void execute(final String commands) {
+        String[] lines = commands.split("\n");
 
-        LineReader lines = new LineReader(new StringReader(commands));
-
-        int ctr = 0;
-        String line = null;
-        try {
-            while ((line = lines.readLine()) != null) {
-                try {
-                    if (line.length() > 0) executeOne(line);
-                }
-                catch (Exception ex) {
-                    String msg = "Invalid catalog command on line " + ctr + "\n" +
-                        "Contents: '" + line + "'\n";
-                    throw new RuntimeException(msg, ex);
-                }
-                ctr++;
+        for (int ctr = 0; ctr < lines.length; ctr++) {
+            String line = lines[ctr];
+            try {
+                if (line.length() > 0) executeOne(line);
             }
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            catch (Exception ex) {
+                String msg = "Invalid catalog command on line " + ctr + "\n" +
+                        "Contents: '" + line + "'\n";
+                throw new RuntimeException(msg, ex);
+            }
         }
     }
 
