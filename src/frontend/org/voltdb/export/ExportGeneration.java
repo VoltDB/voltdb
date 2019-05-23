@@ -345,10 +345,10 @@ public class ExportGeneration implements Generation {
                         }
                         final ExportDataSource eds = partitionSources.get(tableName);
                         if (eds == null) {
-                            m_deliveryLogger.log(EstTime.currentTimeMillis(), Level.WARN, null,
-                                    "Received export message " + msgType + " for partition " +
-                                    partition + " source " + tableName +
-                                    " which does not exist on this node, sources = " + partitionSources);
+                            m_deliveryLogger.log("Received export message " + msgType + " for partition "
+                                    + partition + " source " + tableName +
+                                    " which does not exist on this node, sources = " + partitionSources,
+                                    EstTime.currentTimeMillis());
                             return;
                         }
 
