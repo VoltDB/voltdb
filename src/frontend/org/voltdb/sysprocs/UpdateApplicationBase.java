@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -421,20 +422,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             Stopwatch sw = Stopwatch.createStarted();
             long elapsed = 0;
             while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
-                resultMapByHost = cf.getNow(null);
-                if (resultMapByHost != null) {
+                try {
+                    resultMapByHost = cf.get(100, TimeUnit.MILLISECONDS);
                     sw.stop();
                     break;
+                } catch (TimeoutException e) {
+                    if (sw.elapsed(TimeUnit.SECONDS) > 5) {
+                        hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                                + "The max timeout value is " + timeoutSeconds + " seconds.");
+                    }
                 }
-
-                if (elapsed < 5) {
-                    // do not log under 5 seconds and sleep for 100 milliseconds
-                    Thread.sleep(100);
-                    continue;
-                }
-                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
-                        + "The max timeout value is " + timeoutSeconds + " seconds.");
-                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
         } catch (Exception e) {
             err = procedureName + " run everywhere call failed: " + e.getMessage();
