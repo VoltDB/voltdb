@@ -851,16 +851,6 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     target.setInlinedDataIsVolatileFalse();
     target.setNonInlinedDataIsVolatileFalse();
 
-    /**
-     * Inserts never "dirty" a tuple since the tuple is new, but...  The
-     * COWIterator may still be scanning and if the tuple came from the free
-     * list then it may need to be marked as dirty so it will be skipped. If COW
-     * is on have it decide. COW should always set the dirty to false unless the
-     * tuple is in a to be scanned area.
-     */
-    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
-        target.setDirtyFalse();
-    }
 
     TableTuple conflict(m_schema);
     try {
@@ -873,6 +863,18 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE,
                 delayTupleDelete ? &m_surgeon : NULL);
     }
+
+    /**
+     * Inserts never "dirty" a tuple since the tuple is new, but...  The
+     * COWIterator may still be scanning and if the tuple came from the free
+     * list then it may need to be marked as dirty so it will be skipped. If COW
+     * is on have it decide. COW should always set the dirty to false unless the
+     * tuple is in a to be scanned area.
+     */
+    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
+        target.setDirtyFalse();
+    }
+
 
     // this is skipped for inserts that are never expected to fail,
     // like some (initially, all) cases of tuple migration on schema change
