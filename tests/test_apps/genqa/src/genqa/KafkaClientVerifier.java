@@ -46,10 +46,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.iv2.TxnEgo;
 
 /**
- * This verifier connects to kafka and consumes messsages from a topic, it then
+ * This verifier connects to kafka and consumes messages from a topic, it then
  * looks for inconsistencies in the data.
  *
- * It requires a field with a seqeuence number and another field with an
+ * It requires a field with a sequence number and another field with an
  * unique index. It will compute gaps in the sequence and check for
  * duplicates based on the index.  It expects that the max sequence number should
  * match the expected number of unique records.
@@ -86,8 +86,8 @@ public class KafkaClientVerifier {
         @Option(desc = "Kafka brokers host:port")
         String brokers = "localhost";
 
-        // Topic prefixes maybe used when two or more instances of a tests share the same kafka cluster
-        // as a means to distinquish each tests data.
+        // Topic prefixes maybe used when two or more instances of a test share the same kafka cluster
+        // as a means to distinguish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
 
@@ -184,17 +184,17 @@ public class KafkaClientVerifier {
                     maxRecordSize.set(mrs);
                     String row[] = RoughCSVTokenizer.tokenize(smsg);
                     Long rowTxnId = Long.parseLong(row[m_uniqueFieldNum].trim());
-                    Long rowNum = Long.parseLong(row[m_sequenceFieldNum]);
+                    Long sequenceNum = Long.parseLong(row[m_sequenceFieldNum]);
 
                     // the number of expected rows should match the max of the
-                    // field that contains the seqeuence field
-                    long maxRow = Math.max(expectedRows.get(), rowNum);
+                    // field that contains the sequence field
+                    long maxRow = Math.max(expectedRows.get(), sequenceNum);
                     expectedRows.set(maxRow);
-                    foundRowIds.add(rowNum);
+                    foundRowIds.add(sequenceNum);
                     if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
                         // System.out.printf(time.format(formatter));
                         System.out.println(timeString() + " Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get()
-                                + " Last row num: " + row[m_sequenceFieldNum] + ", txnid" + row[m_uniqueFieldNum] + ","
+                                + " Last export sequence num: " + row[m_sequenceFieldNum] + ", txnid " + row[m_uniqueFieldNum] + ","
                                 + row[7] + "," + row[8] + "," + row[9] + " foundsize:" + foundRowIds.size());
                     }
 
@@ -330,7 +330,7 @@ public class KafkaClientVerifier {
 
             // We may expect to have missing values in the sequence
             // because of failed txn's in the client, if we do make sure the
-            // number of missing add's up to the expected row count.
+            // number of missing adds up to the expected row count.
             if (lastId < id - 1) {
                 while (lastId < id) {
                     missingCnt++;
@@ -346,15 +346,15 @@ public class KafkaClientVerifier {
             }
         }
         // # received - duplicates + missing rows = LastId
-        long realMissing = lastId - (ids.size() - duplicateCnt + missingCnt);
+        long realMissing = lastId - ids.size() - duplicateCnt + missingCnt;
         System.out.println("");
         System.out.println("Total messages in Kafka = " + ids.size());
-        System.out.println("Total missing sequence numbers in Kafka = " + missingCnt);
+        System.out.println("Total missing client row IDs in Kafka = " + missingCnt);
         System.out.println("Total duplicates discovered in Kafka = " + duplicateCnt);
-        System.out.println("Total attempted rows submitted from client (max sequence) = " + lastId);
-        System.out.println("max sequence number should = received count - duplicates + missing sequences ids");
+        System.out.println("Total attempted rows submitted from client (max client row ID) = " + lastId);
+        System.out.println("max row ID number should = received count - duplicates + missing row ids");
         System.out.println(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
-        System.out.println("unexpected missing records: " + realMissing );
+        System.out.println("missing records: " + realMissing );
 
         if (realMissing > 0) {
             System.err.println("\nERROR There are '" + realMissing + "' missing rows");

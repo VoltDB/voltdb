@@ -462,11 +462,20 @@ public class AsyncExportClient
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = config.parsedServers;
-        final CountDownLatch connections = new CountDownLatch(serverArray.length);
-
+        // final CountDownLatch connections = new CountDownLatch(serverArray.length);
+        Client client = clientRef.get();
         // use a new thread to connect to each server
         for (final String server : serverArray) {
-            new Thread(new Runnable() {
+            // int sleep = 1000;
+            try {
+                client.createConnection(server, config.port);
+                break;
+            }catch (Exception e) {
+                System.err.printf("Connection to " + server + " failed.\n");
+            }
+        }
+        /*
+         * new Thread(new Runnable() {
                 @Override
                 public void run() {
                     connectToOneServerWithRetry(server, config.port);
@@ -476,6 +485,7 @@ public class AsyncExportClient
         }
         // block until all have connected
         connections.await();
+        */
     }
 
     /**
@@ -516,7 +526,6 @@ public class AsyncExportClient
         else {
             clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
         }
-        clientConfig.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(clientConfig);
         clientRef.set(client);
 
