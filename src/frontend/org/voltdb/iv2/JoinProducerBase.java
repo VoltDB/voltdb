@@ -50,6 +50,8 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
     protected TaskLog m_taskLog;
+    // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
+    protected String m_commaSeparatedNameOfViewsToPause = null;
     private String m_snapshotNonce = null;
 
     /**

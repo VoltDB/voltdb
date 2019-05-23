@@ -296,6 +296,8 @@ public class TestSnapshotWithViews extends TestExportBase {
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
         response = client.callProcedure("@AdHoc", "select count(*) from v_ex_np");
         assertEquals(response.getResults()[0].asScalarLong(), 5000);
+        System.out.println("Snapshot Restore for the second time...........");
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
     }
 
     public TestSnapshotWithViews(final String name) {

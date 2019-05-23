@@ -1621,6 +1621,19 @@ VoltDBEngine::loadTable(int32_t tableId,
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
             (table->isCatalogTableReplicated(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
+        // Joined views are special. If any of the source table(s) are not empty, we cannot restore the view content
+        // from a snapshot. The Java top-end has no way to know this so it still tries  to tell the EE
+        // to pause the view on a snapshot restore. When EE finds out that any of the source tables are not empty, it
+        // will ignore the request and let the view stay active. In this case, loadTable() should no longer import
+        // the data from the snapshot to the view table. - ENG-15918
+        auto handler = table->materializedViewHandler();
+        if (handler && handler->snapshotable() && handler->isEnabled()) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Materialized view %s joining multiple tables was skipped in the snapshot restore because it is not paused.",
+                     table->name().c_str());
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+            return true;
+        }
         try {
             table->loadTuplesForLoadTable(serializeIn,
                                           NULL,

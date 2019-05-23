@@ -31,12 +31,15 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.CatalogUtil;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private static final VoltLogger JOINLOG = new VoltLogger("JOIN");
@@ -109,7 +112,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void applyPerPartitionTxnId(SiteProcedureConnection connection) {
         //If there was no ID nothing to do
         long partitionTxnIds[] = fetchPerPartitionTxnId();
-        if (partitionTxnIds == null) return;
+        if (partitionTxnIds == null) {
+            return;
+        }
         connection.setPerPartitionTxnIds(partitionTxnIds, true);
     }
 
@@ -195,6 +200,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                                     event.drMixedClusterSizeConsumerState,
                                     false /* requireExistingSequenceNumbers */,
                                     event.clusterCreateTime);
+                    assert(m_commaSeparatedNameOfViewsToPause != null);
+                    // Resume the views.
+                    siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, true);
                 } catch (InterruptedException e) {
                     // isDone() already returned true, this shouldn't happen
                     VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
@@ -260,6 +268,27 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
             applyPerPartitionTxnId(siteConnection);
         } else {
+            if (m_commaSeparatedNameOfViewsToPause == null) {
+                // The very first execution of runForRejoin will lead us here.
+                StringBuilder commaSeparatedViewNames = new StringBuilder();
+                Database db = VoltDB.instance().getCatalogContext().database;
+                for (Table table : VoltDB.instance().getCatalogContext().tables) {
+                    if (table.getIsreplicated() && CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
+                        // If the table is a snapshotted persistent table view, we will try to
+                        // temporarily disable its maintenance job to boost restore performance.
+                        // Only replicated table views are considered here.
+                        // Partitioned ones are going to be taken care of by BalancePartition.
+                        commaSeparatedViewNames.append(table.getTypeName()).append(",");
+                    }
+                }
+                // Get rid of the trailing comma.
+                if (commaSeparatedViewNames.length() > 0) {
+                    commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
+                }
+                m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
+                // Set enabled to false for the views we found.
+                siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
+            }
             runForBlockingDataTransfer(siteConnection);
             return;
         }
