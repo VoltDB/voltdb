@@ -533,15 +533,14 @@ public abstract class CatalogUtil {
 
         // build a treemap based on the field value
         TreeMap<Object, T> map = new TreeMap<>();
-        boolean hasField = false;
+        boolean checkedFirstItem = false;
         for (T item : items) {
-            // check the first time through for the field
-            if (hasField == false) {
-                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
+            final Object field = item.getField(sortFieldName);
+            if (!checkedFirstItem) {
+                assert(field != null);
+                checkedFirstItem = true;
             }
-            assert(hasField == true);
-
-            map.put(item.getField(sortFieldName), item);
+            map.put(field, item);
         }
 
         // create a sorted list from the map
