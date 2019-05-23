@@ -749,25 +749,8 @@ public class VoltCompiler {
 
     private static void generateCatalogReport(Catalog catalog, String ddl, boolean standaloneCompiler,
             ArrayList<Feedback> warnings, InMemoryJarfile jarOutput) throws IOException {
-        VoltDBInterface voltdb = VoltDB.instance();
-        // try to get a catalog context
-        CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
-        ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
-        int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
-        Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
-        int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
-        int kfactor = deployment != null ? deployment.getKfactor() : 0;
-        int sitesPerHost = 8;
-        if  (voltdb != null && voltdb.getCatalogContext() != null) {
-            sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
-        }
-        boolean isPro = MiscUtils.isPro();
-        long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(tableCount, sitesPerHost, kfactor);
-
-        String report = ReportMaker.report(catalog, minHeapRqt, isPro, hostcount, sitesPerHost, kfactor,
-                warnings, ddl);
         // put the compiler report into the jarfile
-        jarOutput.put(CATLOG_REPORT, report.getBytes(Constants.UTF8ENCODING));
+        jarOutput.put(CATLOG_REPORT, "<html><body>tl;dr…nobody needed this</body></html>".getBytes(Constants.UTF8ENCODING));
     }
 
     /**
