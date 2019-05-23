@@ -666,7 +666,7 @@ public class InitiatorMailbox implements Mailbox
             // The host with old partition leader is down.
             if (message.isStatusReset()) {
                 if ( m_leaderMigrationState.get() == LeaderMigrationState.TXN_RESTART) {
-                    m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_DRAINED ,LeaderMigrationState.NONE);
+                    m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_RESTART ,LeaderMigrationState.NONE);
                 } else {
                     m_leaderMigrationState.set(LeaderMigrationState.TXN_DRAINED);
                 }
