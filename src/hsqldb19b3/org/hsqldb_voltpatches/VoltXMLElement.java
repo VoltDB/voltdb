@@ -160,9 +160,7 @@ public class VoltXMLElement {
 
     public VoltXMLElement duplicate() {
         VoltXMLElement retval = new VoltXMLElement(name);
-        for (Entry<String, String> e : attributes.entrySet()) {
-            retval.attributes.put(e.getKey(), e.getValue());
-        }
+        retval.attributes.putAll(attributes);
         for (VoltXMLElement child : children) {
             retval.children.add(child.duplicate());
         }
