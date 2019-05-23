@@ -113,7 +113,7 @@ public class DDLCompiler {
     private final VoltCompiler m_compiler;
     private final MaterializedViewProcessor m_mvProcessor;
 
-    private String m_fullDDL = "";
+    private StringBuilder m_fullDDL = new StringBuilder(256 * 1024);
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
 
@@ -816,7 +816,7 @@ public class DDLCompiler {
 
     void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
         // note this will need to be decompressed to be used
-        String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
+        String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL.toString());
         db.setSchema(binDDL);
 
         // output the xml catalog to disk
@@ -2124,7 +2124,7 @@ public class DDLCompiler {
                 // kind of ugly.  We hex-encode each statement so we can
                 // avoid embedded newlines so we can delimit statements
                 // with newline.
-                m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                m_fullDDL.append(Encoder.hexEncode(stmt.statement)).append("\n");
 
                 // figure out what table this DDL might affect to minimize diff processing
                 HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
