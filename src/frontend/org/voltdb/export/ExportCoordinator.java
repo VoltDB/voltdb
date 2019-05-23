@@ -195,6 +195,8 @@ public class ExportCoordinator {
          */
         private void invokeNext() {
 
+            // Do not try to acquire the distributed lock until
+            // completely initialized
             if (!isCoordinatorInitialized()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Uninitialized, skip invocation");
@@ -751,6 +753,13 @@ public class ExportCoordinator {
         return tableName + "_" + partitionId;
 
     }
+
+    // Coordinator must be shut down whenever it has started initializing; the
+    // shutdown will occur only after the coordinator is completely initialized.
+    private boolean mustBeShutdown() {
+        return m_state == State.INITIALIZED || m_state == State.INITIALIZING;
+    }
+
     /**
      * @return true if coordinator is initialized
      *
@@ -819,8 +828,9 @@ public class ExportCoordinator {
      */
     public void shutdown() throws InterruptedException {
 
-        if (!isCoordinatorInitialized()) {
-            // Nothing to shut down
+        if (!mustBeShutdown()) {
+            // Nothing to shut down, notify EDS it can shut down
+            m_eds.onCoordinatorShutdown();
             return;
         }
         exportLog.info("Export coordinator requesting shutdown: clearing pending invocations");
@@ -997,9 +1007,7 @@ public class ExportCoordinator {
                 m_safePoint = gap.getFirst() - 1;
             }
 
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
-            }
+            exportLog.info("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
             return m_isMaster;
         }
 
@@ -1045,7 +1053,7 @@ public class ExportCoordinator {
         if (!replicaId.equals(NO_HOST_ID)) {
             m_isMaster = m_hostId.equals(replicaId);
             m_safePoint = Math.min(leaderNextSafePoint, replicaSafePoint);
-            exportLog.debug("Replica host " + replicaId + " fills gap [" + gap.getFirst()
+            exportLog.info("Replica host " + replicaId + " fills gap [" + gap.getFirst()
             + ", " + gap.getSecond() + "], until safe point " + m_safePoint);
             return m_isMaster;
         }
@@ -1053,9 +1061,8 @@ public class ExportCoordinator {
         // If no replicas were found, the leader is Export Master and will become BLOCKED
         m_safePoint = gap.getFirst();
         m_isMaster = isPartitionLeader();
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Leader host " + m_leaderHostId + " is Export Master and will be blocked");
-        }
+        exportLog.info("Leader host " + m_leaderHostId
+                + " is Export Master and will be blocked at safe point " + m_safePoint);
         return m_isMaster;
     }
 

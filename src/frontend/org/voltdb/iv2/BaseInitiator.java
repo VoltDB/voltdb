@@ -45,7 +45,7 @@ import org.voltdb.rejoin.TaskLog;
  */
 public abstract class BaseInitiator<S extends Scheduler> implements Initiator
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger tmLog = new VoltLogger("TM");
 
     // External references/config
     protected final HostMessenger m_messenger;

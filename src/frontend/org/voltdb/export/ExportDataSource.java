@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -49,7 +50,9 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -81,12 +84,14 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
-     * Processors also log using this facility.
+     * Processor loggers.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
+    private static final RateLimitedLogger consoleLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), consoleLog, Level.WARN);
 
+    private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
     private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
             8 + // generation id
             4; // schema size
@@ -1650,13 +1655,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 processStreamControl(OperationMode.RELEASE);
             } else {
                 // Show warning only in full cluster.
-                String warnMsg = "Export is blocked, missing [" +
+                String warnMsg = "Export is blocked, missing rows [" +
                         start + ", " + end + "] from " +
                         ExportDataSource.this.toString() +
-                        ". Please rejoin a node with the missing export queue data or " +
-                        "use 'voltadmin export release' command to skip the missing data.";
-                exportLog.warn(warnMsg);
-                consoleLog.warn(warnMsg);
+                        ". Please rejoin any nodes missing from the cluster or use " +
+                        "the 'voltadmin export release' command to skip the missing data.";
+                exportLogLimited.log(warnMsg, EstTime.currentTimeMillis());
+                consoleLogLimited.log(warnMsg, EstTime.currentTimeMillis() );
                 SnmpTrapSender snmp = VoltDB.instance().getSnmpTrapSender();
                 if (snmp != null) {
                     try {

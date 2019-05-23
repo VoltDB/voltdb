@@ -1045,17 +1045,26 @@ class Stats(object):
                             if previous_ticket:
                                 test_data['existing_ticket'] = previous_ticket
                                 previous_ticket_summary = previous_ticket.fields.summary
-                                previous_ticket_failure_type = previous_ticket_summary.split(' ')[0]
                                 previous_ticket_description = previous_ticket.fields.description
+                                previous_ticket_failure_type = previous_ticket_summary.split(' ')[0]
+                                # Get the "type" of tickets auto-filed before recent changes
+                                if (previous_ticket_failure_type.startswith('org.volt')
+                                            and '(' in previous_ticket_summary):
+                                    previous_ticket_failure_type = previous_ticket_summary \
+                                                                   .split('(')[1] \
+                                                                   .split(' ')[0] \
+                                                                   .split(')')[0]
                                 logging.debug('  previous_ticket.key         : '+str(previous_ticket.key))
                                 logging.debug('  previous_ticket_summary     : '+str(previous_ticket_summary))
                                 logging.debug('  previous_ticket_failure_type: '+str(previous_ticket_failure_type))
                                 logging.debug('  previous_ticket_description : '+str(previous_ticket_description))
 
 
-                            # When no current, open Jira bug ticket exists, file
-                            # a ticket, either of type 'NEW' or 'INTERMITTENT'
-                            if not previous_ticket_failure_type:
+                            # When no current, open Jira bug ticket exists
+                            # (or the type is unrecognized), file a ticket,
+                            # either of type 'NEW' or 'INTERMITTENT'
+                            if (not previous_ticket_failure_type) or (previous_ticket_failure_type not in
+                                        ['NEW', 'INTERMITTENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']):
                                 failure_percent = self.qualifies_as_intermittent_failure(
                                                             cursor, fullTestName, job, build)
                                 if failure_percent:
@@ -1149,6 +1158,16 @@ class Stats(object):
                                                             cursor, fullTestName, job, build,
                                                             previous_ticket_description):
                                         self.close_jira_issue(test_data, DRY_RUN)
+
+                            # It should be impossible to get here; but just in case we
+                            # miss a type of ticket failure, and somehow slip through to
+                            # here, as used to happen with older Jira tickets, auto-filed
+                            # before recent changes, whose type could not be identified
+                            # in the same way: then issue a warning
+                            else:
+                                logging.warn("Unrecognized failure type '%s' ignored, for ticket: %s"
+                                             + (str(previous_ticket_failure_type),
+                                                str(previous_ticket.get(key)) ))
 
                             count_test_cases = count_test_cases + 1
                             if not (count_test_cases % LOG_MESSAGE_EVERY_NUM_TEST_CASES):
@@ -1325,8 +1344,8 @@ if __name__ == '__main__':
     process_passed = isTruthy(process_passed)
     post_to_slack  = isTruthy(post_to_slack)
 
-    logging.info('Processing job: %s;  build range: %s;\n'
-                 '    process tests that passed: %s;  post to slack: %s'
+    logging.info('Processing job: %s;\n    build range: %s;'
+                 '  process tests that passed: %s;  post to slack: %s'
                  % (job, build_range, str(process_passed), str(post_to_slack)) )
 
     stats.get_build_data(job, build_range, process_passed,
