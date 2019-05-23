@@ -221,7 +221,7 @@ public class QueryPlanner implements AutoCloseable {
                                     "operation")))
                     .contains(columnExpression)) {
                 throw new PlanningErrorException(String.format(
-                        "%s: Cannot migrate from table %s because the WHERE caluse does not contain TTL column %s",
+                        "%s: Cannot migrate from table %s because the WHERE clause does not contain TTL column %s",
                         sql, targetTable.getTypeName(), ttl.getName()));
             }
         }

@@ -684,6 +684,37 @@ public class DDLCompiler {
         }
     }
 
+    /**
+     * Process a VoltDB-specific create table ... migrate to target ... DDL statement.
+     * @param stmt
+     * @throws VoltCompilerException
+     */
+    private void processCreateTableStatement(DDLStatement stmt) throws VoltCompilerException {
+        final String statement = stmt.statement;
+        Matcher statementMatcher = SQLParser.matchCreateTableMigrateTo(statement);
+        if (statementMatcher.matches()) {
+            // if we have migrate to target clause
+            if ((statementMatcher.groupCount() > 1) &&
+                    (statementMatcher.group(2) != null) &&
+                    (!statementMatcher.group(2).isEmpty())) {
+                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+                String targetName = checkIdentifierStart(statementMatcher.group(2), statement);
+
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML == null) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid DDL statement: table %s does not exist", tableName));
+                }
+
+                tableXML.attributes.put("migrateExport", targetName);
+            }
+        } else {
+            throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\", "
+                            + "expected syntax: CREATE TABLE <table> [MIGRATE TO TARGET <target>] (column datatype, ...); ",
+                    statement.substring(0, statement.length() - 1)));
+        }
+    }
+
     private void processTableExportStatement(DDLStatement stmt, Database db, boolean alterTable) throws VoltCompilerException {
         String statement = stmt.statement;
         Matcher statementMatcher;
@@ -1428,6 +1459,16 @@ public class DDLCompiler {
                         .findAny()
                         .orElse(null);
 
+        final String migrationTarget = node.attributes.get("migrateExport");
+        if (!StringUtil.isEmpty(migrationTarget)) {
+            table.setMigrationtarget(migrationTarget);
+            table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
+        } else if (migratingIndexName != null) {
+            throw m_compiler.new VoltCompilerException(
+                    String.format("Cannot create migrating index \"%s\" on non-migrating table \"%s\"",
+                            migratingIndexName, name));
+        }
+
         if (ttlNode != null) {
             TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
             String column = ttlNode.attributes.get("column");
@@ -1438,15 +1479,6 @@ public class DDLCompiler {
             ttl.setBatchsize(ttlValue);
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
-            final String migrationTarget = ttlNode.attributes.get("migrationTarget");
-            if (!StringUtil.isEmpty(migrationTarget)) {
-                ttl.setMigrationtarget(migrationTarget);
-                table.setTabletype(TableType.PERSISTENT_MIGRATE.get());
-            } else if (migratingIndexName != null) {
-                throw m_compiler.new VoltCompilerException(
-                        String.format("Cannot create migrating index \"%s\" on non-migrating table \"%s\"",
-                                migratingIndexName, name));
-            }
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
                     ttl.setTtlcolumn(col);
@@ -2255,6 +2287,9 @@ public class DDLCompiler {
 
                 boolean createTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
                         ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
+                if (createTable) {
+                    processCreateTableStatement(stmt);
+                }
                 boolean alterTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.ALTER) &&
                         ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
                 if (createTable || alterTable) {

@@ -167,6 +167,7 @@ begin Table                                  "A table (relation) in the database
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
   TimeToLive* timeToLive                     "Time to live"
   int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
+  string migrationTarget                     "The target where the data are migrated to"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

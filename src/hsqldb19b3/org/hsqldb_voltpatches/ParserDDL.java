@@ -1344,6 +1344,8 @@ public class ParserDDL extends ParserRoutine {
         }
 
         int position = getPosition();
+        // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
+        readUntilThis(Tokens.OPENBRACKET);
 
         readThis(Tokens.OPENBRACKET);
 
