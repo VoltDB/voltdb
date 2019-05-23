@@ -37,6 +37,9 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
 
+import com.google_voltpatches.common.hash.Hasher;
+import com.google_voltpatches.common.hash.Hashing;
+import com.google_voltpatches.common.primitives.Ints;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
@@ -226,13 +229,8 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     // UTILITY
     ///////////////////////////////////////////////////////
 
-    // This method should be able to be killed and all usage replaced with
-    // getSha1Hash, in theory.  We serialize this to pass it between the master
-    // and replica for DR, so there's probably some extra work to do beyond
-    // just replacing one method call with another, though.
     public long getCRC() {
-
-        PureJavaCrc32 crc = new PureJavaCrc32();
+        Hasher hasher = Hashing.murmur3_128().newHasher();
 
         for (Entry<String, byte[]> e : super.entrySet()) {
             if (e.getKey().equals("buildinfo.txt") || e.getKey().equals("catalog-report.html")) {
@@ -246,17 +244,16 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
                 while (ddlbytes[index] != '\n') {
                     index++;
                 }
-                byte[] newddlbytes = Arrays.copyOfRange(ddlbytes, index, ddlbytes.length);
-                crc.update(e.getKey().getBytes(Constants.UTF8ENCODING));
-                crc.update(newddlbytes);
+                hasher.putInt(e.getKey().hashCode());
+                hasher.putBytes(ddlbytes, index, ddlbytes.length - index);
             }
             else {
-                crc.update(e.getKey().getBytes(Constants.UTF8ENCODING));
-                crc.update(e.getValue());
+                hasher.putInt(e.getKey().hashCode());
+                hasher.putBytes(e.getValue());
             }
         }
 
-        return crc.getValue();
+        return hasher.hash().asLong();
     }
 
     public byte[] getSha1Hash() {
