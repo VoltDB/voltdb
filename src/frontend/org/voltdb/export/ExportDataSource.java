@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,7 +54,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
@@ -84,6 +87,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
     private final String m_database;
@@ -1436,8 +1441,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                 m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
+                exportLogLimited.log("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                        this.toString() + ". Please rejoin a node with the missing export queue data. ",
+                        EstTime.currentTimeMillis());
             }
         }
     }
@@ -1521,9 +1527,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {
                                     // Show warning only in full cluster.
-                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                    exportLogLimited.log("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
                                             ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin export release' command to skip the missing data.");
+                                            "use 'voltadmin export release' command to skip the missing data.",
+                                            EstTime.currentTimeMillis());
                                 } else {
                                     processStreamControl(OperationMode.RELEASE);
                                 }
