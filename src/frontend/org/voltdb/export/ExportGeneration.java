@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
@@ -36,6 +37,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.hsqldb_voltpatches.lib.StringUtil;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -43,7 +45,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
@@ -75,6 +79,8 @@ public class ExportGeneration implements Generation {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     public final File m_directory;
 
@@ -246,8 +252,9 @@ public class ExportGeneration implements Generation {
                         buf.get(stringBytes);
                         String signature = new String(stringBytes, Constants.UTF8ENCODING);
                         if (partitionSources == null) {
-                            exportLog.error("Received an export ack for partition " + partition +
-                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
+                            exportLogLimited.log("Received an export ack for partition " + partition +
+                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition,
+                                    EstTime.currentTimeMillis());
                             return;
                         }
                         final ExportDataSource eds = partitionSources.get(signature);
@@ -263,9 +270,10 @@ public class ExportGeneration implements Generation {
                                 }
                                 sendDummyTakeMastershipResponse(message.m_sourceHSId, requestId, partition, stringBytes);
                             } else {
-                                exportLog.warn("Received export message " + msgType + " for partition " +
+                                exportLogLimited.log("Received export message " + msgType + " for partition " +
                                         partition + " source signature " + signature +
-                                        " which does not exist on this node, sources = " + partitionSources);
+                                        " which does not exist on this node, sources = " + partitionSources,
+                                        EstTime.currentTimeMillis());
                             }
                             return;
                         }
@@ -336,10 +344,10 @@ public class ExportGeneration implements Generation {
                             }
                             eds.handleTakeMastershipResponse(message.m_sourceHSId, requestId);
                         } else {
-                            exportLog.error("Receive unsupported message type " + message + " in export subsystem");
+                            exportLog.error("Received unsupported message type " + message + " in export subsystem");
                         }
                     } else {
-                        exportLog.error("Receive unexpected message " + message + " in export subsystem");
+                        exportLog.error("Received unexpected message " + message + " in export subsystem");
                     }
                 }
             };
@@ -677,8 +685,9 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            exportLog.error("PUSH Could not find export data source for partition " + partitionId +
-                    " Signature " + signature + ". The export data is being discarded.");
+            exportLogLimitedPush.log("PUSH Could not find export data source for partition " + partitionId +
+                    " Signature " + signature + ". The export data is being discarded.",
+                    EstTime.currentTimeMillis());
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
