@@ -86,7 +86,7 @@ public class ExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     // Rate-limit message delivery warnings to 1 per minutes
-    private static final RateLimitedLogger m_deliveryLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     public final File m_directory;
 
@@ -345,7 +345,7 @@ public class ExportGeneration implements Generation {
                         }
                         final ExportDataSource eds = partitionSources.get(tableName);
                         if (eds == null) {
-                            m_deliveryLogger.log("Received export message " + msgType + " for partition "
+                            exportLogLimited.log("Received export message " + msgType + " for partition "
                                     + partition + " source " + tableName +
                                     " which does not exist on this node, sources = " + partitionSources,
                                     EstTime.currentTimeMillis());
@@ -820,10 +820,12 @@ public class ExportGeneration implements Generation {
             /*
              * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
              */
-            exportLog.info("PUSH on unknown export data source for partition " + partitionId +
+            exportLogLimited.log("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
                     + "seq: " + startSequenceNumber + ", count: " + tupleCount
-                    + ") is being discarded.");
+                    + ") is being discarded.",
+                    EstTime.currentTimeMillis());
+
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
