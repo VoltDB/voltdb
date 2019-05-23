@@ -79,7 +79,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         assertEquals(numExpectedRowsChanged, results[0].asScalarLong());
 
         int indexOfWhereClause = deleteStmt.toLowerCase().indexOf("where");
-        String deleteWhereClause = "";
+        String deleteWhereClause;
         if (indexOfWhereClause != -1) {
             deleteWhereClause = deleteStmt.substring(indexOfWhereClause);
         }
@@ -87,8 +87,24 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             deleteWhereClause = "";
         }
 
+        // Get the full table reference, including alias if one exists. This is needed
+        // because the where clause can contain aliases.
+        int indexOfTableRef = deleteStmt.toLowerCase().indexOf(tableName.toLowerCase());
+        String deleteTableRef;
+        if (indexOfTableRef != -1) {
+            if (indexOfWhereClause != -1) {
+                deleteTableRef = deleteStmt.substring(indexOfTableRef, indexOfWhereClause - 1);
+            }
+            else {
+                deleteTableRef = deleteStmt.substring(indexOfTableRef);
+            }
+        }
+        else {
+            deleteTableRef = "";
+        }
+
         String query = String.format("select count(*) from %s %s",
-                                     tableName, deleteWhereClause);
+                                      deleteTableRef, deleteWhereClause);
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(0, results[0].asScalarLong());
     }
@@ -600,36 +616,36 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s %s where ID < 8 and ID > 5",
+            String.format("delete from %s %s where ID >= 0",
             table, alias);
-            executeAndTestDelete(table, delete, 2);
+            executeAndTestDelete(table, delete, ROWS);
         }
 
         // Aliasing in FROM with AS, refer to a column in WHERE with the alias
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s AS %s where %s.ID < 8 and %s.ID > 5",
-            table, alias, alias, alias);
-            executeAndTestDelete(table, delete, 2);
+            String.format("delete from %s AS %s where %s.ID >= 0",
+            table, alias, alias);
+            executeAndTestDelete(table, delete, ROWS);
         }
 
         // Aliasing in FROM without AS, refer to a column in WHERE without the alias
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s %s where ID < 8 and ID > 5",
+            String.format("delete from %s %s where ID >= 0",
             table, alias);
-            executeAndTestDelete(table, delete, 2);
+            executeAndTestDelete(table, delete, ROWS);
         }
 
         // Aliasing in FROM with AS, refer to a column in WHERE with the alias
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s AS %s where %s.ID < 8 and %s.ID > 5",
-            table, alias, alias, alias);
-            executeAndTestDelete(table, delete, 2);
+            String.format("delete from %s AS %s where %s.ID >= 0",
+            table, alias, alias);
+            executeAndTestDelete(table, delete, ROWS);
         }
     }
 
@@ -638,11 +654,11 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         Client client = getClient();
 
         // Aliasing in FROM without AS, refer to a column in WHERE with the original table
-        verifyStmtFails(client, "delete from P1 AS %s where P1.ID < 8 and P1.ID > 5",
+        verifyStmtFails(client, "delete from P1 AS P where P1.ID < 8 and P1.ID > 5",
         "object not found: P1.ID");
 
         // Aliasing in FROM with AS, refer to a column in WHERE with the original table
-        verifyStmtFails(client, "delete from P1 %s where P1.ID < 8 and P1.ID > 5",
+        verifyStmtFails(client, "delete from P1 P where P1.ID < 8 and P1.ID > 5",
         "object not found: P1.ID");
     }
 
