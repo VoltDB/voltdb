@@ -176,6 +176,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         }
 
         jarOut.finish();
+        jarOut.flush();
         jarIn.close();
     }
 
