@@ -1269,8 +1269,6 @@ public class DDLCompiler {
             m_matViewMap.put(table, query);
         }
         final boolean isStream = (node.attributes.get("stream") != null);
-        final String streamTarget = node.attributes.get("export");
-        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed;
@@ -1425,6 +1423,8 @@ public class DDLCompiler {
         } else {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
+            final String streamTarget = node.attributes.get("export");
+            final String streamPartitionColumn = node.attributes.get("partitioncolumn");
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn, streamTarget);
         }
     }
