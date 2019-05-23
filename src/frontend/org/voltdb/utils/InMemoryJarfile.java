@@ -280,12 +280,11 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
                 while (ddlbytes[index] != '\n') {
                     index++;
                 }
-                byte[] newddlbytes = Arrays.copyOfRange(ddlbytes, index, ddlbytes.length);
-                md.update(e.getKey().getBytes(Constants.UTF8ENCODING));
-                md.update(newddlbytes);
+                md.update(Ints.toByteArray(e.getKey().hashCode()));
+                md.update(ddlbytes, index, ddlbytes.length - index);
             }
             else {
-                md.update(e.getKey().getBytes(Constants.UTF8ENCODING));
+                md.update(Ints.toByteArray(e.getKey().hashCode()));
                 md.update(e.getValue());
             }
         }
