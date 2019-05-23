@@ -1268,7 +1268,7 @@ public class DDLCompiler {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-        final boolean isStream = (node.attributes.get("stream") != null);
+        final boolean isStream = node.attributes.containsKey("stream");
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed;
@@ -1308,18 +1308,18 @@ public class DDLCompiler {
                 // drop them: there are constraint objects in the catalog
                 // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (!indexNode.name.equals("index")) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
+                    if (!indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX)) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
                                 indexMap, columnMap, m_compiler);
                     }
                 }
 
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (!indexNode.name.equals("index")) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX)) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap,
                                 indexMap, columnMap, m_compiler);
                     }
