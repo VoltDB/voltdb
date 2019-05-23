@@ -250,6 +250,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
+            if (m_shutdown.get()) {
+                return;
+            }
             //Pre 4.1 clusers don't know about subscribe, don't stress over it.
             if (response.getStatusString() != null &&
                 response.getStatusString().contains("@Subscribe was not found")) {
@@ -258,9 +261,7 @@ class Distributer {
                 }
                 return;
             }
-            if (m_shutdown.get()) {
-                return;
-            }
+
             //Fast path subscribing retry if the connection was lost before getting a response
             if (response.getStatus() == ClientResponse.CONNECTION_LOST ) {
                 if (!m_connections.isEmpty()) {
@@ -1614,7 +1615,7 @@ class Distributer {
                         "Fails to queue the partition update query, please try later."));
             }
             if (!topologyUpdate) {
-                latch.await();
+                latch.await(1, TimeUnit.MINUTES);
             }
             m_lastPartitionKeyFetched.set(System.currentTimeMillis());
         } catch (InterruptedException | IOException e) {
