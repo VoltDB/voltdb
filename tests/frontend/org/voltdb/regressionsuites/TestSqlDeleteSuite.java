@@ -25,6 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.util.Arrays;
 
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -127,6 +129,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             executeAndTestDelete(table, delete, 1);
         }
     }
+
 
     public void testDeleteWithEqualToNonIndexPredicate()
             throws Exception
@@ -585,6 +588,62 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             validateTableOfScalarLongs(client, stmt, new long[] { 6, 7, 8, 9 });
         }
 
+    }
+
+    // Test cases where the usages of table alias in delete statement are valid
+    public void testDeleteTableAliasValid() throws Exception {
+        Client client = getClient();
+
+        // Aliasing in FROM without AS, refer to a column in WHERE without the alias
+        String[] tables = {"P1", "R1"};
+        String alias = "ALIAS";
+        for (String table : tables)
+        {
+            String delete =
+            String.format("delete from %s %s where ID < 8 and ID > 5",
+            table, alias);
+            executeAndTestDelete(table, delete, 2);
+        }
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the alias
+        for (String table : tables)
+        {
+            String delete =
+            String.format("delete from %s AS %s where %s.ID < 8 and %s.ID > 5",
+            table, alias, alias, alias);
+            executeAndTestDelete(table, delete, 2);
+        }
+
+        // Aliasing in FROM without AS, refer to a column in WHERE without the alias
+        for (String table : tables)
+        {
+            String delete =
+            String.format("delete from %s %s where ID < 8 and ID > 5",
+            table, alias);
+            executeAndTestDelete(table, delete, 2);
+        }
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the alias
+        for (String table : tables)
+        {
+            String delete =
+            String.format("delete from %s AS %s where %s.ID < 8 and %s.ID > 5",
+            table, alias, alias, alias);
+            executeAndTestDelete(table, delete, 2);
+        }
+    }
+
+    // Test cases where the usages of table alias in delete statement are invalid
+    public void testDeleteTableAliasInvalid() throws Exception {
+        Client client = getClient();
+
+        // Aliasing in FROM without AS, refer to a column in WHERE with the original table
+        verifyStmtFails(client, "delete from P1 AS %s where P1.ID < 8 and P1.ID > 5",
+        "object not found: P1.ID");
+
+        // Aliasing in FROM with AS, refer to a column in WHERE with the original table
+        verifyStmtFails(client, "delete from P1 %s where P1.ID < 8 and P1.ID > 5",
+        "object not found: P1.ID");
     }
 
     //

@@ -1493,7 +1493,6 @@ public class ParserDQL extends ParserBase {
         Table      table = readTableName();
         SimpleName alias = null;
 
-        //if (operation != StatementTypes.DELETE_WHERE) {
         if (token.tokenType == Tokens.AS) {
             read();
             checkIsNonCoreReservedIdentifier();
