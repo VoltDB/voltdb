@@ -66,6 +66,8 @@ public final class PlanCostUtil {
     // I can't quite justify that rationally, but it "seems reasonable". --paul
     private static final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
 
+    private static final double E_CONST = Math.exp(1);
+
     private PlanCostUtil() {
     }
 
@@ -183,7 +185,7 @@ public final class PlanCostUtil {
         // the opposite direction is sparsity == 1/N, where the cost becomes N, and index is not useful at all!
         //
         // To account for a multi-column indexes and partial coverage, Sparsity is adjusted to be
-        // Adjusted sparsity = sparsity * log(|Index Column Count - Key Width + 1|)
+        // Adjusted sparsity = sparsity / log(|Index Column Count - Key Width + e|)
         // where the Index Column Count denotes number of columns / expressions in the index
         // and Key Width denotes the number of Index columns / expressions covered by a given access path.
         // The motivation is that we favor fuller coverage of an index, by dis-favoring more partial coverage that
@@ -204,8 +206,8 @@ public final class PlanCostUtil {
         Preconditions.checkState(keyWidth <= colCount);
 
         double sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
-        sparsity *= Math.log(Math.abs(colCount - keyWidth + 1));
-        double tuplesToRead = Math.log(Math.exp(1) - 1 + rowCount * sparsity) / sparsity;
+        sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
+        double tuplesToRead = Math.log(E_CONST - 1 + rowCount * sparsity) / sparsity;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;

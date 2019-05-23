@@ -21,7 +21,6 @@ import com.google_voltpatches.common.collect.Sets;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableScan;

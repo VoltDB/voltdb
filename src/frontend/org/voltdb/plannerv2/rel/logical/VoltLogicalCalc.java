@@ -19,9 +19,12 @@ package org.voltdb.plannerv2.rel.logical;
 
 import java.util.Set;
 
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -67,4 +70,11 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
         }
         variableSet.addAll(vuv.variables);
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+    }
+
 }
