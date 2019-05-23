@@ -1597,6 +1597,9 @@ class Distributer {
      */
     private void refreshPartitionKeys(boolean topologyUpdate)  {
 
+        if (m_shutdown.get()) {
+            return;
+        }
         long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
         if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
             return;
