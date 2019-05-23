@@ -614,22 +614,16 @@ public class HSQLInterface {
     public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
         VoltXMLElement xml = emptySchema.duplicate();
 
-        // search all the tables XXX probably could do this non-linearly,
-        //  but i don't know about case-insensitivity yet
-        HashMappedList hsqlTables = getHSQLTables();
-        for (int i = 0; i < hsqlTables.size(); i++) {
-            Table table = (Table) hsqlTables.get(i);
-            String candidateTableName = table.getName().name;
-
-            // found the table of interest
-            if (candidateTableName.equalsIgnoreCase(tableName)) {
-                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
-                assert(vxmle != null);
-                xml.children.add(vxmle);
-                return xml;
-            }
+        // unclear if assuming upper case is safe, but it seems to work 🤞
+        Table table = (Table) getHSQLTables().get(tableName.toUpperCase());
+        if (table == null) {
+            return null;
         }
-        return null;
+
+        VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+        assert(vxmle != null);
+        xml.children.add(vxmle);
+        return xml;
     }
 
     private HashMappedList getHSQLTables() {
