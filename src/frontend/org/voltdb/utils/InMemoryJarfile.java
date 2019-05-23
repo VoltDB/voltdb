@@ -17,15 +17,7 @@
 
 package org.voltdb.utils;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -161,7 +153,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     // saves the time for various conversion. The bytes are
     // directly transformed and written to the specified file
     public static void writeToFile(byte[] catalogBytes, File file) throws IOException {
-        JarOutputStream jarOut = new JarOutputStream(new FileOutputStream(file));
+        JarOutputStream jarOut = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
 
         JarInputStream jarIn = new JarInputStream(new ByteArrayInputStream(catalogBytes));
         JarEntry catEntry = null;
