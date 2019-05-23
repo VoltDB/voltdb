@@ -233,7 +233,7 @@ public class Catalog extends CatalogType {
      * @return The serialized string representation of the catalog.
      */
     public String serialize() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(10 * 1024 * 1024);
 
         writeFieldCommands(sb, null);
         writeChildCommands(sb);

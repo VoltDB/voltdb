@@ -201,7 +201,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     }
 
     public byte[] getFullJarBytes() throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream output = new ByteArrayOutputStream(10 * 1024 * 1024);
         writeToOutputStream(output);
         output.close();
         return output.toByteArray();

@@ -92,7 +92,7 @@ public class VoltXMLElement {
      * @return The XML.
      */
     public String toXML() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(256 * 1024);
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
         toXML(sb, 0);
         return sb.toString();
