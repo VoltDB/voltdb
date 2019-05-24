@@ -39,6 +39,7 @@ import java.util.jar.JarOutputStream;
 
 import com.google_voltpatches.common.hash.Hasher;
 import com.google_voltpatches.common.hash.Hashing;
+import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.primitives.Ints;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.VoltDB;
@@ -152,32 +153,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     ///////////////////////////////////////////////////////
 
     // Static helper function for writing the contents of
-    // the catalog to the specified location, this greatly
-    // saves the time for various conversion. The bytes are
-    // directly transformed and written to the specified file
+    // the catalog to the specified location
     public static void writeToFile(byte[] catalogBytes, File file) throws IOException {
-        JarOutputStream jarOut = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
-
-        JarInputStream jarIn = new JarInputStream(new ByteArrayInputStream(catalogBytes));
-        JarEntry catEntry = null;
-        JarInputStreamReader reader = new JarInputStreamReader();
-        while ((catEntry = jarIn.getNextJarEntry()) != null) {
-            byte[] value = reader.readEntryFromStream(jarIn);
-            String key = catEntry.getName();
-
-            assert (value != null);
-            JarEntry entry = new JarEntry(key);
-            entry.setSize(value.length);
-            entry.setTime(System.currentTimeMillis());
-            jarOut.putNextEntry(entry);
-            jarOut.write(value);
-            jarOut.flush();
-            jarOut.closeEntry();
-        }
-
-        jarOut.finish();
-        jarOut.flush();
-        jarIn.close();
+        Files.write(catalogBytes, file);
     }
 
     public Runnable writeToFile(File file) throws IOException {
