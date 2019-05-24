@@ -41,6 +41,7 @@ import org.voltdb.Inits;
 import org.voltdb.client.TLSHandshaker;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
 
 public class PortConnector {
@@ -107,9 +108,8 @@ public class PortConnector {
             if (! shookHands) {
                 throw new IOException("SSL handshake failed");
             }
-            int appBufferSize = sslEngine.getSession().getApplicationBufferSize();
             m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
-            m_enc = new SSLBufferEncrypter(sslEngine, appBufferSize, m_packetBufferSize);
+            m_enc = new SSLBufferEncrypter(sslEngine);
             m_dec = new SSLBufferDecrypter(sslEngine);
             m_tlsFrame = null;
         }
@@ -117,9 +117,7 @@ public class PortConnector {
 
     public long write(ByteBuffer buf) throws IOException {
         if (m_enc != null) {
-            ByteBuffer frame = (ByteBuffer)ByteBuffer.allocate(m_packetBufferSize).clear();
-            m_enc.tlswrap(buf, frame);
-            buf = frame;
+            buf = m_enc.tlswrap(buf, UnpooledByteBufAllocator.DEFAULT).nioBuffer();
         }
         long wrote = 0;
         while (buf.hasRemaining()) {
