@@ -79,8 +79,8 @@ public class ExportGeneration implements Generation {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
-    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.INFO);
+    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.INFO);
 
     public final File m_directory;
 
@@ -253,7 +253,7 @@ public class ExportGeneration implements Generation {
                         String signature = new String(stringBytes, Constants.UTF8ENCODING);
                         if (partitionSources == null) {
                             exportLogLimited.log("Received an export ack for partition " + partition +
-                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition,
+                                    " which does not exist on this node: this should be a transient condition.",
                                     EstTime.currentTimeMillis());
                             return;
                         }
@@ -272,7 +272,8 @@ public class ExportGeneration implements Generation {
                             } else {
                                 exportLogLimited.log("Received export message " + msgType + " for partition " +
                                         partition + " source signature " + signature +
-                                        " which does not exist on this node, sources = " + partitionSources,
+                                        " which does not exist on this node: this should be a transient condition." +
+                                        " Sources = " + partitionSources,
                                         EstTime.currentTimeMillis());
                             }
                             return;
