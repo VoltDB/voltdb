@@ -23,47 +23,82 @@ import java.nio.ReadOnlyBufferException;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSession;
 
 import org.voltcore.network.TLSException;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class SSLBufferEncrypter {
 
     private final SSLEngine m_sslEngine;
 
-    public SSLBufferEncrypter(SSLEngine sslEngine, int applicationBufferSize, int packetBufferSize) {
-        this.m_sslEngine = sslEngine;
-    }
-
     public SSLBufferEncrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
     }
 
-    public void tlswrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer)  {
-        while (true) {
-            SSLEngineResult result = null;
-            try {
-                result = m_sslEngine.wrap(srcBuffer, dstBuffer.slice());
-            } catch (SSLException|ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
-                throw new TLSException("ssl engine wrap fault", e);
-            }
-            switch (result.getStatus()) {
+    public ByteBuf tlswrap(ByteBuffer src, ByteBufAllocator allocator) {
+        ByteBuf encrypted = tlswrap(Unpooled.wrappedBuffer(src), allocator);
+        src.position(src.limit());
+        return encrypted;
+    }
+
+    public ByteBuf tlswrap(ByteBuf src, ByteBufAllocator allocator) {
+        SSLSession session = m_sslEngine.getSession();
+        int packetBufferSize = session.getPacketBufferSize();
+
+        CompositeByteBuf fullyEncrypted = null;
+        ByteBuf piece = null;
+
+        try {
+            do {
+                piece = allocator.buffer(packetBufferSize);
+                assert piece.nioBufferCount() == 1 : "Should only have one buffer: " + piece.nioBufferCount();
+                ByteBuffer destNioBuf = piece.nioBuffer(0, piece.writableBytes());
+
+                ByteBuffer[] srcNioBuffers = src.nioBuffers();
+
+                SSLEngineResult result = null;
+                try {
+                    result = m_sslEngine.wrap(srcNioBuffers, destNioBuf);
+                } catch (SSLException | ReadOnlyBufferException | IllegalArgumentException | IllegalStateException e) {
+                    throw new TLSException("ssl engine wrap fault", e);
+                }
+                switch (result.getStatus()) {
                 case OK:
-                    // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    if (result.bytesProduced() > 0) {
-                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return;
-                        }
-                    else {
-                        continue;
-                    }
+                    src.readerIndex(src.readerIndex() + result.bytesConsumed());
+                    break;
                 case BUFFER_OVERFLOW:
-                    throw new TLSException("SSL engine unexpectedly overflowed when enrypting");
+                    throw new TLSException("SSL engine unexpectedly overflowed when encrypting");
                 case BUFFER_UNDERFLOW:
                     throw new TLSException("SSL engine unexpectedly underflowed when encrypting");
                 case CLOSED:
                     throw new TLSException("SSL engine is closed on ssl wrap of buffer.");
+                }
+                piece.writerIndex(destNioBuf.position());
+
+                if (fullyEncrypted == null) {
+                    if (!src.isReadable()) {
+                        // It all fit in one buffer just return that
+                        return piece;
+                    }
+                    // Avoid buffer compaction and use a large maxNumComponents
+                    fullyEncrypted = allocator.compositeBuffer(1024);
+                }
+                fullyEncrypted.addComponent(true, piece);
+                piece = null;
+            } while (src.isReadable());
+
+            return fullyEncrypted;
+        } catch (Throwable t) {
+            if (piece != null) {
+                piece.release();
             }
+            fullyEncrypted.release();
+            throw t;
         }
     }
-
 }

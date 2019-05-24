@@ -24,7 +24,6 @@ import java.nio.channels.SocketChannel;
 import javax.net.ssl.SSLEngine;
 
 import org.voltcore.network.CipherExecutor;
-import org.voltcore.network.TLSException;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -136,38 +135,16 @@ public class TLSMessagingChannel extends MessagingChannel {
             return 0;
         }
 
-        CompositeByteBuf outbuf = Unpooled.compositeBuffer();
-        ByteBuf msg = Unpooled.wrappedBuffer(message);
-        final int needed = CipherExecutor.framesFor(msg.readableBytes());
-        for (int have = 0; have < needed; ++have) {
-            final int slicesz = Math.min(CipherExecutor.FRAME_SIZE, msg.readableBytes());
-            ByteBuf clear = msg.readSlice(slicesz).writerIndex(slicesz);
-            ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());
-            ByteBuffer src = clear.nioBuffer();
-            ByteBuffer dst = encr.nioBuffer();
-            try {
-                m_encrypter.tlswrap(src, dst);
-            } catch (TLSException e) {
-                outbuf.release();
-                encr.release();
-                throw new IOException("failed to encrypt tls frame", e);
-            }
-            assert !src.hasRemaining() : "encryption wrap did not consume the whole source buffer";
-            encr.writerIndex(dst.limit());
-            outbuf.addComponent(true, encr);
-        }
         int bytesWritten = 0;
+        ByteBuf outputBuf = m_encrypter.tlswrap(message, m_ce.allocator());
         try {
-            while (outbuf.isReadable()) {
-                bytesWritten += outbuf.readBytes(m_socketChannel, outbuf.readableBytes());
+            while (outputBuf.isReadable()) {
+                bytesWritten += outputBuf.readBytes(m_socketChannel, outputBuf.readableBytes());
             }
-        } catch (IOException e) {
-            throw e;
         } finally {
-            outbuf.release();
+            outputBuf.release();
         }
 
-        message.position(message.position() + msg.readerIndex());
         return bytesWritten;
     }
 }
