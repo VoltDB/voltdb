@@ -143,7 +143,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             executeAndTestDelete(table, delete, 1);
         }
     }
-    
+
     public void testDeleteWithEqualToNonIndexPredicate()
             throws Exception
     {
