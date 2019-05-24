@@ -17,8 +17,14 @@
 
 package org.voltdb.compiler.statements;
 
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 
+import com.google_voltpatches.common.cache.CacheBuilder;
+import com.google_voltpatches.common.cache.CacheLoader;
+import com.google_voltpatches.common.cache.LoadingCache;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -33,6 +39,10 @@ import org.voltdb.parser.SQLParser;
  * If not, end the chain now and give it to HSQL for handling.
  */
 public class VoltDBStatementProcessor extends StatementProcessor {
+    private static final LoadingCache<String, Optional<String>> PREAMBLE_STATEMENT_CACHE = CacheBuilder.newBuilder()
+            .maximumSize(5_000)
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .build(CacheLoader.from(VoltDBStatementProcessor::matchAllVoltDBStatementPreambles));
 
     public VoltDBStatementProcessor(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
@@ -53,15 +63,30 @@ public class VoltDBStatementProcessor extends StatementProcessor {
         }
         ddlStatement.statement = ddlStatement.statement.trim();
 
-        // Matches if it is the beginning of a VoltDB statement
-        Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(ddlStatement.statement);
-        if ( ! statementMatcher.find()) {
-            m_returnAfterThis = true;
+        try {
+            final Optional<String> commandPrefix = PREAMBLE_STATEMENT_CACHE.get(ddlStatement.statement);
+            if (!commandPrefix.isPresent()) {
+                m_returnAfterThis = true;
+                return false;
+            }
+            // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR
+            m_commandPrefix = commandPrefix.get();
             return false;
+        } catch (ExecutionException e) {
+            // Our cache loader method never throws, so this *should* never happen. But we have to be
+            // safe just in case. Unfortunately, we can't actually throw a VoltCompilerException here
+            // because it's not a static class and we don't have a VoltCompiler instance with which to
+            // instantiate the VoltCompilerException.
+            throw new RuntimeException("Error parsing DDL via statement cache", e);
         }
-        // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR
-        m_commandPrefix = statementMatcher.group(1).toUpperCase();
-        return false;
+    }
+
+    private static Optional<String> matchAllVoltDBStatementPreambles(String statement) {
+        final Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(statement);
+        if (!statementMatcher.find()) {
+            return Optional.empty();
+        }
+        return Optional.of(statementMatcher.group(1).toUpperCase());
     }
 
 }
