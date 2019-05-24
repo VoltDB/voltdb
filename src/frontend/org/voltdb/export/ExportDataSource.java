@@ -674,6 +674,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
+                    if (m_closed) {
+                        return 0L;
+                    }
                     return m_committedBuffers.sizeInBytes();
                 }
             }).get();
@@ -835,26 +838,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new RuntimeException(e);
         }
 
-        if (m_es.isShutdown()) {
-            //If we are shutting down push it to PBD
-            try {
-                pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
-                        tupleCount, uniqueId, genId, buffer, false);
-            } catch (Throwable t) {
-                VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
-            } finally {
-                m_bufferPushPermits.release();
-            }
-           return;
+        if (m_closed) {
+            exportLog.error("Closed: ignoring export buffer with " + tupleCount + " rows");
+            return;
         }
         try {
             m_es.execute((new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        if (!m_es.isShutdown()) {
+                        if (!m_closed) {
                             pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
                                     tupleCount, uniqueId, genId, buffer, m_readyForPolling);
+                        } else {
+                            exportLog.error("Closed: ignoring export buffer with " + tupleCount + " rows");
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -1012,6 +1009,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Note that this callback is invoked from a runnable on the executor service.
      */
     public void resumePolling() {
+        if (m_closed) {
+            return;
+        }
         if (m_pollTask != null) {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Resuming polling...");
@@ -1057,7 +1057,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         return;
                     }
                     try {
-                        if (!m_es.isShutdown()) {
+                        if (!m_closed) {
                             pollImpl(pollTask);
                         }
                     } catch (Exception e) {
@@ -1311,9 +1311,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
 
                 try {
-                    if (!m_es.isShutdown()) {
-                        localAck(commitSeqNo, lastSeqNo);
-                    }
+                    localAck(commitSeqNo, lastSeqNo);
                     forwardAckToOtherReplicas();
                     if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
                         m_migrateRowsDeleter.delete(commitSpHandle);
@@ -1424,10 +1422,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    if (m_es.isShutdown()) {
-                        return;
-                    }
-
                     // Reflect the remote ack in our state
                     localAck(seq, seq);
 
@@ -1454,6 +1448,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param ackSeq
      */
     public void localAck(long commitSeq, long ackSeq) {
+        if (m_closed) {
+            return;
+        }
         setCommittedSeqNo(commitSeq);
         ackImpl(ackSeq);
     }
@@ -1734,7 +1731,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void updateCatalog(Table table, long genId) {
         // Skip unneeded catalog update
-        if (m_previousGenId >= genId) {
+        if (m_previousGenId >= genId || m_closed) {
             return;
         }
         m_es.execute(new Runnable() {
