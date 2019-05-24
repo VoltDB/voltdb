@@ -87,6 +87,7 @@ public class ExportGeneration implements Generation {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     // Rate-limit message delivery warnings to 1 per minutes
     private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     public final File m_directory;
 
@@ -820,7 +821,7 @@ public class ExportGeneration implements Generation {
             /*
              * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
              */
-            exportLogLimited.log("PUSH on unknown export data source for partition " + partitionId +
+            exportLogLimitedPush.log("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
                     + "seq: " + startSequenceNumber + ", count: " + tupleCount
                     + ") is being discarded.",
