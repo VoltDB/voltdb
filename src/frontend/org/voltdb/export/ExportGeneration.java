@@ -339,8 +339,9 @@ public class ExportGeneration implements Generation {
                         String tableName = new String(stringBytes, Constants.UTF8ENCODING);
                         if (partitionSources == null) {
                             if (!m_removingPartitions.contains(partition)) {
-                                exportLog.error("Received an export message " + msgType + " for partition " + partition +
-                                        " which does not exist on this node");
+                                exportLogLimited.log("Received an export message " + msgType + " for partition " + partition +
+                                        " which does not exist on this node",
+                                        EstTime.currentTimeMillis());
                             }
                             return;
                         }
