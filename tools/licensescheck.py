@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, re
+import datetime, os, sys, re, string
 
 # Path to eng checkout root directory. To use this as a git pre-commit hook,
 # create a symlink to this file in .git/hooks with the name pre-commit
@@ -30,9 +30,9 @@ prunelist = ('hsqldb19b3',
 
 def licenseStartsHere(content, approvedLicenses):
     for license in approvedLicenses:
-        if content.startswith(license):
-            return 1
-    return 0
+        if license.match(content):
+            return True
+    return False
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py') \
@@ -77,8 +77,9 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
         print "ERROR: \"%s\" does not start with an approved license." % f
     return 1
 
+TRAILING_WHITE_SPACE_RE = re.compile(r'[\t\f\v ]+\n')
 def verifyTrailingWhitespace(f, content):
-    if re.search(r'[\t\f\v ]\n', content):
+    if TRAILING_WHITE_SPACE_RE.search(content):
         print("ERROR: \"%s\" contains trailing whitespace." % (f))
         return 1
     return 0
@@ -205,12 +206,25 @@ def verifyGetStringChars(f, content):
         return 1
     return 0
 
+def validYearRegex(startYear):
+    ''' Return a regex which will match any year between startYear and this current year '''
+    return '(' + '|'.join(map(str, range(startYear, datetime.date.today().year + 1))) + ')'
+
+def generateCopyrightYearRegex():
+    ''' Create a regex which allows a range of years or a single year '''
+    return '(' + validYearRegex(2008) + '-)?' + validYearRegex(2019)
+
+LICESE_FILE_VALUES = {'copyrightYear': generateCopyrightYearRegex()}
+
+def readLicenseFile(filename):
+    ''' Return a regular expresion which can be used to validate a license '''
+    # This is a bit hacky but license have regular expression key values so we need to escape them but not $ since that is used by the template
+    return re.compile(string.Template(re.escape(readFile(filename)).replace('\\$', '$')).substitute(**LICESE_FILE_VALUES))
+
 def readFile(filename):
     "read a file into a string"
-    FH=open(filename, 'r')
-    fileString = FH.read()
-    FH.close()
-    return fileString
+    with open(filename) as fh:
+        return fh.read()
 
 def writeRepairedContent(filename, newtext, original):
     try:
@@ -277,8 +291,8 @@ def fixTrailingWhitespace(f, content):
     lines = content.split("\n")
     cleanlines = []
     for line in lines:
-        if re.search(r'[\t\f\v ]+$', line):
-            (line, ignored) = re.split(r'[\t\f\v ]+$', line)
+        if TRAILING_WHITE_SPACE_RE.search(line):
+            (line, ignored) = TRAILING_WHITE_SPACE_RE.split(line)
         cleanlines.append(line)
     print "Fix: Removing trailing whitespace."
     return writeRepairedContent(f, "\n".join(cleanlines),  content)
@@ -402,26 +416,25 @@ testLicensesPy = [basepath + 'tools/approved_licenses/mit_x11_voltdb_python.txt'
 
 srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
-
 (fixcount, errcount) = (0, 0)
 (fixinc, errinc) = processAllFiles(basepath + "src", fix,
-    tuple([readFile(f) for f in srcLicenses]),
-    tuple([readFile(f) for f in srcLicensesPy]))
+    tuple([readLicenseFile(f) for f in srcLicenses]),
+    tuple([readLicenseFile(f) for f in srcLicensesPy]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "lib/python", fix,
-    tuple([readFile(f) for f in srcLicenses]),
-    tuple([readFile(f) for f in srcLicensesPy]))
+    tuple([readLicenseFile(f) for f in srcLicenses]),
+    tuple([readLicenseFile(f) for f in srcLicensesPy]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "tests", fix,
-    tuple([readFile(f) for f in testLicenses]),
-    tuple([readFile(f) for f in testLicensesPy]))
+    tuple([readLicenseFile(f) for f in testLicenses]),
+    tuple([readLicenseFile(f) for f in testLicensesPy]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "examples", fix,
-    tuple([readFile(f) for f in testLicenses]),
-    tuple([readFile(f) for f in testLicensesPy]))
+    tuple([readLicenseFile(f) for f in testLicenses]),
+    tuple([readLicenseFile(f) for f in testLicensesPy]))
 fixcount += fixinc
 errcount += errinc
 
@@ -452,14 +465,14 @@ if not ascommithook:
             proLicenses = [pathprefix + '/tools/approved_licenses/license.txt']
             proLicensesPy = [pathprefix + '/tools/approved_licenses/license_python.txt']
             (fixinc, errinc) = processAllFiles(pathprefix + "/src/", fix,
-                tuple([readFile(f) for f in proLicenses]),
-                tuple([readFile(f) for f in proLicensesPy]))
+                tuple([readLicenseFile(f) for f in proLicenses]),
+                tuple([readLicenseFile(f) for f in proLicensesPy]))
             profixcount += fixinc
             proerrcount += errinc
 
             (fixinc, errinc) = processAllFiles(pathprefix + "/tests/", fix,
-                tuple([readFile(f) for f in proLicenses]),
-                tuple([readFile(f) for f in proLicensesPy]))
+                tuple([readLicenseFile(f) for f in proLicenses]),
+                tuple([readLicenseFile(f) for f in proLicensesPy]))
             profixcount += fixinc
             proerrcount += errinc
 
