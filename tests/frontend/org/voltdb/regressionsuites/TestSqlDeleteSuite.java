@@ -613,7 +613,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s %s where ID >= 0",
+            String.format("DELETE FROM %s %s WHERE ID >= 0",
             table, alias);
             executeAndTestDelete(table, delete, ROWS);
         }
@@ -622,7 +622,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s AS %s where %s.ID >= 0",
+            String.format("DELETE FROM %s AS %s WHERE %s.ID >= 0",
             table, alias, alias);
             executeAndTestDelete(table, delete, ROWS);
         }
@@ -631,7 +631,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s %s where ID >= 0",
+            String.format("DELETE FROM %s %s WHERE ID >= 0",
             table, alias);
             executeAndTestDelete(table, delete, ROWS);
         }
@@ -640,7 +640,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         for (String table : tables)
         {
             String delete =
-            String.format("delete from %s AS %s where %s.ID >= 0",
+            String.format("DELETE FROM %s AS %s WHERE %s.ID >= 0",
             table, alias, alias);
             executeAndTestDelete(table, delete, ROWS);
         }
@@ -651,12 +651,16 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         Client client = getClient();
 
         // Aliasing in FROM without AS, refer to a column in WHERE with the original table
-        verifyStmtFails(client, "delete from P1 AS P where P1.ID < 8 and P1.ID > 5",
+        verifyStmtFails(client, "DELETE FROM P1 AS P WHERE P1.ID < 8 AND P1.ID > 5",
         "object not found: P1.ID");
 
         // Aliasing in FROM with AS, refer to a column in WHERE with the original table
-        verifyStmtFails(client, "delete from P1 P where P1.ID < 8 and P1.ID > 5",
+        verifyStmtFails(client, "DELETE FROM P1 P WHERE P1.ID < 8 AND P1.ID > 5",
         "object not found: P1.ID");
+
+        // Using LIMIT, reserved keyword as a table alias
+        verifyStmtFails(client, "DELETE FROM P1 AS LIMIT WHERE P1.ID < 8 and P1.ID > 5",
+        "unexpected token: LIMIT");
     }
 
     //
