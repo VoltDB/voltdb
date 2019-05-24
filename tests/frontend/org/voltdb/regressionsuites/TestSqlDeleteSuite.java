@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.util.Arrays;
 
-import org.hsqldb_voltpatches.HSQLInterface;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
