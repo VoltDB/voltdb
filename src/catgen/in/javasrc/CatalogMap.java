@@ -72,7 +72,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         }
         // if parent is the catalog root, don't add an extra slash to the existing one
         if (m_parent != m_catalog) {
-            sb.append(m_parent.getCatalogPath()).append('/');
+            m_parent.getCatalogPath(sb);
+            sb.append('/');
         }
         sb.append(m_name);
     }
