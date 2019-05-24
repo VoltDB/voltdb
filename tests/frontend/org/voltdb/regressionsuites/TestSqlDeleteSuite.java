@@ -658,7 +658,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         verifyStmtFails(client, "DELETE FROM P1 P WHERE P1.ID < 8 AND P1.ID > 5",
         "object not found: P1.ID");
 
-        // Using LIMIT, reserved keyword as a table alias
+        // Using LIMIT, a reserved keyword, as a table alias
         verifyStmtFails(client, "DELETE FROM P1 AS LIMIT WHERE P1.ID < 8 and P1.ID > 5",
         "unexpected token: LIMIT");
     }
