@@ -715,31 +715,6 @@ public class DDLCompiler {
         }
     }
 
-    private void processTableExportStatement(DDLStatement stmt, Database db, boolean alterTable) throws VoltCompilerException {
-        String statement = stmt.statement;
-        Matcher statementMatcher;
-        if (alterTable) {
-            statementMatcher = SQLParser.matchAlterTTL(statement);
-        } else {
-            statementMatcher = SQLParser.matchCreateTable(statement);
-        }
-        if (statementMatcher.matches()) {
-            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-            if (tableXML != null) {
-                for (VoltXMLElement subNode : tableXML.children) {
-                    if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
-                        final String migrationTarget = subNode.attributes.get("migrationTarget");
-                        if (!StringUtil.isEmpty(migrationTarget)) {
-                            tableXML.attributes.put("migrateExport", migrationTarget);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
@@ -2289,11 +2264,6 @@ public class DDLCompiler {
                         ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
                 if (createTable) {
                     processCreateTableStatement(stmt);
-                }
-                boolean alterTable = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.ALTER) &&
-                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.TABLE);
-                if (createTable || alterTable) {
-                    processTableExportStatement(stmt, db, alterTable);
                 }
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;

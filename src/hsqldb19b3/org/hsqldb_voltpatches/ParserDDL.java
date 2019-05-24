@@ -1003,7 +1003,7 @@ public class ParserDDL extends ParserRoutine {
         if (t.getTTL() == null) {
             throw Error.error(ErrorCode.X_42501);
         }
-        if (!StringUtil.isEmpty(t.getTTL().migrationTarget)) {
+        if (t.hasMigrationTarget()) {
             throw unexpectedToken("May not drop migration target");
         }
         Object[] args = new Object[] {
@@ -1097,7 +1097,6 @@ public class ParserDDL extends ParserRoutine {
         String ttlColumn = "";
         int batchSize = 1000;
         int maxFrequency = 1;
-        String migrationTarget = "";
         read();
         if (token.tokenType != Tokens.TTL) {
             throw unexpectedToken();
@@ -1141,7 +1140,7 @@ public class ParserDDL extends ParserRoutine {
         }
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         }
         if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
             if (token.tokenType == Tokens.BATCH_SIZE) {
@@ -1165,13 +1164,9 @@ public class ParserDDL extends ParserRoutine {
             }
         }
 
-        if (token.tokenType == Tokens.MIGRATE) {
-            migrationTarget = readMigrateTarget();
-        }
-
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         }
 
         if (token.tokenType == Tokens.BATCH_SIZE || token.tokenType == Tokens.MAX_FREQUENCY) {
@@ -1192,22 +1187,15 @@ public class ParserDDL extends ParserRoutine {
             }
         }
 
-        if (token.tokenType == Tokens.MIGRATE) {
-            migrationTarget = readMigrateTarget();
-        }
-
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         }
 
-        if (token.tokenType == Tokens.MIGRATE) {
-            migrationTarget = readMigrateTarget();
-        }
         read();
 
       if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, migrationTarget);
+            return createTimeToLive(table, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         } else {
             throw unexpectedToken();
         }
@@ -1228,24 +1216,9 @@ public class ParserDDL extends ParserRoutine {
         }
         return token.tokenString;
     }
-    private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
-            int batchSize, int maxFrequency, String migrationTargetName) {
-        if (!alter) {
-            table.addTTL(value, unit, column, batchSize, maxFrequency, migrationTargetName);
-        } else {
-            // The migration target can not be added via alter
-            if (table.getTTL() != null) {
-                final String oldTarget = table.getTTL().migrationTarget;
-                if (StringUtil.isEmpty(oldTarget) && !StringUtil.isEmpty(migrationTargetName)) {
-                    throw unexpectedToken("The migration target cannot be added.");
-                }
-                if (!StringUtil.isEmpty(oldTarget) && !oldTarget.equalsIgnoreCase(migrationTargetName)) {
-                    throw unexpectedToken("The migration target cannot be altered.");
-                }
-            } else if (!StringUtil.isEmpty(migrationTargetName)) {
-                throw unexpectedToken("The migration target cannot be added.");
-            }
-        }
+    private Statement createTimeToLive(Table table, int value, String unit, String column,
+            int batchSize, int maxFrequency) {
+        table.addTTL(value, unit, column, batchSize, maxFrequency);
 
         Object[] args = new Object[] {
                 table.getName(),
@@ -1254,7 +1227,6 @@ public class ParserDDL extends ParserRoutine {
                 column,
                 batchSize,
                 maxFrequency,
-                migrationTargetName,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
             };
@@ -1344,6 +1316,8 @@ public class ParserDDL extends ParserRoutine {
         }
 
         int position = getPosition();
+
+        table.setHasMigrationTarget(token.tokenType == Tokens.MIGRATE);
         // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
         readUntilThis(Tokens.OPENBRACKET);
 

@@ -929,18 +929,8 @@ public class CatalogDiffEngine {
             suspect instanceof GroupRef ||
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
-            suspect instanceof PlanFragment) {
-            return null;
-        }
-
-        if (suspect instanceof TimeToLive) {
-            TimeToLive current = (TimeToLive)suspect;
-            if (prevType != null) {
-                TimeToLive previous = (TimeToLive)prevType;
-                if (previous.getMigrationtarget() == null && current.getMigrationtarget() != null) {
-                    m_requiresNewExportGeneration= true;
-                }
-            }
+            suspect instanceof PlanFragment ||
+            suspect instanceof TimeToLive) {
             return null;
         }
 

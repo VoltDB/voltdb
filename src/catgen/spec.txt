@@ -176,7 +176,6 @@ begin TimeToLive javaonly             "Time to Live (TTL), limits the life span 
   Column? ttlColumn                   "A column used to determine the duration of data"
   int batchSize                       "Number of tuples to be deleted in a batch. default: 1000"
   int maxFrequency                    "Maximal number of times of deleting batchSize rows per second.default: 1"
-  string migrationTarget              "The target where the data are migrated to"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"

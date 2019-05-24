@@ -332,11 +332,6 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
                 table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
-
-                if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
-                    assert(TableType.isPersistentMigrate(catalog_tbl.getTabletype()));
-                    table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
-                }
             }
             else if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
                 table_sb.append(" EXPORT TO TARGET ");
