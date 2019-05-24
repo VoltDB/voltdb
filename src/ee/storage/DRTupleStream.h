@@ -36,6 +36,7 @@ public:
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 8;
     //Type(1), parHash(4)
     static const size_t HASH_DELIMITER_SIZE = 1 + 4;
+    static const size_t DR_LOG_HEADER_SIZE = TXN_RECORD_HEADER_SIZE + HASH_DELIMITER_SIZE;
 
     // Also update DRProducerProtocol.java if version changes
     // whenever PROTOCOL_VERSION changes, check if DRBufferParser needs to be updated,
@@ -93,6 +94,8 @@ public:
     virtual void generateDREvent(DREventType type, int64_t spHandle,
                                  int64_t uniqueId, ByteArray catalogCommands);
 
+    static int getDRLogHeaderSize();
+
     static int32_t getTestDRBuffer(uint8_t drProtocolVersion,
                                    int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
@@ -107,8 +110,6 @@ public:
     const uint64_t getOpenUniqueIdForTest() const {
         return m_openUniqueId;
     }
-
-    static size_t getDRLogHeaderSize();
 
 private:
     bool transactionChecks(int64_t spHandle, int64_t uniqueId);

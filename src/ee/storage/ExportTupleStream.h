@@ -165,6 +165,10 @@ private:
     static const uint8_t s_EXPORT_BUFFER_VERSION;
     // meta-data column count
     static const int METADATA_COL_CNT = 6;
+    // partitionColumn(4), columnCount(4)
+    static const int EXPORT_ROW_HEADER_SIZE = 8;
+    // txnId(8), timestamp(8), seqNo(8), artitionId(8), siteId(8), exportOperation(1)
+    static const int EXPORT_BUFFER_METADATA_HEADER_SIZE = 41;
 
     // column names of meta data columns
     static const std::string VOLT_TRANSACTION_ID;

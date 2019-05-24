@@ -30,8 +30,6 @@ using namespace std;
 using namespace voltdb;
 
 const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 20; // committedSequenceNumber(8) + row count(4) + uniqueId(8)
-const size_t EXPORT_BUFFER_METADATA_HEADER_SIZE = 41; // txnId(8) + timestamp(8) + seqNo(8) + partitionId(8) +
-                                                      // siteId(8) + exportOperation(1)
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                      int64_t siteId,
@@ -346,6 +344,6 @@ void ExportTupleStream::extendBufferChain(size_t minLength) {
 }
 
 size_t ExportTupleStream::getExportMetaHeaderSize() {
-    return 4/*rowLength*/ + 4/*partitionColumnIndex*/ + 4/*columnCount*/ + EXPORT_BUFFER_METADATA_HEADER_SIZE;
+    return EXPORT_ROW_HEADER_SIZE + EXPORT_BUFFER_METADATA_HEADER_SIZE;
 }
 

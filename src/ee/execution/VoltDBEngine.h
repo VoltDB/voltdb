@@ -169,6 +169,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
 
+        static int getDRHiddenColumnSize() { return s_drHiddenColumnSize; }
+
         StreamedTable* getPartitionedDRConflictStreamedTable() const {
             return m_drPartitionedConflictStreamedTable;
         }
@@ -841,6 +843,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
+
+        static int s_drHiddenColumnSize;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {

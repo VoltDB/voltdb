@@ -904,11 +904,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 assert(m_shadowStream != nullptr);
-                AbstractDRTupleStream* drStreamPassing = NULL;
-                if (doDRActions(drStream) && shouldDRStream) {
-                    drStreamPassing = drStream;
-                }
-                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT, drStreamPassing);
+                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
             }
         }
     }
@@ -1020,17 +1016,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              * into the undo pool temp storage and hold onto it with oldTupleData.
              */
            oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
-
-           ExecutorContext* ec = ExecutorContext::getExecutorContext();
-           AbstractDRTupleStream* drStream = getDRTupleStream(ec);
            // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
            if (isTableWithExportUpdateOld(m_tableType)) {
-               m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD,
-                       doDRActions(drStream) ? drStream : NULL);
+               m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
            }
            if (isTableWithExportUpdateNew(m_tableType)) {
-               m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW,
-                       doDRActions(drStream) ? drStream : NULL);
+               m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW);
            }
         }
     }
@@ -1147,8 +1138,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        AbstractDRTupleStream* drStream = getDRTupleStream(ec);
         m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE,
                 doDRActions(drStream) ? drStream : NULL);
     }
@@ -1326,8 +1315,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
         if (isTableWithExportDeletes(m_tableType)) {
             assert(m_shadowStream != nullptr);
-            m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE,
-                    doDRActions(drStream) ? drStream : NULL);
+            m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE);
         }
     }
 

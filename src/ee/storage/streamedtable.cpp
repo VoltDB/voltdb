@@ -161,16 +161,16 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
         if (drStream != NULL) {
             if (m_migrateTxnSizeGuard.undoToken == 0L) {
-                int64_t rawExportBufSizePlusNullArray =
+                // The buffer size includes the row length and null array, as DR buffer also has those.
+                int64_t rawExportBufSize =
                         m_wrapper->getUso() - mark - ExportTupleStream::getExportMetaHeaderSize();
                 m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
-                m_migrateTxnSizeGuard.estimatedDRLogSize +=
-                        rawExportBufSizePlusNullArray + DRTupleStream::getDRLogHeaderSize();
+                m_migrateTxnSizeGuard.estimatedDRLogSize += rawExportBufSize + DRTupleStream::getDRLogHeaderSize();
             } else {
-                int64_t rawExportBufSizePlusNullArray =
+                // The buffer size includes the row length and null array, as DR buffer also has those.
+                int64_t rawExportBufSize =
                         m_wrapper->getUso() - m_migrateTxnSizeGuard.uso - ExportTupleStream::getExportMetaHeaderSize();
-                m_migrateTxnSizeGuard.estimatedDRLogSize +=
-                        rawExportBufSizePlusNullArray + DRTupleStream::getDRLogHeaderSize();
+                m_migrateTxnSizeGuard.estimatedDRLogSize += rawExportBufSize + DRTupleStream::getDRLogHeaderSize();
             }
             m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
             if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
@@ -230,6 +230,9 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
                     ExportTupleStream::getExportMetaHeaderSize() + DRTupleStream::getDRLogHeaderSize();
             assert (m_migrateTxnSizeGuard.estimatedDRLogSize >= 0);
             m_migrateTxnSizeGuard.uso = mark;
+            if (m_migrateTxnSizeGuard.estimatedDRLogSize == 0) {
+                m_migrateTxnSizeGuard.reset();
+            }
         }
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
