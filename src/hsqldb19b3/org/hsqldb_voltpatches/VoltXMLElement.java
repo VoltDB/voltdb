@@ -18,6 +18,8 @@
 package org.hsqldb_voltpatches;
 
 import com.google_voltpatches.common.base.Strings;
+import com.google_voltpatches.common.collect.LinkedListMultimap;
+import com.google_voltpatches.common.collect.ListMultimap;
 import com.google_voltpatches.common.hash.Hasher;
 import com.google_voltpatches.common.hash.Hashing;
 
@@ -33,7 +35,14 @@ public class VoltXMLElement {
 
     public String name;
     public final Map<String, String> attributes = new TreeMap<>();
-    public final List<VoltXMLElement> children = new ArrayList<>();
+
+    // This used to be a plain list, but we wanted a secondary index on
+    // the elements and the VoltDB team doesn't believe in encapsulation
+    // (this list was made public for some reason and now has 250+ references
+    // to it throughout the codebase). So we've introduced this gross hack,
+    // which enables us to act like a List with the added benefit of a
+    // secondary index.
+    public final SecondaryIndexList children = new SecondaryIndexList();
 
     public VoltXMLElement(String  name) {
         this.name = name;
@@ -202,12 +211,7 @@ public class VoltXMLElement {
      */
     public VoltXMLElement findChild(String uniqueName)
     {
-        for (VoltXMLElement vxe : children) {
-            if (uniqueName.equals(vxe.getUniqueName())) {
-                return vxe;
-            }
-        }
-        return null;
+        return children.getByUniqueName(uniqueName);
     }
 
     /**
@@ -520,5 +524,51 @@ public class VoltXMLElement {
             return defval;
         }
         return(Integer.parseInt(valstr));
+    }
+
+    public class SecondaryIndexList extends AbstractList<VoltXMLElement> {
+        private final List<VoltXMLElement> childList = new ArrayList<>();
+        private final ListMultimap<String, VoltXMLElement> childUniqueNameIndex = LinkedListMultimap.create();
+
+        SecondaryIndexList() {
+        }
+
+        VoltXMLElement getByUniqueName(String uniqueName) {
+            final List<VoltXMLElement> elements = childUniqueNameIndex.get(uniqueName.toUpperCase());
+            if (elements.isEmpty()) {
+                return null;
+            }
+            return elements.get(0);
+        }
+
+        @Override
+        public VoltXMLElement get(int index) {
+            return childList.get(index);
+        }
+
+        @Override
+        public int size() {
+            return childList.size();
+        }
+
+        @Override
+        public VoltXMLElement set(int index, VoltXMLElement element) {
+            final VoltXMLElement setElement = childList.set(index, element);
+            childUniqueNameIndex.put(element.getUniqueName().toUpperCase(), element);
+            return setElement;
+        }
+
+        @Override
+        public void add(int index, VoltXMLElement element) {
+            childList.add(index, element);
+            childUniqueNameIndex.put(element.getUniqueName().toUpperCase(), element);
+        }
+
+        @Override
+        public VoltXMLElement remove(int index) {
+            final VoltXMLElement previous = childList.remove(index);
+            assert(childUniqueNameIndex.remove(previous.getUniqueName().toUpperCase(), previous));
+            return previous;
+        }
     }
 }
