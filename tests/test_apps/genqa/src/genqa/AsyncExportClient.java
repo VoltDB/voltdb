@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -76,7 +77,8 @@ import org.voltdb.iv2.TxnEgo;
 
 public class AsyncExportClient
 {
-    // Transactions between catalog swaps.
+    static VoltLogger log = new VoltLogger("ExportClient");
+// Transactions between catalog swaps.
     public static long CATALOG_SWAP_INTERVAL = 500000;
     // Number of txn ids per client log file.
     public static long CLIENT_TXNID_FILE_SIZE = 250000;
@@ -268,6 +270,7 @@ public class AsyncExportClient
     // Application entry point
     public static void main(String[] args)
     {
+        VoltLogger log = new VoltLogger("ExportClient.main");
         try
         {
 
@@ -363,7 +366,7 @@ public class AsyncExportClient
                 swap_count++;
                 if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
                 {
-                    System.out.println("Changing catalogs...");
+                    log.info("Changing catalogs...");
                     clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
                     first_cat = !first_cat;
                 }
@@ -380,7 +383,7 @@ public class AsyncExportClient
 
             Thread.sleep(10000);
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
-            System.out.println("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
+            log.info("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
                 clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
@@ -407,10 +410,10 @@ public class AsyncExportClient
             , TrackingResults.get(1)
             );
             if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
-                System.out.println("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+                log.info("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
             }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
-            System.out.println(
+            log.info(
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
@@ -448,7 +451,7 @@ public class AsyncExportClient
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static void connect() throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         String[] serverArray = config.parsedServers;
         Client client = clientRef.get();
@@ -537,7 +540,7 @@ public class AsyncExportClient
 
         // this is a problem -- Quiesce forces queuing but does NOT mean export is done
         try {
-            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+            log.info(client.callProcedure("@Quiesce").getResults()[0]);
         }
         catch (Exception ex) {
         }
@@ -573,10 +576,10 @@ public class AsyncExportClient
                 }
                 String stream = stats.getString("SOURCE");
                 Long partition = stats.getLong("PARTITION_ID");
-                System.out.println("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
+                log.info("DEBUG: Partition "+partition+" for stream "+stream+" TUPLE_PENDING is "+pending);
                 if (pending != 0) {
                     passedThisTime = false;
-                    System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
+                    log.info("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
 
                     break;
                 }
@@ -587,8 +590,8 @@ public class AsyncExportClient
             }
             Thread.sleep(5000);
         }
-        System.out.println("Passed is: " + passed);
-        System.out.println(stats);
+        log.info("Passed is: " + passed);
+        log.info(stats);
     }
 
 }
