@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;

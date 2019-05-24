@@ -30,6 +30,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
@@ -39,6 +40,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.hsqldb_voltpatches.lib.StringUtil;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -46,7 +48,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
@@ -81,6 +85,8 @@ public class ExportGeneration implements Generation {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    // Rate-limit message delivery warnings to 1 per minutes
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
 
     public final File m_directory;
 
@@ -339,9 +345,10 @@ public class ExportGeneration implements Generation {
                         }
                         final ExportDataSource eds = partitionSources.get(tableName);
                         if (eds == null) {
-                            exportLog.warn("Received export message " + msgType + " for partition " +
-                                    partition + " source " + tableName +
-                                    " which does not exist on this node, sources = " + partitionSources);
+                            exportLogLimited.log("Received export message " + msgType + " for partition "
+                                    + partition + " source " + tableName +
+                                    " which does not exist on this node, sources = " + partitionSources,
+                                    EstTime.currentTimeMillis());
                             return;
                         }
 
@@ -360,10 +367,10 @@ public class ExportGeneration implements Generation {
                                 // ignore it: as it is already shutdown
                             }
                         } else {
-                            exportLog.error("Receive unsupported message type " + message + " in export subsystem");
+                            exportLog.error("Received unsupported message type " + message + " in export subsystem");
                         }
                     } else {
-                        exportLog.error("Receive unexpected message " + message + " in export subsystem");
+                        exportLog.error("Received unexpected message " + message + " in export subsystem");
                     }
                 }
             };
@@ -813,10 +820,12 @@ public class ExportGeneration implements Generation {
             /*
              * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
              */
-            exportLog.info("PUSH on unknown export data source for partition " + partitionId +
+            exportLogLimited.log("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
                     + "seq: " + startSequenceNumber + ", count: " + tupleCount
-                    + ") is being discarded.");
+                    + ") is being discarded.",
+                    EstTime.currentTimeMillis());
+
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }

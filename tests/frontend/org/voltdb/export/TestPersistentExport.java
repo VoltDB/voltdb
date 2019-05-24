@@ -39,6 +39,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestPersistentExport extends ExportLocalClusterBase {
@@ -89,15 +90,18 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     @After
     public void tearDown() throws Exception {
-        System.out.println("Shutting down client and server");
-        for (Entry<String, ServerListener> entry : m_serverSockets.entrySet()) {
-            ServerListener serverSocket = entry.getValue();
-            if (serverSocket != null) {
-                serverSocket.closeClient();
-                serverSocket.close();
+        if (m_cluster != null) {
+            System.out.println("Shutting down client and server");
+            for (Entry<String, ServerListener> entry : m_serverSockets.entrySet()) {
+                ServerListener serverSocket = entry.getValue();
+                if (serverSocket != null) {
+                    serverSocket.closeClient();
+                    serverSocket.close();
+                }
             }
+            m_cluster.shutDown();
+            m_cluster = null;
         }
-        m_cluster.shutDown();
     }
 
     @Test
@@ -162,5 +166,45 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             }
         }
         assert(false);
+    }
+
+    @Test
+    public void testMigrateExportLicensing() throws Exception {
+        if (MiscUtils.isPro()) {
+            return;
+        }
+        tearDown();
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        String stream3= "CREATE table T1 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO1;"
+                        + " CREATE table T2 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO2;"
+                        + " CREATE table T3 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MIGRATE to TARGET FOO3";
+
+        project.addLiteralSchema(stream3);
+        LocalCluster cluster = new LocalCluster("testMigrateExportLicensing.jar", 4, 3, KFACTOR,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
+        cluster.setHasLocalServer(false);
+
+        // does not allow more than 2 streams
+        assert(!(cluster.compile(project)));
+    }
+
+    @Test
+    public void testChangeDataCaptureLicensing() throws Exception {
+        if (MiscUtils.isPro()) {
+            return;
+        }
+        tearDown();
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        String stream3= "CREATE table T1 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO1;"
+                        + " CREATE table T2 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO2;"
+                        + " CREATE table T3 (a INTEGER NOT NULL) EXPORT TO to TARGET FOO3";
+
+        project.addLiteralSchema(stream3);
+        LocalCluster cluster = new LocalCluster("testChangeDataCaptureLicensing.jar", 4, 3, KFACTOR,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
+        cluster.setHasLocalServer(false);
+
+        // does not allow more than 2 streams
+        assert(!(cluster.compile(project)));
     }
 }

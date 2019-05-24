@@ -1219,9 +1219,15 @@ tr:hover{
 
         if ticket_to_modify and not DRY_RUN:
             # Update the Jira ticket's summary, description, etc.
-            previous_summary = ticket_to_modify.fields.summary
-            old_description  = ticket_to_modify.fields.description
-            new_description  = self.get_modified_description(old_description, descriptions)
+            previous_summary  = ticket_to_modify.fields.summary
+            old_description   = ticket_to_modify.fields.description
+            new_description   = self.get_modified_description(old_description, descriptions)
+            previous_priority = ticket_to_modify.fields.priority
+#             logging.info('previous_priority: '+str(previous_priority))
+            # If ticket has been marked as a "Blocker" (presumably manually),
+            # then do not downgrade it
+            if previous_priority == 'Blocker':
+                priority = previous_priority
             try:
                 ticket_to_modify.update(fields={'summary'    : summary,
                                                 'description': new_description,
