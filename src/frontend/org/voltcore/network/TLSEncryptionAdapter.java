@@ -21,10 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.GatheringByteChannel;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,25 +35,19 @@ import org.voltcore.utils.FlexibleSemaphore;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 
-import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
 
 public class TLSEncryptionAdapter {
     private static final VoltLogger s_networkLog = new VoltLogger("NETWORK");
 
     private final ConcurrentLinkedDeque<ExecutionException> m_exceptions = new ConcurrentLinkedDeque<>();
     // Input frames encrypted as they came in
-    private final ConcurrentLinkedDeque<EncryptFrame> m_encryptedFrames = new ConcurrentLinkedDeque<>();
-    // Frames that form full messages
-    private final CompositeByteBuf m_encryptedMessages;
-    // Number of full messages in encryptedMessages
-    private int m_numEncryptedMessages = 0;
-    private final List<EncryptFrame> m_partialMessages = new ArrayList<>();
-    private volatile int m_partialSize = 0;
+    private final ConcurrentLinkedDeque<EncryptedMessages> m_encryptedQueue = new ConcurrentLinkedDeque<>();
+
+    // Encrypted data which is in the process of being written out
+    private EncryptedMessages m_inflightMessages;
 
     private final FlexibleSemaphore m_inFlight = new FlexibleSemaphore(1);
 
@@ -74,7 +65,6 @@ public class TLSEncryptionAdapter {
         m_sslEngine = engine;
         m_ce = cipherExecutor;
         m_encrypter = new SSLBufferEncrypter(engine);
-        m_encryptedMessages = Unpooled.compositeBuffer();
     }
 
     /**
@@ -101,7 +91,9 @@ public class TLSEncryptionAdapter {
         while ((ds = buffersToEncrypt.poll()) != null) {
             ++processedWrites;
             final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
+            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) {
+                continue;
+            }
             // pack as messages you can inside a TLS frame before you send it to
             // the encryption gateway
             if (serializedSize > frameMax) {
@@ -109,7 +101,7 @@ public class TLSEncryptionAdapter {
                 // partial parts of one message. a message may not contain whole
                 // messages and an incomplete partial fragment of one
                 if (accum.writerIndex() > 0) {
-                    m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
+                    m_ecryptgw.offer(new SerializedMessages(accum, frameMsgs));
                     frameMsgs = 0;
                     bytesQueued += accum.writerIndex();
                     accum = m_ce.allocator().buffer(frameMax).clear();
@@ -119,11 +111,11 @@ public class TLSEncryptionAdapter {
                 ds.serialize(jbb);
                 NIOWriteStreamBase.checkSloppySerialization(jbb, ds);
                 bytesQueued += big.writerIndex();
-                m_ecryptgw.offer(new EncryptFrame(big, 1));
+                m_ecryptgw.offer(new SerializedMessages(big, 1));
                 frameMsgs = 0;
                 continue;
             } else if (accum.writerIndex() + serializedSize > frameMax) {
-                m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
+                m_ecryptgw.offer(new SerializedMessages(accum, frameMsgs));
                 frameMsgs = 0;
                 bytesQueued += accum.writerIndex();
                 accum = m_ce.allocator().buffer(frameMax).clear();
@@ -136,7 +128,7 @@ public class TLSEncryptionAdapter {
             ++frameMsgs;
         }
         if (accum.writerIndex() > 0) {
-            m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
+            m_ecryptgw.offer(new SerializedMessages(accum, frameMsgs));
             bytesQueued += accum.writerIndex();
         } else {
             accum.release();
@@ -165,8 +157,8 @@ public class TLSEncryptionAdapter {
         } while (!acquired);
     }
 
-    CompositeByteBuf getEncryptedMessagesBuffer() {
-        return m_encryptedMessages;
+    boolean hasOutstandingData() {
+        return !(m_inflightMessages == null && m_encryptedQueue.isEmpty());
     }
 
     static final class EncryptLedger {
@@ -185,80 +177,35 @@ public class TLSEncryptionAdapter {
         checkForGatewayExceptions();
 
         int delta = 0;
-        int queued;
-        // add to output buffer frames that contain whole messages
-        while ((queued=addFramesForCompleteMessage()) >= 0) {
-            delta += queued;
-        }
-
-        long bytesWritten = m_encryptedMessages.readBytes(channel, m_encryptedMessages.readableBytes());
-        m_encryptedMessages.discardReadComponents();
-
+        int bytesWritten = 0;
         int messagesWritten = 0;
-        if (!m_encryptedMessages.isReadable() && bytesWritten > 0) {
-            messagesWritten += m_numEncryptedMessages;
-            m_numEncryptedMessages = 0;
+
+        while (true) {
+            if (m_inflightMessages == null) {
+                m_inflightMessages = m_encryptedQueue.poll();
+                if (m_inflightMessages == null) {
+                    break;
+                }
+            }
+
+            bytesWritten += m_inflightMessages.write(channel);
+            if (m_inflightMessages.m_messages.isReadable()) {
+                break;
+            }
+
+            delta += m_inflightMessages.m_delta;
+            messagesWritten += m_inflightMessages.m_count;
+            m_inflightMessages.m_messages.release();
+            m_inflightMessages = null;
         }
 
         return new EncryptLedger(delta, bytesWritten, messagesWritten);
     }
 
-    /**
-     * Gather all the frames that comprise a whole Volt Message
-     * Returns the delta between the original message byte count and encrypted message byte count.
-     */
-    private int addFramesForCompleteMessage() {
-        boolean added = false;
-        EncryptFrame frame = null;
-        int delta = 0;
-
-        while (!added && (frame = m_encryptedFrames.poll()) != null) {
-            if (!frame.isLast()) {
-                //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
-                // This is the only method with synchronized(m_partialMessages) and
-                // it doesn't look like this method will be called from multiple threads concurrently.
-                // Take this out 8.0 release.
-                synchronized(m_partialMessages) {
-                    m_partialMessages.add(frame);
-                    ++m_partialSize;
-                }
-                continue;
-            }
-
-            final int partialSize = m_partialSize;
-            if (partialSize > 0) {
-                assert frame.chunks == partialSize + 1
-                        : "partial frame buildup has wrong number of preceding pieces";
-
-                //TODO: Review - I don't think this synchronized(m_partialMessages) is required.
-                // See comment above.
-                // Take this out 8.0 release.
-                synchronized(m_partialMessages) {
-                    for (EncryptFrame frm: m_partialMessages) {
-                        m_encryptedMessages.addComponent(true, frm.frame);
-                        delta += frm.delta;
-                    }
-                    m_partialMessages.clear();
-                    m_partialSize = 0;
-                }
-            }
-            m_encryptedMessages.addComponent(true, frame.frame);
-            delta += frame.delta;
-
-            m_numEncryptedMessages += frame.msgs;
-            added = true;
-        }
-        return added ? delta : -1;
-    }
-
     // Called from synchronized block only
     // (Except from dumpState, which doesn't appear to be used).
     public boolean isEmpty() {
-        return m_ecryptgw.isEmpty()
-            && m_encryptedFrames.isEmpty()
-            && m_partialSize == 0
-            && !m_encryptedMessages.isReadable();
-
+        return m_ecryptgw.isEmpty() && m_encryptedQueue.isEmpty() && m_inflightMessages == null;
     }
 
     public void checkForGatewayExceptions() throws IOException {
@@ -276,8 +223,9 @@ public class TLSEncryptionAdapter {
         return new StringBuilder(256).append("TLSEncryptionAdapter[")
                 .append("isEmpty()=").append(isEmpty())
                 .append(", exceptions.isEmpty()=").append(m_exceptions.isEmpty())
-                .append(", encryptedFrames.isEmpty()=").append(m_encryptedFrames.isEmpty())
-                .append(", encryptedMessages.readableBytes()=").append(m_encryptedMessages.readableBytes())
+                .append(", encryptedFrames.isEmpty()=").append(m_encryptedQueue.isEmpty())
+                .append(", m_inflightMessages.readableBytes()=")
+                .append(m_inflightMessages == null ? 0 : m_inflightMessages.m_messages.readableBytes())
                 .append(", gateway=").append(m_ecryptgw.dumpState())
                 .append(", inFlight=").append(m_inFlight.availablePermits())
                 .append("]").toString();
@@ -285,9 +233,8 @@ public class TLSEncryptionAdapter {
 
     // Called from synchronized block only
     public int getOutstandingMessageCount() {
-        return m_encryptedFrames.size()
-             + m_partialSize
-             + m_encryptedMessages.numComponents();
+        return m_encryptedQueue.size()
+                + (m_inflightMessages == null ? 0 : m_inflightMessages.m_count);
     }
 
     // Called from synchronized block only
@@ -308,17 +255,14 @@ public class TLSEncryptionAdapter {
 
             m_ecryptgw.die();
 
-            EncryptFrame frame = null;
-            while ((frame = m_encryptedFrames.poll()) != null) {
-                frame.frame.release();
+            EncryptedMessages messages = null;
+            while ((messages = m_encryptedQueue.poll()) != null) {
+                messages.m_messages.release();
             }
 
-            for (EncryptFrame ef: m_partialMessages) {
-                ef.frame.release();
+            if (m_inflightMessages != null) {
+                m_inflightMessages.m_messages.release();
             }
-            m_partialMessages.clear();
-
-            if (m_encryptedMessages.refCnt() > 0) m_encryptedMessages.release();
         } finally {
             m_inFlight.drainPermits();
             m_inFlight.release();
@@ -333,63 +277,24 @@ public class TLSEncryptionAdapter {
      * to the m_exceptions queue
      */
     class EncryptionGateway implements Runnable {
-        private final ConcurrentLinkedDeque<EncryptFrame> m_q = new ConcurrentLinkedDeque<>();
-        private final int COALESCE_THRESHOLD = CipherExecutor.FRAME_SIZE - 4096;
+        private final ConcurrentLinkedDeque<SerializedMessages> m_q = new ConcurrentLinkedDeque<>();
 
-        synchronized void offer(EncryptFrame frame) throws IOException {
+        synchronized void offer(SerializedMessages frame) {
             final boolean wasEmpty = m_q.isEmpty();
 
-            List<EncryptFrame> chunks = frame.chunked(
-                    Math.min(CipherExecutor.FRAME_SIZE, applicationBufferSize()));
-
-            m_q.addAll(chunks);
-            m_inFlight.reducePermits(chunks.size());
+            m_q.add(frame);
+            m_inFlight.reducePermits(1);
 
             if (wasEmpty) {
                 submitSelf();
             }
         }
 
-        /**
-         * Encryption takes time and the likelihood that some or more encrypt frames
-         * are queued up behind the recently completed frame encryption is high. This
-         * takes queued up small frames and coalesces them into a bigger frame
-         */
-        //Called from synchronized block only
-        private void coalesceEncryptFrames() {
-            EncryptFrame head = m_q.peek();
-            if (head == null || head.chunks > 1 || head.bb.readableBytes() > COALESCE_THRESHOLD) {
-                return;
-            }
-
-            m_q.poll();
-            ByteBuf bb = head.bb;
-            int msgs = head.msgs;
-            int released = 0;
-
-            head = m_q.peek();
-            while (head != null && head.chunks == 1 && head.bb.readableBytes() <= bb.writableBytes()) {
-                m_q.poll();
-                bb.writeBytes(head.bb, head.bb.readableBytes());
-                head.bb.release();
-                ++released;
-                msgs += head.msgs;
-                head = m_q.peek();
-            }
-            m_q.push(new EncryptFrame(bb, 0, msgs));
-            if (released > 0) {
-                m_inFlight.release(released);
-            }
-        }
-
         synchronized int die() {
             int toUnqueue = 0;
-            EncryptFrame ef = null;
+            SerializedMessages ef = null;
             while ((ef = m_q.poll()) != null) {
-                toUnqueue += ef.frame.readableBytes();
-                if (ef.isLast()) {
-                    ef.bb.release();
-                }
+                toUnqueue += ef.m_messages.readableBytes();
             }
             return toUnqueue;
         }
@@ -400,63 +305,51 @@ public class TLSEncryptionAdapter {
                     .append("]").toString();
         }
 
-        public Iterator<EncryptFrame> iterator() {
-            return ImmutableList.copyOf(m_q).iterator();
-        }
-
         @Override
         public void run() {
-            EncryptFrame frame = m_q.peek();
-            if (frame == null) return;
-
-            ByteBuffer src = frame.frame.nioBuffer();
-            ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());
-            ByteBuffer dest = encr.nioBuffer();
+            SerializedMessages messages = m_q.peek();
+            if (messages == null) {
+                return;
+            }
 
             try {
-                m_encrypter.tlswrap(src, dest);
-            } catch (TLSException e) {
-                m_inFlight.release();
-                encr.release();
-                m_exceptions.offer(new ExecutionException("failed to encrypt frame", e));
-                s_networkLog.error("failed to encrypt frame", e);
-                m_connection.enableWriteSelection();
-                return;
-            }
-            assert !src.hasRemaining() : "encryption wrap did not consume the whole source buffer";
-            int delta = dest.limit() - frame.frame.readableBytes();
-            encr.writerIndex(dest.limit());
-
-            if (!m_isShutdown) {
-                m_encryptedFrames.offer(frame.encrypted(delta, encr));
-                /*
-                 * All interactions with write stream must be protected
-                 * with a lock to ensure that interests ops are consistent with
-                 * the state of writes queued to the stream. This prevent
-                 * lost queued writes where the write is queued
-                 * but the write interest op is not set.
-                 */
-                if (frame.isLast()) {
-                    try {
-                        m_connection.enableWriteSelection();
-                    } catch(CancelledKeyException e) {
-                        // If the connection gets closed for some reason we will get this error.
-                        // OK to ignore and return immediately
-                        s_networkLog.debug("CancelledKeyException while trying to enable write", e);
-                        return;
-                    }
+                int clearTextSize = messages.m_messages.readableBytes();
+                ByteBuf encr;
+                try {
+                    encr = m_encrypter.tlswrap(messages.m_messages, m_ce.allocator());
+                } catch (TLSException e) {
+                    m_exceptions.offer(new ExecutionException("failed to encrypt frame", e));
+                    m_connection.enableWriteSelection();
+                    return;
                 }
-            } else {
-                encr.release();
-                return;
+
+                if (m_isShutdown) {
+                    encr.release();
+                    return;
+                }
+
+                m_encryptedQueue.offer(new EncryptedMessages(encr, messages.m_count, clearTextSize));
+
+                /*
+                 * All interactions with write stream must be protected with a lock to ensure that interests ops are
+                 * consistent with the state of writes queued to the stream. This prevent lost queued writes where the
+                 * write is queued but the write interest op is not set.
+                 */
+                try {
+                    m_connection.enableWriteSelection();
+                } catch (CancelledKeyException e) {
+                    // If the connection gets closed for some reason we will get this error.
+                    // OK to ignore and return immediately
+                    s_networkLog.debug("CancelledKeyException while trying to enable write", e);
+                    return;
+                }
+            } finally {
+                messages.m_messages.release();
+                m_inFlight.release();
             }
+
             synchronized(this) {
                 m_q.poll();
-                if (frame.isLast()) {
-                    frame.bb.release();
-                }
-                m_inFlight.release();
-                coalesceEncryptFrames();
                 if (m_q.peek() != null && !m_isShutdown) {
                     submitSelf();
                 }
@@ -480,16 +373,57 @@ public class TLSEncryptionAdapter {
         }
         @Override
         public void run() {
-            if (!m_isShutdown) return;
+            if (!m_isShutdown) {
+                return;
+            }
             try {
                 m_fut.get();
             } catch (InterruptedException notPossible) {
             } catch (ExecutionException e) {
-                m_inFlight.release();
                 s_networkLog.error("unexpect fault occurred in encrypt task", e.getCause());
                 m_exceptions.offer(e);
             }
         }
     }
 
+    /**
+     * Simple class to hold the plain text bytes of 1 one or more messages
+     */
+    private static class SerializedMessages {
+        // Plain text data of messages
+        final ByteBuf m_messages;
+        // Number of individual messages in m_messages
+        final int m_count;
+
+        SerializedMessages(ByteBuf messages, int count) {
+            super();
+            m_messages = messages;
+            m_count = count;
+        }
+    }
+
+    /**
+     * Simple class to hold a fully encrypted messages
+     */
+    private static final class EncryptedMessages extends SerializedMessages {
+        // Difference in size of encrypted data to clear text data
+        final int m_delta;
+
+        EncryptedMessages(ByteBuf messages, int count, int clearTextSize) {
+            super(messages, count);
+            m_delta = m_messages.readableBytes() - clearTextSize;
+        }
+
+        /**
+         * Write the contents of these messages to {@code channel}
+         *
+         * @param channel {@link GatheringByteChannel} to write to
+         * @return Number of bytes written
+         * @throws IOException If an error occurs
+         * @see GatheringByteChannel#write(ByteBuffer[])
+         */
+        long write(GatheringByteChannel channel) throws IOException {
+            return m_messages.readBytes(channel, m_messages.readableBytes());
+        }
+    }
 }
