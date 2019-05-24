@@ -35,7 +35,7 @@ public class Catalog extends CatalogType {
 
     //private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
     //private final PatriciaTrie<CatalogType> m_pathCache = new PatriciaTrie<>();
-    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
+    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8*1024).build();
 
     private CatalogType m_prevUsedPath = null;
 
