@@ -84,12 +84,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
-     * Processor loggers.
+     * Processor loggers: rate limited loggers are instance-specific
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final RateLimitedLogger consoleLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), consoleLog, Level.WARN);
+    private final RateLimitedLogger consoleLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), consoleLog, Level.WARN);
 
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
     private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
