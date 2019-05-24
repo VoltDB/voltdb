@@ -27,6 +27,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1867,8 +1868,7 @@ public class VoltCompiler {
             canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
             newDDLReader = new VoltCompilerStringReader("Ad Hoc DDL Input", newDDL);
 
-            List<VoltCompilerReader> ddlList = new ArrayList<>();
-            ddlList.add(newDDLReader);
+            List<VoltCompilerReader> ddlList = Collections.singletonList(newDDLReader);
 
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
@@ -2078,13 +2078,13 @@ public class VoltCompiler {
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
             // Gather DDL files for re-compilation
-            List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
+            List<VoltCompilerReader> ddlReaderList = Collections.emptyList();
             Entry<String, byte[]> entry = outputJar.firstEntry();
             while (entry != null) {
                 String path = entry.getKey();
                 // ENG-12980: only look for auto-gen.ddl on root directory
                 if (AUTOGEN_DDL_FILE_NAME.equalsIgnoreCase(path)) {
-                    ddlReaderList.add(new VoltCompilerJarFileReader(outputJar, path));
+                    ddlReaderList = Collections.singletonList(new VoltCompilerJarFileReader(outputJar, path));
                     break;
                 }
                 entry = outputJar.higherEntry(entry.getKey());
