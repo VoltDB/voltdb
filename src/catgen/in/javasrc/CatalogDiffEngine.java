@@ -1037,6 +1037,13 @@ public class CatalogDiffEngine {
                     return null;
                 }
             }
+
+            if (field.equals("migrationTarget")) {
+                if (prevType != null && ((Table) suspect).getMigrationtarget() != ((Table) prevType).getMigrationtarget()) {
+                    m_requiresNewExportGeneration = true;
+                }
+                return null;
+            }
             // Always allow disabling DR on table
             if (field.equalsIgnoreCase("isdred")) {
                 Boolean isDRed = (Boolean) suspect.getField(field);
