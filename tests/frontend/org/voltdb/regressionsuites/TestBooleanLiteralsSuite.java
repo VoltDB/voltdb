@@ -73,10 +73,11 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         // We do not test a partitioned table joining another partitioned table on a constant boolean value here.
         // Instead, we test this case in TestPlansJoin for proper error message.
         // The query is not plannable because the planner cannot guarantee that all rows would be in a single partition.
-        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1),
-                                      tableResult, caseWhenFalseResult, client); // replicated
-        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3),
-                                      tableResult, caseWhenFalseResult, client); // partitioned
+        // ENG-16162 remove comment after resolved
+//        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1),
+//                                      tableResult, caseWhenFalseResult, client); // replicated
+//        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3),
+//                                      tableResult, caseWhenFalseResult, client); // partitioned
     }
 
     private void subTestBooleanLiteralsInQuery(String sqlBody,
