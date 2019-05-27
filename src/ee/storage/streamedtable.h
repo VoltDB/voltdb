@@ -42,7 +42,7 @@ class MaterializedViewTriggerForStreamInsert;
  * only to support Export.
  */
 
-class StreamedTable : public Table {
+class StreamedTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableFactory;
     friend class StreamedTableStats;
 
@@ -55,6 +55,8 @@ public:
 
     virtual ~StreamedTable();
 
+    void notifyQuantumRelease();
+
     // virtual Table functions
     // Return a table iterator BY VALUE
     TableIterator iterator();
@@ -65,12 +67,12 @@ public:
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    void streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type);
     virtual bool insertTuple(TableTuple &tuple);
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setGeneration(int64_t generation);
 
     // The MatViewType typedef is required to satisfy initMaterializedViews
     // template code that needs to identify
@@ -125,6 +127,9 @@ public:
 
     void setWrapper(ExportTupleStream *wrapper) {
         m_wrapper = wrapper;
+        if (m_wrapper) {
+            m_sequenceNo = m_wrapper->getSequenceNumber() - 1;
+        }
     }
 
     ExportTupleStream* getWrapper() {

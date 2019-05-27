@@ -238,6 +238,7 @@ BANNER("Configuring the VoltDB Execution Engine."
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
        "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
+       "VOLT_TRACE_ALLOCATIONS: ${VOLT_TRACE_ALLOCATIONS}"
        "VOLT_TIMER_ENABLED:     ${VOLT_TIMER_ENABLED}"
    )
 
@@ -292,8 +293,8 @@ SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
 # VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
 # VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_OPENSSL_BUILD_PREFIX:     /openssl
-# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2.d/ ... unpacked source
-# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.2.0.d/ ... generated binaries
+# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2d/ ... unpacked source
+# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.0.2d/ ... generated binaries
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/openssl)
@@ -301,7 +302,6 @@ SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_BUILD_PREFIX}/src/${VOLTDB_OPENSSL_NAME
 SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_SRC})
 
 BANNER("Describing OPENSSL"
-       "  PREFIX at ${VOLTDB_OPENSSL_BUILD_PREFIX}"
        "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
        "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
        "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
@@ -310,7 +310,6 @@ BANNER("Describing OPENSSL"
 
 
 ExternalProject_Add(crypto
-  PREFIX ${VOLTDB_OPENSSL_BUILD_PREFIX} # Not sure this is necessary.
   SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
   INSTALL_DIR ${VOLTDB_3PTY_INSTALL_PREFIX}
   DOWNLOAD_DIR ${VOLTDB_OPENSSL_BUILD_PREFIX}/src
@@ -331,18 +330,18 @@ SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
 # to do this with a CMake build, but we don't use it.
 #
 ########################################################################
-SET (VOLTDB_PCRE2_VERSION 10.10)
+SET (VOLTDB_PCRE2_VERSION 10.33)
 SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
 # We unpack the tarball in the binary directory.  It saves us
 # checking it all in to github.  That's why this is
 # ${PROJECT_NAME}_BINARY_DIR.
-SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tar.gz)
 #
 # VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
 # VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
 # VOLTDB_PCRE2_BUILD_PREFIX:      /pcre2
-# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.10/ ... unpacked source
-# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.10/ ... generated binaries
+# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.33/ ... unpacked source
+# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.33/ ... generated binaries
 SET (VOLTDB_PCRE2_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/pcre2)
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_BUILD_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_BUILD_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
@@ -354,7 +353,6 @@ BANNER("Describing PCRE2"
        "  CONFIGURE_COMMAND: ./configure --disable-shared --with-pic --prefix=${VOLTDB_3PTY_INSTALL_PREFIX}"
    )
 ExternalProject_Add(pcre2
-  PREFIX ${VOLTDB_PCRE2_BUILD_PREFIX}  # Not sure this is necessary.
   SOURCE_DIR ${VOLTDB_PCRE2_SRC}
   BINARY_DIR ${VOLTDB_PCRE2_OBJ}
   INSTALL_DIR ${VOLTDB_3PTY_INSTALL_PREFIX}
@@ -377,7 +375,7 @@ SET (VOLTDB_S2GEO_OBJ ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
   -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
-  -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}
+  -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}/
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/google-s2-geometry)
 
@@ -412,3 +410,4 @@ ADD_SUBDIRECTORY(src/ee ee)
 ########################################################################
 ENABLE_TESTING()
 ADD_SUBDIRECTORY(tests/ee tests)
+

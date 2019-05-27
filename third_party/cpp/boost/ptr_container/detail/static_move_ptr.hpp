@@ -5,7 +5,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt.)
 
 // Implementation of the move_ptr from the "Move Proposal" 
-// (http://std.dkuug.dk/jtc1/sc22/wg21/docs/papers/2002/n1377.htm) 
+// (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm) 
 // enhanced to support custom deleters and safe boolean conversions.
 //
 // The implementation is based on an implementation by Daniel Wallin, at
@@ -76,8 +76,8 @@ public:
             }
     
     template<typename TT>
-    explicit static_move_ptr(TT* tt) 
-        : impl_(tt, Deleter()) 
+    static_move_ptr(TT* tt, Deleter del) 
+        : impl_(tt, del) 
         { }
 
         // Destructor
@@ -131,13 +131,7 @@ public:
         }
 
     template<typename TT>
-    void reset(TT* tt) 
-        {
-            static_move_ptr(tt).swap(*this);
-        }
-
-    template<typename TT, typename DD>
-    void reset(TT* tt, DD dd) 
+    void reset(TT* tt, Deleter dd) 
         {
             static_move_ptr(tt, dd).swap(*this);
         }
@@ -151,7 +145,7 @@ public:
     deleter_const_reference get_deleter() const { return impl_.second(); }
 private:
     template<typename TT, typename DD>
-    void check(const static_move_ptr<TT, DD>& ptr)
+    void check(const static_move_ptr<TT, DD>&)
         {
             typedef move_ptrs::is_smart_ptr_convertible<TT, T> convertible;
             BOOST_STATIC_ASSERT(convertible::value);

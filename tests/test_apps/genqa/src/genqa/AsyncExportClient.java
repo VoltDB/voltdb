@@ -548,6 +548,7 @@ public class AsyncExportClient
         boolean passed = false;
         Instant maxTime = Instant.now().plusSeconds(timeout);
         Instant maxStatsTime = Instant.now().plusSeconds(60);
+        long lastPending = 0;
         VoltTable stats = null;
         try {
             System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
@@ -577,11 +578,17 @@ public class AsyncExportClient
                     + "increase --timeout arg for slower clients" );
                 }
                 Long pending = stats.getLong("TUPLE_PENDING");
+                if ( pending != lastPending) {
+                    // reset the timer if we are making progress
+                    maxTime = Instant.now().plusSeconds(timeout);
+                    pending = lastPending;
+                }
                 if (0 != pending ) {
                     String stream = stats.getString("SOURCE");
                     Long partition = stats.getLong("PARTITION_ID");
                     passedThisTime = false;
-                    System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is  not zero, got "+pending);
+                    System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is not zero, got "+pending);
+
                     break;
                 }
             }

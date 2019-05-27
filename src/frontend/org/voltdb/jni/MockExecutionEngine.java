@@ -143,7 +143,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
         final long spHandle, final long lastCommittedTxnId, long uniqueId,
-        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken, boolean elastic)
     throws EEException
     {
         return null;
@@ -198,11 +198,17 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mTableSignature) {
+            long uso, long seqNo, int partitionId, String mStreamName) {
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+        return 0;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String streamName) {
         return null;
     }
 
@@ -226,7 +232,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
         throw new UnsupportedOperationException();
     }
 
@@ -257,5 +263,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public void setViewsEnabled(String viewNames, boolean enabled) {
         return;
+    }
+
+    @Override
+    public void disableExternalStreams() {
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return true;
     }
 }

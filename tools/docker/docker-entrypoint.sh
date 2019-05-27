@@ -27,9 +27,9 @@ function init() {
         DEPLOYMENT=${DEFAULT_DEPLOYMENT}
     fi
 
-    OPTIONS="-C ${DEPLOYMENT} -D ${DIRECTORY_SPEC}"
-    echo "Run voltdb init $OPTIONS"
-    bin/voltdb init ${OPTIONS}
+    INIT_OPTIONS="-C ${DEPLOYMENT} -D ${DIRECTORY_SPEC}"
+    echo "Run voltdb init $INIT_OPTIONS"
+    bin/voltdb init ${INIT_OPTIONS}
 }
 
 function execVoltdbStart() {

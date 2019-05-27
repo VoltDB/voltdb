@@ -148,7 +148,7 @@ public class FragmentTask extends FragmentTaskBase
 
             //The fragment is not misrouted and the site may have been marked as non-leader via @MigratePartitionLeader
             //but it should be processed by the same site, act like a leader.
-            response.setForOldLeader(m_fragmentMsg.isForOldLeader());
+            response.setExecutedOnPreviousLeader(m_fragmentMsg.isExecutedOnPreviousLeader());
             deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
@@ -277,6 +277,7 @@ public class FragmentTask extends FragmentTaskBase
             }
         }
 
+        int totalTableSize = 0;
         int drBufferChanged = 0;
         boolean exceptionThrown = false;
         boolean exceptionCaught = false;
@@ -358,6 +359,15 @@ public class FragmentTask extends FragmentTaskBase
                         // read the dependencyId() -1;
                         fragResult.readInt();
                         tableSize = fragResult.readInt();
+
+                        if ((totalTableSize += tableSize) > m_fragmentMsg.getMaxResponseSize()) {
+                            hostLog.warn(String.format(
+                                    "Total table size (%d bytes) for mp response to %s is larger than max %d",
+                                    totalTableSize, m_fragmentMsg.getProcedureName(),
+                                    m_fragmentMsg.getMaxResponseSize()));
+                            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+                        }
+
                         fullBacking = new byte[tableSize];
                         // get a copy of the buffer
                         fragResult.readFully(fullBacking);

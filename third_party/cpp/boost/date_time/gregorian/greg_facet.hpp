@@ -6,12 +6,14 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2008-11-23 03:13:35 -0800 (Sun, 23 Nov 2008) $
+ * $Date$
  */
 
-#include "boost/date_time/gregorian/gregorian_types.hpp"
-#include "boost/date_time/date_formatting_locales.hpp" // sets BOOST_DATE_TIME_NO_LOCALE
-#include "boost/date_time/gregorian/parsers.hpp"
+#include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/gregorian/gregorian_types.hpp>
+#include <boost/date_time/date_formatting_locales.hpp> // sets BOOST_DATE_TIME_NO_LOCALE
+#include <boost/date_time/gregorian/parsers.hpp>
+#include <boost/io/ios_state.hpp>
 
 //This file is basically commented out if locales are not supported
 #ifndef BOOST_DATE_TIME_NO_LOCALE
@@ -26,7 +28,7 @@ namespace boost {
 namespace gregorian {
   
   //! Configuration of the output facet template
-  struct greg_facet_config
+  struct BOOST_SYMBOL_VISIBLE greg_facet_config
   {
     typedef boost::gregorian::greg_month month_type;
     typedef boost::date_time::special_values special_value_enum;
@@ -74,9 +76,9 @@ namespace gregorian {
       greg_month_formatter::format_month(m, os, f);
 
     }
-    else { //default to numeric
-      charT fill_char = '0';
-      os  << std::setw(2) << std::setfill(fill_char) << m.as_number();
+    else { // default to numeric
+      boost::io::basic_ios_fill_saver<charT> ifs(os);
+      os  << std::setw(2) << std::setfill(os.widen('0')) << m.as_number();
     }
 
     return os;
@@ -97,7 +99,7 @@ namespace gregorian {
     std::locale locale = os.getloc();
     if (std::has_facet<facet_def>(locale)) {
       const facet_def& f = std::use_facet<facet_def>(locale);
-      greg_weekday_formatter::format_weekday(wd.as_enum(), os, f, true);
+      greg_weekday_formatter::format_weekday(wd, os, f, true);
     }
     else { //default to short English string eg: Sun, Mon, Tue, Wed...
       os  << wd.as_short_string();
@@ -141,7 +143,8 @@ namespace gregorian {
   std::basic_ostream<charT, traits>&
   operator<<(std::basic_ostream<charT, traits>& os, const partial_date& pd)
   {
-    os << std::setw(2) << std::setfill('0') << pd.day() << ' ' 
+    boost::io::basic_ios_fill_saver<charT> ifs(os);
+    os << std::setw(2) << std::setfill(os.widen('0')) << pd.day() << ' ' 
        << pd.month().as_short_string() ; 
     return os;
   }
@@ -214,8 +217,6 @@ namespace gregorian {
   std::basic_istream<charT>& operator>>(std::basic_istream<charT>& is, date& d)
   {
     std::istream_iterator<std::basic_string<charT>, charT> beg(is), eos;
-    
-    typedef boost::date_time::all_date_names_put<greg_facet_config, charT> facet_def;
     d = from_stream(beg, eos);
     return is;
   }
@@ -292,7 +293,17 @@ namespace gregorian {
      * names as a default. */
     catch(std::bad_cast&){
       charT a = '\0';
+      
+#if defined(BOOST_NO_CXX11_SMART_PTR)
+      
       std::auto_ptr< const facet_def > f(create_facet_def(a));
+      
+#else
+
+      std::unique_ptr< const facet_def > f(create_facet_def(a));
+      
+#endif
+      
       num = date_time::find_match(f->get_short_month_names(), 
                                   f->get_long_month_names(), 
                                   (greg_month::max)(), s); // greg_month spans 1..12, so max returns the array size,
@@ -334,7 +345,17 @@ namespace gregorian {
      * names as a default. */
     catch(std::bad_cast&){
       charT a = '\0';
+      
+#if defined(BOOST_NO_CXX11_SMART_PTR)
+
       std::auto_ptr< const facet_def > f(create_facet_def(a));
+      
+#else 
+
+      std::unique_ptr< const facet_def > f(create_facet_def(a));
+      
+#endif
+      
       num = date_time::find_match(f->get_short_weekday_names(), 
                                   f->get_long_weekday_names(), 
                                   (greg_weekday::max)() + 1, s); // greg_weekday spans 0..6, so increment is needed
@@ -347,8 +368,7 @@ namespace gregorian {
 
 } } //namespace gregorian
 
-#endif  
-    
-    
+#endif
+
 #endif
 

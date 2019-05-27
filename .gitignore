@@ -48,6 +48,8 @@ doc/tutorials/*/*.jar
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/libvoltdb*.dylib
+/voltdb/libcatalog*.so
+/voltdb/libcatalog*.dylib
 /voltdb/voltdb*.jar
 /examples/*/*.jar
 /plannerlog.txt
@@ -66,14 +68,9 @@ bundles
 *.lcbak
 .gradle/*
 build.gradle
-/lib/python/vdm/server/nohup.out/*
-/lib/python/vdm/tests/geb_vdm/.gradle/*
-/lib/python/vdm/tests/geb_vdm/build/*
-/lib/python/vdm/tests/server/test_reports/*
 /src/frontend/org/voltdb/.gradle/*
 /build/lib/voltdb.war
 /tests/geb/vmc/.nb-gradle/
-/lib/python/vdm/tests/geb_vdm/.nb-gradle/
 tools/meshmonitor/build/
 tools/meshmonitor/dist/
 tools/ee/ee_auto_generated_unit_tests

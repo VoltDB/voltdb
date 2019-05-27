@@ -337,8 +337,7 @@ public class HSQLInterface {
 
         try {
             cs = sessionProxy.compileStatement(sql);
-        }
-        catch (HsqlException caught) {
+        } catch (HsqlException caught) {
             // a switch in case we want to give more error details on additional error codes
             switch(caught.getErrorCode()) {
             case -ErrorCode.X_42581:
@@ -348,16 +347,14 @@ public class HSQLInterface {
             default:
                 throw new HSQLParseException("Error in \"" + sql + "\" - " + caught.getMessage(), caught);
             }
-        }
-        catch (StackOverflowError caught) {
+        } catch (StackOverflowError caught) {
             // Handle this consistently in high level callers
             // regardless of where it is thrown.
             // It should be presumed to be a user error where the user is
             // exceeding a soft limit on the supportable complexity of a
             // SQL statement causing unreasonable levels of recursion.
             throw caught;
-        }
-        catch (Throwable caught) {
+        } catch (Throwable caught) {
             // Expectable user errors should have been thrown as HSQLException.
             // So, this throwable should be an unexpected system error.
             // The details of these arbitrary Throwables are not typically

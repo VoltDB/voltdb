@@ -26,36 +26,38 @@ package org.voltdb;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.voltdb.regressionsuites.RegressionSuite.assertContentOfTable;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
     private final static boolean m_debug = false;
-    public static final boolean retry_on_mismatch = true;
 
     @AfterClass
     public static void tearDownClass()
@@ -63,7 +65,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         try {
             VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         }
-        catch (IOException e) {};
+        catch (IOException e) {}
     }
 
     @Test
@@ -337,6 +339,58 @@ public class TestAdHocQueries extends AdHocQueryTester {
     public static String m_catalogJar = "adhoc.jar";
     public static String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
     public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+
+    @Test
+    public void testENG15335() {
+        final TestEnv env = new TestEnv("CREATE TABLE P0(id INTEGER NOT NULL);\n" +
+                "PARTITION TABLE P0 ON COLUMN id;\n" +
+                "CREATE TABLE R21(VCHAR_INLINE VARCHAR(14));\n" +
+                "DROP INDEX didx0 IF EXISTS;",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    "SELECT id FROM P0;",
+                    "SELECT VCHAR_INLINE FROM R21 WHERE (SELECT MIN(VCHAR_INLINE) FROM R21) LIKE 'abc%';")
+                    .forEachOrdered(query -> {
+                        try {
+                            assertEquals("Query \"" + query + "\" Should have passed",
+                                    ClientResponse.SUCCESS,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testENG15572() {
+        // Test subqueries on either side of LIKE/START WITH expression
+        final TestEnv env = new TestEnv("CREATE TABLE R0(v VARCHAR(100));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) STARTS WITH V LIMIT 1;",
+                    "SELECT * FROM R0 WHERE V STARTS WITH (SELECT MAX('s') FROM R0);",
+                    "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) LIKE V LIMIT 1;",
+                    "SELECT * FROM R0 WHERE V LIKE (SELECT MAX('s') FROM R0);")
+            .forEachOrdered(query -> {
+                try {
+                    assertEquals("Query \"" + query + "\" Should have passed",
+                            ClientResponse.SUCCESS,
+                            env.m_client.callProcedure("@AdHoc", query).getStatus());
+                } catch (IOException | ProcCallException e) {
+                    fail("Should have passed query \"" + query + "\": " + e.getMessage());
+                }
+            });
+        } finally {
+            env.tearDown();
+        }
+    }
 
     @Test
     public void testSimple() throws Exception {
@@ -913,6 +967,97 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG15117() throws Exception {
+        final String ddl = "CREATE TABLE SJYH_DENGLU2 (\n" +
+                "DL_USER_ID varchar(22) DEFAULT '' NOT NULL,\n" +
+                "DL_ACCOUNT_ID varchar(32) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_TIME varchar(8) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_DATE varchar(8) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_IP varchar(18) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_ADDR varchar(15) DEFAULT '' NOT NULL,\n" +
+                "DL_REGISTER_IP_CITY varchar(32) DEFAULT '' NOT NULL,\n" +
+                "DL_ACCOUNT_TYPE varchar(2) DEFAULT '' NOT NULL,\n" +
+                "DL_PHONE_NO varchar(15) DEFAULT '' NOT NULL,\n" +
+                "DL_INDUSTRY_TYPE varchar(8) DEFAULT '' NOT NULL,\n" +
+                "SCORE float,\n" +
+                "TRXSTATUS varchar(1) DEFAULT '1',\n" +
+                "KEY_INFO varchar(256)\n" +
+                ");\n" +
+                "\n" +
+                "PARTITION TABLE SJYH_DENGLU2 ON COLUMN DL_USER_ID;";
+
+        final TestEnv env = new TestEnv(ddl,
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+
+            // insert some data
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003002','1','18423485412','000002',0,'1','1')", 1);
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003001','1','18423485412','000002',0,'1','1')", 1);
+            batcher.add("insert into SJYH_DENGLU2 values ('113001','6600003001','22:49','','14.105.100.124','aaa','1000003000','1','18423485412','000002',0,'1','1')", 1);
+            batcher.run();
+
+            // run the same subselect query for multiple times, we should always get the same&correct answer
+            Stream.generate(() -> "select * from (select count(*) from SJYH_DENGLU2 where DL_USER_ID = '113001' ) as result;")
+                    .limit(5)
+                    .forEachOrdered(stmt -> {
+                        try {
+                            final ClientResponse cr = env.m_client.callProcedure("@AdHoc", stmt);
+                            assertContentOfTable(new Object[][]{{3}}, cr.getResults()[0]);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+    @Test
+    public void testENG15719PartialIndex() throws Exception {
+        testENG15719PartialIndex(false);
+        testENG15719PartialIndex(true);
+    }
+
+    private void testENG15719PartialIndex(boolean partitioned) throws Exception {
+        final TestEnv env = new TestEnv("CREATE TABLE foo(i int not null, j int);\n" +
+                (partitioned ? "partition table foo on column i;\n" : "") +
+                "create index partial_index on foo(i) where abs(i) > 0;\n",
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        try {
+            env.setUp();
+            final Batcher batcher = new Batcher(env);
+            final int nrep = 3; // how many repetitions each tuple gets inserted
+            IntStream.range(0, 5).forEach(n -> batcher.add(nrep,
+                    String.format("INSERT INTO foo VALUES(%d, %d);\n", n, n + 1), 1));
+            batcher.run();
+            Stream.of(Pair.of("true", IntStream.of(nrep * 5, 5, 0, 4, nrep * 10)),
+                    Pair.of("abs(i) > 0", IntStream.of(nrep * 4, 4, 1, 4, nrep * 10)),
+                    Pair.of("abs(i) > 0 AND j > 3", IntStream.of(nrep * 2, 2, 3, 4, nrep * 7)))
+                    .forEach(pair -> {
+                        final List<String> sqls = Stream.of("COUNT(*)", "COUNT (distinct i)", "MIN(i)", "MAX(i)", "SUM(i)")
+                                .map(aggregate -> String.format("SELECT %s FROM foo WHERE %s;", aggregate, pair.getFirst()))
+                                .collect(Collectors.toList());
+                        final List<Integer> expected = pair.getSecond().boxed().collect(Collectors.toList());
+                        assertEquals("Query number/result count mismatch", sqls.size(), expected.size());
+                        for(int index = 0; index < sqls.size(); ++index) {
+                            final String sql = sqls.get(index);
+                            final int expectedResult = expected.get(index);
+                            try {
+                                assertContentOfTable(new Object[][]{{expectedResult}},
+                                        env.m_client.callProcedure("@AdHoc", sql).getResults()[0]);
+                            } catch (Exception e) {
+                                fail(String.format("Query %s have worked fine", sql));
+                            }
+                        }
+                    });
+        } finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */
@@ -929,6 +1074,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_queries.add(query);
             if (expectedCount != null) {
                 m_expectedCounts.add(expectedCount);
+            }
+        }
+
+        void add(int nrep, String query, Integer expectedCount) {
+            for(int index = 0; index < nrep; ++index) {
+                add(query, expectedCount);
             }
         }
 
@@ -988,172 +1139,91 @@ public class TestAdHocQueries extends AdHocQueryTester {
     /**
      * Test environment with configured schema and server.
      */
-    public static class TestEnv {
-
-        final VoltProjectBuilder m_builder;
-        LocalCluster m_cluster;
-        Client m_client = null;
-
+    public static class TestEnv extends RegressionSuite.RegresssionEnv {
+        TestEnv(String ddl, String pathToCatalog, String pathToDeployment,
+                int siteCount, int hostCount, int kFactor) {
+            super(ddl, pathToCatalog, pathToDeployment, siteCount, hostCount,kFactor, m_debug);
+        }
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
-
-            m_builder = new VoltProjectBuilder();
-            //Increase query tmeout as long literal queries taking long time.
-            m_builder.setQueryTimeout(60000);
-            try {
-                m_builder.addLiteralSchema("create table BLAH (" +
-                                           "IVAL bigint default 0 not null, " +
-                                           "TVAL timestamp default null," +
-                                           "DVAL decimal default null," +
-                                           "PRIMARY KEY(IVAL));\n" +
-                                           "PARTITION TABLE BLAH ON COLUMN IVAL;\n" +
-                                           "\n" +
-                                           "CREATE TABLE AAA (A1 VARCHAR(2), A2 VARCHAR(2), A3 VARCHAR(2));\n" +
-                                           "CREATE TABLE BBB (B1 VARCHAR(2), B2 VARCHAR(2), B3 VARCHAR(2) NOT NULL UNIQUE);\n" +
-                                           "CREATE TABLE CCC (C1 VARCHAR(2), C2 VARCHAR(2), C3 VARCHAR(2));\n" +
-                                           "\n" +
-                                           "CREATE TABLE CHAR_TEST (COL1 VARCHAR(254));\n" +
-                                           "CREATE TABLE INT_TEST (COL1 INTEGER);\n" +
-                                           "CREATE TABLE SMALL_TEST (COL1 SMALLINT);\n" +
-                                           "CREATE TABLE REAL_TEST (REF VARCHAR(1),COL1 REAL);\n" +
-                                           "CREATE TABLE REAL3_TEST (COL1 REAL,COL2 REAL,COL3 REAL);\n" +
-                                           "CREATE TABLE DOUB_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
-                                           "CREATE TABLE DOUB3_TEST (COL1 FLOAT,COL2 FLOAT\n" +
-                                           "   PRECISION,COL3 FLOAT);\n" +
-                                           "\n" +
-                                           "-- Users may provide an explicit precision for FLOAT_TEST.COL1\n" +
-                                           "\n" +
-                                           "CREATE TABLE FLOAT_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
-                                           "\n" +
-                                           "CREATE TABLE INDEXLIMIT(COL1 VARCHAR(2), COL2 VARCHAR(2),\n" +
-                                           "   COL3 VARCHAR(2), COL4 VARCHAR(2), COL5 VARCHAR(2),\n" +
-                                           "   COL6 VARCHAR(2), COL7 VARCHAR(2));\n" +
-                                           "\n" +
-                                           "CREATE TABLE WIDETABLE (WIDE VARCHAR(118));\n" +
-                                           "CREATE TABLE WIDETAB (WIDE1 VARCHAR(38), WIDE2 VARCHAR(38), WIDE3 VARCHAR(38));\n" +
-                                           "\n" +
-                                           "CREATE TABLE TEST_TRUNC (TEST_STRING VARCHAR (6));\n" +
-                                           "\n" +
-                                           "CREATE TABLE WARNING(TESTCHAR VARCHAR(6), TESTINT INTEGER);\n" +
-                                           "\n" +
-                                           "CREATE TABLE TV (dec3 DECIMAL(3), dec1514 DECIMAL(15,14),\n" +
-                                           "                 dec150 DECIMAL(15,0), dec1515 DECIMAL(15,15));\n" +
-                                           "\n" +
-                                           "CREATE TABLE TU (smint SMALLINT, dec1514 DECIMAL(15,14),\n" +
-                                           "                 integr INTEGER, dec1515 DECIMAL(15,15));\n" +
-                                           "\n" +
-                                           "CREATE TABLE STAFF\n" +
-                                           "  (EMPNUM   VARCHAR(3) NOT NULL UNIQUE,\n" +
-                                           "   EMPNAME  VARCHAR(20),\n" +
-                                           "   GRADE    DECIMAL(4),\n" +
-                                           "   CITY     VARCHAR(15));\n" +
-                                           "\n" +
-                                           "CREATE TABLE PROJ\n" +
-                                           "  (PNUM     VARCHAR(3) NOT NULL UNIQUE,\n" +
-                                           "   PNAME    VARCHAR(20),\n" +
-                                           "   PTYPE    VARCHAR(6),\n" +
-                                           "   BUDGET   DECIMAL(9),\n" +
-                                           "   CITY     VARCHAR(15));\n" +
-                                           "\n" +
-                                           "CREATE TABLE WORKS\n" +
-                                           "  (EMPNUM   VARCHAR(3) NOT NULL,\n" +
-                                           "   PNUM     VARCHAR(3) NOT NULL,\n" +
-                                           "   HOURS    DECIMAL(5),\n" +
-                                           "   UNIQUE(EMPNUM,PNUM));\n" +
-                                           "\n" +
-                                           "CREATE TABLE INTS\n" +
-                                           "  (INT1      SMALLINT NOT NULL,\n" +
-                                           "   INT2      SMALLINT NOT NULL);\n" +
-                                           "CREATE TABLE VOTES\n" +
-                                           "  (PHONE_NUMBER BIGINT NOT NULL,\n" +
-                                           "   STATE     VARCHAR(2) NOT NULL,\n" +
-                                           "   CONTESTANT_NUMBER  INTEGER NOT NULL);\n" +
-                                           "\n" +
-                                           "CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
-                                           "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
-                                           "CREATE PROCEDURE InsertWithDate AS \n" +
-                                           "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
-                                           "\n" +
-                                           "CREATE TABLE TS_CONSTRAINT_EXCEPTION\n" +
-                                           "  (TS TIMESTAMP UNIQUE NOT NULL,\n" +
-                                           "   COL1 VARCHAR(2048)); \n" +
-                                           "");
-
-                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
-                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                fail("Failed to set up schema");
-            }
-
-            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
-                                         BackendTarget.NATIVE_EE_JNI,
-                                         LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug);
-            m_cluster.setHasLocalServer(true);
-            boolean success = m_cluster.compile(m_builder);
-            assert(success);
-
-            try {
-                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
-            }
-            catch (Exception e) {
-                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
-            }
-        }
-
-        void setUp() {
-            m_cluster.startUp();
-
-            try {
-                // do the test
-                m_client = ClientFactory.createClient();
-                m_client.createConnection("localhost", m_cluster.port(0));
-            }
-            catch (UnknownHostException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-        }
-
-        void tearDown() {
-            if (m_client != null) {
-                try {
-                    m_client.close();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to close client");
-                }
-            }
-            m_client = null;
-
-            if (m_cluster != null) {
-                try {
-                    m_cluster.shutDown();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to shut down cluster");
-                }
-            }
-            m_cluster = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
-
-        boolean isValgrind() {
-            if (m_cluster != null)
-                return m_cluster.isValgrind();
-            return true;
-        }
-
-        boolean isMemcheckDefined() {
-            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
+                int siteCount, int hostCount, int kFactor) {
+            super("create table BLAH (" +
+                            "IVAL bigint default 0 not null, " +
+                            "TVAL timestamp default null," +
+                            "DVAL decimal default null," +
+                            "PRIMARY KEY(IVAL));\n" +
+                            "PARTITION TABLE BLAH ON COLUMN IVAL;\n" +
+                            "\n" +
+                            "CREATE TABLE AAA (A1 VARCHAR(2), A2 VARCHAR(2), A3 VARCHAR(2));\n" +
+                            "CREATE TABLE BBB (B1 VARCHAR(2), B2 VARCHAR(2), B3 VARCHAR(2) NOT NULL UNIQUE);\n" +
+                            "CREATE TABLE CCC (C1 VARCHAR(2), C2 VARCHAR(2), C3 VARCHAR(2));\n" +
+                            "\n" +
+                            "CREATE TABLE CHAR_TEST (COL1 VARCHAR(254));\n" +
+                            "CREATE TABLE INT_TEST (COL1 INTEGER);\n" +
+                            "CREATE TABLE SMALL_TEST (COL1 SMALLINT);\n" +
+                            "CREATE TABLE REAL_TEST (REF VARCHAR(1),COL1 REAL);\n" +
+                            "CREATE TABLE REAL3_TEST (COL1 REAL,COL2 REAL,COL3 REAL);\n" +
+                            "CREATE TABLE DOUB_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                            "CREATE TABLE DOUB3_TEST (COL1 FLOAT,COL2 FLOAT\n" +
+                            "   PRECISION,COL3 FLOAT);\n" +
+                            "\n" +
+                            "-- Users may provide an explicit precision for FLOAT_TEST.COL1\n" +
+                            "\n" +
+                            "CREATE TABLE FLOAT_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                            "\n" +
+                            "CREATE TABLE INDEXLIMIT(COL1 VARCHAR(2), COL2 VARCHAR(2),\n" +
+                            "   COL3 VARCHAR(2), COL4 VARCHAR(2), COL5 VARCHAR(2),\n" +
+                            "   COL6 VARCHAR(2), COL7 VARCHAR(2));\n" +
+                            "\n" +
+                            "CREATE TABLE WIDETABLE (WIDE VARCHAR(118));\n" +
+                            "CREATE TABLE WIDETAB (WIDE1 VARCHAR(38), WIDE2 VARCHAR(38), WIDE3 VARCHAR(38));\n" +
+                            "\n" +
+                            "CREATE TABLE TEST_TRUNC (TEST_STRING VARCHAR (6));\n" +
+                            "\n" +
+                            "CREATE TABLE WARNING(TESTCHAR VARCHAR(6), TESTINT INTEGER);\n" +
+                            "\n" +
+                            "CREATE TABLE TV (dec3 DECIMAL(3), dec1514 DECIMAL(15,14),\n" +
+                            "                 dec150 DECIMAL(15,0), dec1515 DECIMAL(15,15));\n" +
+                            "\n" +
+                            "CREATE TABLE TU (smint SMALLINT, dec1514 DECIMAL(15,14),\n" +
+                            "                 integr INTEGER, dec1515 DECIMAL(15,15));\n" +
+                            "\n" +
+                            "CREATE TABLE STAFF\n" +
+                            "  (EMPNUM   VARCHAR(3) NOT NULL UNIQUE,\n" +
+                            "   EMPNAME  VARCHAR(20),\n" +
+                            "   GRADE    DECIMAL(4),\n" +
+                            "   CITY     VARCHAR(15));\n" +
+                            "\n" +
+                            "CREATE TABLE PROJ\n" +
+                            "  (PNUM     VARCHAR(3) NOT NULL UNIQUE,\n" +
+                            "   PNAME    VARCHAR(20),\n" +
+                            "   PTYPE    VARCHAR(6),\n" +
+                            "   BUDGET   DECIMAL(9),\n" +
+                            "   CITY     VARCHAR(15));\n" +
+                            "\n" +
+                            "CREATE TABLE WORKS\n" +
+                            "  (EMPNUM   VARCHAR(3) NOT NULL,\n" +
+                            "   PNUM     VARCHAR(3) NOT NULL,\n" +
+                            "   HOURS    DECIMAL(5),\n" +
+                            "   UNIQUE(EMPNUM,PNUM));\n" +
+                            "\n" +
+                            "CREATE TABLE INTS\n" +
+                            "  (INT1      SMALLINT NOT NULL,\n" +
+                            "   INT2      SMALLINT NOT NULL);\n" +
+                            "CREATE TABLE VOTES\n" +
+                            "  (PHONE_NUMBER BIGINT NOT NULL,\n" +
+                            "   STATE     VARCHAR(2) NOT NULL,\n" +
+                            "   CONTESTANT_NUMBER  INTEGER NOT NULL);\n" +
+                            "\n" +
+                            "CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
+                            "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
+                            "CREATE PROCEDURE InsertWithDate AS \n" +
+                            "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
+                            "\n" +
+                            "CREATE TABLE TS_CONSTRAINT_EXCEPTION\n" +
+                            "  (TS TIMESTAMP UNIQUE NOT NULL,\n" +
+                            "   COL1 VARCHAR(2048)); \n" +
+                            "",
+                    pathToCatalog, pathToDeployment, siteCount, hostCount, kFactor, m_debug);
         }
     }
 

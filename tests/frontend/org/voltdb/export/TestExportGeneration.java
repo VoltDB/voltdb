@@ -27,6 +27,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -47,20 +50,21 @@ import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportMatchers.AckPayloadMessage;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.messaging.LocalMailbox;
@@ -72,12 +76,12 @@ import com.google_voltpatches.common.collect.ImmutableList;
 public class TestExportGeneration {
 
     static {
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
     }
 
     static String testout_jar;
     static CatalogMap<Connector> m_connectors;
-    static String m_tableSignature;
+    static String m_streamName;
     static File m_tempRoot;
 
     @BeforeClass
@@ -92,7 +96,7 @@ public class TestExportGeneration {
         testout_jar = m_tempRoot.getCanonicalPath() + File.separatorChar + "testout.jar";
 
         String schemaDDL =
-                "create stream e1 (id integer, f1 varchar(16)); ";
+                "create stream e1 export to target e1 (id integer, f1 varchar(16)); ";
 
         VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileDDLString(schemaDDL, testout_jar);
@@ -102,14 +106,14 @@ public class TestExportGeneration {
                 .getCatalog().getClusters().get("cluster")
                 .getDatabases().get("database")
                 .getConnectors();
-        Connector defaultConnector = m_connectors.get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        Connector defaultConnector = m_connectors.get("e1");
         defaultConnector.setEnabled(true);
 
-        m_tableSignature = defaultConnector
+        m_streamName = defaultConnector
                 .getTableinfo()
                 .getIgnoreCase("e1")
                 .getTable()
-                .getSignature();
+                .getTypeName();
     }
 
     File m_dataDirectory;
@@ -123,7 +127,7 @@ public class TestExportGeneration {
     int m_part = 2;
 
     final AtomicReference<CountDownLatch> m_mbxNotifyCdlRef =
-            new AtomicReference<>(new CountDownLatch(1));
+            new AtomicReference<>(null);
     final AtomicReference<Matcher<VoltMessage>> m_ackMatcherRef =
             new AtomicReference<>();
     LocalMailbox m_mbox;
@@ -138,9 +142,12 @@ public class TestExportGeneration {
         props.put("outdir", m_tempRoot.getAbsolutePath() + "/my_exports");
         Set<String> tables = new HashSet<>();
         tables.add("e1");
-        config.put(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, new Pair<>(props, tables));
+        config.put("e1", new Pair<>(props, tables));
         ExportDataProcessor processor = new GuestProcessor();
         processor.setProcessorConfig(config);
+        // Do NOT start the actual processor as we don't have an actual
+        // export client
+        // processor.startPolling();
         return processor;
     }
 
@@ -157,18 +164,39 @@ public class TestExportGeneration {
 
         m_mockVoltDB = new MockVoltDB();
         m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite(m_host, m_site), m_part);
+        m_mockVoltDB.addTable("e1", false);
+        m_mockVoltDB.addColumnToTable("e1", "id", VoltType.INTEGER, true, "AA", VoltType.INTEGER);
+        m_mockVoltDB.addColumnToTable("e1", "f1", VoltType.STRING, true, "AA", VoltType.STRING);
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(m_dataDirectory);
+        m_exportGeneration = new ExportGeneration(m_dataDirectory, m_mockVoltDB.getHostMessenger());
+
+        ExportDataProcessor processor = getProcessor();
+        processor.setExportGeneration(m_exportGeneration);
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
-                m_connectors, getProcessor(), m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
-                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
+                m_connectors, getProcessor(), m_mockVoltDB.m_hostId,
+                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))), false);
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
             public void deliver(VoltMessage message) {
+                long seqNo = -1L;
+                if (message instanceof BinaryPayloadMessage) {
+                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final byte msgType = buf.get();
+                    // Skip non-related messages
+                    if (msgType != ExportManager.RELEASE_BUFFER) {
+                        return;
+                    }
+                    final int partition = buf.getInt();
+                    final int length = buf.getInt();
+                    byte stringBytes[] = new byte[length];
+                    buf.get(stringBytes);
+                    seqNo = buf.getLong();
+                }
                 assertThat( message, m_ackMatcherRef.get());
                 m_mbxNotifyCdlRef.get().countDown();
             }
@@ -193,13 +221,30 @@ public class TestExportGeneration {
             cb.get();
         }
 
-        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature);
+        m_expDs = m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_streamName);
+
+        // Assign a mock {@code ExportCoordinator}
+        m_expDs.m_coordinator = getMockCoordinator();
+
+        // Make sure the test EDS is always ready for polling
+        m_expDs.setReadyForPolling(true);
+
         m_zkPartitionDN =  VoltZK.exportGenerations + "/mailboxes" + "/" + m_part;
+    }
+
+    private ExportCoordinator getMockCoordinator() {
+        ExportCoordinator mock = mock(ExportCoordinator.class);
+        when(mock.isCoordinatorInitialized()).thenReturn(true);
+        when(mock.isPartitionLeader()).thenReturn(true);
+        when(mock.isMaster()).thenReturn(true);
+        when(mock.isSafePoint(anyLong())).thenReturn(true);
+        when(mock.isExportMaster(anyLong())).thenReturn(true);
+        return mock;
     }
 
     @After
     public void tearDown() throws Exception {
-        m_exportGeneration.close(null);
+        m_exportGeneration.close();
         m_mockVoltDB.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
@@ -207,31 +252,31 @@ public class TestExportGeneration {
     @Test
     public void testAckReceipt() throws Exception {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
-        final CountDownLatch promoted = new CountDownLatch(1);
+
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
-        m_exportGeneration.acceptMastership(m_part);
-        promoted.await(5, TimeUnit.SECONDS);
+        m_exportGeneration.becomeLeader(m_part);
 
         int retries = 4000;
         long seqNo = 1L;
         boolean active = false;
 
         while( --retries >= 0 && ! active) {
+
             m_exportGeneration.pushExportBuffer(
                     m_part,
-                    m_tableSignature,
+                    m_streamName,
+                    seqNo,
                     seqNo,
                     1,
                     0L,
-                    foo.duplicate(),
-                    false
+                    System.currentTimeMillis(),
+                    foo.duplicate()
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_streamName, seqNo));
 
             cont.discard();
 
@@ -250,12 +295,13 @@ public class TestExportGeneration {
 
         m_exportGeneration.pushExportBuffer(
                 m_part,
-                m_tableSignature,
+                m_streamName,
                 /*seqNo*/1L,
+                1L,
                 1,
                 0L,
-                foo.duplicate(),
-                false
+                System.currentTimeMillis(),
+                foo.duplicate()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -276,7 +322,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, 1L).asVoltMessage()
+                new AckPayloadMessage(m_part, m_streamName, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -290,13 +336,69 @@ public class TestExportGeneration {
         assertEquals("unexpected data sources size", 0, m_expDs.sizeInBytes());
     }
 
+    @Test
+    @Ignore
+    public void testStaleAckDelivery() throws Exception {
+        ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
+
+        int retries = 4000;
+        long size = m_expDs.sizeInBytes();
+
+        m_exportGeneration.pushExportBuffer(
+                m_part,
+                m_streamName,
+                /*seqNo*/1L,
+                1L,
+                1,
+                0L,
+                System.currentTimeMillis(),
+                foo.duplicate()
+                );
+
+        while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+        assertTrue("timeout on data source size poll", retries >= 0);
+        assertEquals("unexpected data sources size", foo.capacity() - StreamBlock.HEADER_SIZE, m_expDs.sizeInBytes());
+
+        retries = 1000;
+        size = m_expDs.sizeInBytes();
+
+        Long hsid = getOtherMailboxHsid();
+        assertNotNull( "other mailbox not listed in zookeeper",  hsid);
+
+        // Send an ack message with a catalogVersion < the EDS catalogVersion
+        m_mbox.send(
+                hsid,
+                new AckPayloadMessage(m_part,
+                        m_streamName, 1L,
+                        m_expDs.getCatalogVersionCreated() - 1) // stale catalogVersion
+                    .asVoltMessage()
+                );
+
+        while( --retries >= 0) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException iex) {
+                Throwables.propagate(iex);
+            }
+        }
+
+        // The ack should have been ignored
+        assertEquals("unexpected data sources size", size, m_expDs.sizeInBytes());
+    }
+
     private Long getOtherMailboxHsid() throws Exception {
         Long otherHsid = null;
 
         ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
         m_zk.getChildren(m_zkPartitionDN, null, callback, null);
 
-        for ( String child: callback.getChildren()) {
+        for ( String child: callback.get()) {
             long asLong = Long.parseLong(child);
             if( asLong != m_mbox.getHSId()) {
                 otherHsid = asLong;

@@ -46,16 +46,26 @@ import org.voltdb.iv2.UniqueIdGenerator;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
+    // start seq number(8) + committed seq number (8) + row count(4) + uniqueId (8)
+    public static final int HEADER_SIZE = 28;
+    public static final int SEQUENCE_NUMBER_OFFSET = 0;
+    public static final int COMMIT_SEQUENCE_NUMBER_OFFSET = 8;
+    public static final int ROW_NUMBER_OFFSET = 16;
+    public static final int UNIQUE_ID_OFFSET = 20;
 
-    public StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
-        m_buffer = cont;
+    StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, long committedSequenceNumber,
+            int rowCount, long uniqueId, long segmentIndex, boolean isPersisted) {
+        m_buffer = fcont;
+        m_schema = schemaCont;
         m_startSequenceNumber = startSequenceNumber;
+        m_committedSequenceNumber = committedSequenceNumber;
         m_rowCount = rowCount;
         m_uniqueId = uniqueId;
-        // The first 12 bytes are space for us to store the sequence number and row count if we end up persisting
+        // The first 20 bytes are space for us to store the sequence number, row count and uniqueId
+        // if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
+        m_segmentIndex = segmentIndex;
         //The first 8 bytes are space for us to store the sequence number if we end up persisting
         m_isPersisted = isPersisted;
     }
@@ -70,6 +80,10 @@ public class StreamBlock {
         if (count == 0) {
             m_buffer.discard();
             m_buffer = null;
+            if (m_schema != null) {
+                m_schema.discard();
+                m_schema = null;
+            }
         } else if (count < 0) {
             VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
         }
@@ -81,6 +95,11 @@ public class StreamBlock {
 
     public long lastSequenceNumber() {
         return m_startSequenceNumber + m_rowCount - 1;
+    }
+
+
+    long committedSequenceNumber() {
+        return m_committedSequenceNumber;
     }
 
     /**
@@ -133,12 +152,16 @@ public class StreamBlock {
     }
 
     private final long m_startSequenceNumber;
+    private long m_committedSequenceNumber;
     private final int m_rowCount;
     private final long m_uniqueId;
     private final long m_totalSize;
     private BBContainer m_buffer;
+    private BBContainer m_schema;
     // index of the last row that has been released.
     private int m_releaseOffset = -1;
+    // reverse lookup to find pbd segment
+    private long m_segmentIndex = -1;
 
     /*
      * True if this block is still backed by a file and false
@@ -149,6 +172,14 @@ public class StreamBlock {
     public BBContainer unreleasedContainer() {
         m_refCount.incrementAndGet();
         return getRefCountingContainer(m_buffer.b().slice().asReadOnlyBuffer());
+    }
+
+    BBContainer getSchemaContainer() {
+        if (m_schema == null) {
+            return null;
+        }
+        m_refCount.incrementAndGet();
+        return getRefCountingContainer(m_schema.b().slice().asReadOnlyBuffer());
     }
 
     private BBContainer getRefCountingContainer(ByteBuffer buf) {
@@ -167,11 +198,16 @@ public class StreamBlock {
      */
     public BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
-        m_buffer.b().putLong(0, startSequenceNumber());
-        m_buffer.b().putInt(8, rowCount());
-        m_buffer.b().putLong(12, uniqueId());
-        m_buffer.b().position(0);
+        m_buffer.b().putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
+        m_buffer.b().putLong(COMMIT_SEQUENCE_NUMBER_OFFSET, committedSequenceNumber());
+        m_buffer.b().putInt(ROW_NUMBER_OFFSET, rowCount());
+        m_buffer.b().putLong(UNIQUE_ID_OFFSET, uniqueId());
+        m_buffer.b().position(SEQUENCE_NUMBER_OFFSET);
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
+    }
+
+    public long getSegmentIndex() {
+        return m_segmentIndex;
     }
 }

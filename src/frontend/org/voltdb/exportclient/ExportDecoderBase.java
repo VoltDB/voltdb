@@ -89,7 +89,7 @@ public abstract class ExportDecoderBase {
     final ExportRow m_legacyRow;
 
     //Used by new style connector to pickup schema information from previous record.
-    ExportRow m_previousRow;
+    ExportRow m_rowSchema;
     public ExportDecoderBase(AdvertisedDataSource ads) {
         m_source = ads;
         m_startTS = System.currentTimeMillis();
@@ -282,13 +282,13 @@ public abstract class ExportDecoderBase {
         return m_legacy;
     }
 
-    public void setPreviousRow(ExportRow row) {
-        //We do keep the values of previous row but they are not used.
-        m_previousRow = row;
+    public void setExportRowSchema(ExportRow row) {
+        //We do keep the values in the schema row but they are not used.
+        m_rowSchema = row;
     }
 
-    public ExportRow getPreviousRow() {
+    public ExportRow getExportRowSchema() {
         //We do keep the values of previous row but they should not be relied upon only schema information is used.
-        return m_previousRow;
+        return m_rowSchema;
     }
 }

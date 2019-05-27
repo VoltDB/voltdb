@@ -93,7 +93,7 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
-                            false, false, schema);
+                            false, false, false, schema);
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);

@@ -1,11 +1,7 @@
-We're currently using Boost 1.53.
+We're currently using Boost 1.70
 
 It's header-only and we specifically disable any references to boost::thread.
 
-No included Boost files have been modified.
+No included Boost files have been modified. We keep all the library headers in, and exclude all components that
+needs building artifacts (e.g. thread, filesystem, etc.).
 
-Many files have been removed. If you use some new part of boost and it fails because a
-header is missing, you can get the full Boost tarball of the appropriate version and
-restore missing headers as needed.
-
-Feel free to remove headers that aren't used.

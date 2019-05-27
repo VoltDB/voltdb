@@ -93,7 +93,7 @@ class TupleValueExpression : public AbstractExpression {
 
   protected:
 
-    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int tuple_idx;           // which tuple
     const int value_idx;           // which (offset) column of the tuple
 };
 

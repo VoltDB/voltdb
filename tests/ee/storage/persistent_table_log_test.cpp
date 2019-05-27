@@ -135,7 +135,7 @@ public:
                                              BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, false, m_tableSchema);
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);

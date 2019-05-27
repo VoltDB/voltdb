@@ -26,8 +26,8 @@ package org.voltdb.iv2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -113,7 +113,7 @@ public class TestMpPromoteAlgo
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig);
+            ofTotal, handle, handle, versionedHashinatorConfig, Long.MIN_VALUE);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -184,7 +184,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
 
         // check if the hashinator was updated to the newer version
@@ -252,7 +252,7 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        inOrder.verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        inOrder.verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
 
         assertEquals(txnEgo(1003L), result.get().m_txnId);
     }
@@ -325,7 +325,7 @@ public class TestMpPromoteAlgo
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
         needsRepair.add(2L);
-        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(CompleteTransactionMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
     }
 

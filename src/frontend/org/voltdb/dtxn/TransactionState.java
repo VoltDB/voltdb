@@ -55,6 +55,12 @@ public abstract class TransactionState extends OrderableTransaction  {
     // This timestamp is only used for restarted transactions
     protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
+    // The transaction is caught up in the partition leader migration process
+    protected boolean m_leaderMigrationInvolved = false;
+
+    // Last generate sp unique ID or 0 if not set
+    public final long m_lastSpUniqueId;
+
     /**
      * Set up the final member variables from the parameters. This will
      * be called exclusively by subclasses.
@@ -80,6 +86,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     {
         super(notice.getTxnId(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_spHandle = notice.getSpHandle();
+        m_lastSpUniqueId = notice.getLastSpUniqueId();
         m_mbox = mbox;
         m_notice = notice;
         m_isReadOnly = readOnly;
@@ -219,5 +226,13 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public long getTimetamp() {
         return m_restartTimestamp;
+    }
+
+    public void setLeaderMigrationInvolved() {
+        m_leaderMigrationInvolved = true;
+    }
+
+    public boolean isLeaderMigrationInvolved() {
+        return m_leaderMigrationInvolved;
     }
 }

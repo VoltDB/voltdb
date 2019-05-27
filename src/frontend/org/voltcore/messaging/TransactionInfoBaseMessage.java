@@ -142,6 +142,13 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_isForReplay;
     }
 
+    /**
+     * @return The last generate uniqueId for the SP or {@code 0} if it is not set
+     */
+    public long getLastSpUniqueId() {
+        return 0L;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -196,4 +203,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     public String getMessageInfo() {
         return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
+
+    public abstract void toDuplicateCounterString(StringBuilder sb);
 }

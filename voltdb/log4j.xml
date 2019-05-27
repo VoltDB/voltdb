@@ -64,9 +64,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="EXPORT">
-        <level value="INFO"/>
-    </logger -->
+    <logger name="EXPORT">
+        <level value="DEBUG"/>
+    </logger>
 
     <!-- logger name="IMPORT">
         <level value="INFO"/>
@@ -88,9 +88,9 @@
         <level value="INFO"/>
     </logger -->
 
-	<!-- logger name="JOIN">
-		<level value="INFO"/>
-	</logger -->
+    <!-- logger name="ELASTIC">
+        <level value="INFO"/>
+    </logger -->
 
     <!-- logger name="SNAPSHOT">
         <level value="INFO"/>

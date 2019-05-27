@@ -95,6 +95,12 @@ public interface ClientResponse {
     public static final byte TXN_MISROUTED = -11;
 
     /**
+     * Status code indicating that a record in DR binary log could not be applied because a table
+     * could not be found for the table hash from the remote cluster. Used internally only.
+     */
+    public static final byte DR_TABLE_HASH_NOT_FOUND = -12;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

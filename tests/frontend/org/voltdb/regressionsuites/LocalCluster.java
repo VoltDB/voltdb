@@ -23,12 +23,17 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +46,7 @@ import java.util.regex.Pattern;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -58,6 +63,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
@@ -181,7 +187,8 @@ public class LocalCluster extends VoltServerConfig {
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
     //NEW_CLI can be picked up from env var or -D to JVM.
-    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? System.getProperty("NEW_CLI", "true") : System.getenv("NEW_CLI"));
+    private boolean isNewCli = Boolean
+            .parseBoolean(System.getProperty("NEW_CLI", MoreObjects.firstNonNull(System.getenv("NEW_CLI"), "true")));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
@@ -189,7 +196,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
-    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+    private boolean isEnableSSL = Boolean.parseBoolean(System.getProperty("ENABLE_SSL", System.getenv("ENABLE_SSL")));
     public boolean isEnableSSL() { return isEnableSSL; };
     public void setEnableSSL(boolean flag) {
         isEnableSSL = flag;
@@ -208,6 +215,8 @@ public class LocalCluster extends VoltServerConfig {
     private String m_mismatchSchema = null;
     /** Node to initialize with a different schema, or null to use the same schema on all nodes. */
     private Integer m_mismatchNode = null;
+    /** Set of hosts which were removed from the cluster. This is a bit hacky because it just skips these hosts */
+    private Set<Integer> m_removedHosts = Collections.emptySet();
 
     public void setHttpOverridePort(int port) {
         m_httpOverridePort = port;
@@ -218,8 +227,7 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public void setLogSearchPatterns(List<String> regexes) {
-        for (int i = 0; i < regexes.size(); i++) {
-            String s = regexes.get(i);
+        for (String s : regexes) {
             Pattern p = Pattern.compile(s);
             m_logMessageMatchPatterns.put(s, p);
         }
@@ -325,10 +333,10 @@ public class LocalCluster extends VoltServerConfig {
         numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
-        m_additionalProcessEnv = env==null ? new HashMap<>() : env;
-        if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
+        m_additionalProcessEnv = env == null ? new HashMap<>() : env;
+        if (Boolean.getBoolean(NativeLibraryLoader.USE_JAVA_LIBRARY_PATH)) {
             // set use.javalib for LocalCluster so that Eclipse runs will be OK.
-            m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
+            m_additionalProcessEnv.put(NativeLibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
         }
         // get the name of the calling class
         StackTraceElement[] traces = Thread.currentThread().getStackTrace();
@@ -337,9 +345,9 @@ public class LocalCluster extends VoltServerConfig {
         //ArrayUtils.reverse(traces);
         int i;
         // skip all stack frames below this method
-        for (i = 0; ! traces[i].getClassName().equals(getClass().getName()); i++);
+        for (i = 0; !traces[i].getClassName().equals(getClass().getName()); i++) {}
         // skip all stack frames from localcluster itself
-        for (;      traces[i].getClassName().equals(getClass().getName()); i++);
+        for (; traces[i].getClassName().equals(getClass().getName()); i++) {}
         // skip the package name
         int dot = traces[i].getClassName().lastIndexOf('.');
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
@@ -378,15 +386,16 @@ public class LocalCluster extends VoltServerConfig {
         // start ignores them silently if they are set.
         if (schemaToStage != null) {
             try {
-                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+                templateCmdLine.m_userSchemas = Collections
+                        .singletonList(VoltProjectBuilder.createFileForSchema(schemaToStage));
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchemas + "\"");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
         if (classesJarToStage != null) {
-            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
-            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+            templateCmdLine.m_stagedClassesPaths = Collections.singletonList(new VoltFile(classesJarToStage));
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPaths + "\"");
         }
 
         // if the user wants valgrind and it makes sense, give it to 'em
@@ -511,6 +520,10 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = name;
     }
 
+    public void setCallingClassName(String name) {
+        m_callingClassName = name;
+    }
+
     public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
         if (! m_compiled) {
             m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId);
@@ -523,13 +536,31 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
-        if (!m_compiled) {
-            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId);
-            m_compiled = m_initialCatalog != null;
-            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
-            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+        return compile(builder, null);
+    }
+
+    /**
+     * Update the catalog of a running instance. It is recommended that {@code builder} is the same builder which was
+     * used to compile this instance with the appropriate modifications.
+     *
+     * @param builder {@link VoltProjectBuilder} with updated configuration.
+     * @throws ProcCallException    If there was an error calling the procedure
+     * @throws InterruptedException If this thread was interrupted
+     * @throws IOException          If there was an error writing or reading the updated configuration
+     */
+    public void updateCatalog(VoltProjectBuilder builder) throws IOException, ProcCallException, InterruptedException {
+        m_compiled = false;
+        assertTrue(compile(builder));
+
+        String deplymentString = new String(Files.readAllBytes(Paths.get(builder.getPathToDeployment())),
+                Constants.UTF8ENCODING);
+        Client client = createAdminClient(new ClientConfig());
+        try {
+            assertEquals(ClientResponse.SUCCESS,
+                    client.callProcedure("@UpdateApplicationCatalog", null, deplymentString).getStatus());
+        } finally {
+            client.close();
         }
-        return m_compiled;
     }
 
     @Override
@@ -652,7 +683,6 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltFilePrefix(subroot.getPath());
         }
         cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
-        cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
@@ -695,7 +725,7 @@ public class LocalCluster extends VoltServerConfig {
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(action == StartAction.JOIN);
-            cmdln.m_hostCount = m_hostCount;
+            cmdln.hostCount(m_hostCount - m_removedHosts.size());
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
@@ -748,7 +778,8 @@ public class LocalCluster extends VoltServerConfig {
         }
         if (new Integer(hostId).equals(m_mismatchNode)) {
             assert m_usesStagedSchema;
-            cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+            cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                    : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
         }
         cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
 
@@ -860,7 +891,20 @@ public class LocalCluster extends VoltServerConfig {
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
-        templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
+
+        NavigableSet<String> coordinators = internalPortGenerator.getCoordinators();
+        if (!m_removedHosts.isEmpty()) {
+            ImmutableSortedSet.Builder<String> sb = ImmutableSortedSet.naturalOrder();
+            int i = 0;
+            for (String coordinator : coordinators) {
+                if (!m_removedHosts.contains(i++)) {
+                    sb.add(coordinator);
+                }
+            }
+            coordinators = sb.build();
+        }
+
+        templateCmdLine.coordinators(coordinators);
         if (m_httpPortEnabled) {
             templateCmdLine.httpPort(0); // Set this value to 0 would enable http port assignment
         }
@@ -882,14 +926,16 @@ public class LocalCluster extends VoltServerConfig {
 
         // create the in-process server instance.
         if (m_hasLocalServer) {
+            while (m_removedHosts.contains(oopStartIndex)) {
+                ++oopStartIndex;
+            }
             try {
-                //Init
+                // Init
                 if (isNewCli && !skipInit) {
                     initLocalServer(oopStartIndex, clearLocalDataDirectories);
                 }
                 startLocalServer(oopStartIndex, clearLocalDataDirectories);
-            }
-            catch (IOException ioe) {
+            } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
             ++oopStartIndex;
@@ -897,6 +943,9 @@ public class LocalCluster extends VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < hostCount; i++) {
+            if (m_removedHosts.contains(i)) {
+                continue;
+            }
             try {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
@@ -1031,7 +1080,8 @@ public class LocalCluster extends VoltServerConfig {
             }
             if (new Integer(hostId).equals(m_mismatchNode)) {
                 assert m_usesStagedSchema;
-                cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+                cmdln.m_userSchemas = m_mismatchSchema == null ? null
+                        : Collections.singletonList(VoltProjectBuilder.createFileForSchema(m_mismatchSchema));
             }
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -1133,7 +1183,7 @@ public class LocalCluster extends VoltServerConfig {
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
             cmdln.enableAdd(startAction == StartAction.JOIN);
-            cmdln.hostCount(m_hostCount);
+            cmdln.hostCount(m_hostCount - m_removedHosts.size());
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
@@ -1149,7 +1199,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         try {
             cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
-            cmdln.coordinators(internalPortGenerator.getCoordinators());
             if (m_replicationPort != -1) {
                 int index = m_hasLocalServer ? hostId + 1 : hostId;
                 cmdln.drAgentStartPort(m_replicationPort + index);
@@ -1408,7 +1457,7 @@ public class LocalCluster extends VoltServerConfig {
      * join multiple nodes to the cluster
      * @param hostIds a set of new host ids
      */
-    public void join(Set<Integer> hostIds) {
+    public boolean join(Set<Integer> hostIds) {
         for (int hostId : hostIds) {
             try {
                 if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
@@ -1420,7 +1469,7 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(ioe);
             }
         }
-        waitForAllReady();
+        return waitForAllReady();
     }
 
     /**
@@ -1446,6 +1495,15 @@ public class LocalCluster extends VoltServerConfig {
             }
         }
         waitForAllReady();
+    }
+
+    /**
+     * Update the set of removed hosts to be {@code removeHosts}
+     *
+     * @param removeHosts Set of hosts which were removed
+     */
+    public void setRemovedHosts(Set<Integer> removeHosts) {
+        m_removedHosts = removeHosts;
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
@@ -1490,7 +1548,7 @@ public class LocalCluster extends VoltServerConfig {
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
-        if (templateCmdLine.target().isIPC && m_eeProcs.contains(hostId)) {
+        if (templateCmdLine.target().isIPC && m_eeProcs.size() < hostId) {
             EEProcess eeProc = m_eeProcs.get(hostId);
             File valgrindOutputFile = null;
             try {
@@ -1678,7 +1736,7 @@ public class LocalCluster extends VoltServerConfig {
         try {
             resp = adminClient.callProcedure("@PrepareShutdown");
         } catch (ProcCallException e) {
-            throw new IOException(e.getCause());
+            throw new IOException(e);
         }
         if (resp == null) {
             throw new IOException("Failed to prepare for shutdown.");
@@ -1888,6 +1946,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
+        return getListenerAddresses(false);
+    }
+
+    public List<String> getListenerAddresses(boolean useAdmin) {
         if (!m_running) {
             return null;
         }
@@ -1897,7 +1959,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + cl.m_port);
+                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
             }
         }
         return listeners;
@@ -2262,7 +2324,7 @@ public class LocalCluster extends VoltServerConfig {
                                           DrRoleType drRole, boolean hasLocalServer) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null, null);
         lc.setHasLocalServer(hasLocalServer);
         lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
@@ -2306,16 +2368,27 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+            int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar, DrRoleType drRole,
+            boolean hasLocalServer, VoltProjectBuilder builder, String callingMethodName, boolean enableSPIMigration,
+            Map<String, String> javaProps) throws IOException {
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort,
+                remoteReplicationPort, pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, null,
+                callingMethodName, enableSPIMigration, javaProps);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor,
+                                                  int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
-                                                  String callingMethodName,
+                                                  String callingClassName, String callingMethodName,
                                                   boolean enableSPIMigration,
                                                   Map<String, String> javaProps) throws IOException {
         if (builder == null) {
             builder = new VoltProjectBuilder();
         }
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingClassName,
+                callingMethodName);
 
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
@@ -2353,11 +2426,11 @@ public class LocalCluster extends VoltServerConfig {
         m_compiled = true;
     }
 
-    public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
+    private static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                               int kfactor, int clusterId, int replicationPort,
                                               int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                               DrRoleType drRole, VoltProjectBuilder builder,
-                                              String callingMethodName) throws IOException {
+                                              String callingClassName, String callingMethodName) throws IOException {
         builder.addLiteralSchema(schemaDDL);
         if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
@@ -2370,6 +2443,9 @@ public class LocalCluster extends VoltServerConfig {
         builder.setUseDDLSchema(true);
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI);
         lc.setReplicationPort(replicationPort);
+        if (callingClassName != null) {
+            lc.setCallingClassName(callingClassName);
+        }
         if (callingMethodName != null) {
             lc.setCallingMethodName(callingMethodName);
         }
@@ -2387,7 +2463,9 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        client.createConnection(getAdminAddress(0));
+        for (String address : getListenerAddresses(true)) {
+            client.createConnection(address);
+        }
         return client;
     }
 
@@ -2397,7 +2475,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // Reset the message match result
     public void resetLogMessageMatchResult(int hostNum, String regex) {
-        assert(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assert(m_logMessageMatchResults.containsKey(hostNum));
         assert(m_logMessageMatchPatterns.containsKey(regex));
         m_logMessageMatchResults.get(hostNum).remove(regex);
@@ -2410,7 +2488,7 @@ public class LocalCluster extends VoltServerConfig {
 
     // verify the presence of message in the log from specified host
     public boolean verifyLogMessage(int hostNum, String regex) {
-        assertTrue(m_logMessageMatchPatterns != null);
+        assertNotNull(m_logMessageMatchPatterns);
         assertTrue(m_logMessageMatchResults.containsKey(hostNum));
         assertTrue(m_logMessageMatchPatterns.containsKey(regex));
         return m_logMessageMatchResults.get(hostNum).contains(regex);
@@ -2455,6 +2533,10 @@ public class LocalCluster extends VoltServerConfig {
     // verify the message does not exist in all the logs
     public boolean verifyLogMessageNotExist(String regex) {
         return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
+    }
+
+    public boolean anyHostHasLogMessage(String regex) {
+        return m_logMessageMatchResults.values().stream().anyMatch(s -> s.contains(regex));
     }
 
     private void resetLogMessageMatchResults(int hostId) {

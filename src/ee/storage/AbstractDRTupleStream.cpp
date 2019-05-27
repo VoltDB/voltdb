@@ -49,43 +49,16 @@ void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
     m_secondaryCapacity = capacity;
 }
 
-void AbstractDRTupleStream::pushStreamBuffer(StreamBlock *block, bool sync)
+void AbstractDRTupleStream::pushStreamBuffer(DrStreamBlock *block)
 {
-    if (sync) return;
     int64_t rowTarget = ExecutorContext::getPhysicalTopend()->pushDRBuffer(m_partitionId, block);
     if (rowTarget >= 0) {
         m_rowTarget = rowTarget;
     }
 }
 
-// Set m_opened = false first otherwise checkOpenTransaction() may
-// consider the transaction being rolled back as open.
-void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost, int64_t)
-{
-    if (mark == INVALID_DR_MARK) {
-        m_openSpHandle = m_committedSpHandle;
-        m_openUniqueId = m_committedUniqueId;
-        m_openSequenceNumber = m_committedSequenceNumber;
-        m_opened = false;
-        return;
-    }
-    if (drRowCost <= m_txnRowCount) {
-        m_txnRowCount -= drRowCost;
-    } else {
-        // convenience to let us just throw away everything at once
-        assert(drRowCost == SIZE_MAX);
-        m_txnRowCount = 0;
-    }
-    if (mark == m_committedUso) {
-        assert(m_txnRowCount == 0);
-        m_openSequenceNumber = m_committedSequenceNumber;
-        m_opened = false;
-    }
-    TupleStreamBase::rollbackTo(mark, drRowCost, SIZE_MAX);
-}
-
-void AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
-                                     int64_t lastCommittedSpHandle)
+bool AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
+                                          int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
@@ -98,23 +71,26 @@ void AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
             fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
                     "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
                     (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle);
-            return;
+            return false;
         }
 
         // more data for an ongoing transaction with no new committed data
         if ((currentSpHandle == m_openSpHandle) &&
                 (lastCommittedSpHandle == m_committedSpHandle)) {
             extendBufferChain(0);
-            return;
+            return true;
         }
 
         // the open transaction should be committed
         if (m_openSpHandle <= lastCommittedSpHandle) {
             extendBufferChain(0);
+            return true;
         }
 
         pushPendingBlocks();
+        return true;
     }
+    return false;
 }
 
 void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber)
@@ -124,7 +100,7 @@ void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumbe
     m_committedSequenceNumber = sequenceNumber;
 }
 
-void AbstractDRTupleStream::handleOpenTransaction(StreamBlock *oldBlock)
+void AbstractDRTupleStream::handleOpenTransaction(DrStreamBlock *oldBlock)
 {
     size_t uso = m_currBlock->uso();
     size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
@@ -152,8 +128,13 @@ void AbstractDRTupleStream::fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t
     std::string failureMessageForVoltLogger = reallysuperbig_failure_message;
     ExecutorContext::getPhysicalTopend()->pushPoisonPill(m_partitionId, failureMessageForVoltLogger, m_currBlock);
     m_currBlock = NULL;
-    if (m_opened) {
-        commitTransactionCommon();
+
+    bool wasOpened = m_opened;
+
+    commitTransactionCommon();
+    extendBufferChain(0);
+
+    if (wasOpened) {
         ++m_openSequenceNumber;
         if (m_enabled) {
             beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
@@ -161,9 +142,6 @@ void AbstractDRTupleStream::fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t
         else {
             openTransactionCommon(spHandle, uniqueId);
         }
-    }
-    else {
-        commitTransactionCommon();
     }
 }
 

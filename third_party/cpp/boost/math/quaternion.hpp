@@ -10,139 +10,71 @@
 #ifndef BOOST_QUATERNION_HPP
 #define BOOST_QUATERNION_HPP
 
+#include <boost/config.hpp> // for BOOST_NO_STD_LOCALE
+#include <boost/math_fwd.hpp>
+#include <boost/detail/workaround.hpp>
+#include <boost/type_traits/is_convertible.hpp>
+#include <boost/utility/enable_if.hpp>
+#ifndef    BOOST_NO_STD_LOCALE
+#  include <locale>                                    // for the "<<" operator
+#endif /* BOOST_NO_STD_LOCALE */
 
 #include <complex>
 #include <iosfwd>                                    // for the "<<" and ">>" operators
 #include <sstream>                                    // for the "<<" operator
 
-#include <boost/config.hpp> // for BOOST_NO_STD_LOCALE
-#include <boost/detail/workaround.hpp>
-#ifndef    BOOST_NO_STD_LOCALE
-    #include <locale>                                    // for the "<<" operator
-#endif /* BOOST_NO_STD_LOCALE */
-
-#include <valarray>
-
-
-
 #include <boost/math/special_functions/sinc.hpp>    // for the Sinus cardinal
 #include <boost/math/special_functions/sinhc.hpp>    // for the Hyperbolic Sinus cardinal
 
+#if defined(BOOST_NO_CXX11_NOEXCEPT) || defined(BOOST_NO_CXX11_RVALUE_REFERENCES) || defined(BOOST_NO_SFINAE_EXPR)
+#include <boost/type_traits/is_pod.hpp>
+#endif
 
 namespace boost
 {
-    namespace math
-    {
-#if     BOOST_WORKAROUND(__GNUC__, < 3)
-        // gcc 2.95.x uses expression templates for valarray calculations, but
-        // the result is not conforming. We need BOOST_GET_VALARRAY to get an
-        // actual valarray result when we need to call a member function
-    #define    BOOST_GET_VALARRAY(T,x)    ::std::valarray<T>(x)
-        // gcc 2.95.x has an "std::ios" class that is similar to 
-        // "std::ios_base", so we just use a #define
-    #define    BOOST_IOS_BASE    ::std::ios
-        // gcc 2.x ignores function scope using declarations,
-        // put them in the scope of the enclosing namespace instead:
-        using    ::std::valarray;
-        using    ::std::sqrt;
-        using    ::std::cos;
-        using    ::std::sin;
-        using    ::std::exp;
-        using    ::std::cosh;
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
+   namespace math
+   {
 
-#define    BOOST_QUATERNION_ACCESSOR_GENERATOR(type)                    \
-            type                    real() const                        \
-            {                                                           \
-                return(a);                                              \
-            }                                                           \
-                                                                        \
-            quaternion<type>        unreal() const                      \
-            {                                                           \
-                return(quaternion<type>(static_cast<type>(0),b,c,d));   \
-            }                                                           \
-                                                                        \
-            type                    R_component_1() const               \
-            {                                                           \
-                return(a);                                              \
-            }                                                           \
-                                                                        \
-            type                    R_component_2() const               \
-            {                                                           \
-                return(b);                                              \
-            }                                                           \
-                                                                        \
-            type                    R_component_3() const               \
-            {                                                           \
-                return(c);                                              \
-            }                                                           \
-                                                                        \
-            type                    R_component_4() const               \
-            {                                                           \
-                return(d);                                              \
-            }                                                           \
-                                                                        \
-            ::std::complex<type>    C_component_1() const               \
-            {                                                           \
-                return(::std::complex<type>(a,b));                      \
-            }                                                           \
-                                                                        \
-            ::std::complex<type>    C_component_2() const               \
-            {                                                           \
-                return(::std::complex<type>(c,d));                      \
-            }
-        
-        
-#define    BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR(type)                               \
-            template<typename X>                                                            \
-            quaternion<type> &        operator = (quaternion<X> const  & a_affecter)        \
-            {                                                                               \
-                a = static_cast<type>(a_affecter.R_component_1());                          \
-                b = static_cast<type>(a_affecter.R_component_2());                          \
-                c = static_cast<type>(a_affecter.R_component_3());                          \
-                d = static_cast<type>(a_affecter.R_component_4());                          \
-                                                                                            \
-                return(*this);                                                              \
-            }                                                                               \
-                                                                                            \
-            quaternion<type> &        operator = (quaternion<type> const & a_affecter)      \
-            {                                                                               \
-                a = a_affecter.a;                                                           \
-                b = a_affecter.b;                                                           \
-                c = a_affecter.c;                                                           \
-                d = a_affecter.d;                                                           \
-                                                                                            \
-                return(*this);                                                              \
-            }                                                                               \
-                                                                                            \
-            quaternion<type> &        operator = (type const & a_affecter)                  \
-            {                                                                               \
-                a = a_affecter;                                                             \
-                                                                                            \
-                b = c = d = static_cast<type>(0);                                           \
-                                                                                            \
-                return(*this);                                                              \
-            }                                                                               \
-                                                                                            \
-            quaternion<type> &        operator = (::std::complex<type> const & a_affecter)  \
-            {                                                                               \
-                a = a_affecter.real();                                                      \
-                b = a_affecter.imag();                                                      \
-                                                                                            \
-                c = d = static_cast<type>(0);                                               \
-                                                                                            \
-                return(*this);                                                              \
-            }
-        
-        
-#define    BOOST_QUATERNION_MEMBER_DATA_GENERATOR(type)       \
-            type    a;                                        \
-            type    b;                                        \
-            type    c;                                        \
-            type    d;
-        
-        
-        template<typename T>
+      namespace detail {
+
+#if !defined(BOOST_NO_CXX11_NOEXCEPT) && !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && !defined(BOOST_NO_SFINAE_EXPR)
+
+         template <class T>
+         struct is_trivial_arithmetic_type_imp
+         {
+            typedef mpl::bool_<
+               noexcept(std::declval<T&>() += std::declval<T>())
+               && noexcept(std::declval<T&>() -= std::declval<T>())
+               && noexcept(std::declval<T&>() *= std::declval<T>())
+               && noexcept(std::declval<T&>() /= std::declval<T>())
+            > type;
+         };
+
+         template <class T>
+         struct is_trivial_arithmetic_type : public is_trivial_arithmetic_type_imp<T>::type {};
+#else
+
+         template <class T>
+         struct is_trivial_arithmetic_type : public boost::is_pod<T> {};
+
+#endif
+
+      }
+
+#ifndef BOOST_NO_CXX14_CONSTEXPR
+      namespace constexpr_detail
+      {
+         template <class T>
+         constexpr void swap(T& a, T& b)
+         {
+            T t(a);
+            a = b;
+            b = t;
+         }
+       }
+#endif
+
+       template<typename T>
         class quaternion
         {
         public:
@@ -153,7 +85,7 @@ namespace boost
             // constructor for H seen as R^4
             // (also default constructor)
             
-            explicit            quaternion( T const & requested_a = T(),
+            BOOST_CONSTEXPR explicit            quaternion( T const & requested_a = T(),
                                             T const & requested_b = T(),
                                             T const & requested_c = T(),
                                             T const & requested_d = T())
@@ -168,7 +100,7 @@ namespace boost
             
             // constructor for H seen as C^2
                 
-            explicit            quaternion( ::std::complex<T> const & z0,
+            BOOST_CONSTEXPR explicit            quaternion( ::std::complex<T> const & z0,
                                             ::std::complex<T> const & z1 = ::std::complex<T>())
             :   a(z0.real()),
                 b(z0.imag()),
@@ -180,13 +112,23 @@ namespace boost
             
             
             // UNtemplated copy constructor
-            // (this is taken care of by the compiler itself)
-            
+            BOOST_CONSTEXPR quaternion(quaternion const & a_recopier)
+               : a(a_recopier.R_component_1()),
+               b(a_recopier.R_component_2()),
+               c(a_recopier.R_component_3()),
+               d(a_recopier.R_component_4()) {}
+#ifndef BOOST_NO_CXX11_RVALUE_REFERENCES
+            BOOST_CONSTEXPR quaternion(quaternion && a_recopier)
+               : a(std::move(a_recopier.R_component_1())),
+               b(std::move(a_recopier.R_component_2())),
+               c(std::move(a_recopier.R_component_3())),
+               d(std::move(a_recopier.R_component_4())) {}
+#endif
             
             // templated copy constructor
             
             template<typename X>
-            explicit            quaternion(quaternion<X> const & a_recopier)
+            BOOST_CONSTEXPR explicit            quaternion(quaternion<X> const & a_recopier)
             :   a(static_cast<T>(a_recopier.R_component_1())),
                 b(static_cast<T>(a_recopier.R_component_2())),
                 c(static_cast<T>(a_recopier.R_component_3())),
@@ -209,194 +151,278 @@ namespace boost
             //            However, for practicallity, there are accessors for the other components
             //            (these are necessary for the templated copy constructor, for instance).
             
-            BOOST_QUATERNION_ACCESSOR_GENERATOR(T)
-            
+            BOOST_CONSTEXPR T real() const
+            {
+               return(a);
+            }
+
+            BOOST_CONSTEXPR quaternion<T> unreal() const
+            {
+               return(quaternion<T>(static_cast<T>(0), b, c, d));
+            }
+
+            BOOST_CONSTEXPR T R_component_1() const
+            {
+               return(a);
+            }
+
+            BOOST_CONSTEXPR T R_component_2() const
+            {
+               return(b);
+            }
+
+            BOOST_CONSTEXPR T R_component_3() const
+            {
+               return(c);
+            }
+
+            BOOST_CONSTEXPR T R_component_4() const
+            {
+               return(d);
+            }
+
+            BOOST_CONSTEXPR ::std::complex<T> C_component_1() const
+            {
+               return(::std::complex<T>(a, b));
+            }
+
+            BOOST_CONSTEXPR ::std::complex<T> C_component_2() const
+            {
+               return(::std::complex<T>(c, d));
+            }
+
+            BOOST_CXX14_CONSTEXPR void swap(quaternion& o)
+            {
+#ifndef BOOST_NO_CXX14_CONSTEXPR
+               using constexpr_detail::swap;
+#else
+               using std::swap;
+#endif
+               swap(a, o.a);
+               swap(b, o.b);
+               swap(c, o.c);
+               swap(d, o.d);
+            }
+
             // assignment operators
             
-            BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR(T)
-            
+            template<typename X>
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator = (quaternion<X> const  & a_affecter)
+            {
+               a = static_cast<T>(a_affecter.R_component_1());
+               b = static_cast<T>(a_affecter.R_component_2());
+               c = static_cast<T>(a_affecter.R_component_3());
+               d = static_cast<T>(a_affecter.R_component_4());
+
+               return(*this);
+            }
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator = (quaternion<T> const & a_affecter)
+            {
+               a = a_affecter.a;
+               b = a_affecter.b;
+               c = a_affecter.c;
+               d = a_affecter.d;
+
+               return(*this);
+            }
+#ifndef BOOST_NO_CXX11_RVALUE_REFERENCES
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator = (quaternion<T> && a_affecter)
+            {
+               a = std::move(a_affecter.a);
+               b = std::move(a_affecter.b);
+               c = std::move(a_affecter.c);
+               d = std::move(a_affecter.d);
+
+               return(*this);
+            }
+#endif
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator = (T const & a_affecter)
+            {
+               a = a_affecter;
+
+               b = c = d = static_cast<T>(0);
+
+               return(*this);
+            }
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator = (::std::complex<T> const & a_affecter)
+            {
+               a = a_affecter.real();
+               b = a_affecter.imag();
+
+               c = d = static_cast<T>(0);
+
+               return(*this);
+            }
+
             // other assignment-related operators
             //
             // NOTE:    Quaternion multiplication is *NOT* commutative;
             //            symbolically, "q *= rhs;" means "q = q * rhs;"
             //            and "q /= rhs;" means "q = q * inverse_of(rhs);"
-            
-            quaternion<T> &        operator += (T const & rhs)
+            //
+            // Note2:   Each operator comes in 2 forms - one for the simple case where
+            //          type T throws no exceptions, and one exception-safe version
+            //          for the case where it might.
+         private:
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(T const & rhs, const mpl::true_&)
             {
-                T    at = a + rhs;    // exception guard
-                
-                a = at;
-                
-                return(*this);
+               a += rhs;
+               return *this;
             }
-            
-            
-            quaternion<T> &        operator += (::std::complex<T> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(T const & rhs, const mpl::false_&)
             {
-                T    at = a + rhs.real();    // exception guard
-                T    bt = b + rhs.imag();    // exception guard
-                
-                a = at; 
-                b = bt;
-                
-                return(*this);
+               quaternion<T> result(a + rhs, b, c, d); // exception guard
+               swap(result);
+               return *this;
             }
-            
-            
-            template<typename X>
-            quaternion<T> &        operator += (quaternion<X> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(std::complex<T> const & rhs, const mpl::true_&)
             {
-                T    at = a + static_cast<T>(rhs.R_component_1());    // exception guard
-                T    bt = b + static_cast<T>(rhs.R_component_2());    // exception guard
-                T    ct = c + static_cast<T>(rhs.R_component_3());    // exception guard
-                T    dt = d + static_cast<T>(rhs.R_component_4());    // exception guard
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
-                return(*this);
+               a += std::real(rhs);
+               b += std::imag(rhs);
+               return *this;
             }
-            
-            
-            
-            quaternion<T> &        operator -= (T const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(std::complex<T> const & rhs, const mpl::false_&)
             {
-                T    at = a - rhs;    // exception guard
-                
-                a = at;
-                
-                return(*this);
+               quaternion<T> result(a + std::real(rhs), b + std::imag(rhs), c, d); // exception guard
+               swap(result);
+               return *this;
             }
-            
-            
-            quaternion<T> &        operator -= (::std::complex<T> const & rhs)
+            template <class X>
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(quaternion<X> const & rhs, const mpl::true_&)
             {
-                T    at = a - rhs.real();    // exception guard
-                T    bt = b - rhs.imag();    // exception guard
-                
-                a = at;
-                b = bt;
-                
-                return(*this);
+               a += rhs.R_component_1();
+               b += rhs.R_component_2();
+               c += rhs.R_component_3();
+               d += rhs.R_component_4();
+               return *this;
             }
-            
-            
-            template<typename X>
-            quaternion<T> &        operator -= (quaternion<X> const & rhs)
+            template <class X>
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_add(quaternion<X> const & rhs, const mpl::false_&)
             {
-                T    at = a - static_cast<T>(rhs.R_component_1());    // exception guard
-                T    bt = b - static_cast<T>(rhs.R_component_2());    // exception guard
-                T    ct = c - static_cast<T>(rhs.R_component_3());    // exception guard
-                T    dt = d - static_cast<T>(rhs.R_component_4());    // exception guard
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
-                return(*this);
+               quaternion<T> result(a + rhs.R_component_1(), b + rhs.R_component_2(), c + rhs.R_component_3(), d + rhs.R_component_4()); // exception guard
+               swap(result);
+               return *this;
             }
-            
-            
-            quaternion<T> &        operator *= (T const & rhs)
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(T const & rhs, const mpl::true_&)
             {
-                T    at = a * rhs;    // exception guard
-                T    bt = b * rhs;    // exception guard
-                T    ct = c * rhs;    // exception guard
-                T    dt = d * rhs;    // exception guard
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
-                return(*this);
+               a -= rhs;
+               return *this;
             }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(T const & rhs, const mpl::false_&)
+            {
+               quaternion<T> result(a - rhs, b, c, d); // exception guard
+               swap(result);
+               return *this;
+            }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(std::complex<T> const & rhs, const mpl::true_&)
+            {
+               a -= std::real(rhs);
+               b -= std::imag(rhs);
+               return *this;
+            }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(std::complex<T> const & rhs, const mpl::false_&)
+            {
+               quaternion<T> result(a - std::real(rhs), b - std::imag(rhs), c, d); // exception guard
+               swap(result);
+               return *this;
+            }
+            template <class X>
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(quaternion<X> const & rhs, const mpl::true_&)
+            {
+               a -= rhs.R_component_1();
+               b -= rhs.R_component_2();
+               c -= rhs.R_component_3();
+               d -= rhs.R_component_4();
+               return *this;
+            }
+            template <class X>
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_subtract(quaternion<X> const & rhs, const mpl::false_&)
+            {
+               quaternion<T> result(a - rhs.R_component_1(), b - rhs.R_component_2(), c - rhs.R_component_3(), d - rhs.R_component_4()); // exception guard
+               swap(result);
+               return *this;
+            }
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_multiply(T const & rhs, const mpl::true_&)
+            {
+               a *= rhs;
+               b *= rhs;
+               c *= rhs;
+               d *= rhs;
+               return *this;
+            }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_multiply(T const & rhs, const mpl::false_&)
+            {
+               quaternion<T> result(a * rhs, b * rhs, c * rhs, d * rhs); // exception guard
+               swap(result);
+               return *this;
+            }
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_divide(T const & rhs, const mpl::true_&)
+            {
+               a /= rhs;
+               b /= rhs;
+               c /= rhs;
+               d /= rhs;
+               return *this;
+            }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        do_divide(T const & rhs, const mpl::false_&)
+            {
+               quaternion<T> result(a / rhs, b / rhs, c / rhs, d / rhs); // exception guard
+               swap(result);
+               return *this;
+            }
+         public:
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator += (T const & rhs) { return do_add(rhs, detail::is_trivial_arithmetic_type<T>()); }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator += (::std::complex<T> const & rhs) { return do_add(rhs, detail::is_trivial_arithmetic_type<T>()); }
+            template<typename X> BOOST_CXX14_CONSTEXPR quaternion<T> & operator += (quaternion<X> const & rhs) { return do_add(rhs, detail::is_trivial_arithmetic_type<T>()); }
+
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator -= (T const & rhs) { return do_subtract(rhs, detail::is_trivial_arithmetic_type<T>()); }
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator -= (::std::complex<T> const & rhs) { return do_subtract(rhs, detail::is_trivial_arithmetic_type<T>()); }
+            template<typename X> BOOST_CXX14_CONSTEXPR quaternion<T> & operator -= (quaternion<X> const & rhs) { return do_subtract(rhs, detail::is_trivial_arithmetic_type<T>()); }
             
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator *= (T const & rhs) { return do_multiply(rhs, detail::is_trivial_arithmetic_type<T>()); }
             
-            quaternion<T> &        operator *= (::std::complex<T> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator *= (::std::complex<T> const & rhs)
             {
                 T    ar = rhs.real();
                 T    br = rhs.imag();
-                
-                T    at = +a*ar-b*br;
-                T    bt = +a*br+b*ar;
-                T    ct = +c*ar+d*br;
-                T    dt = -c*br+d*ar;
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
+                quaternion<T> result(a*ar - b*br, a*br + b*ar, c*ar + d*br, -c*br+d*ar);
+                swap(result);
                 return(*this);
             }
             
-            
             template<typename X>
-            quaternion<T> &        operator *= (quaternion<X> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator *= (quaternion<X> const & rhs)
             {
                 T    ar = static_cast<T>(rhs.R_component_1());
                 T    br = static_cast<T>(rhs.R_component_2());
                 T    cr = static_cast<T>(rhs.R_component_3());
                 T    dr = static_cast<T>(rhs.R_component_4());
                 
-                T    at = +a*ar-b*br-c*cr-d*dr;
-                T    bt = +a*br+b*ar+c*dr-d*cr;    //(a*br+ar*b)+(c*dr-cr*d);
-                T    ct = +a*cr-b*dr+c*ar+d*br;    //(a*cr+ar*c)+(d*br-dr*b);
-                T    dt = +a*dr+b*cr-c*br+d*ar;    //(a*dr+ar*d)+(b*cr-br*c);
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
+                quaternion<T> result(a*ar - b*br - c*cr - d*dr, a*br + b*ar + c*dr - d*cr, a*cr - b*dr + c*ar + d*br, a*dr + b*cr - c*br + d*ar);
+                swap(result);
                 return(*this);
             }
             
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator /= (T const & rhs) { return do_divide(rhs, detail::is_trivial_arithmetic_type<T>()); }
             
-            
-            quaternion<T> &        operator /= (T const & rhs)
-            {
-                T    at = a / rhs;    // exception guard
-                T    bt = b / rhs;    // exception guard
-                T    ct = c / rhs;    // exception guard
-                T    dt = d / rhs;    // exception guard
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
-                return(*this);
-            }
-            
-            
-            quaternion<T> &        operator /= (::std::complex<T> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator /= (::std::complex<T> const & rhs)
             {
                 T    ar = rhs.real();
                 T    br = rhs.imag();
-                
                 T    denominator = ar*ar+br*br;
-                
-                T    at = (+a*ar+b*br)/denominator;    //(a*ar+b*br)/denominator;
-                T    bt = (-a*br+b*ar)/denominator;    //(ar*b-a*br)/denominator;
-                T    ct = (+c*ar-d*br)/denominator;    //(ar*c-d*br)/denominator;
-                T    dt = (+c*br+d*ar)/denominator;    //(ar*d+br*c)/denominator;
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
+                quaternion<T> result((+a*ar + b*br) / denominator, (-a*br + b*ar) / denominator, (+c*ar - d*br) / denominator, (+c*br + d*ar) / denominator);
+                swap(result);
                 return(*this);
             }
             
-            
             template<typename X>
-            quaternion<T> &        operator /= (quaternion<X> const & rhs)
+            BOOST_CXX14_CONSTEXPR quaternion<T> &        operator /= (quaternion<X> const & rhs)
             {
                 T    ar = static_cast<T>(rhs.R_component_1());
                 T    br = static_cast<T>(rhs.R_component_2());
@@ -404,731 +430,173 @@ namespace boost
                 T    dr = static_cast<T>(rhs.R_component_4());
                 
                 T    denominator = ar*ar+br*br+cr*cr+dr*dr;
-                
-                T    at = (+a*ar+b*br+c*cr+d*dr)/denominator;    //(a*ar+b*br+c*cr+d*dr)/denominator;
-                T    bt = (-a*br+b*ar-c*dr+d*cr)/denominator;    //((ar*b-a*br)+(cr*d-c*dr))/denominator;
-                T    ct = (-a*cr+b*dr+c*ar-d*br)/denominator;    //((ar*c-a*cr)+(dr*b-d*br))/denominator;
-                T    dt = (-a*dr-b*cr+c*br+d*ar)/denominator;    //((ar*d-a*dr)+(br*c-b*cr))/denominator;
-                
-                a = at;
-                b = bt;
-                c = ct;
-                d = dt;
-                
+                quaternion<T> result((+a*ar+b*br+c*cr+d*dr)/denominator, (-a*br+b*ar-c*dr+d*cr)/denominator, (-a*cr+b*dr+c*ar-d*br)/denominator, (-a*dr-b*cr+c*br+d*ar)/denominator);
+                swap(result);
                 return(*this);
             }
-            
-            
-        protected:
-            
-            BOOST_QUATERNION_MEMBER_DATA_GENERATOR(T)
-            
-            
         private:
+           T a, b, c, d;
             
         };
-        
-        
-        // declaration of quaternion specialization
-        
-        template<>    class quaternion<float>;
-        template<>    class quaternion<double>;
-        template<>    class quaternion<long double>;
-        
-        
-        // helper templates for converting copy constructors (declaration)
-        
-        namespace detail
-        {
-            
-            template<   typename T,
-                        typename U
-                    >
-            quaternion<T>    quaternion_type_converter(quaternion<U> const & rhs);
-        }
-        
-        
-        // implementation of quaternion specialization
-        
-        
-#define    BOOST_QUATERNION_CONSTRUCTOR_GENERATOR(type)                                                 \
-            explicit            quaternion( type const & requested_a = static_cast<type>(0),            \
-                                            type const & requested_b = static_cast<type>(0),            \
-                                            type const & requested_c = static_cast<type>(0),            \
-                                            type const & requested_d = static_cast<type>(0))            \
-            :   a(requested_a),                                                                         \
-                b(requested_b),                                                                         \
-                c(requested_c),                                                                         \
-                d(requested_d)                                                                          \
-            {                                                                                           \
-            }                                                                                           \
-                                                                                                        \
-            explicit            quaternion( ::std::complex<type> const & z0,                            \
-                                            ::std::complex<type> const & z1 = ::std::complex<type>())   \
-            :   a(z0.real()),                                                                           \
-                b(z0.imag()),                                                                           \
-                c(z1.real()),                                                                           \
-                d(z1.imag())                                                                            \
-            {                                                                                           \
-            }
-        
-        
-#define    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_1(type)             \
-            quaternion<type> &        operator += (type const & rhs) \
-            {                                                        \
-                a += rhs;                                            \
-                                                                     \
-                return(*this);                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_2(type)                             \
-            quaternion<type> &        operator += (::std::complex<type> const & rhs) \
-            {                                                                        \
-                a += rhs.real();                                                     \
-                b += rhs.imag();                                                     \
-                                                                                     \
-                return(*this);                                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_3(type)                      \
-            template<typename X>                                              \
-            quaternion<type> &        operator += (quaternion<X> const & rhs) \
-            {                                                                 \
-                a += static_cast<type>(rhs.R_component_1());                  \
-                b += static_cast<type>(rhs.R_component_2());                  \
-                c += static_cast<type>(rhs.R_component_3());                  \
-                d += static_cast<type>(rhs.R_component_4());                  \
-                                                                              \
-                return(*this);                                                \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_1(type)             \
-            quaternion<type> &        operator -= (type const & rhs) \
-            {                                                        \
-                a -= rhs;                                            \
-                                                                     \
-                return(*this);                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_2(type)                             \
-            quaternion<type> &        operator -= (::std::complex<type> const & rhs) \
-            {                                                                        \
-                a -= rhs.real();                                                     \
-                b -= rhs.imag();                                                     \
-                                                                                     \
-                return(*this);                                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_3(type)                      \
-            template<typename X>                                              \
-            quaternion<type> &        operator -= (quaternion<X> const & rhs) \
-            {                                                                 \
-                a -= static_cast<type>(rhs.R_component_1());                  \
-                b -= static_cast<type>(rhs.R_component_2());                  \
-                c -= static_cast<type>(rhs.R_component_3());                  \
-                d -= static_cast<type>(rhs.R_component_4());                  \
-                                                                              \
-                return(*this);                                                \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_1(type)             \
-            quaternion<type> &        operator *= (type const & rhs) \
-            {                                                        \
-                a *= rhs;                                            \
-                b *= rhs;                                            \
-                c *= rhs;                                            \
-                d *= rhs;                                            \
-                                                                     \
-                return(*this);                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_2(type)                             \
-            quaternion<type> &        operator *= (::std::complex<type> const & rhs) \
-            {                                                                        \
-                type    ar = rhs.real();                                             \
-                type    br = rhs.imag();                                             \
-                                                                                     \
-                type    at = +a*ar-b*br;                                             \
-                type    bt = +a*br+b*ar;                                             \
-                type    ct = +c*ar+d*br;                                             \
-                type    dt = -c*br+d*ar;                                             \
-                                                                                     \
-                a = at;                                                              \
-                b = bt;                                                              \
-                c = ct;                                                              \
-                d = dt;                                                              \
-                                                                                     \
-                return(*this);                                                       \
-            }
-    
-#define    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_3(type)                      \
-            template<typename X>                                              \
-            quaternion<type> &        operator *= (quaternion<X> const & rhs) \
-            {                                                                 \
-                type    ar = static_cast<type>(rhs.R_component_1());          \
-                type    br = static_cast<type>(rhs.R_component_2());          \
-                type    cr = static_cast<type>(rhs.R_component_3());          \
-                type    dr = static_cast<type>(rhs.R_component_4());          \
-                                                                              \
-                type    at = +a*ar-b*br-c*cr-d*dr;                            \
-                type    bt = +a*br+b*ar+c*dr-d*cr;                            \
-                type    ct = +a*cr-b*dr+c*ar+d*br;                            \
-                type    dt = +a*dr+b*cr-c*br+d*ar;                            \
-                                                                              \
-                a = at;                                                       \
-                b = bt;                                                       \
-                c = ct;                                                       \
-                d = dt;                                                       \
-                                                                              \
-                return(*this);                                                \
-            }
-    
-// There is quite a lot of repetition in the code below. This is intentional.
-// The last conditional block is the normal form, and the others merely
-// consist of workarounds for various compiler deficiencies. Hopefuly, when
-// more compilers are conformant and we can retire support for those that are
-// not, we will be able to remove the clutter. This is makes the situation
-// (painfully) explicit.
-    
-#define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_1(type)             \
-            quaternion<type> &        operator /= (type const & rhs) \
-            {                                                        \
-                a /= rhs;                                            \
-                b /= rhs;                                            \
-                c /= rhs;                                            \
-                d /= rhs;                                            \
-                                                                     \
-                return(*this);                                       \
-            }
 
-#if defined(__GNUC__) && (__GNUC__ < 3)
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_2(type)                                            \
-            quaternion<type> &        operator /= (::std::complex<type> const & rhs)                    \
-            {                                                                                           \
-                using    ::std::valarray;                                                               \
-                                                                                                        \
-                valarray<type>    tr(2);                                                                \
-                                                                                                        \
-                tr[0] = rhs.real();                                                                     \
-                tr[1] = rhs.imag();                                                                     \
-                                                                                                        \
-                type            mixam = (BOOST_GET_VALARRAY(type,static_cast<type>(1)/abs(tr)).max)();  \
-                                                                                                        \
-                tr *= mixam;                                                                            \
-                                                                                                        \
-                valarray<type>    tt(4);                                                                \
-                                                                                                        \
-                tt[0] = +a*tr[0]+b*tr[1];                                                               \
-                tt[1] = -a*tr[1]+b*tr[0];                                                               \
-                tt[2] = +c*tr[0]-d*tr[1];                                                               \
-                tt[3] = +c*tr[1]+d*tr[0];                                                               \
-                                                                                                        \
-                tr *= tr;                                                                               \
-                                                                                                        \
-                tt *= (mixam/tr.sum());                                                                 \
-                                                                                                        \
-                a = tt[0];                                                                              \
-                b = tt[1];                                                                              \
-                c = tt[2];                                                                              \
-                d = tt[3];                                                                              \
-                                                                                                        \
-                return(*this);                                                                          \
-            }
-#elif    defined(BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP)
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_2(type)                         \
-            quaternion<type> &        operator /= (::std::complex<type> const & rhs) \
-            {                                                                        \
-                using    ::std::valarray;                                            \
-                using    ::std::abs;                                                 \
-                                                                                     \
-                valarray<type>    tr(2);                                             \
-                                                                                     \
-                tr[0] = rhs.real();                                                  \
-                tr[1] = rhs.imag();                                                  \
-                                                                                     \
-                type            mixam = static_cast<type>(1)/(abs(tr).max)();        \
-                                                                                     \
-                tr *= mixam;                                                         \
-                                                                                     \
-                valarray<type>    tt(4);                                             \
-                                                                                     \
-                tt[0] = +a*tr[0]+b*tr[1];                                            \
-                tt[1] = -a*tr[1]+b*tr[0];                                            \
-                tt[2] = +c*tr[0]-d*tr[1];                                            \
-                tt[3] = +c*tr[1]+d*tr[0];                                            \
-                                                                                     \
-                tr *= tr;                                                            \
-                                                                                     \
-                tt *= (mixam/tr.sum());                                              \
-                                                                                     \
-                a = tt[0];                                                           \
-                b = tt[1];                                                           \
-                c = tt[2];                                                           \
-                d = tt[3];                                                           \
-                                                                                     \
-                return(*this);                                                       \
-            }
-#else
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_2(type)                         \
-            quaternion<type> &        operator /= (::std::complex<type> const & rhs) \
-            {                                                                        \
-                using    ::std::valarray;                                            \
-                                                                                     \
-                valarray<type>    tr(2);                                             \
-                                                                                     \
-                tr[0] = rhs.real();                                                  \
-                tr[1] = rhs.imag();                                                  \
-                                                                                     \
-                type            mixam = static_cast<type>(1)/(abs(tr).max)();        \
-                                                                                     \
-                tr *= mixam;                                                         \
-                                                                                     \
-                valarray<type>    tt(4);                                             \
-                                                                                     \
-                tt[0] = +a*tr[0]+b*tr[1];                                            \
-                tt[1] = -a*tr[1]+b*tr[0];                                            \
-                tt[2] = +c*tr[0]-d*tr[1];                                            \
-                tt[3] = +c*tr[1]+d*tr[0];                                            \
-                                                                                     \
-                tr *= tr;                                                            \
-                                                                                     \
-                tt *= (mixam/tr.sum());                                              \
-                                                                                     \
-                a = tt[0];                                                           \
-                b = tt[1];                                                           \
-                c = tt[2];                                                           \
-                d = tt[3];                                                           \
-                                                                                     \
-                return(*this);                                                       \
-            }
-#endif /* defined(__GNUC__) && (__GNUC__ < 3) */ /* BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP */
-    
-#if defined(__GNUC__) && (__GNUC__ < 3)
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_3(type)                                            \
-            template<typename X>                                                                        \
-            quaternion<type> &        operator /= (quaternion<X> const & rhs)                           \
-            {                                                                                           \
-                using    ::std::valarray;                                                               \
-                                                                                                        \
-                valarray<type>    tr(4);                                                                \
-                                                                                                        \
-                tr[0] = static_cast<type>(rhs.R_component_1());                                         \
-                tr[1] = static_cast<type>(rhs.R_component_2());                                         \
-                tr[2] = static_cast<type>(rhs.R_component_3());                                         \
-                tr[3] = static_cast<type>(rhs.R_component_4());                                         \
-                                                                                                        \
-                type            mixam = (BOOST_GET_VALARRAY(type,static_cast<type>(1)/abs(tr)).max)();  \
-                                                                                                        \
-                tr *= mixam;                                                                            \
-                                                                                                        \
-                valarray<type>    tt(4);                                                                \
-                                                                                                        \
-                tt[0] = +a*tr[0]+b*tr[1]+c*tr[2]+d*tr[3];                                               \
-                tt[1] = -a*tr[1]+b*tr[0]-c*tr[3]+d*tr[2];                                               \
-                tt[2] = -a*tr[2]+b*tr[3]+c*tr[0]-d*tr[1];                                               \
-                tt[3] = -a*tr[3]-b*tr[2]+c*tr[1]+d*tr[0];                                               \
-                                                                                                        \
-                tr *= tr;                                                                               \
-                                                                                                        \
-                tt *= (mixam/tr.sum());                                                                 \
-                                                                                                        \
-                a = tt[0];                                                                              \
-                b = tt[1];                                                                              \
-                c = tt[2];                                                                              \
-                d = tt[3];                                                                              \
-                                                                                                        \
-                return(*this);                                                                          \
-            }
-#elif    defined(BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP)
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_3(type)                  \
-            template<typename X>                                              \
-            quaternion<type> &        operator /= (quaternion<X> const & rhs) \
-            {                                                                 \
-                using    ::std::valarray;                                     \
-                using    ::std::abs;                                          \
-                                                                              \
-                valarray<type>    tr(4);                                      \
-                                                                              \
-                tr[0] = static_cast<type>(rhs.R_component_1());               \
-                tr[1] = static_cast<type>(rhs.R_component_2());               \
-                tr[2] = static_cast<type>(rhs.R_component_3());               \
-                tr[3] = static_cast<type>(rhs.R_component_4());               \
-                                                                              \
-                type            mixam = static_cast<type>(1)/(abs(tr).max)(); \
-                                                                              \
-                tr *= mixam;                                                  \
-                                                                              \
-                valarray<type>    tt(4);                                      \
-                                                                              \
-                tt[0] = +a*tr[0]+b*tr[1]+c*tr[2]+d*tr[3];                     \
-                tt[1] = -a*tr[1]+b*tr[0]-c*tr[3]+d*tr[2];                     \
-                tt[2] = -a*tr[2]+b*tr[3]+c*tr[0]-d*tr[1];                     \
-                tt[3] = -a*tr[3]-b*tr[2]+c*tr[1]+d*tr[0];                     \
-                                                                              \
-                tr *= tr;                                                     \
-                                                                              \
-                tt *= (mixam/tr.sum());                                       \
-                                                                              \
-                a = tt[0];                                                    \
-                b = tt[1];                                                    \
-                c = tt[2];                                                    \
-                d = tt[3];                                                    \
-                                                                              \
-                return(*this);                                                \
-            }
-#else
-    #define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_3(type)                  \
-            template<typename X>                                              \
-            quaternion<type> &        operator /= (quaternion<X> const & rhs) \
-            {                                                                 \
-                using    ::std::valarray;                                     \
-                                                                              \
-                valarray<type>    tr(4);                                      \
-                                                                              \
-                tr[0] = static_cast<type>(rhs.R_component_1());               \
-                tr[1] = static_cast<type>(rhs.R_component_2());               \
-                tr[2] = static_cast<type>(rhs.R_component_3());               \
-                tr[3] = static_cast<type>(rhs.R_component_4());               \
-                                                                              \
-                type            mixam = static_cast<type>(1)/(abs(tr).max)(); \
-                                                                              \
-                tr *= mixam;                                                  \
-                                                                              \
-                valarray<type>    tt(4);                                      \
-                                                                              \
-                tt[0] = +a*tr[0]+b*tr[1]+c*tr[2]+d*tr[3];                     \
-                tt[1] = -a*tr[1]+b*tr[0]-c*tr[3]+d*tr[2];                     \
-                tt[2] = -a*tr[2]+b*tr[3]+c*tr[0]-d*tr[1];                     \
-                tt[3] = -a*tr[3]-b*tr[2]+c*tr[1]+d*tr[0];                     \
-                                                                              \
-                tr *= tr;                                                     \
-                                                                              \
-                tt *= (mixam/tr.sum());                                       \
-                                                                              \
-                a = tt[0];                                                    \
-                b = tt[1];                                                    \
-                c = tt[2];                                                    \
-                d = tt[3];                                                    \
-                                                                              \
-                return(*this);                                                \
-            }
-#endif /* defined(__GNUC__) && (__GNUC__ < 3) */ /* BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP */
-    
-#define    BOOST_QUATERNION_MEMBER_ADD_GENERATOR(type)   \
-        BOOST_QUATERNION_MEMBER_ADD_GENERATOR_1(type)    \
-        BOOST_QUATERNION_MEMBER_ADD_GENERATOR_2(type)    \
-        BOOST_QUATERNION_MEMBER_ADD_GENERATOR_3(type)
+// swap:
+template <class T>
+BOOST_CXX14_CONSTEXPR void swap(quaternion<T>& a, quaternion<T>& b) { a.swap(b); }
         
-#define    BOOST_QUATERNION_MEMBER_SUB_GENERATOR(type)   \
-        BOOST_QUATERNION_MEMBER_SUB_GENERATOR_1(type)    \
-        BOOST_QUATERNION_MEMBER_SUB_GENERATOR_2(type)    \
-        BOOST_QUATERNION_MEMBER_SUB_GENERATOR_3(type)
-        
-#define    BOOST_QUATERNION_MEMBER_MUL_GENERATOR(type)   \
-        BOOST_QUATERNION_MEMBER_MUL_GENERATOR_1(type)    \
-        BOOST_QUATERNION_MEMBER_MUL_GENERATOR_2(type)    \
-        BOOST_QUATERNION_MEMBER_MUL_GENERATOR_3(type)
-        
-#define    BOOST_QUATERNION_MEMBER_DIV_GENERATOR(type)   \
-        BOOST_QUATERNION_MEMBER_DIV_GENERATOR_1(type)    \
-        BOOST_QUATERNION_MEMBER_DIV_GENERATOR_2(type)    \
-        BOOST_QUATERNION_MEMBER_DIV_GENERATOR_3(type)
-        
-#define    BOOST_QUATERNION_MEMBER_ALGEBRAIC_GENERATOR(type)   \
-        BOOST_QUATERNION_MEMBER_ADD_GENERATOR(type)            \
-        BOOST_QUATERNION_MEMBER_SUB_GENERATOR(type)            \
-        BOOST_QUATERNION_MEMBER_MUL_GENERATOR(type)            \
-        BOOST_QUATERNION_MEMBER_DIV_GENERATOR(type)
-        
-        
-        template<>
-        class quaternion<float>
-        {
-        public:
-            
-            typedef float value_type;
-            
-            BOOST_QUATERNION_CONSTRUCTOR_GENERATOR(float)
-            
-            // UNtemplated copy constructor
-            // (this is taken care of by the compiler itself)
-            
-            // explicit copy constructors (precision-loosing converters)
-            
-            explicit            quaternion(quaternion<double> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<float, double>(a_recopier);
-            }
-            
-            explicit            quaternion(quaternion<long double> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<float, long double>(a_recopier);
-            }
-            
-            // destructor
-            // (this is taken care of by the compiler itself)
-            
-            // accessors
-            //
-            // Note:    Like complex number, quaternions do have a meaningful notion of "real part",
-            //            but unlike them there is no meaningful notion of "imaginary part".
-            //            Instead there is an "unreal part" which itself is a quaternion, and usually
-            //            nothing simpler (as opposed to the complex number case).
-            //            However, for practicallity, there are accessors for the other components
-            //            (these are necessary for the templated copy constructor, for instance).
-            
-            BOOST_QUATERNION_ACCESSOR_GENERATOR(float)
-            
-            // assignment operators
-            
-            BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR(float)
-            
-            // other assignment-related operators
-            //
-            // NOTE:    Quaternion multiplication is *NOT* commutative;
-            //            symbolically, "q *= rhs;" means "q = q * rhs;"
-            //            and "q /= rhs;" means "q = q * inverse_of(rhs);"
-            
-            BOOST_QUATERNION_MEMBER_ALGEBRAIC_GENERATOR(float)
-            
-            
-        protected:
-            
-            BOOST_QUATERNION_MEMBER_DATA_GENERATOR(float)
-            
-            
-        private:
-            
-        };
-        
-        
-        template<>
-        class quaternion<double>
-        {
-        public:
-            
-            typedef double value_type;
-            
-            BOOST_QUATERNION_CONSTRUCTOR_GENERATOR(double)
-            
-            // UNtemplated copy constructor
-            // (this is taken care of by the compiler itself)
-            
-            // converting copy constructor
-            
-            explicit                quaternion(quaternion<float> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<double, float>(a_recopier);
-            }
-            
-            // explicit copy constructors (precision-loosing converters)
-            
-            explicit                quaternion(quaternion<long double> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<double, long double>(a_recopier);
-            }
-            
-            // destructor
-            // (this is taken care of by the compiler itself)
-            
-            // accessors
-            //
-            // Note:    Like complex number, quaternions do have a meaningful notion of "real part",
-            //            but unlike them there is no meaningful notion of "imaginary part".
-            //            Instead there is an "unreal part" which itself is a quaternion, and usually
-            //            nothing simpler (as opposed to the complex number case).
-            //            However, for practicallity, there are accessors for the other components
-            //            (these are necessary for the templated copy constructor, for instance).
-            
-            BOOST_QUATERNION_ACCESSOR_GENERATOR(double)
-            
-            // assignment operators
-            
-            BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR(double)
-            
-            // other assignment-related operators
-            //
-            // NOTE:    Quaternion multiplication is *NOT* commutative;
-            //            symbolically, "q *= rhs;" means "q = q * rhs;"
-            //            and "q /= rhs;" means "q = q * inverse_of(rhs);"
-            
-            BOOST_QUATERNION_MEMBER_ALGEBRAIC_GENERATOR(double)
-            
-            
-        protected:
-            
-            BOOST_QUATERNION_MEMBER_DATA_GENERATOR(double)
-            
-            
-        private:
-            
-        };
-        
-        
-        template<>
-        class quaternion<long double>
-        {
-        public:
-            
-            typedef long double value_type;
-            
-            BOOST_QUATERNION_CONSTRUCTOR_GENERATOR(long double)
-            
-            // UNtemplated copy constructor
-            // (this is taken care of by the compiler itself)
-            
-            // converting copy constructors
-            
-            explicit                    quaternion(quaternion<float> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<long double, float>(a_recopier);
-            }
-            
-            explicit                    quaternion(quaternion<double> const & a_recopier)
-            {
-                *this = detail::quaternion_type_converter<long double, double>(a_recopier);
-            }
-            
-            // destructor
-            // (this is taken care of by the compiler itself)
-            
-            // accessors
-            //
-            // Note:    Like complex number, quaternions do have a meaningful notion of "real part",
-            //            but unlike them there is no meaningful notion of "imaginary part".
-            //            Instead there is an "unreal part" which itself is a quaternion, and usually
-            //            nothing simpler (as opposed to the complex number case).
-            //            However, for practicallity, there are accessors for the other components
-            //            (these are necessary for the templated copy constructor, for instance).
-            
-            BOOST_QUATERNION_ACCESSOR_GENERATOR(long double)
-            
-            // assignment operators
-            
-            BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR(long double)
-            
-            // other assignment-related operators
-            //
-            // NOTE:    Quaternion multiplication is *NOT* commutative;
-            //            symbolically, "q *= rhs;" means "q = q * rhs;"
-            //            and "q /= rhs;" means "q = q * inverse_of(rhs);"
-            
-            BOOST_QUATERNION_MEMBER_ALGEBRAIC_GENERATOR(long double)
-            
-            
-        protected:
-            
-            BOOST_QUATERNION_MEMBER_DATA_GENERATOR(long double)
-            
-            
-        private:
-            
-        };
-        
-        
-#undef    BOOST_QUATERNION_MEMBER_ALGEBRAIC_GENERATOR
-#undef    BOOST_QUATERNION_MEMBER_ADD_GENERATOR
-#undef    BOOST_QUATERNION_MEMBER_SUB_GENERATOR
-#undef    BOOST_QUATERNION_MEMBER_MUL_GENERATOR
-#undef    BOOST_QUATERNION_MEMBER_DIV_GENERATOR
-#undef    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_1
-#undef    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_2
-#undef    BOOST_QUATERNION_MEMBER_ADD_GENERATOR_3
-#undef    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_1
-#undef    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_2
-#undef    BOOST_QUATERNION_MEMBER_SUB_GENERATOR_3
-#undef    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_1
-#undef    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_2
-#undef    BOOST_QUATERNION_MEMBER_MUL_GENERATOR_3
-#undef    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_1
-#undef    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_2
-#undef    BOOST_QUATERNION_MEMBER_DIV_GENERATOR_3
-        
-#undef    BOOST_QUATERNION_CONSTRUCTOR_GENERATOR
-        
-        
-#undef    BOOST_QUATERNION_MEMBER_ASSIGNMENT_GENERATOR
-        
-#undef    BOOST_QUATERNION_MEMBER_DATA_GENERATOR
-        
-#undef    BOOST_QUATERNION_ACCESSOR_GENERATOR
-        
-        
-        // operators
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)      \
-        {                                                    \
-            quaternion<T>    res(lhs);                       \
-            res op##= rhs;                                   \
-            return(res);                                     \
-        }
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_1_L(op)                                                  \
-        template<typename T>                                                                            \
-        inline quaternion<T>    operator op (T const & lhs, quaternion<T> const & rhs)                  \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_1_R(op)                                                  \
-        template<typename T>                                                                            \
-        inline quaternion<T>    operator op (quaternion<T> const & lhs, T const & rhs)                  \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_2_L(op)                                                  \
-        template<typename T>                                                                            \
-        inline quaternion<T>    operator op (::std::complex<T> const & lhs, quaternion<T> const & rhs)  \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_2_R(op)                                                  \
-        template<typename T>                                                                            \
-        inline quaternion<T>    operator op (quaternion<T> const & lhs, ::std::complex<T> const & rhs)  \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR_3(op)                                                    \
-        template<typename T>                                                                            \
-        inline quaternion<T>    operator op (quaternion<T> const & lhs, quaternion<T> const & rhs)      \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_BODY(op)
-        
-#define    BOOST_QUATERNION_OPERATOR_GENERATOR(op)     \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_1_L(op)    \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_1_R(op)    \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_2_L(op)    \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_2_R(op)    \
-        BOOST_QUATERNION_OPERATOR_GENERATOR_3(op)
-        
-        
-        BOOST_QUATERNION_OPERATOR_GENERATOR(+)
-        BOOST_QUATERNION_OPERATOR_GENERATOR(-)
-        BOOST_QUATERNION_OPERATOR_GENERATOR(*)
-        BOOST_QUATERNION_OPERATOR_GENERATOR(/)
+// operator+
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator + (const quaternion<T1>& a, const T2& b)
+{
+   return quaternion<T1>(static_cast<T1>(a.R_component_1() + b), a.R_component_2(), a.R_component_3(), a.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator + (const T1& a, const quaternion<T2>& b)
+{
+   return quaternion<T2>(static_cast<T2>(b.R_component_1() + a), b.R_component_2(), b.R_component_3(), b.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator + (const quaternion<T1>& a, const std::complex<T2>& b)
+{
+   return quaternion<T1>(a.R_component_1() + std::real(b), a.R_component_2() + std::imag(b), a.R_component_3(), a.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator + (const std::complex<T1>& a, const quaternion<T2>& b)
+{
+   return quaternion<T1>(b.R_component_1() + real(a), b.R_component_2() + imag(a), b.R_component_3(), b.R_component_4());
+}
+template <class T>
+inline BOOST_CONSTEXPR quaternion<T> operator + (const quaternion<T>& a, const quaternion<T>& b)
+{
+   return quaternion<T>(a.R_component_1() + b.R_component_1(), a.R_component_2() + b.R_component_2(), a.R_component_3() + b.R_component_3(), a.R_component_4() + b.R_component_4());
+}
+// operator-
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator - (const quaternion<T1>& a, const T2& b)
+{
+   return quaternion<T1>(static_cast<T1>(a.R_component_1() - b), a.R_component_2(), a.R_component_3(), a.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator - (const T1& a, const quaternion<T2>& b)
+{
+   return quaternion<T2>(static_cast<T2>(a - b.R_component_1()), -b.R_component_2(), -b.R_component_3(), -b.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator - (const quaternion<T1>& a, const std::complex<T2>& b)
+{
+   return quaternion<T1>(a.R_component_1() - std::real(b), a.R_component_2() - std::imag(b), a.R_component_3(), a.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator - (const std::complex<T1>& a, const quaternion<T2>& b)
+{
+   return quaternion<T1>(real(a) - b.R_component_1(), imag(a) - b.R_component_2(), -b.R_component_3(), -b.R_component_4());
+}
+template <class T>
+inline BOOST_CONSTEXPR quaternion<T> operator - (const quaternion<T>& a, const quaternion<T>& b)
+{
+   return quaternion<T>(a.R_component_1() - b.R_component_1(), a.R_component_2() - b.R_component_2(), a.R_component_3() - b.R_component_3(), a.R_component_4() - b.R_component_4());
+}
 
+// operator*
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator * (const quaternion<T1>& a, const T2& b)
+{
+   return quaternion<T1>(static_cast<T1>(a.R_component_1() * b), a.R_component_2() * b, a.R_component_3() * b, a.R_component_4() * b);
+}
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator * (const T1& a, const quaternion<T2>& b)
+{
+   return quaternion<T2>(static_cast<T2>(a * b.R_component_1()), a * b.R_component_2(), a * b.R_component_3(), a * b.R_component_4());
+}
+template <class T1, class T2>
+inline BOOST_CXX14_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator * (const quaternion<T1>& a, const std::complex<T2>& b)
+{
+   quaternion<T1> result(a);
+   result *= b;
+   return result;
+}
+template <class T1, class T2>
+inline BOOST_CXX14_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator * (const std::complex<T1>& a, const quaternion<T2>& b)
+{
+   quaternion<T1> result(a);
+   result *= b;
+   return result;
+}
+template <class T>
+inline BOOST_CXX14_CONSTEXPR quaternion<T> operator * (const quaternion<T>& a, const quaternion<T>& b)
+{
+   quaternion<T> result(a);
+   result *= b;
+   return result;
+}
 
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR
-        
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_1_L
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_1_R
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_2_L
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_2_R
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_3
-
-#undef    BOOST_QUATERNION_OPERATOR_GENERATOR_BODY
+// operator/
+template <class T1, class T2>
+inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator / (const quaternion<T1>& a, const T2& b)
+{
+   return quaternion<T1>(a.R_component_1() / b, a.R_component_2() / b, a.R_component_3() / b, a.R_component_4() / b);
+}
+template <class T1, class T2>
+inline BOOST_CXX14_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator / (const T1& a, const quaternion<T2>& b)
+{
+   quaternion<T2> result(a);
+   result /= b;
+   return result;
+}
+template <class T1, class T2>
+inline BOOST_CXX14_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T2, T1>::value, quaternion<T1> >::type
+operator / (const quaternion<T1>& a, const std::complex<T2>& b)
+{
+   quaternion<T1> result(a);
+   result /= b;
+   return result;
+}
+template <class T1, class T2>
+inline BOOST_CXX14_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<T1, T2>::value, quaternion<T2> >::type
+operator / (const std::complex<T1>& a, const quaternion<T2>& b)
+{
+   quaternion<T2> result(a);
+   result /= b;
+   return result;
+}
+template <class T>
+inline BOOST_CXX14_CONSTEXPR quaternion<T> operator / (const quaternion<T>& a, const quaternion<T>& b)
+{
+   quaternion<T> result(a);
+   result /= b;
+   return result;
+}
         
         
         template<typename T>
-        inline quaternion<T>                    operator + (quaternion<T> const & q)
+        inline BOOST_CONSTEXPR const quaternion<T>&             operator + (quaternion<T> const & q)
         {
-            return(q);
+            return q;
         }
         
         
         template<typename T>
-        inline quaternion<T>                    operator - (quaternion<T> const & q)
+        inline BOOST_CONSTEXPR quaternion<T>                    operator - (quaternion<T> const & q)
         {
             return(quaternion<T>(-q.R_component_1(),-q.R_component_2(),-q.R_component_3(),-q.R_component_4()));
         }
         
         
-        template<typename T>
-        inline bool                                operator == (T const & lhs, quaternion<T> const & rhs)
+        template<typename R, typename T>
+        inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<R, T>::value, bool>::type operator == (R const & lhs, quaternion<T> const & rhs)
         {
             return    (
                         (rhs.R_component_1() == lhs)&&
@@ -1139,20 +607,15 @@ namespace boost
         }
         
         
-        template<typename T>
-        inline bool                                operator == (quaternion<T> const & lhs, T const & rhs)
+        template<typename T, typename R>
+        inline BOOST_CONSTEXPR typename boost::enable_if_c<boost::is_convertible<R, T>::value, bool>::type operator == (quaternion<T> const & lhs, R const & rhs)
         {
-            return    (
-                        (lhs.R_component_1() == rhs)&&
-                        (lhs.R_component_2() == static_cast<T>(0))&&
-                        (lhs.R_component_3() == static_cast<T>(0))&&
-                        (lhs.R_component_4() == static_cast<T>(0))
-                    );
+           return rhs == lhs;
         }
         
         
         template<typename T>
-        inline bool                                operator == (::std::complex<T> const & lhs, quaternion<T> const & rhs)
+        inline BOOST_CONSTEXPR bool                                operator == (::std::complex<T> const & lhs, quaternion<T> const & rhs)
         {
             return    (
                         (rhs.R_component_1() == lhs.real())&&
@@ -1164,19 +627,14 @@ namespace boost
         
         
         template<typename T>
-        inline bool                                operator == (quaternion<T> const & lhs, ::std::complex<T> const & rhs)
+        inline BOOST_CONSTEXPR bool                                operator == (quaternion<T> const & lhs, ::std::complex<T> const & rhs)
         {
-            return    (
-                        (lhs.R_component_1() == rhs.real())&&
-                        (lhs.R_component_2() == rhs.imag())&&
-                        (lhs.R_component_3() == static_cast<T>(0))&&
-                        (lhs.R_component_4() == static_cast<T>(0))
-                    );
+           return rhs == lhs;
         }
         
         
         template<typename T>
-        inline bool                                operator == (quaternion<T> const & lhs, quaternion<T> const & rhs)
+        inline BOOST_CONSTEXPR bool                                operator == (quaternion<T> const & lhs, quaternion<T> const & rhs)
         {
             return    (
                         (rhs.R_component_1() == lhs.R_component_1())&&
@@ -1185,53 +643,22 @@ namespace boost
                         (rhs.R_component_4() == lhs.R_component_4())
                     );
         }
-        
-        
-#define    BOOST_QUATERNION_NOT_EQUAL_GENERATOR  \
-        {                                        \
-            return(!(lhs == rhs));               \
-        }
-        
-        template<typename T>
-        inline bool                                operator != (T const & lhs, quaternion<T> const & rhs)
-        BOOST_QUATERNION_NOT_EQUAL_GENERATOR
-        
-        template<typename T>
-        inline bool                                operator != (quaternion<T> const & lhs, T const & rhs)
-        BOOST_QUATERNION_NOT_EQUAL_GENERATOR
-        
-        template<typename T>
-        inline bool                                operator != (::std::complex<T> const & lhs, quaternion<T> const & rhs)
-        BOOST_QUATERNION_NOT_EQUAL_GENERATOR
-        
-        template<typename T>
-        inline bool                                operator != (quaternion<T> const & lhs, ::std::complex<T> const & rhs)
-        BOOST_QUATERNION_NOT_EQUAL_GENERATOR
-        
-        template<typename T>
-        inline bool                                operator != (quaternion<T> const & lhs, quaternion<T> const & rhs)
-        BOOST_QUATERNION_NOT_EQUAL_GENERATOR
-        
-#undef    BOOST_QUATERNION_NOT_EQUAL_GENERATOR
+                
+        template<typename R, typename T> inline BOOST_CONSTEXPR bool operator != (R const & lhs, quaternion<T> const & rhs) { return !(lhs == rhs); }
+        template<typename T, typename R> inline BOOST_CONSTEXPR bool operator != (quaternion<T> const & lhs, R const & rhs) { return !(lhs == rhs); }
+        template<typename T> inline BOOST_CONSTEXPR bool operator != (::std::complex<T> const & lhs, quaternion<T> const & rhs) { return !(lhs == rhs); }
+        template<typename T> inline BOOST_CONSTEXPR bool operator != (quaternion<T> const & lhs, ::std::complex<T> const & rhs) { return !(lhs == rhs); }
+        template<typename T> inline BOOST_CONSTEXPR bool operator != (quaternion<T> const & lhs, quaternion<T> const & rhs) { return !(lhs == rhs); }
         
         
         // Note:    we allow the following formats, whith a, b, c, and d reals
         //            a
         //            (a), (a,b), (a,b,c), (a,b,c,d)
         //            (a,(c)), (a,(c,d)), ((a)), ((a),c), ((a),(c)), ((a),(c,d)), ((a,b)), ((a,b),c), ((a,b),(c)), ((a,b),(c,d))
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-        template<typename T>
-        std::istream &                            operator >> (    ::std::istream & is,
-                                                                quaternion<T> & q)
-#else
         template<typename T, typename charT, class traits>
         ::std::basic_istream<charT,traits> &    operator >> (    ::std::basic_istream<charT,traits> & is,
                                                                 quaternion<T> & q)
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
         {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-            typedef char    charT;
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
             
 #ifdef    BOOST_NO_STD_LOCALE
 #else
@@ -1319,20 +746,12 @@ namespace boost
                         }
                         else                            // error
                         {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                            is.setstate(::std::ios::failbit);
-#else
                             is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                         }
                     }
                     else                                // error
                     {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                        is.setstate(::std::ios::failbit);
-#else
                         is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                     }
                 }
                 else                                // read "(a", possible: (a), (a,b), (a,b,c), (a,b,c,d), (a,(c)), (a,(c,d))
@@ -1396,11 +815,7 @@ namespace boost
                             }
                             else                        // error
                             {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                                is.setstate(::std::ios::failbit);
-#else
                                 is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                             }
                         }
                         else                        // read "(a,b", possible: (a,b), (a,b,c), (a,b,c,d)
@@ -1467,39 +882,23 @@ namespace boost
                                     }
                                     else                // error
                                     {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                                        is.setstate(::std::ios::failbit);
-#else
                                         is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                                     }
                                 }
                                 else                    // error
                                 {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                                    is.setstate(::std::ios::failbit);
-#else
                                     is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                                 }
                             }
                             else                        // error
                             {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                                is.setstate(::std::ios::failbit);
-#else
                                 is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                             }
                         }
                     }
                     else                                // error
                     {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-                        is.setstate(::std::ios::failbit);
-#else
                         is.setstate(::std::ios_base::failbit);
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
                     }
                 }
             }
@@ -1519,22 +918,12 @@ namespace boost
         }
         
         
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-        template<typename T>
-        ::std::ostream &                         operator << (    ::std::ostream & os,
-                                                                quaternion<T> const & q)
-#else
         template<typename T, typename charT, class traits>
         ::std::basic_ostream<charT,traits> &    operator << (    ::std::basic_ostream<charT,traits> & os,
                                                                 quaternion<T> const & q)
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
         {
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-            ::std::ostringstream                        s;
-#else
             ::std::basic_ostringstream<charT,traits>    s;
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
-            
+
             s.flags(os.flags());
 #ifdef    BOOST_NO_STD_LOCALE
 #else
@@ -1554,80 +943,41 @@ namespace boost
         // values
         
         template<typename T>
-        inline T                                real(quaternion<T> const & q)
+        inline BOOST_CONSTEXPR T real(quaternion<T> const & q)
         {
             return(q.real());
         }
         
         
         template<typename T>
-        inline quaternion<T>                    unreal(quaternion<T> const & q)
+        inline BOOST_CONSTEXPR quaternion<T> unreal(quaternion<T> const & q)
         {
             return(q.unreal());
         }
-        
-        
-#define    BOOST_QUATERNION_VALARRAY_LOADER  \
-            using    ::std::valarray;        \
-                                             \
-            valarray<T>    temp(4);          \
-                                             \
-            temp[0] = q.R_component_1();     \
-            temp[1] = q.R_component_2();     \
-            temp[2] = q.R_component_3();     \
-            temp[3] = q.R_component_4();
-        
-        
+                
         template<typename T>
-        inline T                                sup(quaternion<T> const & q)
+        inline T sup(quaternion<T> const & q)
         {
-#ifdef    BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP
             using    ::std::abs;
-#endif    /* BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP */
-            
-            BOOST_QUATERNION_VALARRAY_LOADER
-            
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-            return((BOOST_GET_VALARRAY(T, abs(temp)).max)());
-#else
-            return((abs(temp).max)());
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
+            return (std::max)((std::max)(abs(q.R_component_1()), abs(q.R_component_2())), (std::max)(abs(q.R_component_3()), abs(q.R_component_4())));
         }
         
         
         template<typename T>
-        inline T                                l1(quaternion<T> const & q)
+        inline T l1(quaternion<T> const & q)
         {
-#ifdef    BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP
-            using    ::std::abs;
-#endif    /* BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP */
-            
-            BOOST_QUATERNION_VALARRAY_LOADER
-            
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-            return(BOOST_GET_VALARRAY(T, abs(temp)).sum());
-#else
-            return(abs(temp).sum());
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
+           using    ::std::abs;
+           return abs(q.R_component_1()) + abs(q.R_component_2()) + abs(q.R_component_3()) + abs(q.R_component_4());
         }
         
         
         template<typename T>
-        inline T                                abs(quaternion<T> const & q)
+        inline T abs(quaternion<T> const & q)
         {
-#ifdef    BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP
             using    ::std::abs;
-#endif    /* BOOST_NO_ARGUMENT_DEPENDENT_LOOKUP */
-            
             using    ::std::sqrt;
             
-            BOOST_QUATERNION_VALARRAY_LOADER
-            
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-            T            maxim = (BOOST_GET_VALARRAY(T, abs(temp)).max)();    // overflow protection
-#else
-            T            maxim = (abs(temp).max)();    // overflow protection
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
+            T            maxim = sup(q);    // overflow protection
             
             if    (maxim == static_cast<T>(0))
             {
@@ -1637,31 +987,34 @@ namespace boost
             {
                 T    mixam = static_cast<T>(1)/maxim;    // prefer multiplications over divisions
                 
-                temp *= mixam;
+                T a = q.R_component_1() * mixam;
+                T b = q.R_component_2() * mixam;
+                T c = q.R_component_3() * mixam;
+                T d = q.R_component_4() * mixam;
+
+                a *= a;
+                b *= b;
+                c *= c;
+                d *= d;
                 
-                temp *= temp;
-                
-                return(maxim*sqrt(temp.sum()));
+                return(maxim * sqrt(a + b + c + d));
             }
             
             //return(sqrt(norm(q)));
         }
         
         
-#undef    BOOST_QUATERNION_VALARRAY_LOADER
-        
-        
         // Note:    This is the Cayley norm, not the Euclidian norm...
         
         template<typename T>
-        inline T                                norm(quaternion<T>const  & q)
+        inline BOOST_CXX14_CONSTEXPR T norm(quaternion<T>const  & q)
         {
             return(real(q*conj(q)));
         }
         
         
         template<typename T>
-        inline quaternion<T>                    conj(quaternion<T> const & q)
+        inline BOOST_CONSTEXPR quaternion<T> conj(quaternion<T> const & q)
         {
             return(quaternion<T>(   +q.R_component_1(),
                                     -q.R_component_2(),
@@ -1894,31 +1247,7 @@ namespace boost
                 return(pow(quaternion<T>(static_cast<T>(1))/q,-n));
             }
         }
-        
-        
-        // helper templates for converting copy constructors (definition)
-        
-        namespace detail
-        {
-            
-            template<   typename T,
-                        typename U
-                    >
-            quaternion<T>    quaternion_type_converter(quaternion<U> const & rhs)
-            {
-                return(quaternion<T>(   static_cast<T>(rhs.R_component_1()),
-                                        static_cast<T>(rhs.R_component_2()),
-                                        static_cast<T>(rhs.R_component_3()),
-                                        static_cast<T>(rhs.R_component_4())));
-            }
-        }
     }
 }
-
-
-#if    BOOST_WORKAROUND(__GNUC__, < 3)
-    #undef    BOOST_GET_VALARRAY
-#endif /* BOOST_WORKAROUND(__GNUC__, < 3) */
-
 
 #endif /* BOOST_QUATERNION_HPP */

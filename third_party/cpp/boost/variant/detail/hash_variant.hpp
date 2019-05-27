@@ -3,8 +3,7 @@
 // See http://www.boost.org for updates, documentation, and revision history.
 //-----------------------------------------------------------------------------
 //
-// Copyright (c) 2011
-// Antony Polukhin
+// Copyright (c) 2011-2019 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -14,7 +13,7 @@
 #ifndef BOOST_HASH_VARIANT_FUNCTION_HPP
 #define BOOST_HASH_VARIANT_FUNCTION_HPP
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1020)
+#if defined(_MSC_VER)
 # pragma once
 #endif
 
@@ -29,8 +28,7 @@ namespace boost {
         struct variant_hasher: public boost::static_visitor<std::size_t> {
             template <class T>
             std::size_t operator()(T const& val) const {
-                using namespace boost;
-                hash<T> hasher;
+                boost::hash<T> hasher;
                 return hasher(val);
             }
         };

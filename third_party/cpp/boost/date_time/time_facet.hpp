@@ -7,7 +7,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author:  Martin Andrian, Jeff Garland, Bart Garst
- * $Date: 2012-09-22 09:04:10 -0700 (Sat, 22 Sep 2012) $
+ * $Date$
  */
 
 #include <cctype>
@@ -200,7 +200,7 @@ namespace date_time {
   template <class time_type,
             class CharT,
             class OutItrT = std::ostreambuf_iterator<CharT, std::char_traits<CharT> > >
-  class time_facet :
+  class BOOST_SYMBOL_VISIBLE time_facet :
     public boost::date_time::date_facet<typename time_type::date_type , CharT, OutItrT> {
     typedef time_formats< CharT > formats_type;
    public:
@@ -693,7 +693,7 @@ namespace date_time {
   template <class time_type,
             class CharT,
             class InItrT = std::istreambuf_iterator<CharT, std::char_traits<CharT> > >
-  class time_input_facet :
+  class BOOST_SYMBOL_VISIBLE time_input_facet :
     public boost::date_time::date_input_facet<typename time_type::date_type , CharT, InItrT> {
     public:
       typedef typename time_type::date_type date_type;
@@ -822,7 +822,7 @@ namespace date_time {
         const_itr itr(m_time_duration_format.begin());
         while (itr != m_time_duration_format.end() && (sitr != stream_end)) {
           if (*itr == '%') {
-            ++itr;
+            if (++itr == m_time_duration_format.end()) break;
             if (*itr != '%') {
               switch(*itr) {
               case 'O':
@@ -866,6 +866,7 @@ namespace date_time {
                     break;
                   // %s is the same as %S%f so we drop through into %f
                 }
+                /* Falls through. */
               case 'f':
                 {
                   // check for decimal, check special_values if missing
@@ -994,7 +995,7 @@ namespace date_time {
         const_itr itr(this->m_format.begin());
         while (itr != this->m_format.end() && (sitr != stream_end)) {
           if (*itr == '%') {
-            ++itr;
+            if (++itr == this->m_format.end()) break;
             if (*itr != '%') {
               // the cases are grouped by date & time flags - not alphabetical order
               switch(*itr) {
@@ -1088,9 +1089,12 @@ namespace date_time {
                     break;
                   }
                 case 'd':
+                case 'e':
                   {
                     try {
-                      t_day = this->m_parser.parse_day_of_month(sitr, stream_end);
+                      t_day = (*itr == 'd') ?
+                          this->m_parser.parse_day_of_month(sitr, stream_end) :
+                          this->m_parser.parse_var_day_of_month(sitr, stream_end);
                     }
                     catch(std::out_of_range&) { // base class for exception bad_day_of_month
                       match_results mr;
@@ -1131,10 +1135,12 @@ namespace date_time {
                     if(sec == -1){
                        return check_special_value(sitr, stream_end, t, c);
                     }
-                    if (*itr == 'S')
+                    if (*itr == 'S' || sitr == stream_end)
                       break;
-                    // %s is the same as %S%f so we drop through into %f
+                    // %s is the same as %S%f so we drop through into %f if we are
+                    // not at the end of the stream
                   }
+                  /* Falls through. */
                 case 'f':
                   {
                     // check for decimal, check SV if missing
@@ -1226,7 +1232,7 @@ namespace date_time {
 
         date_type d(not_a_date_time);
         if (day_of_year > 0) {
-          d = date_type(static_cast<unsigned short>(t_year-1),12,31) + date_duration_type(day_of_year);
+          d = date_type(static_cast<unsigned short>(t_year),1,1) + date_duration_type(day_of_year-1);
         }
         else {
           d = date_type(t_year, t_month, t_day);
@@ -1249,7 +1255,7 @@ namespace date_time {
         if((c == '-' || c == '+') && (*sitr != c)) { // was the first character consumed?
           mr.cache += c;
         }
-        this->m_sv_parser.match(sitr, stream_end, mr);
+        (void)this->m_sv_parser.match(sitr, stream_end, mr);
         if(mr.current_match == match_results::PARSE_ERROR) {
           std::string tmp = convert_string_type<char_type, char>(mr.cache);
           boost::throw_exception(std::ios_base::failure("Parse failed. No match found for '" + tmp + "'"));

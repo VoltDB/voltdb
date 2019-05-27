@@ -35,6 +35,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
@@ -44,8 +45,6 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
-
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -282,15 +281,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
+        throw getExceptionFromError(errorCode);
+    }
+
+    private SerializableException getExceptionFromError(final int errorCode) {
         m_exceptionBuffer.clear();
         final int exceptionLength = m_exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
-            throw new EEException(errorCode);
+            return new EEException(errorCode);
         } else {
             m_exceptionBuffer.position(0);
             m_exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(m_exceptionBuffer);
+            return SerializableException.deserializeFromBuffer(m_exceptionBuffer);
         }
     }
 
@@ -510,7 +513,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long uniqueId,
         boolean returnUniqueViolations,
         boolean shouldDRStream,
-        long undoToken) throws EEException
+        long undoToken,
+        boolean elastic) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -524,7 +528,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken);
+                                              returnUniqueViolations, shouldDRStream, undoToken, elastic);
         checkErrorCode(errorCode);
 
         try {
@@ -675,26 +679,35 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String tableSignature)
+            long uso, long seqNo, int partitionId, String streamName)
     {
         if (EXPORT_LOG.isDebugEnabled()) {
             EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
-                    uso + ", seqNo: " + seqNo + ", tableSignature: " + tableSignature);
+                    uso + ", seqNo: " + seqNo + ", streamName: " + streamName);
         }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, uso, seqNo, getStringBytes(tableSignature));
+                                         syncAction, uso, seqNo, getStringBytes(streamName));
         if (retval < 0) {
             LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
                     uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
-                    ", tableSignature: " + tableSignature);
+                    ", streamName: " + streamName);
         }
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
+    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+        m_nextDeserializer.clear();
+        int txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+                getStringBytes(tableName), deletableTxnId, maxRowCount, undoToken);
+        return txnFullyDeleted;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String streamName) {
+        return nativeGetUSOForExportTable(pointer, getStringBytes(streamName));
     }
 
     @Override
@@ -745,11 +758,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
         long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
                 undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int) rowCount);
+            SerializableException exc = getExceptionFromError((int) rowCount);
+            if (exc instanceof DRTableNotFoundException) {
+                ((DRTableNotFoundException) exc).setRemoteTxnUniqueId(remoteTxnUniqueId);
+            }
+            throw exc;
         }
         return rowCount;
     }
@@ -901,9 +918,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             checkErrorCode(errorCode);
             return (byte[])m_nextDeserializer.readArray(byte.class);
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     @Override
@@ -925,5 +941,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
         }
         nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        nativeDisableExternalStreams(pointer);
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return nativeExternalStreamsEnabled(pointer);
     }
 }

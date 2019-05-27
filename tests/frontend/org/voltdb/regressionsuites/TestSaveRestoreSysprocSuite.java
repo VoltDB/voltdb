@@ -51,10 +51,15 @@ import java.util.zip.GZIPInputStream;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -89,6 +94,9 @@ import com.google_voltpatches.common.io.Files;
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
+
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
     private final static int TABLE_COUNT = 11;  // Must match schema used.
@@ -99,6 +107,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        ((CatalogChangeSingleProcessServer) m_config).revertCompile();
+        super.tearDown();
     }
 
     private void corruptTestFiles(java.util.Random r) throws Exception
@@ -325,7 +339,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return saveTables(client, path, nonce, null, null, true, false);
     }
 
-    private VoltTable[] saveTablesWithDefaultNouceAndPath(Client client) {
+    private VoltTable[] saveTablesWithDefaultNonceAndPath(Client client) {
         String defaultParam = "{block:false,format:\"native\"}";
         VoltTable[] results = null;
         try {
@@ -600,10 +614,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testRestoreWithDifferentTopology()
             throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
         m_config.shutDown();
@@ -619,28 +636,26 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         lc.setHasLocalServer(false);
 
         // Save snapshot for 2 site/host cluster.
-        {
-            lc.compile(project);
-            lc.startUp();
+        lc.compile(project);
+        lc.startUp();
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
             try {
-                Client client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(0));
-                try {
-                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
-                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
-                    loadTable(client, "PARTITION_TESTER", false, partition_table);
-                    saveTablesWithDefaultOptions(client, TESTNONCE);
-                    validateSnapshot(true, true, TESTNONCE);
-                }
-                finally {
-                    client.close();
-                }
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                saveTablesWithDefaultOptions(client, TESTNONCE);
+                validateSnapshot(true, true, TESTNONCE);
             }
             finally {
-                lc.shutDown();
+                client.close();
             }
+        }
+        finally {
+            lc.shutDown();
         }
 
         //Copy over snapshot data from removed node
@@ -653,40 +668,44 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Restore snapshot to 1 nodes 1 sites/host cluster.
-        {
-            lc.setHostCount(1);
-            lc.compile(project);
-            lc.startUp(false);
+        lc.setHostCount(1);
+        lc.compile(project);
+        lc.startUp(false);
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
             try {
-                Client client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(0));
+                ClientResponse cr;
                 try {
-                    ClientResponse cr;
-                    try {
-                        cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(false));
-                    } catch(ProcCallException e) {
-                        System.err.println(e.toString());
-                        cr = e.getClientResponse();
-                        System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(), cr.getResults()[0].toString());
-                    }
+                    cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(false));
+                } catch (ProcCallException e) {
+                    System.err.println(e.toString());
+                    cr = e.getClientResponse();
+                    System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(),
+                            cr.getResults()[0].toString());
+                }
 
-                    assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-                }
-                finally {
-                    client.close();
-                }
+                assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
             }
             finally {
-                lc.shutDown();
+                client.close();
             }
+        }
+        finally {
+            lc.shutDown();
         }
     }
 
+    @Test
     public void testRestoreWithGhostPartitionAndJoin()
             throws IOException, InterruptedException, ProcCallException
     {
-        if (!MiscUtils.isPro()) return; // this is a pro only test, involves elastic join
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (!MiscUtils.isPro()) {
+            return; // this is a pro only test, involves elastic join
+        }
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
         m_config.shutDown();
@@ -798,10 +817,14 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      * prevents stale txnIds from being propagated into future snapshots of clusters with different
      * site counts.
      */
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testIgnoreTransactionIdsForRestore, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testIgnoreTransactionIdsForRestore()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testIgnoreTransactionIdsForRestore");
         int num_replicated_items = 1000;
@@ -842,50 +865,44 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         CatalogChangeSingleProcessServer config =
                 (CatalogChangeSingleProcessServer) m_config;
         config.recompile(1);
-        try {
-            m_config.startUp(false);
+        m_config.startUp(false);
 
-            client = getClient();
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+        client = getClient();
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
-            saveTables(client, TMPDIR, TESTNONCE + 2, null, null, true, false);
+        saveTables(client, TMPDIR, TESTNONCE + 2, null, null, true, false);
 
-            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
-            JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
-            assertEquals(newTransactionIds.length(), 2);
+        digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
+        JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
+        assertEquals(newTransactionIds.length(), 2);
 
-            keys = newTransactionIds.keys();
-            while (keys.hasNext()) {
-                String partitionId = keys.next();
-                final long txnid = newTransactionIds.getLong(partitionId);
+        keys = newTransactionIds.keys();
+        while (keys.hasNext()) {
+            String partitionId = keys.next();
+            final long txnid = newTransactionIds.getLong(partitionId);
 
-                //Because these are no longer part of the cluster they should be unchanged
-                assert(!partitionId.equals("2") && !partitionId.equals("1"));
-                if (partitionId.equals(Integer.toString(MpInitiator.MP_INIT_PID))) {
-                    assertTrue(txnid == transactionIds.getLong(partitionId));
-                }
-                else if (partitionId.equals("0")) {
-                    //Since transactionIds are restarted, they should be less
-                    //than those found in the snapshot
-                    assertTrue(txnid < transactionIds.getLong(partitionId));
-                }
-                else {
-                    // No other partitions should exist
-                    assert(false);
-                }
+            // Transaction IDs are reset on restore so check that they are correct for the partition
+            if (partitionId.equals(Integer.toString(MpInitiator.MP_INIT_PID))) {
+                assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).makeNext().makeNext().getTxnId(), txnid);
+            } else if (partitionId.equals("0")) {
+                assertEquals(TxnEgo.makeZero(0).makeNext().makeNext().makeNext().getTxnId(), txnid);
+            } else {
+                // No other partitions should exist
+                fail("Partition should not exist " + partitionId);
             }
-        } finally {
-            config.revertCompile();
         }
     }
 
     /*
      * Test that the original transaction ids are retrieved from the "Recovered" snapshot.
      */
+    @Test
     public void testPropagateTransactionIdsForRecover()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testPropagateTransactionIdsForRecover");
         int num_replicated_items = 1000;
@@ -947,10 +964,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     //
     // Test that a replicated table can be distributed correctly
     //
+    @Test
     public void testDistributeReplicatedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testDistributeReplicatedTable");
         m_config.shutDown();
@@ -964,8 +984,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         if (lc.isNewCli()) {
             lc.setNewCli(false);
         }
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
@@ -1015,19 +1034,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                  * Test that the cluster doesn't goes down if you do a restore with dups
                  */
                 ZooKeeper zk = ZKUtil.getClient(lc.zkinterface(0), 5000, Sets.<Long>newHashSet());
-                try{
-                    doDupRestore(client, zk, TESTNONCE);
-                } catch (Exception ex){
-                    ex.printStackTrace();
-                    fail("SnapshotRestore exception: " + ex.getMessage());
-                }
+                doDupRestore(client, zk, TESTNONCE);
                 lc.shutDownExternal();
                 long start = System.currentTimeMillis();
                 while(!lc.areAllNonLocalProcessesDead()) {
                     Thread.sleep(1);
                     long now = System.currentTimeMillis();
                     long delta = now - start;
-                    if (delta > 10000) break;
+                    if (delta > 10000) {
+                        break;
+                    }
                 }
                 assertTrue(lc.areAllNonLocalProcessesDead());
             } finally {
@@ -1038,9 +1054,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testQueueUserSnapshot() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Staring testQueueUserSnapshot.");
         Client client = getClient();
@@ -1104,7 +1123,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         for (int ii = 0; ii < 5; ii++) {
             Thread.sleep(2000);
             hadSuccess = validateSnapshot(true, true, TESTNONCE + "2");
-            if (hadSuccess) break;
+            if (hadSuccess) {
+                break;
+            }
         }
         assertTrue(hadSuccess);
 
@@ -1123,9 +1144,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Test specific case where a user snapshot is queued
     // and then fails while queued. It shouldn't block future snapshots
     //
+    @Test
     public void testQueueFailedUserSnapshot() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Staring testQueueFailedUserSnapshot.");
         Client client = getClient();
@@ -1191,10 +1215,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, false, TESTNONCE + "2");
     }
 
+    @Test
     public void testRestore12Snapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         Client client = getClient();
         byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
@@ -1236,10 +1263,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
     }
 
+    @Test
     public void testRestoreFutureSnapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         /*
          * The "future" snapshot here was created by writing to REPLICATED_TESTER and
@@ -1331,9 +1361,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
          */
     }
 
+    @Test
     public void testRestoreWithFailures() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         Client client = getClient();
         byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
@@ -1361,25 +1394,27 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertEquals(0, proc.waitFor());
         validateSnapshot(true, false, TESTNONCE);
 
-        byte firstStringBytes[] = new byte[1048576];
-        java.util.Arrays.fill(firstStringBytes, (byte)'c');
-        byte secondStringBytes[] = new byte[1048564];
-        java.util.Arrays.fill(secondStringBytes, (byte)'a');
-
         try {
             client.callProcedure("@SnapshotRestore", TMPDIR + "x", TESTNONCE);
-        } catch(Exception ex) {
-            System.err.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Output path for Json duplicatesPath"));
-            assertTrue(ex.getMessage().contains("does not exist") || ex.getMessage().contains("is not executable"));
+        } catch (ProcCallException ex) {
+            System.err.println(((ClientResponseImpl) ex.getClientResponse()).toJSONString());
+            assertEquals("Restore failed to complete. See response table for additional info.", ex.getMessage());
+            VoltTable table = ex.getClientResponse().getResults()[0];
+            String tableString = table.toString();
+            assertTrue(tableString, table.advanceRow());
+            assertTrue(tableString, table.getString(1).contains("No snapshot related digests files found"));
+            assertTrue(tableString, table.advanceRow());
+            assertTrue(tableString, table.getString(1).contains("does not exist"));
         }
-
     }
 
+    @Test
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testSaveRestoreJumboRows.");
         Client client = getClient();
@@ -1453,9 +1488,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(fourthString.equals(results[0].getString(2)));
     }
 
+    @Test
     public void testTSVConversion() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Staring testTSVConversion.");
         Client client = getClient();
@@ -1483,9 +1521,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         generateAndValidateTextFile( expectedText, false);
     }
 
+    @Test
     public void testCSVConversion() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testCSVConversion");
         Client client = getClient();
@@ -1520,18 +1561,25 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         File f = new File(TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
         long endTime = System.currentTimeMillis() + 10000;
         while (true) {
-            if (f.exists()) break;
+            if (f.exists()) {
+                break;
+            }
             Thread.sleep(1000);
-            if (System.currentTimeMillis() > endTime) break;
+            if (System.currentTimeMillis() > endTime) {
+                break;
+            }
         }
         FileInputStream fis = new FileInputStream(
                 TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
         validateTextFile(expectedText, true, fis);
     }
 
+    @Test
     public void testBadSnapshotParams() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testBadSnapshotParams");
         Client client = getClient();
@@ -1639,9 +1687,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         File f = new File(TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
         long endTime = System.currentTimeMillis() + 10000;
         while (true) {
-            if (f.exists()) break;
+            if (f.exists()) {
+                break;
+            }
             Thread.sleep(1000);
-            if (System.currentTimeMillis() > endTime) break;
+            if (System.currentTimeMillis() > endTime) {
+                break;
+            }
         }
         FileInputStream fis = new FileInputStream(
                 TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
@@ -1653,9 +1705,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Also does some basic smoke tests
     // of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
     //
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSnapshotSave, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSnapshotSave() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testSnapshotSave");
         Client client = getClient();
@@ -1688,7 +1744,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //
         // Check that snapshot status returns a reasonable result
         //
-        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", TABLE_COUNT);
+        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
 
         VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null }).getResults();
         assertNotNull(scanResults);
@@ -1800,16 +1856,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         // per host
         expected_entries =
             ((total_tables - replicated) * num_hosts) + replicated;
-        try
-        {
-            results = client.callProcedure("@SnapshotSave", TMPDIR,
-                                           TESTNONCE, (byte)1).getResults();
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotSave exception: " + ex.getMessage());
-        }
+        results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults();
         assertEquals(expected_entries, results[0].getRowCount());
         while (results[0].advanceRow())
         {
@@ -1843,23 +1890,17 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         validateSnapshot(false, TESTNONCE);
 
-        try
-        {
-            results = client.callProcedure(
-                    "@SnapshotSave",
-                    "{ uripath:\"file://" + TMPDIR +
-                    "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }").getResults();
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotSave exception: " + ex.getMessage());
-        }
+        results = client.callProcedure("@SnapshotSave",
+                "{ uripath:\"file://" + TMPDIR + "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }")
+                .getResults();
         System.out.println("Created CSV snapshot");
     }
 
+    @Test
     public void testSnapshotSaveNonExistingTable() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
         System.out.println("Starting testSnapshotSaveNonExistingTable");
         int num_replicated_items_per_chunk = 100;
         int num_replicated_chunks = 10;
@@ -1895,9 +1936,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testPartialSnapshotSave() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testPartialSnapshotSave");
         int num_replicated_items_per_chunk = 100;
@@ -1943,9 +1987,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testIdleOnlineSnapshot() throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testIdleOnlineSnapshot");
         Client client = getClient();
@@ -1975,15 +2022,19 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //
         // Check that snapshot status returns a reasonable result
         //
-        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", TABLE_COUNT);
+        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
 
         validateSnapshot(true, TESTNONCE);
     }
 
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSaveReplicatedAndRestorePartitionedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSaveReplicatedAndRestorePartitionedTable()
     throws Exception
     {
-        if (isValgrind()) return;
+        if (isValgrind()) {
+            return;
+        }
 
         System.out.println("Starting testSaveReplicatedAndRestorePartitionedTable");
 
@@ -2001,16 +2052,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Thread.sleep(1000);
 
         VoltTable orig_mem = null;
-        try
-        {
-            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + orig_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + orig_mem.toString());
 
         VoltTable[] results = null;
         results = saveTablesWithDefaultOptions(client, TESTNONCE);
@@ -2033,20 +2076,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
+        try {
             client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-
-            while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
-            }
+        } catch (ProcCallException e) {
+            fail(e.getClientResponse().getResults()[0].toFormattedString());
         }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
+
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
+            }
         }
 
         // hacky, need to sleep long enough so the internal server tick
@@ -2054,19 +2093,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Thread.sleep(1000);
 
         VoltTable final_mem = null;
-        try
-        {
-            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + final_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + final_mem.toString());
 
-        checkTable(client, "REPLICATED_TESTER", "RT_ID",
-                   num_replicated_items_per_chunk * num_replicated_chunks);
+        checkTable(client, "REPLICATED_TESTER", "RT_ID", num_replicated_items_per_chunk * num_replicated_chunks);
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
 
@@ -2081,10 +2111,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             foundItem = 0;
             tupleCounts = new long[3];
             results = client.callProcedure("@Statistics", "table", 0).getResults();
-            while (results[0].advanceRow())
-            {
-                if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
-                {
+            while (results[0].advanceRow()) {
+                if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER")) {
                     tupleCounts[foundItem] = results[0].getLong("TUPLE_COUNT");
                     ++foundItem;
                 }
@@ -2100,18 +2128,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         // make sure all sites were loaded
         validateSnapshot(true, TESTNONCE);
-
-        // revert back to replicated table
-        config.revertCompile();
-
     }
 
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testSavePartitionedAndRestoreReplicatedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSavePartitionedAndRestoreReplicatedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
-        System.out.println("Starting testSaveAndRestorePartitionedTable");
+        System.out.println("Starting testSavePartitionedAndRestoreReplicatedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;
         Client client = getClient();
@@ -2126,16 +2154,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Thread.sleep(1000);
 
         VoltTable orig_mem = null;
-        try
-        {
-            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + orig_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + orig_mem.toString());
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
 
@@ -2152,15 +2172,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
         }
 
-        try
-        {
-            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
 
         // Kill and restart all the execution sites after removing partitioning column
         m_config.shutDown();
@@ -2177,21 +2189,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE).getResults();
+        results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
-            while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
             }
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
         }
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
@@ -2226,12 +2229,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Test doing a duplicate restore and validate the CSV file containing duplicates
-        try{
-            doDupRestore(client, TESTNONCE);
-        } catch (Exception ex){
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        doDupRestore(client, TESTNONCE);
 
         /*
          * Assert a non-empty CSV file containing duplicates was created
@@ -2248,15 +2246,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
           }
         }
         assertTrue(havePartitionedCSVFile);
-
-        config.revertCompile();
     }
 
-
+    @Test
     public void testSaveAndRestoreReplicatedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testSaveAndRestoreReplicatedTable");
         int num_replicated_items_per_chunk = 200;
@@ -2273,16 +2271,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Thread.sleep(1000);
 
         VoltTable orig_mem = null;
-        try
-        {
-            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + orig_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + orig_mem.toString());
 
         VoltTable[] results = null;
         results = saveTablesWithDefaultOptions(client, TESTNONCE);
@@ -2299,31 +2289,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
 
         // hacky, need to sleep long enough so the internal server tick
         // updates the memory stats
         Thread.sleep(1000);
 
         VoltTable final_mem = null;
-        try
-        {
-            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + final_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + final_mem.toString());
 
         checkTable(client, "REPLICATED_TESTER", "RT_ID",
                    num_replicated_items_per_chunk * num_replicated_chunks);
@@ -2366,10 +2340,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, TESTNONCE);
     }
 
+    @Test
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
@@ -2434,15 +2411,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
         }
 
-        try
-        {
-            checkSnapshotStatus(client, TMPDIR, "first", null, "SUCCESS", TABLE_COUNT * SITE_COUNT);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        checkSnapshotStatus(client, TMPDIR, "first", null, "SUCCESS", getTableCount() * SITE_COUNT);
 
         cluster1CreateTime = VoltDB.instance().getClusterCreateTime();
         cluster1InstanceId = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
@@ -2458,8 +2427,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
+        results = client.callProcedure("@SnapshotRestore", TMPDIR, "first").getResults();
+
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
+            }
+        }
+
+        try {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
                                            "first").getResults();
 
@@ -2468,41 +2444,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
+            fail("Should have thrown an exception");
         }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
-
-        boolean threwException = false;
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           "first").getResults();
-
-            while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            threwException = true;
-        }
-        assertTrue(threwException);
+        catch (Exception ex) {}
 
         // Make sure the cluster create time has not been altered by the restore
         assertTrue(VoltDB.instance().getClusterCreateTime() == cluster2CreateTime);
 
         // Test doing a duplicate restore and validate the CSV file containing duplicates
-        try{
-            doDupRestore(client, "first");
-        }catch (Exception ex){
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        doDupRestore(client, "first");
 
         // Make sure the cluster time has been reset with the recover
         assertTrue(VoltDB.instance().getClusterCreateTime() == cluster1CreateTime);
@@ -2574,24 +2524,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         validateSnapshot(false, TESTNONCE);
 
-        try
+        results = client.callProcedure("@SnapshotStatus").getResults();
+        boolean hasFailure = false;
+        while (results[0].advanceRow())
         {
-            results = client.callProcedure("@SnapshotStatus").getResults();
-            boolean hasFailure = false;
-            while (results[0].advanceRow())
+            if (results[0].getString("NONCE").contains(TESTNONCE))
             {
-                if (results[0].getString("NONCE").contains(TESTNONCE))
-                {
-                    hasFailure |= results[0].getString("RESULT").equals("FAILURE");
-                }
+                hasFailure |= results[0].getString("RESULT").equals("FAILURE");
             }
-            assertTrue(hasFailure);
         }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        assertTrue(hasFailure);
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         //deleteTestFiles(TESTNONCE);
@@ -2611,16 +2553,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           "second").getResults();
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        results = client.callProcedure("@SnapshotRestore", TMPDIR, "second").getResults();
         // Make sure the cluster time has been reset with the restore
         assertTrue(VoltDB.instance().getClusterCreateTime() == cluster4CreateTime);
 
@@ -2629,16 +2562,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Thread.sleep(1000);
 
         VoltTable final_mem = null;
-        try
-        {
-            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
-            System.out.println("STATS: " + final_mem.toString());
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Statistics exception: " + ex.getMessage());
-        }
+        final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+        System.out.println("STATS: " + final_mem.toString());
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
@@ -2671,8 +2596,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             {
                 marker++;
             }
-            if (marker == 2)
+            if (marker == 2) {
                 break;
+            }
         }
         assertEquals(marker, 2);
         marker = 0;
@@ -2682,8 +2608,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             {
                 marker++;
             }
-            if (marker == 2)
+            if (marker == 2) {
                 break;
+            }
         }
         assertEquals(marker, 2);
         deleteTestFiles("first");
@@ -2691,10 +2618,14 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     // Test that we fail properly when there are no savefiles available
+    @Test
+    @Flaky(description="TestSaveRestoreSysprocSuite.testRestoreMissingFiles, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRestoreMissingFile");
         int num_replicated_items = 1000;
@@ -2740,10 +2671,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     // Test that we fail properly when the save files are corrupted
+    @Test
     public void testCorruptedFiles()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testCorruptedFiles");
         int num_replicated_items = 1000;
@@ -2810,10 +2744,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     // Test that a random corruption doesn't mess up the table. Not reproducible but useful for detecting
     // stuff we won't normally find
+    @Test
     public void testCorruptedFilesRandom()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testCorruptedFilesRandom");
         int num_replicated_items = 1000;
@@ -2872,11 +2809,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-
+    @Test
     public void testRestoreMissingPartitionFile()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -2914,10 +2853,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(resultTable.getString("ERR_MSG").equals("Save data contains no information for table PARTITION_TESTER"));
     }
 
+    @Test
     public void testRepartition()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRepartition");
         int num_replicated_items_per_chunk = 100;
@@ -2946,17 +2888,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE).getResults();
-            // XXX Should check previous results for success but meh for now
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+        // XXX Should check previous results for success but meh for now
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
@@ -2979,14 +2912,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             assertTrue(System.currentTimeMillis() < tend);
         }
         assertEquals(num_partitioned_items_per_chunk * num_partitioned_chunks, tupleCount);
-
-        config.revertCompile();
     }
 
+    @Test
     public void testChangeDDL()
     throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testChangeDDL");
         int num_partitioned_items_per_chunk = 120;
@@ -3036,16 +2970,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            results = client.callProcedure("@SnapshotRestore", TMPDIR,
-                                           TESTNONCE).getResults();
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
         // because stats are not synchronous :(
         Thread.sleep(5000);
@@ -3082,13 +3007,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         assertTrue(found_gets_created);
-        config.revertCompile();
     }
 
+    @Test
     public void testGoodChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testGoodChangeAttributeTypes");
         Client client = getClient();
@@ -3127,15 +3054,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         client = getClient();
 
-        try
-        {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-        }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("SnapshotRestore exception: " + ex.getMessage());
-        }
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
 
         client.callProcedure("@Statistics", "table", 0);
 
@@ -3153,14 +3072,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(row.wasNull());
         row.getLong(3);
         assertTrue(row.wasNull());
-
-        config.revertCompile();
     }
 
+    @Test
     public void testBadChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind())
+         {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testBadChangeAttributeTypes");
         Client client = getClient();
@@ -3221,14 +3142,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
         assertTrue(type_failure);
-
-        config.revertCompile();
     }
 
+    @Test
     public void testRestoreHashinatorWithAddedPartition()
             throws IOException, InterruptedException, ProcCallException
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind())
+         {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRestoreHashinatorWithAddedPartition");
         m_config.shutDown();
@@ -3245,103 +3168,102 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         lc.setHasLocalServer(false);
 
         // Save snapshot for 1 site/host cluster.
-        {
-            lc.compile(project);
-            lc.startUp();
+        lc.compile(project);
+        lc.startUp();
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
             try {
-                Client client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(0));
-                try {
-                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+                VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
-                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
-                    loadTable(client, "PARTITION_TESTER", false, partition_table);
-                    saveTablesWithDefaultOptions(client, TESTNONCE);
-                    validateSnapshot(true, true, TESTNONCE);
-                }
-                finally {
-                    client.close();
-                }
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                saveTablesWithDefaultOptions(client, TESTNONCE);
+                validateSnapshot(true, true, TESTNONCE);
             }
             finally {
-                lc.shutDown();
+                client.close();
             }
+        }
+        finally {
+            lc.shutDown();
         }
 
         // Restore snapshot to 2 nodes 1 sites/host cluster.
-        {
-            lc.setHostCount(2);
-            lc.compile(project);
-            lc.startUp(false);
+        lc.setHostCount(2);
+        lc.compile(project);
+        lc.startUp(false);
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
             try {
-                Client client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(0));
+                ClientResponse cr;
                 try {
-                    ClientResponse cr;
-                    try {
                     cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(true));
-                    } catch(ProcCallException e) {
-                        System.err.println(e.toString());
-                        cr = e.getClientResponse();
-                        System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(), cr.getResults()[0].toString());
-                    }
-                    assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
-                    // Poll statistics until they appear.
-                    while (true) {
-                        VoltTable results = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+                } catch (ProcCallException e) {
+                    System.err.println(e.toString());
+                    cr = e.getClientResponse();
+                    System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(),
+                            cr.getResults()[0].toString());
+                }
+                assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+                // Poll statistics until they appear.
+                while (true) {
+                    VoltTable results = client.callProcedure("@Statistics", "table", 0).getResults()[0];
 
-                        if (results != null && results.getRowCount() > 0) {
-                            long maxPartitionId = -1;
-                            boolean done = true;
-                            while (results.advanceRow()) {
-                                String tableName = results.getString("TABLE_NAME");
-                                long partitionId = results.getLong("PARTITION_ID");
-                                long tupleCount = results.getLong("TUPLE_COUNT");
-                                maxPartitionId = Math.max(partitionId, maxPartitionId);
-                                if (tableName.equals("REPLICATED_TESTER") && tupleCount == 0) {
+                    if (results != null && results.getRowCount() > 0) {
+                        long maxPartitionId = -1;
+                        boolean done = true;
+                        while (results.advanceRow()) {
+                            String tableName = results.getString("TABLE_NAME");
+                            long partitionId = results.getLong("PARTITION_ID");
+                            long tupleCount = results.getLong("TUPLE_COUNT");
+                            maxPartitionId = Math.max(partitionId, maxPartitionId);
+                            if (tableName.equals("REPLICATED_TESTER") && tupleCount == 0) {
+                                done = false;
+                            } else if (tableName.equals("PARTITION_TESTER")) {
+                                // The second partition should have no rows.
+                                if (partitionId == 0 && tupleCount == 0) {
                                     done = false;
                                 }
-                                else if (tableName.equals("PARTITION_TESTER")) {
-                                    // The second partition should have no rows.
-                                    if (partitionId == 0 && tupleCount == 0) {
-                                        done = false;
-                                    }
-                                    else if (partitionId != 0) {
-                                        assertTrue(tupleCount == 0);
-                                    }
+                                else if (partitionId != 0) {
+                                    assertTrue(tupleCount == 0);
                                 }
                             }
+                        }
 
-                            if (maxPartitionId != 1) {
-                                done = false;
-                            }
+                        if (maxPartitionId != 1) {
+                            done = false;
+                        }
 
-                            if (done) {
-                                break;
-                            } else {
-                                Thread.sleep(1);
-                            }
+                        if (done) {
+                            break;
+                        } else {
+                            Thread.sleep(1);
                         }
                     }
                 }
-                finally {
-                    client.close();
-                }
             }
             finally {
-                lc.shutDown();
+                client.close();
             }
+        }
+        finally {
+            lc.shutDown();
         }
     }
 
     //
     // Test that system always pick up the latest complete snapshot to recover
     //
+    @Test
     public void testRecoverPickupLatestSnapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testNewCliRecoverPickupLatestSnapshot");
         m_config.shutDown();
@@ -3356,7 +3278,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3396,10 +3318,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             } finally {
                 client.close();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        finally {
+        } finally {
             lc.shutDown();
         }
     }
@@ -3407,10 +3326,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     //
     // Test that system always pick up the latest complete snapshot to recover
     //
+    @Test
     public void testRecoverFromShutdownSnapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRecoverFromShutdownSnapshot");
         m_config.shutDown();
@@ -3425,7 +3347,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3490,10 +3412,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 client.close();
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        finally {
+        } finally {
             lc.shutDown();
         }
     }
@@ -3502,10 +3421,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // Test that system always pick up the latest complete snapshot to recover,
     // whether it is terminal snapshot or not
     //
+    @Test
     public void testRecoverShutdownSnapshotIsNotLatest()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testRecoverShutdownSnapshotIsNotLatest");
         m_config.shutDown();
@@ -3520,7 +3442,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         lc.compile(project);
         lc.startUp();
-        String snapshotsPath = lc.getServerSpecificRoot("0") + "/snapshots";
+        String snapshotsPath = getSnapshotPath(lc, 0);
         try {
             Client client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));
@@ -3569,15 +3491,19 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             // newer non-terminal snapshot, system should pick up the latest one.
             lc.shutDown();
             lc.startUp(clearLocalDataDirectories);
-            long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER").getResults()[0].asScalarLong();
-            assertEquals(2000, reptableRows);
-            long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER").getResults()[0].asScalarLong();
-            assertEquals(252, parttableRows);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        finally {
+            client = ClientFactory.createClient();
+            try {
+                client.createConnection(lc.getListenerAddresses().get(0));
+                long reptableRows = client.callProcedure("@AdHoc", "select count(*) from REPLICATED_TESTER")
+                        .getResults()[0].asScalarLong();
+                assertEquals(2000, reptableRows);
+                long parttableRows = client.callProcedure("@AdHoc", "select count(*) from PARTITION_TESTER")
+                        .getResults()[0].asScalarLong();
+                assertEquals(252, parttableRows);
+            } finally {
+                client.close();
+            }
+        } finally {
             lc.shutDown();
         }
     }
@@ -3589,10 +3515,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // on one node, then do the recover, verify that system picks up the latest
     // snapshot.
     //
+    @Test
     public void testMinorityOfClusterMissingSnapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testMinorityOfClusterMissingSnapshot");
         m_config.shutDown();
@@ -3619,9 +3548,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, repl_table);
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 // now reptable has 1000 rows and parttable has 126 rows
-                saveTablesWithDefaultNouceAndPath(client);
+                saveTablesWithDefaultNonceAndPath(client);
 
-                Thread.sleep(1000);
+                waitForSnapshotToFinish(client);
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
                 VoltTable another_partition_table = createPartitionedTable(num_partitioned_items, num_partitioned_items);
@@ -3629,12 +3558,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                Thread.sleep(250);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
-                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                File snapshotPath = new File(getSnapshotPath(lc, 0));
                 TreeMap<Long, String> snapshotNonces = new TreeMap<>();
                 for (File child : snapshotPath.listFiles()) {
                     Matcher matcher = pat.matcher(child.getName());
@@ -3669,10 +3599,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             } finally {
                 client.close();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        finally {
+        } finally {
             lc.shutDown();
         }
     }
@@ -3685,10 +3612,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // on two nodes, then do the recover, verify that system picks up the first
     // snapshot.
     //
+    @Test
     public void testMajorityOfClusterMissingSnapshot()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         System.out.println("Starting testMajorityOfClusterMissingSnapshot");
         m_config.shutDown();
@@ -3715,8 +3645,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, repl_table);
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 // now reptable has 1000 rows and parttable has 126 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Load more data
                 VoltTable another_repl_table = createReplicatedTable(num_replicated_items, num_replicated_items, null);
@@ -3725,12 +3655,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "REPLICATED_TESTER", true, another_repl_table);
                 loadTable(client, "PARTITION_TESTER", false, another_partition_table);
                 // now reptable has 2000 rows and parttable has 252 rows
-                saveTablesWithDefaultNouceAndPath(client);
-                Thread.sleep(1000);
+                Thread.sleep(250);
+                saveTablesWithDefaultNonceAndPath(client);
+                waitForSnapshotToFinish(client);
 
                 // Delete the second snapshot on node 0
                 Pattern pat = Pattern.compile(MAGICNONCE + "(\\d+)-.+");
-                File snapshotPath = new File(lc.getServerSpecificRoot("0") + "/snapshots");
+                File snapshotPath = new File(getSnapshotPath(lc, 0));
                 TreeMap<Long, String> snapshotNonces = new TreeMap<>();
                 for (File child : snapshotPath.listFiles()) {
                     Matcher matcher = pat.matcher(child.getName());
@@ -3745,7 +3676,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                         MiscUtils.deleteRecursively(child);
                     }
                 }
-                snapshotPath = new File(lc.getServerSpecificRoot("1") + "/snapshots");
+                snapshotPath = new File(getSnapshotPath(lc, 1));
                 for (File child : snapshotPath.listFiles()) {
                     if (child.getName().startsWith(latestNonce)) {
                         MiscUtils.deleteRecursively(child);
@@ -3779,10 +3710,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testRestoreResults()
     throws Exception
     {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+        if (isValgrind()) {
+            return; // snapshot doesn't run in valgrind ENG-4034
+        }
 
         final int SAVE_HOST_COUNT = 1;
         final int RESTORE_HOST_COUNT = 1;
@@ -3834,7 +3768,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 client.createConnection(lc.getListenerAddresses().get(0));
                 try {
                     SnapshotRestoreResultSet results = restoreTablesWithDefaultOptions(client, TESTNONCE);
-                    validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, TABLE_COUNT, true);
+                    validateRestoreResults(lc.m_siteCount, lc.m_kfactor, results, getTableCount(), true);
                 }
                 finally {
                     client.close();
@@ -3845,6 +3779,64 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
+
+    @Test
+    public void testReplicatedTableCSVSnapshotStatus()
+    throws Exception
+    {
+        m_config.shutDown();
+
+        int host_count = 2;
+        int site_count = 1;
+        int k_factor = 0;
+        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
+                                           BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project =
+            new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        lc.compile(project);
+        lc.startUp();
+        String replicatedTableName = "REPLICATED_TESTER";
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection(lc.getListenerAddresses().get(0));
+            try {
+                VoltTable repl_table = createReplicatedTable(100, 0, null);
+                loadTable(client, replicatedTableName, true, repl_table);
+                VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, null, null, true, true);
+                assertEquals("Wrong host/site count from @SnapshotSave.",
+                             host_count * site_count, results[0].getRowCount());
+            }
+            finally {
+                client.close();
+            }
+
+            // Connect to each host and check @SnapshotStatus.
+            // Only one host should say it saved the replicated table we're watching.
+            Set<Long> hostIds = new HashSet<>();
+            for (int iclient = 0; iclient < host_count; iclient++) {
+                client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(iclient));
+                try {
+                    SnapshotResult[] results =
+                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
+                    for (SnapshotResult result : results) {
+                        if (result.table.equals(replicatedTableName)) {
+                            hostIds.add(result.hostID);
+                        }
+                    }
+                }
+                finally {
+                    client.close();
+                }
+            }
+            assertEquals("Replicated table CSV is not saved on exactly one host.", 1, hostIds.size());
+        } finally {
+            lc.shutDown();
+        }
+    }
+
 
     public static class SnapshotResult {
         Long hostID;
@@ -3971,7 +3963,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSaveRestoreSysprocSuite.class);
+                new MultiConfigSuiteBuilder(TestSaveRestoreSysprocSuite.class);
 
         SaveRestoreTestProjectBuilder project =
             new SaveRestoreTestProjectBuilder();
@@ -3985,5 +3977,33 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         builder.addServerConfig(config, false);
 
         return builder;
+    }
+
+    static void waitForSnapshotToFinish(Client client)
+            throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+        for (int i = 0; i < 20; ++i) {
+            if (isSnapshotFinished(client)) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        fail("Snapshot did not complete before timeout");
+    }
+
+    static boolean isSnapshotFinished(Client client)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr = client.callProcedure("@Statistics", "SNAPSHOTSTATUS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable table = cr.getResults()[0];
+        while (table.advanceRow()) {
+            if (table.getLong("END_TIME") < table.getLong("START_TIME")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static String getSnapshotPath(LocalCluster cluster, int hostId) {
+        return cluster.getServerSpecificRoot(Integer.toString(hostId)) + File.separator + "snapshots";
     }
 }

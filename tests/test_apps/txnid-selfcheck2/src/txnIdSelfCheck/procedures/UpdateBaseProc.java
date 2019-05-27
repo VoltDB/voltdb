@@ -135,8 +135,7 @@ public class UpdateBaseProc extends VoltProcedure {
         }
 
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, prevcnt, adhocInc, adhocJmp, value);
-        if (rowCount > 0)
-            voltQueueSQL(update, txnid, prevtxnid, ts, cidallhash, rid, adhocInc, adhocJmp, cid, rid);
+        voltQueueSQL(update, txnid, prevtxnid, ts, cidallhash, rid, adhocInc, adhocJmp, cid, rid);
         voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, prevcnt, adhocInc, adhocJmp, value);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
@@ -192,7 +191,6 @@ public class UpdateBaseProc extends VoltProcedure {
 
     @SuppressWarnings("deprecation")
     protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback)  {
-        System.out.println("foobar");
         SQLStmtAdHocHelperHelper.voltQueueSQLExperimental(this, "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
         SQLStmtAdHocHelperHelper.voltQueueSQLExperimental(this, "SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
         SQLStmtAdHocHelperHelper.voltQueueSQLExperimental(this, "SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);

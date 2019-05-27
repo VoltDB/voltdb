@@ -6,11 +6,12 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland 
- * $Date: 2008-02-27 12:00:24 -0800 (Wed, 27 Feb 2008) $
+ * $Date$
  */
 
-#include "boost/date_time/posix_time/posix_time_system.hpp"
-#include "boost/date_time/time.hpp"
+#include <boost/date_time/posix_time/posix_time_system.hpp>
+#include <boost/date_time/time.hpp>
+#include <boost/date_time/compiler_config.hpp>
 
 namespace boost {
 
@@ -24,11 +25,11 @@ namespace posix_time {
   using date_time::not_a_date_time;
   using date_time::max_date_time;
   using date_time::min_date_time; 
-  
+
   //! Time type with no timezone or other adjustments
   /*! \ingroup time_basics
    */
-  class ptime : public date_time::base_time<ptime, posix_time_system>
+  class BOOST_SYMBOL_VISIBLE ptime : public date_time::base_time<ptime, posix_time_system>
   {
   public:
     typedef posix_time_system time_system_type;
@@ -53,7 +54,7 @@ namespace posix_time {
     ptime() : date_time::base_time<time_type,time_system_type>(gregorian::date(not_a_date_time), time_duration_type(not_a_date_time))
     {}
 #endif // DATE_TIME_NO_DEFAULT_CONSTRUCTOR
-      
+
   };
 
 

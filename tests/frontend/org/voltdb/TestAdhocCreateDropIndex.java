@@ -474,6 +474,150 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
     }
 
+    @Test
+    public void testENG15220() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R1 (ID INTEGER NOT NULL PRIMARY KEY, TINY TINYINT);";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "CREATE VIEW VR6 (TINY, ID) AS SELECT TINY, MIN(ID) FROM R1 GROUP BY TINY;",
+                    "INSERT INTO R1(ID, TINY) VALUES(1, 11);",
+                    "CREATE ASSUMEUNIQUE INDEX DIDX2 ON R1 (ID);",
+                    "CREATE UNIQUE INDEX DIDX20 ON R1 (ID);")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+            Stream.of(
+                    Pair.of("DROP VIEW VR6;", true),
+                    Pair.of("TRUNCATE TABLE R1;", true),                            // roll back
+                    Pair.of("PARTITION TABLE R1 ON COLUMN ID;", true),              // paritioned table
+                    Pair.of("CREATE VIEW VR6 (TINY, ID) AS SELECT TINY, MIN(ID) FROM R1 GROUP BY TINY;", true),
+                    Pair.of("INSERT INTO R1(ID, TINY) VALUES(1, 11);", true),
+                    Pair.of("CREATE ASSUMEUNIQUE INDEX DIDX2 ON R1 (ID);", false))  // "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. Please use UNIQUE instead"
+                    .forEachOrdered(stmtAndShouldPass -> {
+                        final String stmt = stmtAndShouldPass.getFirst();
+                        final boolean shouldPass = stmtAndShouldPass.getSecond();
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            assertTrue("Query \"" + stmt + "\" should have passed", shouldPass);
+                        } catch (IOException | ProcCallException e) {
+                            assertFalse("Query \"" + stmt + "\" should have failed", shouldPass);
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
+        }
+
+    }
+
+    @Test
+    public void testENG15273() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "ID INTEGER NOT NULL,\n" +
+                "POLYGON GEOGRAPHY,\n" +
+                "PRIMARY KEY (ID)\n" +
+                ");\n" +
+                "CREATE INDEX IDX_R21_POLY ON R21 (POLYGON);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "insert into R21 (ID) values -9355;",
+                    "CREATE VIEW DV1 (POLYGON) AS SELECT MIN(POLYGON) FROM R21;",
+                    "insert into R21 (ID, POLYGON) values 84, PolygonFromText('POLYGON((0.0 0.0, 0.0 -64.0, 51.0 0.0, 0.0 0.0))');",
+                    "UPDATE R21 SET POLYGON = POLYGON;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
+    public void testENG15742() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "VB VARBINARY NOT NULL\n" +
+                ");\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            // we don't allow using VARBINARY type in LIKE/STARTS WITH expression
+            Stream.of(
+                    "CREATE INDEX testIdx ON R21(VB) WHERE x'03' like VB;",
+                    "CREATE INDEX testIdx ON R21(VB) WHERE VB starts with x'03';")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            fail("We should not allow allow using VARBINARY type in LIKE/STARTS WITH expression");
+                        } catch (ProcCallException pce) {
+                            pce.printStackTrace();
+                            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+                            try {
+                                assertFalse(findIndexInSystemCatalogResults("testIdx"));
+                            } catch (Exception e) {
+                                fail(e.getMessage());
+                            }
+                        } catch (IOException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
+    public void testENG15734() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                "ID INTEGER,\n" +
+                "FL FLOAT,\n" +
+                "V1 VARCHAR(63),\n" +
+                "V2 VARCHAR(64) DEFAULT '0'" +
+                ");\n" +
+                "CREATE INDEX DIDX4 ON P4(ID) WHERE V2 LIKE UPPER(V1);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(FL) VALUES(6.2);",
+                    "UPDATE P4 SET V1 = V2;",
+                    "TRUNCATE TABLE P4;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) { }
+        }
+    }
+
     private void createSchema(VoltDB.Configuration config,
                               String ddl,
                               final int sitesPerHost,

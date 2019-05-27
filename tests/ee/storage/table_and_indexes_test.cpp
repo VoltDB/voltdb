@@ -126,10 +126,10 @@ class TableAndIndexTest : public Test {
 
             districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
                                                     districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, false, districtTupleSchema);
+                                                    true, false, false, districtTupleSchema);
             districtReplicaIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
                                                            districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, false, districtReplicaTupleSchema);
+                                                           true, false, false, districtReplicaTupleSchema);
 
 
             vector<voltdb::ValueType> warehouseColumnTypes;
@@ -153,7 +153,7 @@ class TableAndIndexTest : public Test {
 
             warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
                                                      warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                     true, true, warehouseTupleSchema);
+                                                     true, true, false, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
@@ -193,10 +193,10 @@ class TableAndIndexTest : public Test {
 
             customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
                                                     customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, customerTupleSchema);
+                                                    true, true, false, customerTupleSchema);
             customerReplicaIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
                                                            customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, true, customerReplicaTupleSchema);
+                                                           true, true, false, customerReplicaTupleSchema);
 
             customerIndex2ColumnIndices.push_back(2);
             customerIndex2ColumnIndices.push_back(1);
@@ -205,10 +205,10 @@ class TableAndIndexTest : public Test {
 
             customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
                                                     customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, customerTupleSchema);
+                                                    true, true, false, customerTupleSchema);
             customerReplicaIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
                                                            customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           true, true, customerReplicaTupleSchema);
+                                                           true, true, false, customerReplicaTupleSchema);
             customerIndexes.push_back(customerIndex2Scheme);
             customerReplicaIndexes.push_back(customerReplicaIndex2Scheme);
 
@@ -218,10 +218,10 @@ class TableAndIndexTest : public Test {
 
             customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
                                                     customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    false, false, customerTupleSchema);
+                                                    false, false, false, customerTupleSchema);
             customerReplicaIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
                                                            customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                           false, false, customerReplicaTupleSchema);
+                                                           false, false, false, customerReplicaTupleSchema);
             customerIndexes.push_back(customerIndex3Scheme);
             customerReplicaIndexes.push_back(customerReplicaIndex3Scheme);
 
@@ -242,8 +242,18 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, signature, false, 0));
-            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtReplicaTupleSchema, districtColumnNames, signature, false, 0));
+            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                        "DISTRICT",
+                                                                                                        districtTupleSchema,
+                                                                                                        districtColumnNames,
+                                                                                                        signature,
+                                                                                                        false, 0));
+            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0,
+                                                                                                               "DISTRICT",
+                                                                                                               districtReplicaTupleSchema,
+                                                                                                               districtColumnNames,
+                                                                                                               signature,
+                                                                                                               false, 0));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
@@ -264,7 +274,7 @@ class TableAndIndexTest : public Test {
                                                                                             warehouseTupleSchema,
                                                                                             warehouseColumnNames,
                                                                                             signature, false,
-                                                                                            0, false, false));
+                                                                                            0, PERSISTENT));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
@@ -279,11 +289,11 @@ class TableAndIndexTest : public Test {
             customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                customerTupleSchema, customerColumnNames,
                                                                signature, false,
-                                                               0, false, false));
+                                                               0, PERSISTENT));
             customerTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                       customerReplicaTupleSchema, customerColumnNames,
                                                                       signature, false,
-                                                                      0, false, false));
+                                                                      0, PERSISTENT));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
@@ -440,8 +450,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -484,8 +494,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated block of log data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -520,8 +530,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -584,8 +594,8 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     tables[42] = districtTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -624,8 +634,8 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -702,8 +712,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     tables[42] = customerTableReplica;
 
     //Fetch the generated block of log data
-    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    boost::shared_ptr<DrStreamBlock> sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     boost::shared_array<char> data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
@@ -742,8 +752,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
-    sb = topend.blocks[0];
-    topend.blocks.pop_back();
+    sb = topend.drBlocks[0];
+    topend.drBlocks.pop_back();
     data = topend.data[0];
     topend.data.pop_back();
     topend.receivedDRBuffer = false;

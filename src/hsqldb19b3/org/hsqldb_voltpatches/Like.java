@@ -100,7 +100,6 @@ class Like {
     static final int UNDERSCORE_CHAR = 1;
     static final int PERCENT_CHAR    = 2;
     boolean          isVariable      = true;
-    boolean          isBinary        = false;
     Type             dataType;
 
     Like() {}
@@ -116,35 +115,22 @@ class Like {
     private Object getStartsWith() {
 
         if (iLen == 0) {
-            return isBinary ? BinaryData.zeroLengthBinary
-                            : "";
+            return "";
         }
 
-        StringBuffer              sb = null;
-        HsqlByteArrayOutputStream os = null;
-
-        if (isBinary) {
-            os = new HsqlByteArrayOutputStream();
-        } else {
-            sb = new StringBuffer();
-        }
+        StringBuffer              sb = new StringBuffer();
 
         int i = 0;
 
         for (; i < iLen && wildCardType[i] == 0; i++) {
-            if (isBinary) {
-                os.writeByte(cLike[i]);
-            } else {
-                sb.append(cLike[i]);
-            }
+            sb.append(cLike[i]);
         }
 
         if (i == 0) {
             return null;
         }
 
-        return isBinary ? new BinaryData(os.toByteArray(), false)
-                        : sb.toString();
+        return sb.toString();
     }
 
     Boolean compare(Session session, Object o) {
@@ -167,28 +153,12 @@ class Like {
 
     char getChar(Object o, int i) {
 
-        char c;
-
-        if (isBinary) {
-            c = (char) ((BinaryData) o).getBytes()[i];
-        } else {
-            c = ((String) o).charAt(i);
-        }
-
-        return c;
+        return ((String) o).charAt(i);
     }
 
     int getLength(SessionInterface session, Object o, String s) {
 
-        int l;
-
-        if (isBinary) {
-            l = (int) ((BinaryData) o).length(session);
-        } else {
-            l = ((String) o).length();
-        }
-
-        return l;
+        return ((String) o).length();
     }
 
     private boolean compareAt(Object o, int i, int j, int jLen) {
@@ -249,11 +219,7 @@ class Like {
                 int length = getLength(session, escape, "");
 
                 if (length != 1) {
-                    if (isBinary) {
-                        throw Error.error(ErrorCode.X_2200D);
-                    } else {
-                        throw Error.error(ErrorCode.X_22019);
-                    }
+                    throw Error.error(ErrorCode.X_22019);
                 }
 
                 escapeChar = getChar(escape, 0);
@@ -397,11 +363,7 @@ class Like {
             return null;
         }
 
-        if (isBinary) {
-            return new BinaryData(session, (BinaryData) o, maxByteValue);
-        } else {
-            return dataType.concat(session, o, "\uffff");
-        }
+        return dataType.concat(session, o, "\uffff");
     }
 
     public String describe(Session session) {

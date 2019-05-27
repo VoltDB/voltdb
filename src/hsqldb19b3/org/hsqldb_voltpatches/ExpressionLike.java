@@ -205,13 +205,8 @@ public final class ExpressionLike extends ExpressionLogical {
                 || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
 
             likeObject.setIgnoreCase(ignoreCase);
-        } else if (nodes[LEFT].dataType.isBinaryType()
-                   && nodes[RIGHT].dataType.isBinaryType()
-                   && (nodes[ESCAPE] == null
-                       || nodes[ESCAPE].dataType.isBinaryType())) {
-            likeObject.isBinary = true;
-        } else if (false == (nodes[LEFT].dataType.isBooleanType()
-                              && nodes[RIGHT].dataType.isBooleanType())
+        } else if (!(nodes[LEFT].dataType.isBooleanType()
+                && nodes[RIGHT].dataType.isBooleanType())
                               && dataType.isBooleanType()) {
             // If both argument nodes are boolean we have resolved
             // this before.  So, this is ok.  Otherwise, this is not
@@ -337,16 +332,8 @@ public final class ExpressionLike extends ExpressionLogical {
                 like    = true;
             }
 
-            if (!between && !larger) {
-// A VoltDB extension to disable LIKE pattern escape characters
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-// End of VoltDB extension
-                return;
+            if (!between && !larger && nodes.length > 2) {
+                throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
             }
 
             Expression leftBound =
@@ -367,6 +354,9 @@ public final class ExpressionLike extends ExpressionLogical {
                 opType     = OpTypes.AND;
                 likeObject = null;
             } else if (between && like) {
+                if (nodes.length > 2) {
+                    throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
+                }
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);
                 Expression lte = new ExpressionLogical(OpTypes.SMALLER_EQUAL,
@@ -374,14 +364,6 @@ public final class ExpressionLike extends ExpressionLogical {
                                                        rightBound);
                 ExpressionLike newLike = new ExpressionLike(this);
 
-// A VoltDB extension to disable LIKE pattern escape characters
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-// End of VoltDB extension
                 nodes        = new Expression[BINARY];
                 likeObject   = null;
                 nodes[LEFT]  = new ExpressionLogical(OpTypes.AND, gte, lte);
@@ -397,17 +379,9 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[LEFT]  = gte;
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
+            } else if (nodes.length > 2) {
+                throw new HsqlException("ESCAPE not supported with non-constant LIKE pattern", "", 0);
             }
-// A VoltDB extension to disable LIKE pattern escape characters
-            else {
-                /*
-                 * Escape is not supported in the EE yet
-                 */
-                if (nodes.length > 2) {
-                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
-                }
-            }
-// End of VoltDB extension
         }
     }
 

@@ -27,6 +27,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -83,6 +84,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     },
                     "MpInitiator send", 1024 * 128);
 
+    @Override
     public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean balanceSPI) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
@@ -108,8 +110,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         return ra;
     }
 
-    @Override
-    public void setLeaderState(final long maxSeenTxnId)
+    public void setLeaderState(final long maxSeenTxnId, final long repairTruncationHandle)
     {
         final CountDownLatch cdl = new CountDownLatch(1);
         m_taskQueue.offer(new Runnable() {
@@ -117,6 +118,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             public void run() {
                 try {
                     setLeaderStateInternal(maxSeenTxnId);
+                    ((MpScheduler)m_scheduler).m_repairLogTruncationHandle = repairTruncationHandle;
+                    ((MpScheduler)m_scheduler).m_repairLogAwaitingTruncate = repairTruncationHandle;
                 } finally {
                     cdl.countDown();
                 }
@@ -198,7 +201,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
         m_restartSeqGenerator = new MpRestartSequenceGenerator(
-                ((MpScheduler)m_scheduler).getLeaderNodeId(), false);
+                ((MpScheduler)m_scheduler).getHostId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }
@@ -233,11 +236,12 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     @Override
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            TransactionState snapshotTransactionState) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
+                updateReplicasInternal(replicas, partitionMasters, snapshotTransactionState);
             }
         });
         return new long[0];

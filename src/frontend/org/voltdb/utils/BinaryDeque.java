@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.export.ExportSequenceNumberTracker;
 
 /**
  * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain
@@ -40,6 +39,14 @@ public interface BinaryDeque {
     }
 
     /**
+     * Update the extraHeader associated with this instance.
+     *
+     * @param extraHeaderSerializer {@link DeferredSerialization} which will be used to write out the extra header.
+     * @throws IOException If an error occurs while updating the extraHeader
+     */
+    void updateExtraHeader(DeferredSerialization extraHeaderSerializer) throws IOException;
+
+    /**
      * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
@@ -47,16 +54,6 @@ public interface BinaryDeque {
      * @throws IOException
      */
     void offer(BBContainer object) throws IOException;
-
-    /**
-     * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
-     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
-     * If there is an exception attempting to write the buffers then all the buffers will be discarded
-     * @param object
-     * @param allowCompression
-     * @throws IOException
-     */
-    void offer(BBContainer object, boolean allowCompression) throws IOException;
 
     int offer(DeferredSerialization ds) throws IOException;
 
@@ -67,9 +64,10 @@ public interface BinaryDeque {
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
      * @param objects Array of buffers representing the objects to be pushed to the head of the queue
+     * @param DeferredSerialization serializer method to write subsystem-specific meta data.
      * @throws java.io.IOException
      */
-    public void push(BBContainer objects[]) throws IOException;
+    public void push(BBContainer objects[], DeferredSerialization ds) throws IOException;
 
     /**
      * Start a BinaryDequeReader for reading, positioned at the start of the deque.
@@ -95,7 +93,7 @@ public interface BinaryDeque {
 
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 
-    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scanner) throws IOException;
+    public void scanEntries(BinaryDequeScanner scanner) throws IOException;
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
      * will result in an exception
@@ -108,42 +106,6 @@ public interface BinaryDeque {
     public Pair<Integer, Long> getBufferCountAndSize() throws IOException;
 
     public void closeAndDelete() throws IOException;
-
-    /**
-     * Reader class used to read entries from the deque. Multiple readers may be active at the same time,
-     * each of them maintaining their own read location within the deque.
-     */
-    public interface BinaryDequeReader {
-        /**
-         * Read and return the object at the current read position of this reader.
-         * The entry will be removed once all active readers have read the entry.
-         * @param ocf
-         * @return BBContainer with the bytes read. Null if there is nothing left to read.
-         * @throws IOException
-         */
-        public BBContainer poll(OutputContainerFactory ocf) throws IOException;
-
-        /**
-         * Number of bytes left to read for this reader.
-         * @return number of bytes left to read for this reader.
-         * @throws IOException
-         */
-        public long sizeInBytes() throws IOException;
-
-        /**
-         *  Number of objects left to read for this reader.
-         * @return number of objects left to read for this reader
-         * @throws IOException
-         */
-        public int getNumObjects() throws IOException;
-
-        /**
-         * Returns true if this reader still has entries to read. False otherwise
-         * @return true if this reader still has entries to read. False otherwise
-         * @throws IOException
-         */
-        public boolean isEmpty() throws IOException;
-    }
 
     public static class TruncatorResponse {
         public enum Status {
@@ -159,7 +121,7 @@ public interface BinaryDeque {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
 
-        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+        public int writeTruncatedObject(ByteBuffer output, int entryId) throws IOException {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
     }
@@ -182,6 +144,6 @@ public interface BinaryDeque {
     }
 
     public interface BinaryDequeScanner {
-        public ExportSequenceNumberTracker scan(BBContainer bb);
+        public void scan(BBContainer bb);
     }
 }

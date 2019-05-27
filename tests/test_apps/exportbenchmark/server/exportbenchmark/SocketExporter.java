@@ -54,8 +54,8 @@ import java.util.Properties;
  * Export class for performance measuring.
  * Export statistics are checked for timestamps, and performance metrics are
  * periodically pushed to a UDP socket for collection.
- * 
- * Note: due to the way timerStart is managed, the statistics are only 
+ *
+ * Note: due to the way timerStart is managed, the statistics are only
  * valid for the first execution of the test client. If the system is not
  * restarted between executions of the test client, then the first interval
  * reported will be much longer and will skew the test results.
@@ -116,6 +116,7 @@ public class SocketExporter extends ExportClientBase {
             } catch (JSONException e) {
                 m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
             }
+<<<<<<< HEAD
 
             String messageString = message.toString();
             buffer.clear();
@@ -123,6 +124,15 @@ public class SocketExporter extends ExportClientBase {
             buffer.put(messageString.getBytes());
             buffer.flip();
 
+=======
+
+            String messageString = message.toString();
+            buffer.clear();
+            buffer.put((byte)messageString.length());
+            buffer.put(messageString.getBytes());
+            buffer.flip();
+
+>>>>>>> master
             // Send message over socket
             try {
                 int sent = channel.send(buffer, address);

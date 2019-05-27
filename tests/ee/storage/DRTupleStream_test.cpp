@@ -139,7 +139,7 @@ public:
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
+        return m_wrapper.appendTuple(tableHandle, 0, currentSpHandle,
                                currentSpHandle, *m_tuple, type);
     }
 
@@ -152,7 +152,7 @@ public:
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
+        return m_wrapper.appendTuple(tableHandle, 0, currentSpHandle,
                                currentSpHandle, *m_largeTuple, type);
     }
 
@@ -245,7 +245,7 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
 }
@@ -271,15 +271,15 @@ TEST_F(DRTupleStreamTest, BasicOps)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
 
     // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    ASSERT_FALSE(m_topend.drBlocks.empty());
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
@@ -305,15 +305,15 @@ TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE * 9));
 
     // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    ASSERT_FALSE(m_topend.drBlocks.empty());
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
@@ -339,15 +339,15 @@ TEST_F(DRTupleStreamTest, FarFutureFlush)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
 
     // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    ASSERT_FALSE(m_topend.drBlocks.empty());
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
@@ -373,8 +373,8 @@ TEST_F(DRTupleStreamTest, Fill) {
     m_wrapper.endTransaction(addPartitionId(tuples_to_fill + 1));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * tuples_to_fill));
 }
@@ -401,8 +401,8 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
 
     // We should have received a buffer containing only the first txn
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE));
     m_topend.receivedDRBuffer = false;
@@ -413,8 +413,8 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
 
     // should now receive the buffer containing the second, larger txn
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * tuples_to_fill + MAGIC_TRANSACTION_SIZE);
 }
@@ -440,15 +440,15 @@ TEST_F(DRTupleStreamTest, TxnSpanTwoBuffers)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 
     // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    ASSERT_FALSE(m_topend.drBlocks.empty());
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * tuples_to_fill + MAGIC_TRANSACTION_SIZE);
 }
@@ -476,15 +476,15 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * tuples_to_fill_buffer);
 
     // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    ASSERT_FALSE(m_topend.drBlocks.empty());
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * tuples_to_fill_buffer);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * tuples_to_fill_large_buffer + MAGIC_TRANSACTION_SIZE);
 }
@@ -519,7 +519,7 @@ TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
     m_wrapper.endTransaction(addPartitionId(1));
     m_wrapper.periodicFlush(-1, addPartitionId(1));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
     ASSERT_TRUE(BUFFER_SIZE < results->offset() && LARGE_BUFFER_SIZE >= results->offset());
 }
 
@@ -530,14 +530,14 @@ TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
 TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
 {
     int tuples_to_fill = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
-    const StreamBlock *firstBlock = m_wrapper.m_currBlock;
+    const StreamBlock *firstBlock = m_wrapper.getCurrBlock();
     const StreamBlock *secondBlock = NULL;
 
     // fill one large buffer
     for (;;) {
         appendTuple(0, 1);
-        if (m_wrapper.m_currBlock != firstBlock) {
-            secondBlock = m_wrapper.m_currBlock;
+        if (m_wrapper.getCurrBlock() != firstBlock) {
+            secondBlock = m_wrapper.getCurrBlock();
             EXPECT_EQ(LARGE_STREAM_BLOCK, secondBlock->type());
             break;
         }
@@ -553,13 +553,13 @@ TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
     m_wrapper.endTransaction(addPartitionId(2));
 
     // make sure we rolled, and the new buffer is a large buffer
-    EXPECT_NE(secondBlock, m_wrapper.m_currBlock);
-    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.m_currBlock->type());
+    EXPECT_NE(secondBlock, m_wrapper.getCurrBlock());
+    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.getCurrBlock()->type());
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    EXPECT_EQ(2, m_topend.blocks.size());
+    EXPECT_EQ(2, m_topend.drBlocks.size());
 }
 
 /**
@@ -584,13 +584,13 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
     size_t mark = appendTuple(1, 2);
-    m_wrapper.rollbackTo(mark, rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
+    m_wrapper.rollbackDrTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // so flush and make sure we got something sane
     m_wrapper.periodicFlush(-1, addPartitionId(1));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + (MAGIC_TUPLE_SIZE * tuples_to_fill));
 }
@@ -621,7 +621,7 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper.rollbackTo(0, rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
+    m_wrapper.rollbackDrTo(0, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // write a new tuple and then flush the buffer
     appendTuple(2, 3);
@@ -630,8 +630,8 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     //The rollback emits an end transaction record spuriously, we'll just ignore it
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
@@ -654,12 +654,12 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
 
     // add another and roll it back and flush
     size_t mark = appendTuple(10, 11);
-    m_wrapper.rollbackTo(mark, rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
+    m_wrapper.rollbackDrTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10);
 }
@@ -688,13 +688,13 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     }
     for (int i = tuples_to_fill-1; i >= 0; i--)
     {
-        m_wrapper.rollbackTo(marks[i], rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
+        m_wrapper.rollbackDrTo(marks[i], rowCostForDRRecord(DR_RECORD_INSERT));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     // Txnid 11 move to a new buffer, so current buffer only contains txn 1~10
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
@@ -714,7 +714,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     }
 
     const int64_t expectedSequenceNumber = m_wrapper.m_openSequenceNumber;
-    const int64_t expectedUniqueId = m_wrapper.m_openUniqueId;
+    const int64_t expectedUniqueId = m_wrapper.getOpenUniqueIdForTest();
 
     // The following should be ignored because of the guard is on
     size_t mark1;
@@ -727,12 +727,12 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     EXPECT_EQ(mark1, INVALID_DR_MARK);
     EXPECT_EQ(mark2, INVALID_DR_MARK);
     EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
-    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.getOpenUniqueIdForTest());
 
-    m_wrapper.rollbackTo(mark2, rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
-    m_wrapper.rollbackTo(mark1, rowCostForDRRecord(DR_RECORD_INSERT), SIZE_MAX);
+    m_wrapper.rollbackDrTo(mark2, rowCostForDRRecord(DR_RECORD_INSERT));
+    m_wrapper.rollbackDrTo(mark1, rowCostForDRRecord(DR_RECORD_INSERT));
     EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
-    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.getOpenUniqueIdForTest());
 
     // Append one more tuple after the rollback
     appendTuple(12, 13);
@@ -741,8 +741,8 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     m_wrapper.periodicFlush(-1, addPartitionId(14));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 11);
 }
@@ -758,28 +758,28 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
         appendTuple(1, 2);
     }
     m_wrapper.endTransaction(addPartitionId(2));
-    ASSERT_TRUE(m_wrapper.m_currBlock);
-    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
+    ASSERT_TRUE(m_wrapper.getCurrBlock());
+    ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
 
     appendTuple(2, 3);
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    m_topend.blocks.pop_front();
+    m_topend.drBlocks.pop_front();
     m_topend.receivedDRBuffer = false;
 
     for (int i = 1; i < tuples_to_fill; i++) {
         appendTuple(2, 3);
     }
-    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
+    ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
 
     appendTuple(2, 3);
     m_wrapper.endTransaction(addPartitionId(3));
 
     m_wrapper.periodicFlush(-1, addPartitionId(3));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * tuples_to_fill);
     EXPECT_EQ(results->offset(),MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * (tuples_to_fill + 1));
 }
@@ -793,11 +793,11 @@ TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
 
-    m_topend.blocks.pop_front();
+    m_topend.drBlocks.pop_front();
     m_topend.receivedDRBuffer = false;
     for (int i = 0; i < 25; i++) {
         appendTuple(2, 3);
@@ -809,8 +809,8 @@ TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
     m_wrapper.periodicFlush(-1, addPartitionId(3));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
 
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
     EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE * 25);
 }
@@ -824,11 +824,11 @@ TEST_F(DRTupleStreamTest, BufferAllowsAtLeastOneTxn) {
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
 
-    m_topend.blocks.pop_front();
+    m_topend.drBlocks.pop_front();
     m_topend.receivedDRBuffer = false;
 
     appendTuple(2, 3);
@@ -837,8 +837,8 @@ TEST_F(DRTupleStreamTest, BufferAllowsAtLeastOneTxn) {
     m_wrapper.periodicFlush(-1, addPartitionId(3));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
 
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
+    results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
     EXPECT_EQ(results->offset(), MAGIC_TRANSACTION_SIZE + MAGIC_TUPLE_SIZE);
 }

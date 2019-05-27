@@ -53,7 +53,7 @@
 
 #include <murmur3/MurmurHash3.h>
 
-#include "jsoncpp/jsoncpp.h"
+#include "json/json.h"
 
 #include <iostream>
 #include <stdint.h>
@@ -241,7 +241,7 @@ public:
                                              voltdb::BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, false, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         if (m_table != NULL) {
@@ -250,7 +250,7 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
-                                                         m_columnNames, signature, false, 0, false, false,
+                                                         m_columnNames, signature, false, 0, PERSISTENT,
                                                          tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);

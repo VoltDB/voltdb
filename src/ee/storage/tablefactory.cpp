@@ -59,8 +59,7 @@ Table* TableFactory::getPersistentTable(
             char *signature,
             bool tableIsMaterialized,
             int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly,
+            TableType tableType,
             int tableAllocationTargetSize,
             int tupleLimit,
             int32_t compactionThreshold,
@@ -71,7 +70,7 @@ Table* TableFactory::getPersistentTable(
     StreamedTable *streamedTable = NULL;
     PersistentTable *persistentTable = NULL;
 
-    if (exportOnly) {
+    if (tableTypeIsStream(tableType)) {
         table = streamedTable = new StreamedTable(partitionColumn);
     }
     else {
@@ -81,7 +80,8 @@ Table* TableFactory::getPersistentTable(
                                                       tableAllocationTargetSize,
                                                       tupleLimit,
                                                       drEnabled,
-                                                      isReplicated);
+                                                      isReplicated,
+                                                      tableType);
     }
 
     initCommon(databaseId,
@@ -93,7 +93,7 @@ Table* TableFactory::getPersistentTable(
                compactionThreshold);
 
     TableStats *stats;
-    if (exportOnly) {
+    if (tableTypeIsStream(tableType)) {
         stats = streamedTable->getTableStats();
     }
     else {
@@ -108,6 +108,20 @@ Table* TableFactory::getPersistentTable(
 
     // initialize stats for the table
     configureStats(name, stats);
+
+    // If a regular table with export enabled, create a companion streamed table
+    if (isTableWithStream(tableType)) {
+        streamedTable = new StreamedTable(partitionColumn);
+        initCommon(databaseId,
+                   streamedTable,
+                   name,
+                   schema,
+                   columnNames,
+                   false,  // companion streamed table will NOT take ownership of TupleSchema object
+                   compactionThreshold);
+        persistentTable->setStreamedTable(streamedTable);
+        VOLT_TRACE("Created companion streamed table for %s", persistentTable->name().c_str());
+    }
 
     return table;
 }

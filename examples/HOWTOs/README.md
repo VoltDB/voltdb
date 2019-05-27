@@ -16,6 +16,7 @@ Development:
 
 Administration:
 ---------------
+ * [Document your VoltDB deployment](DocumentYourDatabase.md)
  * [Change the Schema or Deployment configuration on a live cluster](MakeChanges.md)
  * [Run VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
  * [Run VoltDB Examples on a Cluster](RunAnExampleInACluster.md)
@@ -25,6 +26,6 @@ Administration:
  * [Enable Authentication](EnableAuthentication.md)
  * [Enable SSL](EnableSSL.md)
  * [Configure Logging](ConfigureLogging.md)
- * [Document your VoltDB deployment](DocumentYourDatabase.md)
+ * [Configure Kafka Importer and Exporter for Kerberos](kafka_kerberos/README.md)
 --------------------------------------------------------------------------------------
 If there's something you'd like to see here, please let us know at support@voltdb.com.

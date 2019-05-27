@@ -31,7 +31,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 
 /**
@@ -78,7 +78,8 @@ public class TaskLogImpl implements TaskLog {
 
         m_partitionId = partitionId;
         m_cursorId = "TaskLog-" + partitionId;
-        m_buffers = new PersistentBinaryDeque(Integer.toString(partitionId), overflowDir, new VoltLogger("REJOIN"));
+        m_buffers = new PersistentBinaryDeque(
+                Integer.toString(partitionId), null, overflowDir, new VoltLogger("REJOIN"));
         m_reader = m_buffers.openForRead(m_cursorId);
         m_es = CoreUtils.getSingleThreadExecutor("TaskLog partition " + partitionId);
     }
@@ -130,8 +131,12 @@ public class TaskLogImpl implements TaskLog {
 
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException {
-        if (message.getSpHandle() <= m_snapshotSpHandle) return;
-        if (m_closed) throw new IOException("Closed");
+        if (message.getSpHandle() <= m_snapshotSpHandle) {
+            return;
+        }
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
 
         assert(message != null);
         bufferCatchup(message.getSerializedSize());
@@ -165,7 +170,9 @@ public class TaskLogImpl implements TaskLog {
      */
     @Override
     public TransactionInfoBaseMessage getNextMessage() throws IOException {
-        if (m_closed) throw new IOException("Closed");
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
         if (m_head == null) {
             // Get another buffer asynchronously
             final Runnable r = new Runnable() {
@@ -240,7 +247,9 @@ public class TaskLogImpl implements TaskLog {
 
     private boolean m_closed = false;
     public void close(boolean synchronous) throws IOException {
-        if (m_closed) return;
+        if (m_closed) {
+            return;
+        }
         m_closed = true;
         m_es.shutdown();
         if (synchronous) {

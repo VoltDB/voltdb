@@ -119,7 +119,7 @@ public:
     }
 
     PlannerDomValue emptyDom() {
-        return PlannerDomRoot("{}").rootObject();
+        return PlannerDomRoot("{}")();
     }
 };
 
@@ -142,9 +142,9 @@ TEST_F(FilterTest, FunctionAbs1Filter) {
     // WHERE abs(id) = 20
     AbstractExpression *tup_val = new TupleValueExpression(0, 0);
     AbstractExpression *const_val = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
-    std::vector<AbstractExpression*>* argument = new std::vector<AbstractExpression*>();
-    argument->push_back(const_val);
-    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(FUNC_ABS, argument);
+    std::vector<AbstractExpression*> argument;
+    argument.push_back(const_val);
+    AbstractExpression* abs_exp = functionFactory(FUNC_ABS, argument);
     AbstractExpression* predicate =
         ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_EQUAL,
             tup_val, abs_exp);
@@ -163,9 +163,9 @@ TEST_F(FilterTest, FunctionAbs2Filter) {
     AbstractExpression *tup_val = new TupleValueExpression(0, 0);
     AbstractExpression* minus_exp =
         new OperatorExpression<OpMinus>(EXPRESSION_TYPE_OPERATOR_MINUS, zero_val, tup_val);
-    std::vector<AbstractExpression*>* argument = new std::vector<AbstractExpression*>();
-    argument->push_back(minus_exp);
-    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(FUNC_ABS, argument);
+    std::vector<AbstractExpression*> argument;
+    argument.push_back(minus_exp);
+    AbstractExpression* abs_exp = functionFactory(FUNC_ABS, argument);
     AbstractExpression *const_val = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
     AbstractExpression* predicate =
         ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_EQUAL,

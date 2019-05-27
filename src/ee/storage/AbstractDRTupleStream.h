@@ -20,6 +20,7 @@
 
 #include "common/ids.h"
 #include "common/tabletuple.h"
+#include "common/StreamBlock.h"
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
@@ -41,21 +42,54 @@ struct DRCommittedInfo{
     DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
 };
 
-class AbstractDRTupleStream : public TupleStreamBase {
+
+class AbstractDRTupleStream : public TupleStreamBase<DrStreamBlock> {
     friend class ExecutorContext;
+    friend class DrStreamBlock;
+    friend class StreamBlock;
 
 public:
     AbstractDRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion);
 
     virtual ~AbstractDRTupleStream() {}
 
-    void pushStreamBuffer(StreamBlock *block, bool sync);
+    void pushStreamBuffer(DrStreamBlock *block);
 
-    /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
+    /** truncate stream back to mark (only virtual for Mock override) */
+    inline void rollbackDrTo(size_t mark, size_t drRowCost)
+    {
+        // Set m_opened = false first otherwise checkOpenTransaction() may
+        // consider the transaction being rolled back as open.
+        if (mark == INVALID_DR_MARK) {
+            m_openSpHandle = m_committedSpHandle;
+            m_openUniqueId = m_committedUniqueId;
+            m_openSequenceNumber = m_committedSequenceNumber;
+            m_opened = false;
+            return;
+        }
+        if (drRowCost <= m_txnRowCount) {
+            m_txnRowCount -= drRowCost;
+        } else {
+            // convenience to let us just throw away everything at once
+            assert(drRowCost == SIZE_MAX);
+            m_txnRowCount = 0;
+        }
+        if (mark == m_committedUso) {
+            assert(m_txnRowCount == 0);
+            m_openSequenceNumber = m_committedSequenceNumber;
+            m_opened = false;
+        }
+        TupleStreamBase::rollbackBlockTo(mark);
+        if (m_currBlock) {
+            // It would be ideal to assume that a block is always ready but sadly the DR Path
+            // throws an exception in the middle of the block allocation when the block
+            // exceeds the limit
+            m_currBlock->commonTruncateTo(mark);
+        }
+    }
 
-    virtual void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedSpHandle);
+    virtual bool periodicFlush(int64_t timeInMillis,
+                               int64_t lastComittedSpHandle);
 
     virtual void setSecondaryCapacity(size_t capacity);
 
@@ -65,47 +99,41 @@ public:
      * write an insert or delete record to the stream
      * for active-active conflict detection purpose, write full row image for delete records.
      * */
-    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId,
-                       TableTuple &tuple,
-                       DRRecordType type) = 0;
+    virtual size_t appendTuple(char *tableHandle,
+                               int partitionColumn,
+                               int64_t spHandle,
+                               int64_t uniqueId,
+                               TableTuple &tuple,
+                               DRRecordType type) = 0;
 
     /**
      * write an update record to the stream
      * for active-active conflict detection purpose, write full before image for update records.
      * */
-    virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId,
-                       TableTuple &oldTuple,
-                       TableTuple &newTuple) = 0;
+    virtual size_t appendUpdateRecord(char *tableHandle,
+                                      int partitionColumn,
+                                      int64_t spHandle,
+                                      int64_t uniqueId,
+                                      TableTuple &oldTuple,
+                                      TableTuple &newTuple) = 0;
 
-    virtual size_t truncateTable(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       std::string tableName,
-                       int partitionColumn,
-                       int64_t spHandle,
-                       int64_t uniqueId) = 0;
+    virtual size_t truncateTable(char *tableHandle,
+                                 std::string tableName,
+                                 int partitionColumn,
+                                 int64_t spHandle,
+                                 int64_t uniqueId) = 0;
 
     virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId) = 0;
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId) = 0;
-
-    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
-
-    void handleOpenTransaction(StreamBlock *oldBlock);
+    virtual void extendBufferChain(size_t minLength) = 0;
 
     void fatalDRErrorWithPoisonPill(int64_t spHandle, int64_t uniqueId, const char *format, ...);
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
 
-    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+    virtual void generateDREvent(DREventType type, int64_t spHandle,
                                  int64_t uniqueId, ByteArray payloads) = 0;
 
     bool drStreamStarted() {
@@ -126,6 +154,8 @@ public:
     int64_t m_openSequenceNumber;
     int64_t m_committedSequenceNumber;
 protected:
+    void handleOpenTransaction(DrStreamBlock *oldBlock);
+
     virtual void openTransactionCommon(int64_t spHandle, int64_t uniqueId);
 
     virtual void commitTransactionCommon();
@@ -139,7 +169,7 @@ protected:
 
 private:
     // return true if stream state was switched from close to open
-    virtual bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) = 0;
+    virtual bool transactionChecks(int64_t spHandle, int64_t uniqueId) = 0;
 };
 
 class DRTupleStreamDisableGuard {

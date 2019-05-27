@@ -14,10 +14,11 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
+import javax.annotation_voltpatches.Nullable;
+
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
-import javax.annotation_voltpatches.Nullable;
 
 /**
  * A {@link ListenableFuture} whose result can be set by a {@link #set(Object)}, {@link
@@ -41,6 +42,10 @@ public final class SettableFuture<V> extends AbstractFuture.TrustedFuture<V> {
     return new SettableFuture<V>();
   }
 
+  public static <V> SettableFuture<V> create(boolean maskExecutorExceptions) {
+      return new SettableFuture<V>(maskExecutorExceptions);
+    }
+
   @CanIgnoreReturnValue
   @Override
   public boolean set(@Nullable V value) {
@@ -61,4 +66,7 @@ public final class SettableFuture<V> extends AbstractFuture.TrustedFuture<V> {
   }
 
   private SettableFuture() {}
+  private SettableFuture(boolean maskExecutorExceptions) {
+      super(maskExecutorExceptions);
+  }
 }

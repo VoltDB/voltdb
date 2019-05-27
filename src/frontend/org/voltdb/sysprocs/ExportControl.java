@@ -34,7 +34,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
@@ -47,12 +46,6 @@ public class ExportControl extends VoltSystemProcedure {
     public static enum OperationMode{ RELEASE
                        //PAUSE, RESUME, TRUNCATE //for future use
     }
-
-    private static final int DEP_exportalControl = (int)
-            SysProcFragmentId.PF_exportControl | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-    private static final int DEF_exportControlAggregate = (int)
-            SysProcFragmentId.PF_exportControlAggregate;
-
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -86,10 +79,10 @@ public class ExportControl extends VoltSystemProcedure {
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
 
-            return new DependencyPair.TableDependencyPair(DEP_exportalControl, results);
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControl, results);
         } else if (fragmentId == SysProcFragmentId.PF_exportControlAggregate) {
-            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_exportalControl));
-            return new DependencyPair.TableDependencyPair(DEF_exportControlAggregate, result);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(SysProcFragmentId.PF_exportControl));
+            return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_exportControlAggregate, result);
         }
         return null;
     }
@@ -124,23 +117,7 @@ public class ExportControl extends VoltSystemProcedure {
 
     private final VoltTable[] performExportControl(String exportSource,
             String[] exportTargets, String operationMode) {
-        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-        pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_exportControl;
-        pfs[0].outputDepId = DEP_exportalControl;
-        pfs[0].inputDepIds = new int[] {};
-        pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                exportSource, exportTargets, operationMode);
-
-        // This fragment aggregates the results of creating those files
-        pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_exportControlAggregate;
-        pfs[1].outputDepId = DEF_exportControlAggregate;
-        pfs[1].inputDepIds = new int[] { DEP_exportalControl };
-        pfs[1].multipartition = false;
-        pfs[1].parameters = ParameterSet.emptyParameterSet();
-
-        return executeSysProcPlanFragments(pfs, DEF_exportControlAggregate);
+        return createAndExecuteSysProcPlan(SysProcFragmentId.PF_exportControl,
+                SysProcFragmentId.PF_exportControlAggregate, exportSource, exportTargets, operationMode);
     }
 }

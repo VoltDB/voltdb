@@ -42,6 +42,8 @@ public:
         m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
 
+    char * getTupleForTest() const { return m_tuple; }
+
 private:
     char* m_tuple;
     PersistentTableSurgeon *m_tableSurgeon;

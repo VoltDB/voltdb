@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2008-11-12 11:37:53 -0800 (Wed, 12 Nov 2008) $
+ * $Date$
  */
 
 
@@ -16,6 +16,12 @@
 #include "boost/date_time/locale_config.hpp"
 #ifndef BOOST_DATE_TIME_NO_LOCALE
 #  include <ostream>
+#endif
+
+#if defined(BOOST_MSVC)
+#pragma warning(push)
+// conditional expression is constant
+#pragma warning(disable: 4127)
 #endif
 
 namespace boost {
@@ -136,9 +142,7 @@ public:
   }
   bool operator==(const int& rhs) const
   {
-    // quiets compiler warnings
-    bool is_signed = std::numeric_limits<int_type>::is_signed;
-    if(!is_signed)
+    if(!std::numeric_limits<int_type>::is_signed)
     {
       if(is_neg_inf(value_) && rhs == 0)
       {
@@ -153,9 +157,7 @@ public:
   }
   bool operator!=(const int& rhs) const
   {
-    // quiets compiler warnings
-    bool is_signed = std::numeric_limits<int_type>::is_signed;
-    if(!is_signed)
+    if(!std::numeric_limits<int_type>::is_signed)
     {
       if(is_neg_inf(value_) && rhs == 0)
       {
@@ -171,8 +173,7 @@ public:
   bool operator<(const int& rhs) const
   {
     // quiets compiler warnings
-    bool is_signed = std::numeric_limits<int_type>::is_signed;
-    if(!is_signed)
+    if(!std::numeric_limits<int_type>::is_signed)
     {
       if(is_neg_inf(value_) && rhs == 0)
       {
@@ -230,7 +231,7 @@ public:
         return int_adapter::neg_infinity();
       }
     }
-    return int_adapter<int_type>(value_ + rhs.as_number());
+    return int_adapter<int_type>(value_ + static_cast<int_type>(rhs.as_number()));
   }
 
   int_adapter operator+(const int_type rhs) const
@@ -279,7 +280,7 @@ public:
         return int_adapter::pos_infinity();
       }
     }
-    return int_adapter<int_type>(value_ - rhs.as_number());
+    return int_adapter<int_type>(value_ - static_cast<int_type>(rhs.as_number()));
   }
   int_adapter operator-(const int_type rhs) const
   {
@@ -414,18 +415,10 @@ private:
   //! Assumes at least 'this' or 'rhs' is a special value
   int_adapter mult_div_specials(const int_adapter& rhs)const
   {
-    int min_value; 
-    // quiets compiler warnings
-    bool is_signed = std::numeric_limits<int_type>::is_signed;
-    if(is_signed) {
-      min_value = 0;
-    }
-    else {
-      min_value = 1;// there is no zero with unsigned
-    }
     if(this->is_nan() || rhs.is_nan()) {
       return int_adapter<int_type>(not_a_number());
     }
+    BOOST_CONSTEXPR_OR_CONST int min_value = std::numeric_limits<int_type>::is_signed ? 0 : 1; 
     if((*this > 0 && rhs > 0) || (*this < min_value && rhs < min_value)) {
         return int_adapter<int_type>(pos_infinity());
     }
@@ -443,18 +436,10 @@ private:
   //! Assumes 'this' is a special value
   int_adapter mult_div_specials(const int& rhs) const
   {
-    int min_value; 
-    // quiets compiler warnings
-    bool is_signed = std::numeric_limits<int_type>::is_signed;
-    if(is_signed) {
-      min_value = 0;
-    }
-    else {
-      min_value = 1;// there is no zero with unsigned
-    }
     if(this->is_nan()) {
       return int_adapter<int_type>(not_a_number());
     }
+    BOOST_CONSTEXPR_OR_CONST int min_value = std::numeric_limits<int_type>::is_signed ? 0 : 1; 
     if((*this > 0 && rhs > 0) || (*this < min_value && rhs < 0)) {
         return int_adapter<int_type>(pos_infinity());
     }
@@ -504,6 +489,8 @@ private:
 
 } } //namespace date_time
 
-
+#if defined(BOOST_MSVC)
+#pragma warning(pop)
+#endif
 
 #endif

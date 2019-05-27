@@ -25,7 +25,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -74,8 +73,8 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogSerializer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.DRCatalogCommands;
@@ -110,6 +109,7 @@ import org.voltdb.utils.MinimumRatioMaintainer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Lists;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
@@ -558,27 +558,35 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                if (!clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                    clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
-                }
-                int oldProducerPartitionCount = clusterSources.size() - 1;
-                int newProducerPartitionCount = entry.getValue();
-                assert(oldProducerPartitionCount >= 0);
-                assert(newProducerPartitionCount != -1);
-
-                for (int i = oldProducerPartitionCount; i < newProducerPartitionCount; i++) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, i);
-                    clusterSources.put(i, tracker);
-                }
+                addRemoveTrackers(producerClusterId, entry.getValue(), clusterSources);
 
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
+        }
+
+        private void addRemoveTrackers(int clusterId, int newCount, Map<Integer, DRSiteDrIdTracker> currMap) {
+            if (!currMap.containsKey(MpInitiator.MP_INIT_PID)) {
+                DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                                                DRLogSegmentId.makeEmptyDRId(clusterId),
+                                                Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                currMap.put(MpInitiator.MP_INIT_PID, tracker);
+            }
+
+            int oldCount = currMap.size() - 1;
+            assert(oldCount >= 0);
+            assert(newCount > 0);
+
+            if (newCount > oldCount) { // elastic add. Initialize trackers for new partitions
+                for (int i = oldCount; i < newCount; i++) {
+                    DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                            DRLogSegmentId.makeEmptyDRId(clusterId),
+                            Long.MIN_VALUE, Long.MIN_VALUE, i);
+                    currMap.put(i, tracker);
+                }
+            } else { // elastic remove. Remove trackers for removed partitions
+                for (int i=newCount; i< oldCount; i++) {
+                    currMap.remove(i);
+                }
             }
         }
 
@@ -723,7 +731,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
-        final int exportFlushTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
+        int configuredTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
+        final int exportFlushTimeout = configuredTimeout > 0 ? configuredTimeout : 4*1000;
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting
@@ -1104,13 +1113,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo, false);
     }
 
     @Override
     public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
             VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo)
+            boolean undo, boolean elastic)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
@@ -1119,7 +1128,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 uniqueId,
                 returnUniqueViolations,
                 shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
+                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                elastic);
     }
 
     @Override
@@ -1159,8 +1169,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return;
         }
 
-        for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
-            final UndoAction action = iterator.previous();
+        if (undo) {
+            undoLog = Lists.reverse(undoLog);
+        }
+        for (UndoAction action : undoLog) {
             if (undo) {
                 action.undo();
             } else {
@@ -1236,9 +1248,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long[] getUSOForExportTable(String signature)
+    public long[] getUSOForExportTable(String streamName)
     {
-        return m_ee.getUSOForExportTable(signature);
+        return m_ee.getUSOForExportTable(streamName);
     }
 
     @Override
@@ -1410,10 +1422,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void exportAction(boolean syncAction,
                              long uso,
                              Long sequenceNumber,
-                             Integer partitionId, String tableSignature)
+                             Integer partitionId, String streamName)
     {
         m_ee.exportAction(syncAction, uso, sequenceNumber,
-                          partitionId, tableSignature);
+                          partitionId, streamName);
+    }
+
+    @Override
+    public int deleteMigratedRows(long txnid,
+                                      long spHandle,
+                                      long uniqueId,
+                                      String tableName,
+                                      long deletableTxnId,
+                                      int maxRowCount)
+    {
+        return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
+                tableName, deletableTxnId, maxRowCount, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1483,10 +1507,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
-                    catalogTable.getSignature());
-
+                    catalogTable.getTypeName());
             // assign the stats to the other partition's value
-            ExportManagerInterface.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getSignature(),
+            ExportManagerInterface.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
                     false, true, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
         }
 
@@ -1622,7 +1645,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
             for (Table t : oldTables) {
                 if (t.getIsdred()) {
-                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    DRCatalogChange |= diffCmds.contains(CatalogSerializer.getDeleteDiffStatement(t, "tables"));
                     if (DRCatalogChange) {
                         break;
                     }
@@ -1772,16 +1795,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, -1, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logs[])
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte logs[])
             throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
         paramBuffer.put(logs);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, remoteTxnUniqueId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1855,11 +1878,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void disableExternalStreams() {
+        m_ee.disableExternalStreams();
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        return m_ee.externalStreamsEnabled();
+    }
+
+    @Override
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
     }
 
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
+    }
+
+    @Override
+    public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
+            ComparisonOperation op) {
+        return m_loadedProcedures.getMigrateProcRunner(procName, catTable, column, op);
+    }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE;
     }
 }

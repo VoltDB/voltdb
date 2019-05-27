@@ -71,6 +71,7 @@ import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -109,6 +110,7 @@ public class SnapshotUtil {
     public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
     public static final String JSON_TABLES = "tables";
     public static final String JSON_SKIPTABLES = "skiptables";
+    public static final String JSON_ELASTIC_OPERATION = "elasticOperationMetadata";
     /**
      * milestone used to mark a shutdown save snapshot
      */
@@ -188,7 +190,7 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair("txnId", txnId);
                 stringer.keySymbolValuePair("timestamp", timestamp);
                 stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
-                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -624,8 +626,9 @@ public class SnapshotUtil {
             return null;
         } finally {
             try {
-                if (fis != null)
+                if (fis != null) {
                     fis.close();
+                }
             } catch (IOException e) {}
         }
     }
@@ -857,7 +860,9 @@ public class SnapshotUtil {
             try {
                 if (f.getName().endsWith(".digest")) {
                     JSONObject digest = CRCCheck(f, logger);
-                    if (digest == null) continue;
+                    if (digest == null) {
+                        continue;
+                    }
                     Long snapshotTxnId = digest.getLong("txnId");
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
@@ -1266,7 +1271,7 @@ public class SnapshotUtil {
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables) {
             // Export tables are not included in the snapshot.
-            if (CatalogUtil.isTableExportOnly(database, table)) {
+            if (TableType.isStream(table.getTabletype())) {
                 continue;
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.
@@ -1298,7 +1303,9 @@ public class SnapshotUtil {
     }
 
     public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
-        if (results.length < 1) return "HAD NO RESULT TABLES";
+        if (results.length < 1) {
+            return "HAD NO RESULT TABLES";
+        }
         final VoltTable result = results[0];
         result.resetRowPosition();
         //Crazy old code would return one column with an error message.
@@ -1464,7 +1471,9 @@ public class SnapshotUtil {
                             response = responses.poll(
                                     TimeUnit.HOURS.toMillis(2) - (System.currentTimeMillis() - startTime),
                                     TimeUnit.MILLISECONDS);
-                            if (response == null) break;
+                            if (response == null) {
+                                break;
+                            }
                         } catch (InterruptedException e) {
                             VoltDB.crashLocalVoltDB("Should never happen", true, e);
                         }
@@ -1667,5 +1676,23 @@ public class SnapshotUtil {
         StringBuilder sb = new StringBuilder(64).append(dfmt.format(new Date()))
                 .append(Long.toString(zkTxnId, Character.MAX_RADIX));
         return sb.toString();
+    }
+
+    public static String makeSnapshotNonce(String type, long hsid) {
+        return type + "_" + hsid + "_" + System.currentTimeMillis();
+    }
+
+    public static String makeSnapshotRequest(SnapshotRequestConfig config) {
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            config.toJSONString(jsStringer);
+            jsStringer.endObject();
+            return jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+        // unreachable;
+        return null;
     }
 }

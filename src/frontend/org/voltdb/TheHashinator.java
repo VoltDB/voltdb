@@ -176,6 +176,13 @@ public abstract class TheHashinator {
     abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
+    /**
+     * @return {@link Set} of partitions which are in this hashinator
+     */
+    public Set<Integer> getPartitions() {
+        return pGetPartitions();
+    }
+
     static public void resetElasticallyModifiedForTest() {
         m_elasticallyModified = false;
     }
@@ -325,7 +332,9 @@ public abstract class TheHashinator {
         if (existingHashinator == null) {
             existingHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
             TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, existingHashinator);
-            if (tempVal != null) existingHashinator = tempVal;
+            if (tempVal != null) {
+                existingHashinator = tempVal;
+            }
         }
 
         //Do a CAS loop to maintain a global instance
@@ -466,10 +475,16 @@ public abstract class TheHashinator {
                 Set<Integer> partitions = TheHashinator.this.pGetPartitions();
 
                 for (int ii = 0; ii < 500000; ii++) {
-                    if (partitions.isEmpty()) break;
+                    if (partitions.isEmpty()) {
+                        break;
+                    }
                     Object value = null;
-                    if (type == VoltType.INTEGER) value = ii;
-                    if (type == VoltType.STRING) value = String.valueOf(ii);
+                    if (type == VoltType.INTEGER) {
+                        value = ii;
+                    }
+                    if (type == VoltType.STRING) {
+                        value = String.valueOf(ii);
+                    }
                     if (type == VoltType.VARBINARY) {
                         ByteBuffer buf = ByteBuffer.allocate(4);
                         buf.putInt(ii);

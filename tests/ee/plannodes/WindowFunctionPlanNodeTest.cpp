@@ -231,7 +231,7 @@ TEST_F(WindowFunctionPlanNodeTest, TestJSON)
         const char *jsonString = jsonStrings[jsonIdx];
         jsonDescription *jsonDescr = &jsonDescrs[jsonIdx];
         PlannerDomRoot root(jsonString);
-        PlannerDomValue obj(root.rootObject());
+        PlannerDomValue obj(root());
         // If the json string is busted this will be true.
         EXPECT_FALSE(root.isNull());
         boost::shared_ptr<voltdb::WindowFunctionPlanNode>

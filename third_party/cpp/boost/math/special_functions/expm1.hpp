@@ -28,6 +28,16 @@
 #  include <boost/assert.hpp>
 #endif
 
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
+
 namespace boost{ namespace math{
 
 namespace detail
@@ -107,6 +117,10 @@ T expm1_imp(T x, const mpl::int_<0>&, const Policy& pol)
    BOOST_MATH_STD_USING
 
    T a = fabs(x);
+   if((boost::math::isnan)(a))
+   {
+      return policies::raise_domain_error<T>("boost::math::expm1<%1%>(%1%)", "expm1 requires a finite argument, but got %1%", a, pol);
+   }
    if(a > T(0.5f))
    {
       if(a >= tools::log_max_value<T>())
@@ -188,7 +202,7 @@ T expm1_imp(T x, const mpl::int_<64>&, const P& pol)
        BOOST_MATH_BIG_CONSTANT(T, 64, -0.714539134024984593011e-6)
    };
    static const T d[] = { 
-      1, 
+      BOOST_MATH_BIG_CONSTANT(T, 64, 1.0),
       BOOST_MATH_BIG_CONSTANT(T, 64, -0.461477618025562520389e0),
       BOOST_MATH_BIG_CONSTANT(T, 64, 0.961237488025708540713e-1),
       BOOST_MATH_BIG_CONSTANT(T, 64, -0.116483957658204450739e-1),
@@ -234,7 +248,7 @@ T expm1_imp(T x, const mpl::int_<113>&, const P& pol)
       BOOST_MATH_BIG_CONSTANT(T, 113, 0.45261820069007790520447958280473183582e-10)
    };
    static const T d[] = { 
-      1,
+      BOOST_MATH_BIG_CONSTANT(T, 113, 1.0),
       BOOST_MATH_BIG_CONSTANT(T, 113, -0.45441264709074310514348137469214538853e0),
       BOOST_MATH_BIG_CONSTANT(T, 113, 0.96827131936192217313133611655555298106e-1),
       BOOST_MATH_BIG_CONSTANT(T, 113, -0.12745248725908178612540554584374876219e-1),

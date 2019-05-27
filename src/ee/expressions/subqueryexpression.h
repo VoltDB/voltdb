@@ -15,14 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HSTORESUBQUERYEXPRESSION_H
-#define HSTORESUBQUERYEXPRESSION_H
-
-#include "expressions/abstractexpression.h"
-
-#include <boost/scoped_ptr.hpp>
-
+#pragma once
 #include <vector>
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
@@ -39,7 +34,7 @@ class SubqueryExpression : public AbstractExpression {
         int subqueryId,
         const std::vector<int>& paramIdxs,
         const std::vector<int>& otherParamIdxs,
-        const std::vector<AbstractExpression*>* tveParams);
+        const std::vector<AbstractExpression*>& tveParams);
 
     ~SubqueryExpression();
 
@@ -60,8 +55,8 @@ class SubqueryExpression : public AbstractExpression {
     std::vector<int> m_otherParamIdxs;
 
     // The list of the corresponding TVE for each parameter index
-    boost::scoped_ptr<const std::vector<AbstractExpression*> > m_tveParams;
+    const std::vector<AbstractExpression*> m_tveParams;
 };
 
 }
-#endif
+

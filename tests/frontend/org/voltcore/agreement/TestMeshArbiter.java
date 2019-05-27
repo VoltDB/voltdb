@@ -27,16 +27,16 @@ import static com.natpryce.makeiteasy.MakeItEasy.a;
 import static com.natpryce.makeiteasy.MakeItEasy.make;
 import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.FailureSiteForwardMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmMsg;
@@ -315,7 +315,6 @@ public class TestMeshArbiter {
                 );
         Maker<SiteFailureForwardMessage> uf = a(FailureSiteForwardMessage);
 
-        when(aide.getNewestSafeTransactionForInitiator(0L)).thenReturn(10L);
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))

@@ -209,7 +209,7 @@ bool ElasticIndexReadContext::parseHashRange(
                                                  boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
             }
-            catch(boost::bad_lexical_cast) {
+            catch(const boost::bad_lexical_cast&) {
                 char errMsg[1024 * 16];
                 snprintf(errMsg, 1024 * 16,
                          "Unable to parse ElasticIndexReadContext predicate \"%s\".",

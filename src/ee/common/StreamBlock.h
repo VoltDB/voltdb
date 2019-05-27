@@ -41,58 +41,31 @@ namespace voltdb
             : m_data(data + headerSize), m_capacity(capacity - headerSize),
               m_headerSize(headerSize), m_offset(0),
               m_uso(uso),
-              m_lastDRBeginTxnOffset(0),
-              m_rowCountForDR(0),
-              m_rowCountForExport(0),
               m_type(NORMAL_STREAM_BLOCK),
-              m_drEventType(voltdb::NOT_A_EVENT),
-              m_hasDRBeginTxn(false),
-              m_needsSchema(true),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
-              m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
-              m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
-              m_lastSpUniqueId(0),
-              m_lastMpUniqueId(0),
-              m_startExportSequenceNumber(0)
-        {
-        }
+              m_lastSpUniqueId(0)
+        {}
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity),
               m_headerSize(other->m_headerSize), m_offset(other->m_offset),
               m_uso(other->m_uso),
-              m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
-              m_rowCountForDR(other->m_rowCountForDR),
-              m_rowCountForExport(other->m_rowCountForExport),
               m_type(other->m_type),
-              m_drEventType(other->m_drEventType),
-              m_hasDRBeginTxn(other->m_hasDRBeginTxn),
-              m_needsSchema(other->m_needsSchema),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
-              m_startDRSequenceNumber(other->m_startDRSequenceNumber),
-              m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
-              m_lastSpUniqueId(other->m_lastSpUniqueId),
-              m_lastMpUniqueId(other->m_lastMpUniqueId),
-              m_startExportSequenceNumber(other->m_startExportSequenceNumber)
-        {
-        }
+              m_lastSpUniqueId(other->m_lastSpUniqueId)
+        {}
 
         ~StreamBlock()
-        {
-        }
+        {}
 
         /**
          * Returns a pointer to the underlying raw memory allocation
          */
-        char* rawPtr() {
+        inline char* rawPtr() {
             return m_data - m_headerSize;
         }
 
-        int32_t rawLength() const {
+        inline int32_t rawLength() const {
             return static_cast<int32_t>(m_offset + m_headerSize);
         }
 
@@ -100,7 +73,7 @@ namespace voltdb
          * Returns the universal stream offset of the block not
          * including any of the octets in this block.
          */
-        size_t uso() const {
+        inline size_t uso() const {
             return m_uso;
         }
 
@@ -110,126 +83,58 @@ namespace voltdb
          * universal stream offset for the entire block. This excludes
          * the length prefix.
          */
-        size_t offset() const {
+        inline size_t offset() const {
             return m_offset;
         }
 
         /**
          * Number of bytes left in the buffer
          */
-        size_t remaining() const {
+        inline size_t remaining() const {
             return m_capacity - m_offset;
         }
 
-        size_t headerSize() const {
+        inline size_t headerSize() const {
             return m_headerSize;
         }
 
         /**
          * Number of maximum bytes stored in the buffer
          */
-        size_t capacity() const {
+        inline size_t capacity() const {
             return m_capacity;
         }
 
-        size_t lastDRBeginTxnOffset() const {
-            return m_lastDRBeginTxnOffset;
-        }
-
-        int64_t startDRSequenceNumber() const {
-            return m_startDRSequenceNumber;
-        }
-
-        void startDRSequenceNumber(int64_t startDRSequenceNumber) {
-            m_startDRSequenceNumber = std::min(startDRSequenceNumber, m_startDRSequenceNumber);
-        }
-
-        int64_t lastDRSequenceNumber() const {
-            return m_lastDRSequenceNumber;
-        }
-
-        int64_t lastSpUniqueId() const {
-            return m_lastSpUniqueId;
-        }
-
-        int64_t lastMpUniqueId() const {
-            return m_lastMpUniqueId;
-        }
-
-        int64_t lastCommittedSpHandle() {
+        inline int64_t lastCommittedSpHandle() {
             return m_lastCommittedSpHandle;
         }
 
-        int64_t startExportSequenceNumber() const {
-            return m_startExportSequenceNumber;
-        }
-
-        int64_t lastExportSequenceNumber() const {
-            return m_startExportSequenceNumber + (int64_t)getRowCountforExport() - 1;
-        }
-
-        void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
-            m_lastDRSequenceNumber = lastDRSequenceNumber;
-        }
-
-        void recordCompletedSpTxn(int64_t lastSpUniqueId) {
-            m_lastSpUniqueId = lastSpUniqueId;
-        }
-
-        void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
-            m_lastMpUniqueId = lastMpUniqueId;
-        }
-
-        void recordLastCommittedSpHandle(int64_t spHandle) {
+        inline void recordLastCommittedSpHandle(int64_t spHandle) {
             m_lastCommittedSpHandle = spHandle;
         }
 
-        void recordStartExportSequenceNumber(int64_t startExportSequenceNumber) {
-            m_startExportSequenceNumber = startExportSequenceNumber;
+        inline void recordCompletedSpTxn(int64_t lastSpUniqueId) {
+            m_lastSpUniqueId = lastSpUniqueId;
         }
 
-        void markAsEventBuffer(DREventType type) {
-            m_drEventType = type;
+        inline int64_t lastSpUniqueId() const {
+            return m_lastSpUniqueId;
         }
 
-        DREventType drEventType() {
-            return m_drEventType;
-        }
-
-        size_t updateRowCountForDR(size_t rowsToCommit) {
-            m_rowCountForDR += rowsToCommit;
-            return m_rowCountForDR;
-        }
-
-        void updateRowCountForExport(size_t rowsToExport) {
-            m_rowCountForExport += rowsToExport;
-        }
-
-        size_t getRowCountforExport() const {
-            return m_rowCountForExport;
-        }
-
-        StreamBlockType type() const {
+        inline StreamBlockType type() const {
             return m_type;
         }
-        bool needsSchema() { return m_needsSchema; }
-        void noSchema() { m_needsSchema = false; };
 
-    private:
-        char* mutableDataPtr() {
+        inline char* mutableDataPtr() {
             return m_data + m_offset;
         }
 
-        char* headerDataPtr() {
-            return m_data - (m_headerSize - MAGIC_HEADER_SPACE_FOR_JAVA);
-        }
-
-        void consumed(size_t consumed) {
+        inline void commonConsumed(size_t consumed) {
             assert ((m_offset + consumed) <= m_capacity);
             m_offset += consumed;
         }
 
-        void truncateTo(size_t mark) {
+        inline void commonTruncateTo(size_t mark) {
             // just move offset. pretty easy.
             if (((m_uso + offset()) >= mark ) && (m_uso <= mark)) {
                 m_offset = mark - m_uso;
@@ -239,57 +144,191 @@ namespace voltdb
                                     "\n m_uso(%jd), m_offset(%jd), mark(%jd)\n",
                                     (intmax_t)m_uso, (intmax_t)m_offset, (intmax_t)mark);
             }
-
-            recordLastBeginTxnOffset();
         }
 
-        void recordLastBeginTxnOffset() {
-            m_lastDRBeginTxnOffset = m_offset;
-            m_hasDRBeginTxn = true;
-        }
+        inline void setType(StreamBlockType type) { m_type = type; }
 
-        void clearLastBeginTxnOffset() {
-            m_lastDRBeginTxnOffset = 0;
-            m_hasDRBeginTxn =false;
-        }
-
-        bool hasDRBeginTxn() {
-            return m_hasDRBeginTxn;
-        }
-
-        char* mutableLastBeginTxnDataPtr() {
-            return m_data + m_lastDRBeginTxnOffset;
-        }
-
-        void setType(StreamBlockType type) { m_type = type; }
-
+    protected:
         char *m_data;
         const size_t m_capacity;
         const size_t m_headerSize;
         size_t m_offset;         // position for next write.
-        size_t m_uso;            // universal stream offset of m_offset 0.
-        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
-        size_t m_rowCountForDR;
-        size_t m_rowCountForExport;
+        const size_t m_uso;            // universal stream offset of m_offset 0.
 
         StreamBlockType m_type;
+
+        int64_t m_lastCommittedSpHandle; // for record last CommittedSpHandle for Sp Txn in this block
+        int64_t m_lastSpUniqueId;
+    };
+
+
+    class ExportStreamBlock : public StreamBlock {
+    public:
+        ExportStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
+            StreamBlock(data, headerSize, capacity, uso),
+            m_rowCount(0),
+            m_startSequenceNumber(0),
+            m_committedSequenceNumber(-1L)
+        {}
+
+        ExportStreamBlock(ExportStreamBlock* other) :
+            StreamBlock(other),
+            m_rowCount(other->m_rowCount),
+            m_startSequenceNumber(other->m_startSequenceNumber),
+            m_committedSequenceNumber(other->m_committedSequenceNumber)
+        {}
+
+        ~ExportStreamBlock()
+        {}
+
+        inline void recordStartSequenceNumber(int64_t startSequenceNumber) {
+            m_startSequenceNumber = startSequenceNumber;
+        }
+
+        inline const size_t getRowCount() const {
+            return m_rowCount;
+        }
+
+        inline int64_t startSequenceNumber() const {
+            return m_startSequenceNumber;
+        }
+
+        inline int64_t lastSequenceNumber() const {
+            return m_startSequenceNumber + (int64_t)getRowCount() - 1;
+        }
+
+        inline int64_t getCommittedSequenceNumber() const {
+            return m_committedSequenceNumber;
+        }
+
+        inline void setCommittedSequenceNumber(int64_t committedSequenceNumber) {
+            m_committedSequenceNumber = committedSequenceNumber;
+        }
+
+        inline char* headerDataPtr() {
+            return m_data - (m_headerSize - MAGIC_HEADER_SPACE_FOR_JAVA);
+        }
+
+        inline void consumed(size_t consumed) {
+            commonConsumed(consumed);
+            m_rowCount++;
+        }
+
+        inline void truncateExportTo(size_t mark, int64_t seqNo) {
+            commonTruncateTo(mark);
+            m_rowCount = seqNo - m_startSequenceNumber;
+        }
+
+    private:
+        size_t m_rowCount;
+        int64_t m_startSequenceNumber;
+        int64_t m_committedSequenceNumber;
+    };
+
+
+    class DrStreamBlock : public StreamBlock {
+    public:
+        DrStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
+            StreamBlock(data, headerSize, capacity, uso),
+            m_lastDRBeginTxnOffset(0),
+            m_rowCountForDR(0),
+            m_drEventType(voltdb::NOT_A_EVENT),
+            m_hasDRBeginTxn(false),
+            m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
+            m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
+            m_lastMpUniqueId(0)
+        {}
+
+        DrStreamBlock(DrStreamBlock *other) :
+            StreamBlock(other),
+            m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
+            m_rowCountForDR(other->m_rowCountForDR),
+            m_drEventType(other->m_drEventType),
+            m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+            m_startDRSequenceNumber(other->m_startDRSequenceNumber),
+            m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
+            m_lastMpUniqueId(other->m_lastMpUniqueId)
+        {}
+
+        ~DrStreamBlock()
+        {}
+
+        inline void markAsEventBuffer(DREventType type) {
+            m_drEventType = type;
+        }
+
+        inline DREventType drEventType() {
+            return m_drEventType;
+        }
+
+        inline size_t updateRowCountForDR(size_t rowsToCommit) {
+            m_rowCountForDR += rowsToCommit;
+            return m_rowCountForDR;
+        }
+
+        inline void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
+            m_lastMpUniqueId = lastMpUniqueId;
+        }
+
+        inline int64_t lastMpUniqueId() const {
+            return m_lastMpUniqueId;
+        }
+
+        inline void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
+            m_lastDRSequenceNumber = lastDRSequenceNumber;
+        }
+
+        inline int64_t lastDRSequenceNumber() const {
+            return m_lastDRSequenceNumber;
+        }
+
+        inline void startDRSequenceNumber(int64_t startDRSequenceNumber) {
+            m_startDRSequenceNumber = std::min(startDRSequenceNumber, m_startDRSequenceNumber);
+        }
+
+        inline int64_t startDRSequenceNumber() const {
+            return m_startDRSequenceNumber;
+        }
+
+        inline size_t lastDRBeginTxnOffset() const {
+            return m_lastDRBeginTxnOffset;
+        }
+
+        inline void recordLastBeginTxnOffset() {
+            m_lastDRBeginTxnOffset = m_offset;
+            m_hasDRBeginTxn = true;
+        }
+
+        inline void clearLastBeginTxnOffset() {
+            m_lastDRBeginTxnOffset = 0;
+            m_hasDRBeginTxn =false;
+        }
+
+        inline bool hasDRBeginTxn() {
+            return m_hasDRBeginTxn;
+        }
+
+        inline char* mutableLastBeginTxnDataPtr() {
+            return m_data + m_lastDRBeginTxnOffset;
+        }
+
+        inline void consumed(size_t consumed) {
+            commonConsumed(consumed);
+        }
+
+        inline void truncateTo(size_t mark) {
+            commonTruncateTo(mark);
+            recordLastBeginTxnOffset();
+        }
+
+    private:
+        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
+        size_t m_rowCountForDR;
         DREventType m_drEventType;
         bool m_hasDRBeginTxn;    // only used for DR Buffer
-        bool m_needsSchema;
-
-        int64_t m_startSpHandle;
-        int64_t m_lastSpHandle;
-        int64_t m_lastCommittedSpHandle; // for record last CommittedSpHandle for Sp Txn in this block
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
-        int64_t m_lastSpUniqueId;
         int64_t m_lastMpUniqueId;
-        int64_t m_startExportSequenceNumber;
-
-        friend class TupleStreamBase;
-        friend class ExportTupleStream;
-        friend class AbstractDRTupleStream;
-        friend class DRTupleStream;
     };
 }
 

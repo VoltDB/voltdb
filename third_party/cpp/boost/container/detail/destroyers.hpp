@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2005-2012.
+// (C) Copyright Ion Gaztanaga 2005-2013.
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
@@ -13,38 +13,41 @@
 #ifndef BOOST_CONTAINER_DESTROYERS_HPP
 #define BOOST_CONTAINER_DESTROYERS_HPP
 
-#if (defined _MSC_VER) && (_MSC_VER >= 1200)
+#ifndef BOOST_CONFIG_HPP
+#  include <boost/config.hpp>
+#endif
+
+#if defined(BOOST_HAS_PRAGMA_ONCE)
 #  pragma once
 #endif
 
-#include "config_begin.hpp"
+#include <boost/container/detail/config_begin.hpp>
 #include <boost/container/detail/workaround.hpp>
-#include <boost/container/detail/version_type.hpp>
-#include <boost/container/detail/utilities.hpp>
+
 #include <boost/container/allocator_traits.hpp>
+#include <boost/move/detail/to_raw_pointer.hpp>
+#include <boost/container/detail/version_type.hpp>
 
 namespace boost {
 namespace container {
-namespace container_detail {
+namespace dtl {
 
 //!A deleter for scoped_ptr that deallocates the memory
 //!allocated for an object using a STL allocator.
-template <class A>
+template <class Allocator>
 struct scoped_deallocator
 {
-   typedef allocator_traits<A> allocator_traits_type;
+   typedef allocator_traits<Allocator> allocator_traits_type;
    typedef typename allocator_traits_type::pointer pointer;
-   typedef container_detail::integral_constant<unsigned,
-      boost::container::container_detail::
-         version<A>::value>                   alloc_version;
-   typedef container_detail::integral_constant<unsigned, 1>     allocator_v1;
-   typedef container_detail::integral_constant<unsigned, 2>     allocator_v2;
+   typedef dtl::integral_constant<unsigned,
+      boost::container::dtl::
+         version<Allocator>::value>                   alloc_version;
 
    private:
-   void priv_deallocate(allocator_v1)
+   void priv_deallocate(version_1)
    {  m_alloc.deallocate(m_ptr, 1); }
 
-   void priv_deallocate(allocator_v2)
+   void priv_deallocate(version_2)
    {  m_alloc.deallocate_one(m_ptr); }
 
    BOOST_MOVABLE_BUT_NOT_COPYABLE(scoped_deallocator)
@@ -52,9 +55,9 @@ struct scoped_deallocator
    public:
 
    pointer     m_ptr;
-   A&  m_alloc;
+   Allocator&  m_alloc;
 
-   scoped_deallocator(pointer p, A& a)
+   scoped_deallocator(pointer p, Allocator& a)
       : m_ptr(p), m_alloc(a)
    {}
 
@@ -67,6 +70,9 @@ struct scoped_deallocator
 
    pointer get() const
    {  return m_ptr;  }
+
+   void set(const pointer &p)
+   {  m_ptr = p;  }
 
    void release()
    {  m_ptr = 0; }
@@ -87,6 +93,9 @@ struct null_scoped_deallocator
 
    pointer get() const
    {  return pointer();  }
+
+   void set(const pointer &)
+   {}
 };
 
 //!A deleter for scoped_ptr that deallocates the memory
@@ -133,11 +142,9 @@ struct scoped_destroy_deallocator
    typedef boost::container::allocator_traits<Allocator> AllocTraits;
    typedef typename AllocTraits::pointer    pointer;
    typedef typename AllocTraits::size_type  size_type;
-   typedef container_detail::integral_constant<unsigned,
-      boost::container::container_detail::
+   typedef dtl::integral_constant<unsigned,
+      boost::container::dtl::
          version<Allocator>::value>                          alloc_version;
-   typedef container_detail::integral_constant<unsigned, 1>  allocator_v1;
-   typedef container_detail::integral_constant<unsigned, 2>  allocator_v2;
 
    scoped_destroy_deallocator(pointer p, Allocator& a)
       : m_ptr(p), m_alloc(a) {}
@@ -145,7 +152,7 @@ struct scoped_destroy_deallocator
    ~scoped_destroy_deallocator()
    {
       if(m_ptr){
-         AllocTraits::destroy(m_alloc, container_detail::to_raw_pointer(m_ptr));
+         AllocTraits::destroy(m_alloc, boost::movelib::to_raw_pointer(m_ptr));
          priv_deallocate(m_ptr, alloc_version());
       }
    }
@@ -155,10 +162,10 @@ struct scoped_destroy_deallocator
 
    private:
 
-   void priv_deallocate(const pointer &p, allocator_v1)
+   void priv_deallocate(const pointer &p, version_1)
    {  AllocTraits::deallocate(m_alloc, p, 1); }
 
-   void priv_deallocate(const pointer &p, allocator_v2)
+   void priv_deallocate(const pointer &p, version_2)
    {  m_alloc.deallocate_one(p); }
 
    pointer     m_ptr;
@@ -191,13 +198,13 @@ struct scoped_destructor_n
 
    void shrink_forward(size_type inc)
    {  m_n -= inc;   m_p += inc;  }
-  
+
    ~scoped_destructor_n()
    {
       if(!m_p) return;
-      value_type *raw_ptr = container_detail::to_raw_pointer(m_p);
+      value_type *raw_ptr = boost::movelib::to_raw_pointer(m_p);
       while(m_n--){
-         AllocTraits::destroy(m_a, raw_ptr);
+         AllocTraits::destroy(m_a, raw_ptr++);
       }
    }
 
@@ -225,17 +232,20 @@ struct null_scoped_destructor_n
    void increment_size_backwards(size_type)
    {}
 
+   void shrink_forward(size_type)
+   {}
+
    void release()
    {}
 };
 
-template<class A>
+template<class Allocator>
 class scoped_destructor
 {
-   typedef boost::container::allocator_traits<A> AllocTraits;
+   typedef boost::container::allocator_traits<Allocator> AllocTraits;
    public:
-   typedef typename A::value_type value_type;
-   scoped_destructor(A &a, value_type *pv)
+   typedef typename Allocator::value_type value_type;
+   scoped_destructor(Allocator &a, value_type *pv)
       : pv_(pv), a_(a)
    {}
 
@@ -249,19 +259,24 @@ class scoped_destructor
    void release()
    {  pv_ = 0; }
 
+
+   void set(value_type *ptr) { pv_ = ptr; }
+
+   value_type *get() const { return pv_; }
+
    private:
    value_type *pv_;
-   A &a_;
+   Allocator &a_;
 };
 
 
-template<class A>
+template<class Allocator, class Value = typename Allocator::value_type>
 class value_destructor
 {
-   typedef boost::container::allocator_traits<A> AllocTraits;
+   typedef boost::container::allocator_traits<Allocator> AllocTraits;
    public:
-   typedef typename A::value_type value_type;
-   value_destructor(A &a, value_type &rv)
+   typedef Value value_type;
+   value_destructor(Allocator &a, value_type &rv)
       : rv_(rv), a_(a)
    {}
 
@@ -272,7 +287,7 @@ class value_destructor
 
    private:
    value_type &rv_;
-   A &a_;
+   Allocator &a_;
 };
 
 template <class Allocator>
@@ -281,69 +296,67 @@ class allocator_destroyer
    typedef boost::container::allocator_traits<Allocator> AllocTraits;
    typedef typename AllocTraits::value_type value_type;
    typedef typename AllocTraits::pointer    pointer;
-   typedef container_detail::integral_constant<unsigned,
-      boost::container::container_detail::
+   typedef dtl::integral_constant<unsigned,
+      boost::container::dtl::
          version<Allocator>::value>                           alloc_version;
-   typedef container_detail::integral_constant<unsigned, 1>  allocator_v1;
-   typedef container_detail::integral_constant<unsigned, 2>  allocator_v2;
 
    private:
    Allocator & a_;
 
    private:
-   void priv_deallocate(const pointer &p, allocator_v1)
+   void priv_deallocate(const pointer &p, version_1)
    {  AllocTraits::deallocate(a_,p, 1); }
 
-   void priv_deallocate(const pointer &p, allocator_v2)
+   void priv_deallocate(const pointer &p, version_2)
    {  a_.deallocate_one(p); }
 
    public:
-   allocator_destroyer(Allocator &a)
+   explicit allocator_destroyer(Allocator &a)
       : a_(a)
    {}
 
    void operator()(const pointer &p)
    {
-      AllocTraits::destroy(a_, container_detail::to_raw_pointer(p));
+      AllocTraits::destroy(a_, boost::movelib::to_raw_pointer(p));
       this->priv_deallocate(p, alloc_version());
    }
 };
 
-template <class A>
+template <class Allocator>
 class allocator_destroyer_and_chain_builder
 {
-   typedef allocator_traits<A> allocator_traits_type;
+   typedef allocator_traits<Allocator> allocator_traits_type;
    typedef typename allocator_traits_type::value_type value_type;
-   typedef typename A::multiallocation_chain    multiallocation_chain;
+   typedef typename Allocator::multiallocation_chain    multiallocation_chain;
 
-   A & a_;
+   Allocator & a_;
    multiallocation_chain &c_;
 
    public:
-   allocator_destroyer_and_chain_builder(A &a, multiallocation_chain &c)
+   allocator_destroyer_and_chain_builder(Allocator &a, multiallocation_chain &c)
       :  a_(a), c_(c)
    {}
 
-   void operator()(const typename A::pointer &p)
+   void operator()(const typename Allocator::pointer &p)
    {
-      allocator_traits<A>::destroy(a_, container_detail::to_raw_pointer(p));
+      allocator_traits<Allocator>::destroy(a_, boost::movelib::to_raw_pointer(p));
       c_.push_back(p);
    }
 };
 
-template <class A>
+template <class Allocator>
 class allocator_multialloc_chain_node_deallocator
 {
-   typedef allocator_traits<A> allocator_traits_type;
+   typedef allocator_traits<Allocator> allocator_traits_type;
    typedef typename allocator_traits_type::value_type value_type;
-   typedef typename A::multiallocation_chain    multiallocation_chain;
-   typedef allocator_destroyer_and_chain_builder<A> chain_builder;
+   typedef typename Allocator::multiallocation_chain    multiallocation_chain;
+   typedef allocator_destroyer_and_chain_builder<Allocator> chain_builder;
 
-   A & a_;
+   Allocator & a_;
    multiallocation_chain c_;
 
    public:
-   allocator_multialloc_chain_node_deallocator(A &a)
+   allocator_multialloc_chain_node_deallocator(Allocator &a)
       :  a_(a), c_()
    {}
 
@@ -356,7 +369,7 @@ class allocator_multialloc_chain_node_deallocator
    }
 };
 
-}  //namespace container_detail {
+}  //namespace dtl {
 }  //namespace container {
 }  //namespace boost {
 

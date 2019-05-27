@@ -151,7 +151,9 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
     // default value of hidden dr timestamp is null
     if (m_schema->hiddenColumnCount() > 0) {
-        m_tempTuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        for (int i = 0; i < m_schema->hiddenColumnCount(); i++) {
+           m_tempTuple.setHiddenNValue(i, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        }
     }
     m_tempTuple.setActiveTrue();
 

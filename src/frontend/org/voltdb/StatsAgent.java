@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -25,13 +24,10 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.export.ExportManagerInterface;
-import org.voltdb.export.ExportStats;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -49,8 +45,8 @@ public class StatsAgent extends OpsAgent
     {
         super("StatsAgent");
         StatsSelector selectors[] = StatsSelector.values();
-        for (int ii = 0; ii < selectors.length; ii++) {
-            m_registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
+        for (StatsSelector selector : selectors) {
+            m_registeredStatsSources.put(selector, new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
         }
     }
 
@@ -523,6 +519,7 @@ public class StatsAgent extends OpsAgent
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:
+        case IDLETIME:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
         case QUEUE:
@@ -688,13 +685,7 @@ public class StatsAgent extends OpsAgent
                 m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        //putIfAbsent idiom, may return existing map value from another thread
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
-        if (statsSources == null) {
-            statsSources = new NonBlockingHashSet<StatsSource>();
-            siteIdToStatsSources.putIfAbsent(siteId, statsSources);
-        }
-        statsSources.add(source);
+        siteIdToStatsSources.computeIfAbsent(siteId, s -> new NonBlockingHashSet<>()).add(source);
     }
 
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
@@ -830,17 +821,6 @@ public class StatsAgent extends OpsAgent
                         resultTable.addRow(row);
                     }
                 }
-            }
-        }
-        if (selector == StatsSelector.TABLE) {
-            // Append all the stream table stats to Table stats (this should be deprecated at some point)
-            ExportStats statsRows = ExportManagerInterface.instance().getExportStats();
-            Iterator<Object> iter = statsRows.getStatsRowKeyIterator(interval);
-            while (iter.hasNext()) {
-                ExportStatsRow stat = statsRows.getStatsRow(iter.next());
-                resultTable.addRow(now, statsRows.getHostId(), statsRows.getHostname(),
-                        stat.m_siteId, stat.m_partitionId, stat.m_sourceName, "StreamedTable",
-                        stat.m_tupleCount, 0L, 0L, 0L, null, 0);
             }
         }
         return resultTable;

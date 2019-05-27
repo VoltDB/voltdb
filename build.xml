@@ -80,12 +80,15 @@
 <property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.prod.mac.dir'          location='${build.prod.dir}/org/voltdb/native/Mac/x86_64'/>
+<property name='build.prod.linux.dir'        location='${build.prod.dir}/org/voltdb/native/Linux/x86_64'/>
 <property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='build.testproc.dir'          location='${build.dir}/testprocs' />
 <property name='build.testfunc.dir'          location='${build.dir}/testfuncs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
+
 <property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
@@ -120,9 +123,16 @@
 <property name='cmake.verbose.config'        value='no' />
 <property name='cmake.build.maxcores'        value='-1' />
 
+
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
     <os family="mac"/>
+</condition>
+
+<condition property="jar.nativelib.dir"
+    value="${build.prod.mac.dir}"
+    else="${build.prod.linux.dir}">
+    <isset property="os.mac"/>
 </condition>
 
 <!-- Default heap size for Volt server (MB)  -->
@@ -143,6 +153,11 @@
 <!-- By default, do not do extra checking on the EE memory pools  -->
 <condition property="VOLT_POOL_CHECKING" value="false">
     <not><isset property="VOLT_POOL_CHECKING"/></not>
+</condition>
+
+<!-- By default, do not do record stack traces for each EE memory pool allocation  -->
+<condition property="VOLT_TRACE_ALLOCATIONS" value="false">
+    <not><isset property="VOLT_TRACE_ALLOCATIONS"/></not>
 </condition>
 
 <!-- By default, do not do execution timings  -->
@@ -175,7 +190,8 @@
         <include name='*.jar' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
-        <exclude name='kafka-clients-0.10.2.1.jar' />
+ <!--         <exclude name='kafka-clients-0.10.2.1.jar' /> -->
+  <!--       <exclude name='kafka-clients-0.8.2.2.jar' /> -->
         <exclude name='yuicompressor-2.4.8.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
@@ -357,13 +373,13 @@
     <include name='org/voltdb/exportclient/TestHttpExportClient.class' />
     <include name='org/voltdb/exportclient/decode/TestEntityDecoders.class' />
     <include name='org/voltdb/expressions/TestExpressionUtil.class' />
-    <include name='org/voltdb/fullddlfeatures/TestDDLFeatures.class' />
+    <include name='org/voltdb/fullddlfeatures/Test*.class' />
     <include name='org/voltdb/iv2/Test*.class' />
     <include name='org/voltdb/jdbc/Test*.class' />
     <include name='org/voltdb/jni/TestExecutionEngine.class' />
     <include name='org/voltdb/jni/TestFragmentProgressUpdate.class' />
-    <include name='org/voltdb/join/TestDataMigrationSnapshotPlanner.class' />
-    <include name='org/voltdb/join/TestElasticJoinUtils.class' />
+    <include name='org/voltdb/elastic/TestDataMigrationSnapshotPlanner.class' />
+    <include name='org/voltdb/elastic/TestElasticJoinUtils.class' />
     <include name='org/voltdb/messaging/TestVoltMessageSerialization.class' />
     <include name='org/voltdb/planner/TestAdHocPlans.class' />
     <include name='org/voltdb/planner/TestDeterminism.class' />
@@ -629,6 +645,9 @@ DISTRIBUTION
             <exclude name="lib/python" />
             <exclude name="doc/tutorials/**" />
             <exclude name="voltdb/libvoltdb*" />
+            <exclude name="voltdb/libcatalog*" />
+            <!-- This will be packaged into the Jar, do not need to include it into the distribution. -->
+            <exclude name="lib/libcatalog*" />
         </fileset>
     </copy>
 
@@ -658,7 +677,6 @@ DISTRIBUTION
             <include name="kafka/**"/>
             <include name="lib/**" />
             <include name="draingen" />
-            <include name="kubernetes/**" />
         </fileset>
     </copy>
 
@@ -706,7 +724,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
-            <exclude name="lib/python/vdm/tests/**"/>
             <exclude name="**/*.pyc" />
         </fileset>
     </copy>
@@ -785,6 +802,8 @@ DISTRIBUTION
             <exclude name=".gitignore"/>
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
+            <exclude name="voltdb/libcatalog*"/>
+            <exclude name="lib/libcatalog*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
         </fileset>
     </copy>
@@ -819,20 +838,19 @@ DISTRIBUTION
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
+        <!-- Debugging in Eclipse will need this catalog library in the voltdb folder. -->
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
+        </fileset>
     </copy>
 
     <antcall target="call_strip_lib" />
 
     <!-- copy to dir where jar picks it up as well -->
-    <condition property="jar.nativelib.dir"
-        value="${build.prod.dir}/org/voltdb/native/Mac/x86_64"
-        else="${build.prod.dir}/org/voltdb/native/Linux/x86_64">
-        <isset property="os.mac"/>
-    </condition>
-
+    <!-- libcatalog for both OS copied in the "catalog" target (earlier than this) -->
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
-            <include name="libvoltdb*" />
+            <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
 
@@ -840,7 +858,7 @@ DISTRIBUTION
     <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
-        <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
+        <arg value='${build.prod.mac.dir}' />
         <arg value='${dist.version}'/>
         <arg value='${kitbuild}'/>
     </exec>
@@ -1421,13 +1439,20 @@ NATIVE EE STUFF
 ***************************************
 -->
 
-<target name='catalog' description="Generate catalog source code.">
-  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
-    <arg line="catalog.py"/>
-  </exec>
-  <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
-    <arg line="install.py"/>
-  </exec>
+<target name='catalog' depends="buildinfo" description="Generate catalog source code.">
+    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+        <arg line="catalog.py"/>
+    </exec>
+    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+        <arg line="install.py"/>
+    </exec>
+
+    <!--both libcatalogs are checked out, so copy to right place-->
+    <mkdir dir="${build.prod.mac.dir}"/>
+    <copy file="${base.dir}/lib/libcatalog-${dist.version}.jnilib" todir="${build.prod.mac.dir}"/>
+    <mkdir dir="${build.prod.linux.dir}"/>
+    <copy file="${base.dir}/lib/libcatalog-${dist.version}.so" todir="${build.prod.linux.dir}"/>
+
 </target>
 
 <!-- Build the jni library. -->
@@ -1509,6 +1534,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1530,6 +1556,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1549,6 +1576,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1568,6 +1596,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1588,6 +1617,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1731,6 +1761,8 @@ TEST CASES
 
             <jvmarg value="-Dtestindex=${testindex}" />
             <jvmarg value="-Dtestcount=${testcount}" />
+            <jvmarg value="-Drun.flaky.tests=${run.flaky.tests}" />
+            <jvmarg value="-Drun.flaky.tests.debug=${run.flaky.tests.debug}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>
@@ -2352,6 +2384,7 @@ TEST CASES
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
+        <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml"/>
         <arg line="-C=${config} -dv ${explain} -r=${reportpath} -sp=${workpath}"/>
     </java>
 </target>

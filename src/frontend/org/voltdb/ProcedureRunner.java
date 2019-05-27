@@ -36,6 +36,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -49,8 +50,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
@@ -391,7 +392,6 @@ public class ProcedureRunner {
                     log.trace("invoked");
                 }
                 catch (InvocationTargetException itex) {
-                    //itex.printStackTrace();
                     Throwable ex = itex.getCause();
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
@@ -1262,6 +1262,9 @@ public class ProcedureRunner {
         } else if (e.getClass() == MispartitionedException.class) {
             status = ClientResponse.TXN_MISPARTITIONED;
             msg.append("TRANSACTION MISPARTITIONED\n");
+        } else if (e.getClass() == DRTableNotFoundException.class) {
+            status = ClientResponse.DR_TABLE_HASH_NOT_FOUND;
+            msg.append("TABLE NOT FOUND FOR REMOTE TABLE HASH\n");
         } else {
             msg.append("UNEXPECTED FAILURE:\n");
             expected_failure = false;
@@ -1327,6 +1330,8 @@ public class ProcedureRunner {
                 "VOLTDB ERROR: " + msg);
        if (status == ClientResponse.TXN_MISPARTITIONED) {
            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
+       } else if (status == ClientResponse.DR_TABLE_HASH_NOT_FOUND) {
+           ((DRTableNotFoundException) e).setClientResponseResults(response);
        }
 
        return response;
@@ -1426,7 +1431,7 @@ public class ProcedureRunner {
         final VoltTable[] m_results;
 
         BatchState(int batchSize, MpTransactionState txnState, long siteId, boolean finalTask, String procedureName,
-                byte[] procToLoad, boolean perFragmentStatsRecording) {
+                byte[] procToLoad, boolean perFragmentStatsRecording, int maxMpResponseSize) {
             m_batchSize = batchSize;
             m_txnState = txnState;
 
@@ -1449,6 +1454,8 @@ public class ProcedureRunner {
             m_distributedTask.setProcNameToLoad(procToLoad);
             m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
+
+            m_distributedTask.setMaxResponseSize(maxMpResponseSize);
         }
 
         /*
@@ -1479,7 +1486,7 @@ public class ProcedureRunner {
             }
             // two fragments
             else {
-                int outputDepId = m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+                int outputDepId = m_txnState.getNextDependencyId();
                 m_depsForLocalTask[index] = outputDepId;
                 // Add local and distributed fragments.
                 if (stmt.inCatalog) {
@@ -1504,8 +1511,10 @@ public class ProcedureRunner {
     VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
         MpTransactionState txnState = (MpTransactionState)m_txnState;
         assert(txnState != null);
+        long perPartitionMaxResponse = m_site.getMaxTotalMpResponseSize() / txnState.getMasterHSIDs().size();
         BatchState state = new BatchState(batch.size(), txnState, m_site.getCorrespondingSiteId(), finalTask,
-                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts());
+                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts(),
+                (int) Math.min(perPartitionMaxResponse, VoltPort.MAX_MESSAGE_LENGTH - 1024));
 
         // iterate over all sql in the batch, filling out the above data
         // structures
@@ -1552,7 +1561,7 @@ public class ProcedureRunner {
             if (state.m_depsForLocalTask[i] < 0) {
                 continue;
             }
-            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
+            state.m_localTask.setInputDepId(i, state.m_depsForLocalTask[i]);
         }
 
         // note: non-transactional work only helps us if it's final work

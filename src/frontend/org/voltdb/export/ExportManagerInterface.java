@@ -27,11 +27,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 
 /**
@@ -112,11 +114,7 @@ public interface ExportManagerInterface {
     public void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
             boolean isRejoin);
 
-    public void prepareAcceptMastership(int partitionId);
-
-    public void prepareTransferMastership(int partitionId, int hostId);
-
-    public void takeMastership(int partitionId);
+    public void becomeLeader(int partitionId);
 
     public void shutdown();
 
@@ -135,13 +133,17 @@ public interface ExportManagerInterface {
 
     public void pushBuffer(
             int partitionId,
-            String signature,
+            String tableName,
             long startSequenceNumber,
+            long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
+            long genId,
             long bufferPtr,
-            ByteBuffer buffer,
-            boolean sync);
+            ByteBuffer buffer);
 
-    public void sync(final boolean nofsync);
+    public void sync();
+
+    public void clientInterfaceStarted(ClientInterface clientInterface);
+    public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb);
 }

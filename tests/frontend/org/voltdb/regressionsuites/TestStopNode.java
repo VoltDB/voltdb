@@ -29,7 +29,11 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.FlakyTestRule;
+import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -41,10 +45,10 @@ import org.voltdb.iv2.MpInitiator;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.Sets.SetView;
 
-import junit.framework.Test;
-
 public class TestStopNode extends RegressionSuite
 {
+    @Rule
+    public FlakyTestRule ftRule = new FlakyTestRule();
 
     static LocalCluster m_config;
     static int kfactor = 3;
@@ -115,6 +119,8 @@ public class TestStopNode extends RegressionSuite
         }
     }
 
+    @Test
+    @Flaky(description="TestStopNode.testStopNode")
     public void testStopNode() throws Exception {
         Client client = ClientFactory.createClient();
 
@@ -166,6 +172,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
     public void testStopThreeNodesSimultaneously() throws Exception {
         if (kfactor < 1) return;
 
@@ -213,7 +220,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
-
+    @Test
     public void testConcurrentStopNode() throws Exception {
         if (kfactor < 1) return;
 
@@ -267,6 +274,8 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
+    @Flaky(description="TestStopNode.testStopNodesMoreThanAllowed")
     public void testStopNodesMoreThanAllowed() throws Exception {
         if (kfactor < 1) return;
 
@@ -313,6 +322,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
     public void testMixStopNodeWithNodeFailure() throws Exception {
         if (kfactor < 1) return;
 
@@ -359,6 +369,7 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    @Test
     public void testPrepareStopNode() throws Exception {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", m_config.port(0));
@@ -399,7 +410,7 @@ public class TestStopNode extends RegressionSuite
         super.tearDown();
     }
 
-    static public Test suite() throws IOException {
+    static public junit.framework.Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestStopNode.class);
 

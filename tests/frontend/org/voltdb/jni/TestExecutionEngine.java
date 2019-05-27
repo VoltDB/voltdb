@@ -115,10 +115,10 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
+        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE, false);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
@@ -147,7 +147,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
     }
 
     public void testLoadTable() throws Exception {
@@ -179,7 +179,7 @@ public class TestExecutionEngine extends TestCase {
         // Assemble a very long string.
         testTable.addRow(String.join("", Collections.nCopies(15, "我能吞下玻璃而不伤身体。")));
         try {
-            sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+            sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
             fail("The loadTable() call is expected to fail, but did not.");
         }
         catch (SQLException ex) {
@@ -243,7 +243,7 @@ public class TestExecutionEngine extends TestCase {
             public byte[] call() throws Exception {
                 try {
                     byte[] rslt = source2Engine.get().loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
-                            returnUniqueViolations, false, Long.MAX_VALUE);
+                            returnUniqueViolations, false, Long.MAX_VALUE, false);
                     return rslt;
                 }
                 catch (ReplicatedTableException e) {
@@ -258,7 +258,7 @@ public class TestExecutionEngine extends TestCase {
         byte[] srcRslt = null;
         try {
             srcRslt = sourceEngine.loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
-                    returnUniqueViolations, false, Long.MAX_VALUE);
+                    returnUniqueViolations, false, Long.MAX_VALUE, false);
         }
         catch (ConstraintFailureException e) {
             // srcRslt already null

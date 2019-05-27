@@ -646,7 +646,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // One row per site, we don't use HSID though, so hard to do straightforward
         // per-site unique check.  Finesse it.
         // We also get starvation stats for the MPI, so we need to add a site per host.
-        assertEquals(HOSTS * (SITES + 1), results[0].getRowCount());
+        assertEquals(HOSTS * SITES + (KFACTOR == 0 ? 1 : HOSTS), results[0].getRowCount());
         results[0].advanceRow();
         Map<String, String> columnTargets = new HashMap<String, String>();
         columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
@@ -680,7 +680,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // One row per site, we don't use HSID though, so hard to do straightforward
         // per-site unique check.  Finesse it.
         // We also get starvation stats for the MPI, so we need to add a site per host.
-        assertEquals(HOSTS * (SITES + 1), results[0].getRowCount());
+        assertEquals(HOSTS * SITES + (KFACTOR == 0 ? 1 : HOSTS), results[0].getRowCount());
         results[0].advanceRow();
         Map<String, String> columnTargets = new HashMap<String, String>();
         columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));

@@ -87,6 +87,12 @@ public class ClusterSaveFileState
         long txnId = -1;
         while (saveFileState.advanceRow())
         {
+            long originalHostId = saveFileState.getLong("ORIGINAL_HOST_ID");
+            // it means we couldn't find snapshot file on this node, ignore it now,
+            // @SnapshotRestore will check completion of the snapshot later
+            if (originalHostId == ClusterSaveFileState.ERROR_CODE) {
+                continue;
+            }
             checker.checkRow(saveFileState); // throws if inconsistent
             String table_name = saveFileState.getString("TABLE");
 
@@ -111,10 +117,8 @@ public class ClusterSaveFileState
             table_state = getTableState(table_name);
             table_state.addHostData(saveFileState); // throws if inconsistent
         }
-        for (TableSaveFileState table_state : m_tableStateMap.values())
-        {
-            if (!table_state.isConsistent())
-            {
+        for (TableSaveFileState table_state : m_tableStateMap.values()) {
+            if (!table_state.isConsistent()) {
                 String error = table_state.getConsistencyResult();
                 throw new IOException(error);
             }

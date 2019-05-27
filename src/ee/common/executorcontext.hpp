@@ -130,7 +130,6 @@ class ExecutorContext {
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_uniqueId = uniqueId;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
         m_traceOn = traceOn;
         // reset stats for each plan
@@ -216,11 +215,6 @@ class ExecutorContext {
         return m_uniqueId;
     }
 
-    /** Timestamp from unique id for this transaction */
-    int64_t currentTxnTimestamp() {
-        return m_currentTxnTimestamp;
-    }
-
     /** DR cluster id for the local cluster */
     int32_t drClusterId() {
         return m_drClusterId;
@@ -238,6 +232,14 @@ class ExecutorContext {
 
     bool isTraceOn() {
         return m_traceOn;
+    }
+
+    bool externalStreamsEnabled() {
+        return m_externalStreamsEnabled;
+    }
+
+    void disableExternalStreams() {
+        m_externalStreamsEnabled = false;
     }
 
     VoltDBEngine* getContextEngine() {
@@ -488,6 +490,11 @@ class ExecutorContext {
     int64_t m_currentDRTimestamp;
     LargeTempTableBlockCache m_lttBlockCache;
     bool m_traceOn;
+    // used by elastic shrink once all data has been migrated away
+    // from this partition. The site will continue to participate in MP txns
+    // until the site is removed fully from the system, but we want to disable
+    // all streaming (export, DR) because the sites are done at this point.
+    bool m_externalStreamsEnabled;
 
   public:
     int64_t m_lastCommittedSpHandle;

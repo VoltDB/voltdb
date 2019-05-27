@@ -27,73 +27,85 @@ from voltcli import utility
     options=(
         VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False),
         VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default=False),
+        VOLT.BooleanOption('-c', '--cancel', 'cancel', 'cancel a shutdown', default=False),
         VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default=120),
     )
 )
+
 def shutdown(runner):
     if runner.opts.forcing and runner.opts.save:
        runner.abort_with_help('You cannot specify both --force and --save options.')
+    if runner.opts.cancel and runner.opts.save:
+       runner.abort_with_help('You cannot specify both --cancel and --save options.')
+    if runner.opts.cancel and runner.opts.forcing:
+       runner.abort_with_help('You cannot specify both --cancel and --force options.')
     if runner.opts.timeout <= 0:
         runner.abort_with_help('The timeout value must be more than zero seconds.')
     shutdown_params = []
     columns = []
     zk_pause_txnid = 0
 
-    communityVersion = isCommunityVersion(runner)
+    if runner.opts.cancel:
+        runner.info('Canceling cluster shutdown ...')
+        response = runner.call_proc('@CancelShutdown', [], [])
+        if response.status() != 1:
+            runner.abort('Cancel shutdown failed with status: %d' % resp.response.statusString)
+        else:
+            runner.info('Shutdown canceled.')
+    else:
+        runner.info('Cluster shutdown in progress.')
+        if not runner.opts.forcing:
+            stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
+            actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, '\
+                            + 'continue to wait with "voltadmin shutdown",\n'\
+                            + 'or cancel the shutdown with the "voltadmin shutdown --cancel" command'
+            try:
+                runner.info('Preparing for shutdown...')
+                resp = runner.call_proc('@PrepareShutdown', [], [])
+                if resp.status() != 1:
+                    runner.abort('The preparation for shutdown failed with status: %d' % resp.response.statusString)
+                zk_pause_txnid = resp.table(0).tuple(0).column_integer(0)
+                runner.info('The cluster is paused prior to shutdown.')
 
-    runner.info('Cluster shutdown in progress.')
-    if not runner.opts.forcing:
-        stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
-        actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".'
-        try:
-            runner.info('Preparing for shutdown...')
-            resp = runner.call_proc('@PrepareShutdown', [], [])
-            if resp.status() != 1:
-                runner.abort('The preparation for shutdown failed with status: %d' % resp.response.statusString)
-            zk_pause_txnid = resp.table(0).tuple(0).column_integer(0)
-            runner.info('The cluster is paused prior to shutdown.')
+                runner.info('Writing out all queued export data...')
+                status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+                if status <> 0:
+                    runner.abort('The cluster has failed to be quiesce with status: %d' % status)
 
-            runner.info('Writing out all queued export data...')
-            status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
-            if status <> 0:
-                runner.abort('The cluster has failed to be quiesce with status: %d' % status)
+                checkstats.check_clients(runner)
+                checkstats.check_importer(runner)
 
-            checkstats.check_clients(runner)
-            checkstats.check_importer(runner)
-
-            if not communityVersion:
+                # Checking command log regardless of whether we're community or enterprise
                 checkstats.check_command_log(runner)
-                runner.info('All transactions have been made durable.')
+                runner.info('If running Enterprise Edition, all transactions have been made durable.')
 
-            if runner.opts.save:
-               actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
-               columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
-               shutdown_params = [zk_pause_txnid]
-               # save option, check more stats
-               checkstats.check_dr_consumer(runner)
-               runner.info('Starting resolution of external commitments...')
-               checkstats.check_exporter(runner)
-               checkstats.check_dr_producer(runner)
-               runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
-            else:
-                checkstats.check_exporter(runner)
-                runner.info('Shutting down the cluster...')
-        except StatisticsProcedureException as proex:
-             runner.info(stateMessage)
-             runner.error(proex.message)
-             if proex.isTimeout:
-                 runner.info(actionMessage)
-             sys.exit(proex.exitCode)
-        except (KeyboardInterrupt, SystemExit):
-            runner.info(stateMessage)
-            runner.abort(actionMessage)
-    response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status=False)
-    print response
+                if runner.opts.save:
+                   actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, '\
+                            + 'continue to wait with "voltadmin shutdown --save",\n'\
+                            + 'or cancel the shutdown with the "voltadmin shutdown --cancel" command.'
+                   columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
+                   shutdown_params = [zk_pause_txnid]
+                   # save option, check more stats
+                   checkstats.check_dr_consumer(runner)
+                   runner.info('Starting resolution of external commitments...')
+                   checkstats.check_exporter(runner)
+                   status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+                   if status <> 0:
+                       runner.abort('The cluster has failed to quiesce with status: %d' % status)
+                   checkstats.check_dr_producer(runner)
+                   runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
+                else:
+                    checkstats.check_exporter(runner)
+                    runner.info('Shutting down the cluster...')
+            except StatisticsProcedureException as proex:
+                 runner.info(stateMessage)
+                 runner.error(proex.message)
+                 if proex.isTimeout:
+                     runner.info(actionMessage)
+                 sys.exit(proex.exitCode)
+            except (KeyboardInterrupt, SystemExit):
+                runner.info(stateMessage)
+                runner.abort(actionMessage)
+        response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status=False)
+        print response
 
-
-def isCommunityVersion(runner):
-    response = runner.call_proc('@SystemInformation', [VOLT.FastSerializer.VOLTTYPE_STRING], ['OVERVIEW'])
-    for tuple in response.table(0).tuples():
-        if tuple[1] == "LICENSE":
-            return False
-    return True

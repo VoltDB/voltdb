@@ -62,8 +62,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::string tableName, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable();
     st->m_name = tableName;
-    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
-                                           ctx->m_siteId, 0, "sign", st->m_name, columnNames);
+    st->m_wrapper = new ExportTupleStream(ctx->m_partitionId, ctx->m_siteId, 0, st->m_name);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
@@ -103,6 +102,14 @@ StreamedTable::~StreamedTable() {
     }
 }
 
+// Stream writes were done so commit all the writes
+void StreamedTable::notifyQuantumRelease() {
+    if (m_wrapper) {
+        m_wrapper->commit(m_executorContext->getContextEngine(),
+                m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
+    }
+}
+
 TableIterator  StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
@@ -131,6 +138,27 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
+void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type) {
+    if (m_executorContext->externalStreamsEnabled()) {
+        int64_t currSequenceNo = ++m_sequenceNo;
+        assert(m_columnNames.size() == source.columnCount());
+        size_t mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
+                                      m_executorContext->currentSpHandle(),
+                                      currSequenceNo,
+                                      m_executorContext->currentUniqueId(),
+                                      source,
+                                      partitionColumn(),
+                                      type);
+
+        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
+    }
+}
+
 bool StreamedTable::insertTuple(TableTuple &source)
 {
     // not null checks at first
@@ -138,34 +166,13 @@ bool StreamedTable::insertTuple(TableTuple &source)
         throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
     }
 
-    size_t mark = 0;
-    if (m_wrapper) {
-        // handle any materialized views
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleInsert(source, true);
-        }
-        int64_t currSequenceNo = ++m_sequenceNo;
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
-                                      m_executorContext->currentSpHandle(),
-                                      currSequenceNo,
-                                      m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
-                                      source,
-                                      partitionColumn(),
-                                      ExportTupleStream::INSERT);
-
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        if (!uq) {
-            // With no active UndoLog, there is no undo support.
-            return true;
-        }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo));
+    // handle any materialized views
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleInsert(source, true);
     }
-    else {
-        // handle any materialized views even though we dont have any connector.
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleInsert(source, true);
-        }
+
+    if (m_wrapper) {
+        streamTuple(source, ExportTupleStream::INSERT);
     }
     return true;
 }
@@ -185,15 +192,16 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis) {
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void StreamedTable::setGeneration(int64_t generation) {
     if (m_wrapper) {
-        m_wrapper->setSignatureAndGeneration(signature, generation);
+        m_wrapper->setGeneration(generation);
     }
 }
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
-        m_wrapper->rollbackTo(mark, SIZE_MAX, seqNo);
+        assert(seqNo == m_sequenceNo);
+        m_wrapper->rollbackExportTo(mark, seqNo);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.
@@ -225,8 +233,8 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  * since startup (used for rejoin/recovery).
  */
 void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
-    // assume this only gets called from a fresh rejoined node
-    assert(m_sequenceNo == 0);
+    // assume this only gets called from a fresh rejoined node or after the reset of a wrapper
+    assert(m_sequenceNo == 0 || seqNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
         m_wrapper->setBytesUsed(seqNo, streamBytesUsed);

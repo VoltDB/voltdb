@@ -83,6 +83,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -108,6 +109,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -189,6 +191,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
     public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
+    public static final String MIGRATE_HIDDEN_COLUMN_NAME = "migrate_column";
+
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -198,6 +202,8 @@ public abstract class CatalogUtil {
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
     public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo MIGRATE_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -621,6 +627,65 @@ public abstract class CatalogUtil {
         return exportTables.build();
     }
 
+    public static NavigableSet<Table> getExportTablesExcludeViewOnly(CatalogMap<Connector> connectors) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : connectors) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                Table t = tinfo.getTable();
+                if (t.getTabletype() == TableType.CONNECTOR_LESS_STREAM.get()) {
+                    // Skip view-only streams
+                    continue;
+                }
+                exportTables.add(t);
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        return db.getConnectors();
+    }
+
+    public static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (!conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void dumpConnectors(VoltLogger logger, CatalogMap<Connector> connectors) {
+
+        if (!logger.isDebugEnabled()) return;
+        StringBuilder sb = new StringBuilder("Connectors:\n");
+        for (Connector conn : connectors) {
+            sb.append("\tname:    " + conn.getTypeName() + "\n");
+            sb.append("\tenabled: " + conn.getEnabled() + "\n");
+            if (conn.getTableinfo().isEmpty()) {
+                sb.append("\tno tables ...\n");
+            }
+            else {
+                sb.append("\ttables:\n");
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    sb.append("\t\t table name: " + ti.getTypeName() + "\n");
+                }
+            }
+        }
+        logger.debug(sb.toString());
+    }
+
     public static NavigableSet<String> getExportTableNames(Database db) {
         ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
         for (Connector connector : db.getConnectors()) {
@@ -632,26 +697,33 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a streamed / export table
+     * Return true if a table is a stream
      * This function is duplicated in CatalogUtil.h
      * @param database
      * @param table
      * @return true if a table is export or false otherwise
      */
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
-                                            org.voltdb.catalog.Table table)
-    {
-        for (Connector connector : database.getConnectors()) {
-            // iterate the connector tableinfo list looking for tableIndex
-            // tableInfo has a reference to a table - can compare the reference
-            // to the desired table by looking at the relative index. ick.
-            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                    return true;
+                                            org.voltdb.catalog.Table table) {
+        int type = table.getTabletype();
+        if (TableType.isInvalidType(type)) {
+            // This implementation uses connectors instead of just looking at the tableType
+            // because snapshots or catalogs from pre-9.0 versions (DR) will not have this new tableType field.
+            for (Connector connector : database.getConnectors()) {
+                // iterate the connector tableinfo list looking for tableIndex
+                // tableInfo has a reference to a table - can compare the reference
+                // to the desired table by looking at the relative index. ick.
+                for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                    if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                        return true;
+                    }
                 }
             }
+            // Found no connectors
+            return false;
+        } else {
+            return TableType.isStream(type);
         }
-        return false;
     }
 
     public static boolean isExportEnabled() {
@@ -822,7 +894,7 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster(), isPlaceHolderCatalog);
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
@@ -1179,8 +1251,9 @@ public abstract class CatalogUtil {
 
             boolean foundAdminUser = false;
             for (UsersType.User user : deployment.getUsers().getUser()) {
-                if (user.getRoles() == null)
+                if (user.getRoles() == null) {
                     continue;
+                }
 
                 for (String role : extractUserRoles(user)) {
                     if (role.equalsIgnoreCase(ADMIN)) {
@@ -1382,8 +1455,6 @@ public abstract class CatalogUtil {
             throw new DeploymentCheckException("Unable to instantiate export processor", e);
         }
         try {
-            processor.addLogger(hostLog);
-
             processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
@@ -1708,19 +1779,9 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
-                        throw new RuntimeException("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "DR Conflicts cannot be handled.");
-                    } else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                targetName +
-                                " in deployment file however no export " +
-                                "tables are assigned to the this target. " +
-                                "Export target " + targetName + " will be disabled.");
-                    }
+                    hostLog.info("Export configuration enabled and provided for export target " + targetName
+                            + " in deployment file however no export tables are assigned to the this target. "
+                            + "Export target " + targetName + " will be disabled.");
                 }
                 continue;
             }
@@ -1792,7 +1853,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
                 kafkaConfigs.add(importConfiguration);
@@ -1877,7 +1940,9 @@ public abstract class CatalogUtil {
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
-            if (!connectorEnabled) continue;
+            if (!connectorEnabled) {
+                continue;
+            }
 
             ImportConfiguration processorProperties = buildImportProcessorConfiguration(importConfiguration, false);
 
@@ -2288,12 +2353,16 @@ public abstract class CatalogUtil {
      */
     private static Set<String> extractUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<>();
-        if (user == null) return roles;
+        if (user == null) {
+            return roles;
+        }
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
-                if( role == null || role.trim().isEmpty()) continue;
+                if( role == null || role.trim().isEmpty()) {
+                    continue;
+                }
                 roles.add(role.trim().toLowerCase());
             }
         }
@@ -2313,7 +2382,7 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType, boolean isPlaceHolderCatalog) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -2335,13 +2404,11 @@ public abstract class CatalogUtil {
                 clusterId = clusterType.getId();
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
+            } else if (clusterType.getId().equals(dr.getId())) {
+                clusterId = clusterType.getId();
             } else {
-                if (clusterType.getId().equals(dr.getId())) {
-                    clusterId = clusterType.getId();
-                } else {
-                    throw new RuntimeException("Detected two conflicting cluster ids in deployment file, setting cluster id in DR tag is "
-                            + "deprecated, please remove");
-                }
+                throw new RuntimeException("Detected two conflicting cluster ids in deployment file, "
+                        + "setting cluster id in DR tag is deprecated, please remove");
             }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
@@ -2365,11 +2432,18 @@ public abstract class CatalogUtil {
                     }
                 }
                 hostLog.info("Configured connection for DR replica role to host " + drSource + drConsumerSSLInfo);
-            } else {
-                if (dr.getRole() == DrRoleType.XDCR) {
-                    // consumer should be enabled even without connection source for XDCR
-                    cluster.setDrconsumerenabled(true);
-                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            } else if (dr.getRole() == DrRoleType.XDCR) {
+                // consumer should be enabled even without connection source for XDCR
+                cluster.setDrconsumerenabled(true);
+                cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+            }
+            if (!isPlaceHolderCatalog && dr.getRole() == DrRoleType.XDCR) {
+                CatalogMap<Table> tables = db.getTables();
+                if (tables.get(DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) == null
+                        || tables.get(DR_CONFLICTS_REPLICATED_EXPORT_TABLE) == null) {
+                    throw new RuntimeException("The XDCR role cannot be changed on an existing database. "
+                            + "Save the contents, initialize a new instance with the desired role, "
+                            + "and restore the contents.");
                 }
             }
         } else {
@@ -2472,10 +2546,6 @@ public abstract class CatalogUtil {
         ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
-                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-        // create the previous catalog bytes zk node
-        zk.create(VoltZK.catalogbytesPrevious,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
@@ -2875,8 +2945,9 @@ public abstract class CatalogUtil {
      * by a LIMIT PARTITION ROWS constraint, or NULL if there isn't one. */
     public static String getLimitPartitionRowsDeleteStmt(Table table) {
         CatalogMap<Statement> map = table.getTuplelimitdeletestmt();
-        if (map.isEmpty())
+        if (map.isEmpty()) {
             return null;
+        }
 
         assert (map.size() == 1);
         return map.iterator().next().getSqltext();
@@ -3163,7 +3234,7 @@ public abstract class CatalogUtil {
         Map<String, Table> ttls = Maps.newHashMap();
         for (Table t : db.getTables()) {
             if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
-                ttls.put(t.getTypeName(),t);
+                ttls.put(t.getTypeName().toLowerCase(),t);
             }
         }
         return ttls;
@@ -3178,5 +3249,15 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+    public static int getPersistentMigrateBatchSize(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null && table.getTimetolive() != null ) {
+            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (ttl != null && !StringUtil.isEmpty(ttl.getMigrationtarget())) {
+                return ttl.getBatchsize();
+            }
+        }
+        return -1;
     }
 }

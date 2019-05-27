@@ -43,9 +43,9 @@ import org.voltdb.rejoin.TaskLog;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public abstract class BaseInitiator implements Initiator
+public abstract class BaseInitiator<S extends Scheduler> implements Initiator
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger tmLog = new VoltLogger("TM");
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -54,7 +54,7 @@ public abstract class BaseInitiator implements Initiator
     protected final String m_whoami;
 
     // Encapsulated objects
-    protected final Scheduler m_scheduler;
+    protected final S m_scheduler;
     protected final InitiatorMailbox m_initiatorMailbox;
     protected Term m_term = null;
     protected Site m_executionSite = null;
@@ -63,8 +63,7 @@ public abstract class BaseInitiator implements Initiator
 
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
-            StartAction startAction)
+            S scheduler, String whoamiPrefix, StatsAgent agent, StartAction startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
