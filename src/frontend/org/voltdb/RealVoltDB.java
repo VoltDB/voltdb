@@ -1869,7 +1869,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    ExportManagerInterface.instance().takeMastership(spInitiator.getPartitionId());
+                    ExportManagerInterface.instance().becomeLeader(spInitiator.getPartitionId());
                 }
             }
         }

@@ -52,7 +52,7 @@ public class MigrateRowsDeleter {
                     latch.countDown();
                 }
             };
-            ExportManager.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, m_batchSize, deletableTxnId, cb);
+            ExportManagerInterface.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, m_batchSize, deletableTxnId, cb);
             try {
                 latch.await(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
