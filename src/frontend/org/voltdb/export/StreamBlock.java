@@ -53,7 +53,7 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
-    StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, long committedSequenceNumber,
+    public StreamBlock(BBContainer fcont, BBContainer schemaCont, long startSequenceNumber, long committedSequenceNumber,
             int rowCount, long uniqueId, long segmentIndex, boolean isPersisted) {
         m_buffer = fcont;
         m_schema = schemaCont;
@@ -174,7 +174,7 @@ public class StreamBlock {
         return getRefCountingContainer(m_buffer.b().slice().asReadOnlyBuffer());
     }
 
-    BBContainer getSchemaContainer() {
+    public BBContainer getSchemaContainer() {
         if (m_schema == null) {
             return null;
         }
