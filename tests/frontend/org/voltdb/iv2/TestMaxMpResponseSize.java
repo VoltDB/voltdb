@@ -36,9 +36,10 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 
-public class TestMaxMpResponseSize {
+public class TestMaxMpResponseSize extends JUnit4LocalClusterTest {
     @Test
     public void calculateMpMaxTotalResponse() {
         long systemMemory = Runtime.getRuntime().maxMemory();
@@ -101,6 +102,7 @@ public class TestMaxMpResponseSize {
             cluster.setHasLocalServer(false);
             cluster.compile(builder);
             cluster.startCluster();
+            cluster.overrideAnyRequestForValgrind();
 
             ClientConfig config = new ClientConfig();
             config.setTopologyChangeAware(true);
