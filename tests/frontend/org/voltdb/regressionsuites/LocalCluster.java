@@ -23,8 +23,8 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -43,7 +43,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.NativeLibraryLoader;
@@ -63,7 +62,6 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
@@ -1135,7 +1133,7 @@ public class LocalCluster extends VoltServerConfig {
                         proc);
             } else {
                 if (m_logMessageMatchResults.get(hostId) == null) {
-                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                    m_logMessageMatchResults.put(hostId, Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 }
                 ptf = new PipeToFile(
                         fileName,
@@ -1338,7 +1336,7 @@ public class LocalCluster extends VoltServerConfig {
                         resetLogMessageMatchResults(hostId);
                     }
                 } else {
-                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                    m_logMessageMatchResults.put(hostId, Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 }
                 ptf = new PipeToFile(
                         fileName,
@@ -1652,7 +1650,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (m_logMessageMatchResults.containsKey(hostId)) {
                     resetLogMessageMatchResults(hostId);
                 } else {
-                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                    m_logMessageMatchResults.put(hostId, Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 }
                 ptf = new PipeToFile(
                         filePath,
