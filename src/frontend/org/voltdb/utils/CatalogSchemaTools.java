@@ -126,7 +126,7 @@ public abstract class CatalogSchemaTools {
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
                 if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
-                    table_sb.append("MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
+                    table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
                 }
             }
             table_sb.append(" (");
