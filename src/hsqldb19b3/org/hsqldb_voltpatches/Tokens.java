@@ -1820,6 +1820,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_LEFT, LEFT);
         reservedKeys.put(Tokens.T_LIKE, LIKE);
         reservedKeys.put(Tokens.T_LIKE_REGX, LIKE_REGEX);
+        reservedKeys.put(Tokens.T_LIMIT, LIMIT);
         reservedKeys.put(Tokens.T_LN, LN);
         reservedKeys.put(Tokens.T_LOCAL, LOCAL);
         reservedKeys.put(Tokens.T_LOCALTIME, LOCALTIME);
@@ -2343,10 +2344,10 @@ public class Tokens {
             CAST, CORRESPONDING, CONVERT, COUNT, COALESCE, CREATE, CROSS,
             DISTINCT, DROP, ELSE, END, EVERY, EXISTS, EXCEPT, FOR, FROM, FULL,
             GRANT, GROUP, HAVING, INTO, IS, IN, INTERSECT, JOIN, INNER, LEFT,
-            LEADING, LIKE, MAX, MIN, NATURAL, NULLIF, NOT, ON, ORDER, OR,
-            OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME, STDDEV_POP,
-            STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
-            UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
+            LEADING, LIKE, LIMIT, MAX, MIN, NATURAL, NULLIF, NOT, OFFSET, ON,
+            ORDER, OR, OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME,
+            STDDEV_POP, STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER,
+            UNION, UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE,
             // A VoltDB extension to support the MIGRATING index attribute.
