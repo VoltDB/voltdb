@@ -161,7 +161,9 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                                     new DumpMessage());
                             throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
                         }
-                        tmLog.debug(m_whoami + " restarting MP transaction: " + restartTxns.get(0));
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug(m_whoami + " restarting MP transaction: " + restartTxns.get(0));
+                        }
                         Iv2InitiateTaskMessage firstMsg = restartTxns.get(0);
                         assert(firstMsg.getTruncationHandle() == TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
                         m_initiatorMailbox.repairReplicasWith(null, firstMsg);
