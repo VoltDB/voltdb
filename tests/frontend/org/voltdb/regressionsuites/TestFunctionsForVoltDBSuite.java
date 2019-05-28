@@ -118,15 +118,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
 
-                "create table M1(" +
+                "create table M1 MIGRATE TO TARGET archiver (" +
                 "a int not null, " +
                 "b int not null) " +
-                "USING TTL 10 minutes ON COLUMN a MIGRATE TO TARGET archiver;" +
+                "USING TTL 10 minutes ON COLUMN a;" +
 
-                "create table M2(" +
+                "create table M2 MIGRATE TO TARGET archiver (" +
                 "a int not null, " +
                 "b int not null) " +
-                "USING TTL 10 minutes ON COLUMN a MIGRATE TO TARGET archiver;" +
+                "USING TTL 10 minutes ON COLUMN a;" +
                 "PARTITION TABLE M2 ON COLUMN a;\n" +
 
                 "CREATE PROCEDURE IdFieldProc AS\n" +
