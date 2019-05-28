@@ -905,6 +905,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 assert(m_shadowStream != nullptr);
+
+                // insert to partitioned table or partition id 0 for replicated
                 if (!isReplicatedTable() || ec->getPartitionId() == 0) {
                      m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
                 }
@@ -1019,7 +1021,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              * into the undo pool temp storage and hold onto it with oldTupleData.
              */
            oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
-
            // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
            if (isTableWithExportUpdateOld(m_tableType)) {
                m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
@@ -1142,10 +1143,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-
         // add to shadow stream if the table is partitioned or partition 0 for replicated table
         if (!isReplicatedTable() || ec->getPartitionId() == 0) {
-            m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE);
+            m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE, doDRActions(drStream) ? drStream : NULL);
         }
     }
 

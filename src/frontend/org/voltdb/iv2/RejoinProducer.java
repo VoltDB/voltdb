@@ -58,8 +58,6 @@ public class RejoinProducer extends JoinProducerBase {
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor = null;
-    // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
-    private String m_commaSeparatedNameOfViewsToPause = null;
 
     // True if there are any persistent tables in the schema.
     boolean m_hasPersistentTables = true;
