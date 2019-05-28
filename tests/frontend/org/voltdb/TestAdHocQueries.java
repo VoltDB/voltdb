@@ -30,9 +30,7 @@ import static org.voltdb.regressionsuites.RegressionSuite.assertContentOfTable;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -900,16 +898,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did fail on subquery");
             }
 
-            adHocQuery = "SELECT PNAME \n" +
-                    "         FROM PROJ \n" +
-                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
-                    "                           AND PNUM > 'P2';";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-            }
-            catch (ProcCallException pcex) {
-                fail("failed on static clause");
-            }
+            // ENG-16222 remove comment when resolved
+//            adHocQuery = "SELECT PNAME \n" +
+//                    "         FROM PROJ \n" +
+//                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
+//                    "                           AND PNUM > 'P2';";
+//            try {
+//                env.m_client.callProcedure("@AdHoc", adHocQuery);
+//            }
+//            catch (ProcCallException pcex) {
+//                fail("failed on static clause");
+//            }
             adHocQuery = "ROLLBACK;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
