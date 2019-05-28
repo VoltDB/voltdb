@@ -839,7 +839,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_closed) {
-            exportLog.error("Closed: ignoring export buffer with " + tupleCount + " rows");
+            exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
+                    EstTime.currentTimeMillis());
             return;
         }
         try {
@@ -851,7 +852,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             pushExportBufferImpl(startSequenceNumber, committedSequenceNumber,
                                     tupleCount, uniqueId, genId, buffer, m_readyForPolling);
                         } else {
-                            exportLog.error("Closed: ignoring export buffer with " + tupleCount + " rows");
+                            exportLogLimited.log("Closed: ignoring export buffer with " + tupleCount + " rows",
+                                    EstTime.currentTimeMillis());
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
