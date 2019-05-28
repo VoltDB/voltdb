@@ -723,27 +723,24 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     @Override
     public final int getColumnIndex(String name) {
 
-        if (m_columnNameIndexMap != null) {
-            Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
-            if (cachedIndex != null) {
-                return cachedIndex;
+        if (m_columnNameIndexMap == null) {
+            m_columnNameIndexMap = new HashMap<String, Integer>(m_colCount);
+            for (int i = 0; i < m_colCount; i++) {
+                m_columnNameIndexMap.put(getColumnName(i).toUpperCase(), Integer.valueOf(i));
             }
-        } else {
-            m_columnNameIndexMap = new HashMap<String,Integer>(m_colCount);
         }
 
-        assert(verifyTableInvariants());
-        for (int i = 0; i < m_colCount; i++) {
-            if (getColumnName(i).equalsIgnoreCase(name)) {
-                m_columnNameIndexMap.put(name.toUpperCase(), Integer.valueOf(i));
-                return i;
+        Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
+
+        if (cachedIndex == null) {
+            String msg = "No Column named '" + name + "'. Existing columns are:";
+            for (int i = 0; i < m_colCount; i++) {
+                msg += "[" + i + "]" + getColumnName(i) + ",";
             }
+            throw new IllegalArgumentException(msg);
         }
-        String msg = "No Column named '" + name + "'. Existing columns are:";
-        for (int i = 0; i < m_colCount; i++) {
-            msg += "[" + i + "]" + getColumnName(i) + ",";
-        }
-        throw new IllegalArgumentException(msg);
+
+        return cachedIndex;
     }
 
     /**
