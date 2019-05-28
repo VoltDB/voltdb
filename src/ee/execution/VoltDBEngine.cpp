@@ -154,6 +154,7 @@ int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
 class EnginePlanSet : public PlanSet { };
 
 VoltEEExceptionType VoltDBEngine::s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
+int VoltDBEngine::s_drHiddenColumnSize = 0;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
@@ -765,6 +766,7 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
         return false;
     }
     m_isActiveActiveDREnabled = cluster->drRole() == "xdcr";
+    s_drHiddenColumnSize = m_isActiveActiveDREnabled ? 8 : 0;
 
     return true;
 }

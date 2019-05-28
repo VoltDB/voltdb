@@ -1018,7 +1018,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              * into the undo pool temp storage and hold onto it with oldTupleData.
              */
            oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
-
            // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
            if (isTableWithExportUpdateOld(m_tableType)) {
                m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
@@ -1141,7 +1140,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE);
+        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE,
+                doDRActions(drStream) ? drStream : NULL);
     }
 
     if (uq) {
