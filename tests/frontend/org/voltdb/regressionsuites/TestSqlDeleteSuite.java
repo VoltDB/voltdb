@@ -650,11 +650,11 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     public void testDeleteTableAliasInvalid() throws Exception {
         Client client = getClient();
 
-        // Aliasing in FROM without AS, refer to a column in WHERE with the original table
+        // Aliasing in FROM with AS, refer to a column in WHERE with the original table
         verifyStmtFails(client, "DELETE FROM P1 AS P WHERE P1.ID < 8 AND P1.ID > 5",
         "object not found: P1.ID");
 
-        // Aliasing in FROM with AS, refer to a column in WHERE with the original table
+        // Aliasing in FROM without AS, refer to a column in WHERE with the original table
         verifyStmtFails(client, "DELETE FROM P1 P WHERE P1.ID < 8 AND P1.ID > 5",
         "object not found: P1.ID");
 
