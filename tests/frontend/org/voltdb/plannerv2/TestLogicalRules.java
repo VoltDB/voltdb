@@ -496,8 +496,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 + "where t1.i = 3")
                 .transform("VoltLogicalCalc(expr#0..3=[{inputs}], V=[$t3], V0=[$t1])\n" +
                         "  VoltLogicalJoin(condition=[=($2, $0)], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], " +
-                        "expr#8=[=($t6, $t7)], I=[$t0], V=[$t5], $condition=[$t8])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[30.3], " +
+                        "expr#7=[=($t4, $t6)], I=[$t0], V=[$t5], $condition=[$t7])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], " +
                         "expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10])\n" +
@@ -740,5 +740,16 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
-
+    // Non-integral numeric literals should be parsed as DOUBLEs to represent a larger range than DECIMAL
+    public void testNumericLiteralDataType() {
+        // 5.0 is parsed as a DOUBLE and 2 is parsed as an INT
+        // si(SMALLINT) requires a cast to double to be compared to 5.0.
+        // f(FLOAT) does not need a cast because the underlying type being used for FLOAT is actually DOUBLE
+        m_tester.sql("select * from R2 where si = 5.0 and i = 2 and f = 5.1")
+        .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):DOUBLE], expr#7=[5.0], expr#8=[=($t6, $t7)], " +
+                    "expr#9=[2], expr#10=[=($t0, $t9)], expr#11=[5.0], expr#12=[=($t4, $t11)], expr#13=[AND($t8, $t10, $t12)], "  +
+                    "proj#0..5=[{exprs}], $condition=[$t13])\n" +
+                    "  VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
 }
