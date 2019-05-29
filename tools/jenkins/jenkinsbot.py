@@ -45,6 +45,11 @@ JIRA_PASS = os.environ.get('jirapass', None)
 # TODO: change this back to 'ENG', before merging to master
 JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
+# Used to help prevent a Jira ticket from exceeding Jira's maximum
+# description size (32,767 characters, total)
+MAX_NUM_CHARS_PER_JIRA_DESCRIPTION  = 32767
+MAX_NUM_CHARS_PER_DESCRIPTION_PIECE = 2000
+
 # Queries
 
 # System Leaderboard - Leaderboard for master system tests on apprunner.
@@ -835,7 +840,7 @@ tr:hover{
                                                       jira, user, passwd, project)
         if existing_tickets:
             if len(existing_tickets) > 1:
-                logging.warn('More than 1 Jira ticket found; using first one:\n'
+                logging.warn('More than 1 Jira ticket found; using first one listed below:\n'
                              +str(existing_tickets))
                 for et in existing_tickets:
                     logging.warn("    %s: '%s'" % (et.key, et.fields.summary))
@@ -906,7 +911,7 @@ tr:hover{
 
     def create_jira_bug_ticket(self, channel, test_suite, summary,
                                jenkins_job, build_number,
-                               description, version, labels,
+                               descriptions, version, labels,
                                priority='Major', attachments={},
                                jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                project=JIRA_PROJECT, component='Core',
@@ -919,8 +924,9 @@ tr:hover{
                are marked 'is related to'.
         :param summary: The Summary to be used in the Jira ticket that is to
                be created.
-        :param description: The Description to be used in the Jira ticket that
-               is to be created.
+        :param descriptions: One or more pieces of the Description to be added to
+               the Jira ticket; each one will be checked separately for being too
+               long (more than MAX_NUM_CHARS_PER_DESCRIPTION_PIECE characters).
         :param version: The (VoltDB) Version that this bug affects.
         :param labels: The Labels to list in the Jira ticket.
         :param priority: The Priority of the Jira ticket.
@@ -939,7 +945,7 @@ tr:hover{
         logging.debug('  channel     : '+str(channel))
         logging.debug('  test_suite  : '+str(test_suite))
         logging.debug('  summary     : '+str(summary))
-        logging.debug('  description :\n'+str(description)+'\n')
+        logging.debug('  descriptions:\n'+str(descriptions)+'\n')
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -956,12 +962,25 @@ tr:hover{
         issue_dict = {
             'project': project,
             'summary': summary,
-            'description': description,
             'issuetype': {
                 'name': 'Bug'
             },
             'labels': labels
         }
+
+        new_description = ''
+        for dp in descriptions:
+            if len(dp) <= MAX_NUM_CHARS_PER_DESCRIPTION_PIECE:
+                new_description = new_description + dp
+            else:
+                half_length  = int(MAX_NUM_CHARS_PER_DESCRIPTION_PIECE / 2)
+                truncated_dp = dp[:half_length] +'\n...[truncated]...\n' \
+                             + dp[-half_length:]
+                new_description  = new_description + truncated_dp
+                logging.warn('Description piece of length %d characters '
+                             'truncated to %d characters:\n    %s'
+                             % (len(dp), len(truncated_dp), truncated_dp) )
+        issue_dict['description'] = new_description
 
         issue_dict['components'] = self.get_jira_component_list(jira, component, project)
         issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
@@ -1038,8 +1057,7 @@ tr:hover{
 
     def get_modified_description(self, old_description, new_description_pieces,
                                  num_chars_for_partial_match=12,
-                                 ignore_partial_match_for_last_n_pieces=1,
-                                 max_num_chars_per_description_piece=5000):
+                                 ignore_partial_match_for_last_n_pieces=1):
         """Interweaves an old (Jira bug ticket) description with new description
            pieces; essentially, parts of the old description that match new
            description pieces will remain unchanged, but preceded first by parts
@@ -1107,8 +1125,13 @@ tr:hover{
             # extremely long, skip it; this can sometimes avoid exceeding Jira's
             # maximum description size (32,767 characters)
             if ( not msi['full'] and len(new_description_pieces[msi['ndpi']])
-                                         > max_num_chars_per_description_piece ):
+                                         > MAX_NUM_CHARS_PER_DESCRIPTION_PIECE ):
                 new_desc_end_index = msi['ndpi']
+                skipped_ndp = new_description_pieces[msi['ndpi']]
+                logging.warn('Ignoring the following description piece, because '
+                             'it partly matches the old description and has a '
+                             'length of %d characters:\n    %s'
+                             % (len(skipped_ndp), skipped_ndp) )
 
             # Add in any parts of the old_description that we haven't used yet,
             # and which precede the current match (full or partial); and elements
@@ -1116,7 +1139,7 @@ tr:hover{
             # including the one that matches (fully or partially)
             new_description = ( new_description
                 + old_description[old_desc_index:msi['odsi']]
-                + ''.join(new_description_pieces[i][:max_num_chars_per_description_piece]
+                + ''.join(new_description_pieces[i][:MAX_NUM_CHARS_PER_DESCRIPTION_PIECE]
                           for i in range(new_desc_index, new_desc_end_index)) )
             # henceforth, ignore the new_description_pieces that we've now used
             new_desc_index = msi['ndpi'] + 1
@@ -1133,6 +1156,15 @@ tr:hover{
             + old_description[old_desc_index:]
             + ''.join(new_description_pieces[i] for i in range(new_desc_index, len(new_description_pieces) )) )
         logging.debug('    new_description:\n'+str(new_description))
+
+        if len(new_description) > MAX_NUM_CHARS_PER_JIRA_DESCRIPTION:
+            suffix = '\n[Truncated]'
+            last_char_index = MAX_NUM_CHARS_PER_JIRA_DESCRIPTION - len(suffix)
+            logging.warn('Updated Jira description truncated to:\n    %s'
+                         % new_description[:last_char_index] )
+            logging.warn('This part was left out of the truncated Jira description:\n    %s'
+                         % new_description[last_char_index:] )
+            return new_description[:last_char_index] + suffix
 
         return new_description
 
@@ -1176,7 +1208,7 @@ tr:hover{
                determine whether a Jira ticket already exists for this issue
         :param descriptions: One or more pieces of the Description to be added
                to the Jira ticket; the pieces that already exist in the existing
-                ticket do not get added, to avoid redundancy.
+               ticket do not get added, to avoid redundancy.
         :param version ???: The (VoltDB) Version that this bug affects
         :param labels ??: The Labels to list in the Jira ticket
         :param priority: The Priority of the Jira ticket
@@ -1231,7 +1263,7 @@ tr:hover{
             try:
                 ticket_to_modify.update(fields={'summary'    : summary,
                                                 'description': new_description,
-                                                'fixVersions': [{"set":[{"name" : version}]}],
+#                                                 'fixVersions': [{"set":[{"name" : version}]}],
                                                 'labels'     : labels,
                                                 'priority'   : {'name': priority}
                                                 })
@@ -1384,7 +1416,7 @@ tr:hover{
 
             return self.create_jira_bug_ticket(channel, summary_keys[0], summary,
                                                jenkins_job, build_number,
-                                               ''.join(descriptions), version, labels,
+                                               descriptions, version, labels,
                                                priority, attachments,
                                                jira, user, passwd,
                                                project, component, DRY_RUN)
