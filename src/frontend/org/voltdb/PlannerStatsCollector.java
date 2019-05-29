@@ -51,6 +51,12 @@ public class PlannerStatsCollector extends StatsSource {
         HIT2,
         /// Plan not found in either cache.
         MISS,
+        /// Calcite L1 cache hit.
+        CHIT1,
+        /// Calcite L2 cache hit.
+        CHIT2,
+        /// Calcite cache miss.
+        CMISS,
         /// An unexpected failure interrupted cache lookup or planning.
         FAIL
     }

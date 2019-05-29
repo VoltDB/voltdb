@@ -85,7 +85,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
             assertEquals(cache2_level, vt.getLong("CACHE2_LEVEL"));
             assertEquals(cache1_hits,  vt.getLong("CACHE1_HITS"));
             assertEquals(cache2_hits,  vt.getLong("CACHE2_HITS"));
-            //assertEquals(cache_misses, vt.getLong("CACHE_MISSES"));
+            assertEquals(cache_misses, vt.getLong("CACHE_MISSES"));
 
             checked = true;
             break;

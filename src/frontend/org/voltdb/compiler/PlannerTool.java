@@ -323,10 +323,12 @@ public class PlannerTool {
             // check L1 cache is hit or miss
             AdHocPlannedStatement cachedPlan = m_calciteCache.getWithSQL(task.getSQL());
             if (cachedPlan != null) {
-                cacheUse = CacheUse.HIT1;
-                return cachedPlan;
+                cacheUse = CacheUse.CHIT1;
+                // Don't return to avoid wrong cached plan going into executor
+                //return cachedPlan;
+                throw new PlannerFallbackException();
             } else {
-                cacheUse = CacheUse.MISS;
+                cacheUse = CacheUse.CMISS;
             }
 
             // check L2 cache is hit or miss
@@ -339,7 +341,7 @@ public class PlannerTool {
                                                  corePlan,
                                                  ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
                                                  null);
-                cacheUse = CacheUse.HIT2;
+                cacheUse = CacheUse.CHIT2;
             } else {
                 //////////////////////
                 // PLAN THE STMT
@@ -352,8 +354,7 @@ public class PlannerTool {
                                                  core,
                                                  ParameterSet.fromArrayNoCopy(generateVoltParams(ptask)),
                                                  null);
-                // disable cache save until calcite planner is completed
-                //m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
+                m_calciteCache.put(task.getSQL(), parameterizedQuery, ahps, null, false, false);
             }
             //return ahps;
             throw new PlannerFallbackException();
