@@ -25,7 +25,7 @@ import org.voltcore.utils.DBBPool;
  * Represents a reader for a segment. Multiple readers may be active
  * at any point in time, reading from different locations in the segment.
  */
-interface PBDSegmentReader {
+interface PBDSegmentReader<M> {
     /**
      * Are there any more entries to read from this segment for this reader
      *
@@ -54,6 +54,7 @@ interface PBDSegmentReader {
      *         not supplied
      * @throws IOException If an error occurs while reading the extra header
      */
+    @Deprecated
     public DBBPool.BBContainer getExtraHeader() throws IOException;
 
     //Don't use size in bytes to determine empty, could potentially
