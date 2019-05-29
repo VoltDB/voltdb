@@ -1319,6 +1319,7 @@ public class ParserDDL extends ParserRoutine {
 
         table.setHasMigrationTarget(token.tokenType == Tokens.MIGRATE);
         // skip "migrate to target" statement, it will be handled later in DDLCompiler.processCreateTableStatement
+        // We can collect the ttl first in order to decide if its a ttl migration or general migration.
         readUntilThis(Tokens.OPENBRACKET);
 
         readThis(Tokens.OPENBRACKET);
