@@ -63,7 +63,7 @@ import org.voltcore.logging.VoltLogger;
 public class KafkaClientVerifier {
 
     static VoltLogger log = new VoltLogger("KafkaClientVerifier");
-    
+
     public static long VALIDATION_REPORT_INTERVAL = 1000;
     private final int consumerTimeoutSecs;
     private String groupId;
@@ -300,7 +300,7 @@ public class KafkaClientVerifier {
         consumersLatch.await();
         log.info("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
         if (consumedRows.get() == 0) {
-            System.err.println("ERROR No rows were consumed.");
+            log.error("No rows were consumed.");
             testGood.set(false);
         } else if (consumedRows.get() < expectedRows.get()) {
             // we will calculate the details of this below.
@@ -341,7 +341,7 @@ public class KafkaClientVerifier {
             }
         }
         // # received - duplicates + missing rows = LastId
-        long realMissing = lastId - ids.size() - duplicateCnt + missingCnt;
+        // long realMissing = lastId - ids.size() - duplicateCnt + missingCnt;
         log.info("");
         log.info("Total messages in Kafka = " + ids.size());
         log.info("Total missing client row IDs in Kafka = " + missingCnt);
@@ -349,14 +349,13 @@ public class KafkaClientVerifier {
         log.info("Total attempted rows submitted from client (max client row ID) = " + lastId);
         log.info("max row ID number should = received count - duplicates + missing row ids");
         log.info(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
-        log.info("missing records: " + realMissing );
+        // log.info("missing records: " + realMissing );
 
-        if (realMissing > 0) {
-            System.err.println("\nERROR There are '" + realMissing + "' missing rows");
-            testGood.set(false);
-        } else {
-            log.info("There were no missing rows");
-        }
+        /*
+         * if (realMissing > 0) { System.err.println("\nERROR There are '" + realMissing
+         * + "' missing rows"); testGood.set(false); } else {
+         * log.info("There were no missing rows"); }
+         */
 
         // duplicates may be expected in some situations where only part of a buffer was transferred before
         // a failure and we and  volt re-submits the entire buffer
@@ -367,10 +366,10 @@ public class KafkaClientVerifier {
             // the amount of duplicates shouldn't
             // exceed 60 MB ( max size of a .pbd) from retransmitting the entire .pbd .
             if ( missingCnt > 0 && duplicateCnt > 60 * 1024 * 1024) {
-                System.err.println("ERROR there were '" + duplicateCnt + "' duplicate ids using "+duplicate_size+ " bytes of space, it shouldn't exceed 60MB");
+                log.error("there were " + duplicateCnt + " duplicate ids using "+duplicate_size+ " bytes of space, it shouldn't exceed 60MB");
                 testGood.set(false);
             } else {
-                log.info("WARN there were '" + duplicateCnt + "' duplicate ids");
+                log.warn("there were " + duplicateCnt + " duplicate ids");
             }
         }
     }
@@ -395,25 +394,27 @@ public class KafkaClientVerifier {
         try {
             verifier.verifyTopic(fulltopic, config.uniquenessfield, config.sequencefield, config.partitionfield);
         } catch (IOException e) {
-            System.err.println("ERROR " + e.toString());
+            log.error(e.toString());
             e.printStackTrace(System.err);
-
             System.exit(-1);
         } catch (ValidationErr e) {
-            System.err.println("ERROR in Validation: " + e.toString());
+            log.error("in Validation: " + e.toString());
             e.printStackTrace(System.err);
             System.exit(-1);
         } catch (Exception e) {
-            System.err.println("ERROR in Application: " + e.toString());
+            log.error("in Application: " + e.toString());
             e.printStackTrace(System.err);
             System.exit(-1);
         }
 
-        if (verifier.testGood.get())
+        if (verifier.testGood.get()) {
+            log.info("SUCCESS -- exit 0");
             System.exit(0);
-        else
-            System.err.println("ERROR There were missing records");
+        } else {
+            log.error("There were missing records");
+        }
 
+        log.info("FAILURE -- exit -1");
         System.exit(-1);
 
     }

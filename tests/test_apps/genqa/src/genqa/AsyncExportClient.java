@@ -492,7 +492,7 @@ public class AsyncExportClient
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      **
-     * @return 
+     * @return
      */
     static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
         if (resetBaseline) {
