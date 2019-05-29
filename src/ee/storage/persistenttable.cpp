@@ -860,15 +860,6 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     TableTuple conflict(m_schema);
     try {
         tryInsertOnAllIndexes(&target, &conflict);
-
-        // from stream snapshot/rejoin, add it to migrating index
-        if (isTableWithMigrate(m_tableType)) {
-            assert(m_shadowStream != nullptr);
-            NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
-            if(!txnId.isNull()){
-               migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-            }
-        }
     } catch (SQLException& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
@@ -889,6 +880,14 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         target.setDirtyFalse();
     }
 
+    // add it to migrating index when loading tuple from a recover or rejoin snapshot (only)
+     if (isTableWithMigrate(m_tableType)) {
+         assert(m_shadowStream != nullptr);
+         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
+         if(!txnId.isNull()){
+            migratingAdd(ValuePeeker::peekBigInt(txnId), target);
+         }
+     }
 
     // this is skipped for inserts that are never expected to fail,
     // like some (initially, all) cases of tuple migration on schema change
@@ -906,7 +905,11 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 assert(m_shadowStream != nullptr);
-                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+
+                // insert to partitioned table or partition id 0 for replicated
+                if (!isReplicatedTable() || ec->getPartitionId() == 0) {
+                     m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::INSERT);
+                }
             }
         }
     }
@@ -1019,11 +1022,13 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              */
            oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
            // We assume that only fallible and undoable UPDATEs should be propagated to the EXPORT Shadow Stream
-           if (isTableWithExportUpdateOld(m_tableType)) {
-               m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
-           }
-           if (isTableWithExportUpdateNew(m_tableType)) {
-               m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW);
+           if (!isReplicatedTable() || ec->getPartitionId() == 0) {
+               if (isTableWithExportUpdateOld(m_tableType)) {
+                   m_shadowStream->streamTuple(targetTupleToUpdate, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_OLD);
+               }
+               if (isTableWithExportUpdateNew(m_tableType)) {
+                   m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::STREAM_ROW_TYPE::UPDATE_NEW);
+               }
            }
         }
     }
@@ -1140,8 +1145,10 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     if (fromMigrate) {
         assert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
         migratingAdd(ec->currentSpHandle(), targetTupleToUpdate);
-        m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE,
-                doDRActions(drStream) ? drStream : NULL);
+        // add to shadow stream if the table is partitioned or partition 0 for replicated table
+        if (!isReplicatedTable() || ec->getPartitionId() == 0) {
+            m_shadowStream->streamTuple(sourceTupleWithNewValues, ExportTupleStream::MIGRATE, doDRActions(drStream) ? drStream : NULL);
+        }
     }
 
     if (uq) {
@@ -1317,7 +1324,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction, this);
         if (isTableWithExportDeletes(m_tableType)) {
             assert(m_shadowStream != nullptr);
-            m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE);
+            if (!isReplicatedTable() || ec->getPartitionId() == 0) {
+                m_shadowStream->streamTuple(target, ExportTupleStream::STREAM_ROW_TYPE::DELETE);
+            }
         }
     }
 
