@@ -24,12 +24,12 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 
 /**
- * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain
- * and will be returned as a single buffer. Technically not a deque because removal at
- * the end is not supported.
+ * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain and will be
+ * returned as a single buffer. Technically not a deque because removal at the end is not supported.
  *
+ * @param <M> Type of extra header metadata which can be associated with entries
  */
-public interface BinaryDeque {
+public interface BinaryDeque<M> {
     /*
      * Allocator for storage coming out of the BinaryDeque. Only
      * used if copying is necessary, otherwise a slice is returned
@@ -39,12 +39,13 @@ public interface BinaryDeque {
     }
 
     /**
-     * Update the extraHeader associated with this instance.
+     * Update the extraHeader associated with this instance. This updated metadata will be associated with all entries
+     * added after this point but does not affect entries previously written.
      *
-     * @param extraHeaderSerializer {@link DeferredSerialization} which will be used to write out the extra header.
+     * @param extraHeader new extra header metadata.
      * @throws IOException If an error occurs while updating the extraHeader
      */
-    void updateExtraHeader(DeferredSerialization extraHeaderSerializer) throws IOException;
+    void updateExtraHeader(M extraHeader) throws IOException;
 
     /**
      * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
@@ -76,7 +77,7 @@ public interface BinaryDeque {
      * @return a BinaryDequeReader for this cursorId
      * @throws IOException on any errors trying to read the PBD files
      */
-    public BinaryDequeReader openForRead(String cursorId) throws IOException;
+    public BinaryDequeReader<M> openForRead(String cursorId) throws IOException;
 
     /**
      * Close a BinaryDequeReader for reader, also close the SegmentReader for the segment if it is reading one
