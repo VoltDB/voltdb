@@ -1429,15 +1429,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public int deleteMigratedRows(long txnid,
+    public boolean deleteMigratedRows(long txnid,
                                       long spHandle,
                                       long uniqueId,
                                       String tableName,
-                                      long deletableTxnId,
-                                      int maxRowCount)
+                                      long deletableTxnId)
     {
         return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
-                tableName, deletableTxnId, maxRowCount, getNextUndoToken(m_currentTxnId));
+                tableName, deletableTxnId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

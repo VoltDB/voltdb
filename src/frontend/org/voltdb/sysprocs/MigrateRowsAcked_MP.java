@@ -52,14 +52,13 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
             if (fragmentId == SysProcFragmentId.PF_migrateRows) {
                 final String tableName = (String) params.toArray()[0];
                 final long deletableTxnId = (Long) params.toArray()[1];
-                final int maxRowCount = (Integer) params.toArray()[2];
 
                 final TransactionState txnState = m_runner.getTxnState();
-                int txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+                boolean txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
                         txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
-                        tableName, deletableTxnId, maxRowCount);
+                        tableName, deletableTxnId);
                 VoltTable results = new VoltTable(new ColumnInfo("RowsRemainingDeleted", VoltType.BIGINT));
-                results.addRow(txnRemainingDeleted);
+                results.addRow(txnRemainingDeleted ? 1 : 0);
                 return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_migrateRows, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_migrateRowsAggregate) {
@@ -75,15 +74,14 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
 
     public VoltTable run(SystemProcedureExecutionContext ctx,
                            String tableName,            // Name of table that can have rows deleted
-                           long deletableTxnId,         // All rows with TxnIds before this can be deleted
-                           int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
-    {
+                           long deletableTxnId          // All rows with TxnIds before this can be deleted
+                          ) {
         VoltTable result = null;
 
         try {
             VoltTable [] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_migrateRows,
                     SysProcFragmentId.PF_migrateRowsAggregate,
-                    ParameterSet.fromArrayNoCopy(tableName, deletableTxnId, maxRowCount));
+                    ParameterSet.fromArrayNoCopy(tableName, deletableTxnId));
             if (results != null && results.length != 0) {
                 result = results[0];
             }

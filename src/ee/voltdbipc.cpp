@@ -1537,7 +1537,6 @@ void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
                                                static_cast<int64_t>(ntohll(migrate_msg->uniqueId)),
                                                tableName,
                                                static_cast<int64_t>(ntohll(migrate_msg->deletableTxnId)),
-                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)),
                                                static_cast<int64_t>(ntohll(migrate_msg->undoToken)));
     char response[1];
     response[0] = result ? 1 : 0;

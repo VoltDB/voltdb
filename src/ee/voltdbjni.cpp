@@ -1162,10 +1162,10 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * @param undoToken The token marking the rollback point for this transaction
  * @return number of rows to be deleted
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDeleteMigratedRows(
         JNIEnv *env, jobject obj, jlong engine_ptr,
         jlong txnId, jlong spHandle, jlong uniqueId,
-        jbyteArray tableName, jlong deletableTxnId, jint maxRowCount, jlong undoToken)
+        jbyteArray tableName, jlong deletableTxnId, jlong undoToken)
 {
     VOLT_DEBUG("nativeDeleteMigratedRows in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1181,7 +1181,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDelet
                                               static_cast<int64_t>(uniqueId),
                                               tableNameStr,
                                               static_cast<int64_t>(deletableTxnId),
-                                              static_cast<int32_t>(maxRowCount),
                                               static_cast<int64_t>(undoToken));
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());

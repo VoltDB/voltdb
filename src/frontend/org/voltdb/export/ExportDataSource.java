@@ -1315,7 +1315,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     localAck(commitSeqNo, lastSeqNo);
                     forwardAckToOtherReplicas();
-                    if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
+                    if (m_migrateRowsDeleter != null && commitSpHandle > 0 && m_coordinator.isMaster()) {
                         m_migrateRowsDeleter.delete(commitSpHandle);
                     }
                 } catch (Exception e) {
