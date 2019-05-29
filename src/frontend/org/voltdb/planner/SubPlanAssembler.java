@@ -1849,7 +1849,11 @@ public abstract class SubPlanAssembler {
                 result = null;
             } else if (coveringExpr == null) {
                 // Match only the table's column that has the coveringColId
-                if ((indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE)) {
+                // There could be a CAST operator on the indexable expression side. Skip it
+                if (indexableExpr.getExpressionType() == ExpressionType.OPERATOR_CAST) {
+                    indexableExpr = indexableExpr.getLeft();
+                }
+                if (indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     result = null;
                 } else if ((coveringColId == ((TupleValueExpression) indexableExpr).getColumnIndex()) &&
                         (tableScan.getTableAlias().equals(((TupleValueExpression) indexableExpr).getTableAlias()))) {
