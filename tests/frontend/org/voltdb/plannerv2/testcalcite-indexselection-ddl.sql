@@ -76,3 +76,36 @@ CREATE INDEX partial_idx_5 ON c (b) where d > f;
 CREATE INDEX partial_idx_6 ON c (g) where g < 0;
 CREATE INDEX partial_idx_7 ON c (g) where g is not null;
 CREATE INDEX partial_idx_8 ON c (b) WHERE abs(a) > 0;
+
+CREATE TABLE polypoints (
+  poly geography(1024),
+  point geography_point,
+  primarykey int primary key, -- index 1
+  uniquekey int unique, -- index 2
+  uniquehashable int,
+  nonuniquekey int,
+  component1 int,
+  component2unique int,
+  component2non int);
+
+-- index 3
+CREATE INDEX polypointspoly ON polypoints ( poly );
+-- index 4
+CREATE INDEX nonunique ON polypoints ( nonuniquekey );
+
+-- index 5
+CREATE UNIQUE INDEX compoundunique ON polypoints ( component1, component2unique );
+-- index 6
+CREATE INDEX compoundnon ON polypoints ( component1, component2non );
+-- index 7
+CREATE UNIQUE INDEX HASHUNIQUEHASH ON polypoints ( uniquehashable );
+
+CREATE TABLE R (
+  ID      INTEGER  DEFAULT 0,
+  TINY    TINYINT  DEFAULT 0,
+  VCHAR_INLINE_MAX  VARCHAR(63 BYTES) DEFAULT '0',
+  VCHAR_OUTLINE_MIN VARCHAR(64 BYTES) DEFAULT '0' NOT NULL,
+  POLYGON GEOGRAPHY,
+  PRIMARY KEY (ID, VCHAR_OUTLINE_MIN));
+
+CREATE INDEX IDX ON R (R.POLYGON) WHERE NOT R.TINY IS NULL;

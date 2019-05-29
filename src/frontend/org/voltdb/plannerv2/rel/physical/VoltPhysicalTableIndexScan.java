@@ -137,9 +137,17 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     }
 
     @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        double rowCount = super.estimateRowCount(mq);
+        // reduce number of returned rows for a partial index based on the number of it's predicates
+        rowCount = PlanCostUtil.discountPartialIndexRowCount(rowCount, m_accessPath);
+        return rowCount;
+    }
+
+    @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        double cpu = PlanCostUtil.computeIndexCost(m_index, m_accessPath, estimateInitialRowCount(mq), mq);
+        double cpu = PlanCostUtil.computeIndexCost(m_index, m_accessPath, rowCount, mq);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0.);
     }
 
