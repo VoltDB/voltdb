@@ -561,6 +561,7 @@ public class Benchmark {
     UpdateClassesThread updcls = null;
     NibbleDeleteLoader partNDlt = null;
     NibbleDeleteLoader replNDlt = null;
+    TTLMigrate ttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -747,17 +748,27 @@ public class Benchmark {
                 adHocMayhemThread.start();
             }
         }
+ 
         if (!config.disabledThreads.contains("idpt")) {
             idpt = new InvokeDroppedProcedureThread(client);
             idpt.start();
-        } if (!config.disabledThreads.contains("ddlt")) {
+        }
+
+        if (!config.disabledThreads.contains("ddlt")) {
             ddlt = new DdlThread(client);
             // XXX/PSR ddlt.start();
         }
+
         if (!config.disabledThreads.contains("updateclasses")) {
             updcls = new UpdateClassesThread(client, config.duration);
             updcls.start();
         }
+
+        if (!config.disabledThreads.contains("ttlMigratelt")) {
+            ttlMigratelt = new TTLMigrateThread(client, config.duration);
+            updcls.start();
+        }
+        log.info("All threads started...");
         log.info("All threads started...");
 
         while (true) {

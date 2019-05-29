@@ -422,6 +422,16 @@ CREATE TABLE importbr
 , UNIQUE ( cid, seq )
 );
 
+-- TTL with migrate to stream
+CREATE TABLE ttl_migrate
+(
+  big1                     BIGINT        NOT NULL
+, big2                     BIGINT        NOT NULL
+, ts1                      TIMESTAMP     DEFAULT NOW NOT NULL
+) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc ;
+PARTITION TABLE ttl_migrate ON COLUMN big1;
+CREATE INDEX ttl_migrate_idx ON ttl_migrate(ts1) WHERE NOT MIGRATING;
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;

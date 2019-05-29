@@ -16,5 +16,10 @@
             <property name="nonce">ReplStream</property>
             <property name="skipinternals">true</property>
         </configuration>
+        <configuration enabled="true" type="file" target="ABC">
+            <property name="type">csv</property>
+            <property name="nonce">TTLMigrate</property>
+            <property name="skipinternals">true</property>
+        </configuration>
     </export>
 </deployment>
