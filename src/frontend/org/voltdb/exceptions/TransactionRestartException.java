@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.voltdb.client.ClientResponse;
+
 /**
  * This exception is used in IV2 MPI repair to terminate the currently running
  * MP transaction at the MPI.  We have a separate exception type so that we can
@@ -96,5 +98,23 @@ public class TransactionRestartException extends SerializableException {
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_txnId);
         b.put(m_misrouted ? (byte) 1 : (byte) 0);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        if (isMisrouted()) {
+            return ClientResponse.TXN_MISROUTED;
+        } else {
+            return ClientResponse.TXN_RESTART;
+        }
+    }
+
+    @Override
+    public String getShortStatusString() {
+        if (isMisrouted()) {
+            return "TRANSACTION MISROUTED";
+        } else {
+            return "TRANSACTION RESTART";
+        }
     }
 }

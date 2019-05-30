@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.Random;
 
 import org.voltdb.Expectation.Type;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Wraps the stored procedure object created by the user
@@ -186,6 +187,14 @@ public abstract class VoltProcedure {
         @Override
         public String getMessage() {
             return message;
+        }
+
+        public byte getClientResponseStatus() {
+            return ClientResponse.USER_ABORT;
+        }
+
+        public String getShortStatusString() {
+            return "USER ABORT";
         }
     }
 

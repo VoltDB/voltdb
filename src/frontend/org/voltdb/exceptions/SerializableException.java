@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltProcedure;
 
 /**
@@ -158,6 +159,16 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
      */
     @Override
     public String getMessage() { return m_message; }
+
+    /**
+     * Override this method if the ClientResponse sent back must contain
+     * result rows with additional information.
+     *
+     * @param cr
+     */
+    public void setClientResponseResults(ClientResponseImpl cr) {
+        // Does nothing by default
+    }
 
     /**
      * Number of bytes necessary to store the serialized representation of this exception

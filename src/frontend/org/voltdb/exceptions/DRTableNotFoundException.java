@@ -23,6 +23,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Exception thrown by native Execution Engine
@@ -53,6 +54,7 @@ public class DRTableNotFoundException extends SerializableException {
         m_remoteTxnUniqueId = remoteTxnUniqueId;
     }
 
+    @Override
     public void setClientResponseResults(ClientResponseImpl cr) {
         ColumnInfo[] resultColumns = new ColumnInfo[] {
                 new ColumnInfo("SOURCE_UNIQUEID", VoltType.BIGINT)
@@ -71,5 +73,15 @@ public class DRTableNotFoundException extends SerializableException {
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_hash);
         b.putLong(m_remoteTxnUniqueId);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.DR_TABLE_HASH_NOT_FOUND;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "TABLE NOT FOUND FOR REMOTE TABLE HASH";
     }
 }
