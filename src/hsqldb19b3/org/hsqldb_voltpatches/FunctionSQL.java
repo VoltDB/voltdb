@@ -227,6 +227,7 @@ public class FunctionSQL extends Expression {
     //
     int     funcType;
     String  name;
+    static char 	sora;
     short[] parseList;
     short[] parseListAlt;
     boolean isValueFunction;

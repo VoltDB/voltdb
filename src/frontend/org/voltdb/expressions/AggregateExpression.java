@@ -95,6 +95,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_MIN:
         case AGGREGATE_WINDOWED_MIN:
         case AGGREGATE_WINDOWED_MAX:
+        case USER_DEFINE_AGGREGATE:
             //
             // It's always whatever the base type is
             //

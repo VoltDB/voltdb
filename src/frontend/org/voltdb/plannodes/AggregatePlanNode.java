@@ -51,7 +51,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         AGGREGATE_OUTPUT_COLUMN,
         AGGREGATE_EXPRESSION,
         GROUPBY_EXPRESSIONS,
-        PARTIAL_GROUPBY_COLUMNS
+        PARTIAL_GROUPBY_COLUMNS,
+        USER_AGGREGATE_ID
         ;
     }
 
@@ -61,6 +62,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Integer> m_aggregateDistinct = new ArrayList<>();
     // a list of column offsets/indexes not plan column guids.
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
+    // a list of IDs for user define aggregate functions
+    protected List<Integer> m_userAggregateId = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
@@ -373,6 +376,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add(aggInputExpr.clone());
         }
+        if (m_userAggregateId.isEmpty()) {
+            m_userAggregateId.add(0);
+        }
+        else {
+            int size = m_userAggregateId.size();
+            m_userAggregateId.add(size);
+        }
     }
 
     public void updateAggregate(
@@ -409,6 +419,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
+            stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));

@@ -1395,6 +1395,10 @@ public class Expression {
             return;
         }
 
+        if (e.opType == OpTypes.USER_DEFINE_AGGREGATE) {
+            return;
+        }
+
         if (stopAtTypeSet.contains(e.opType)) {
             return;
         }
@@ -1570,6 +1574,9 @@ public class Expression {
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
+
+        // user defined aggregate function
+        prototypes.put(OpTypes.USER_DEFINE_AGGREGATE, (new VoltXMLElement("aggregation")).withValue("optype", "user_define_aggregate"));
     }
 
     /**

@@ -116,6 +116,7 @@ public interface OpTypes {
         , WINDOWED_PERCENT_RANK = 102 // reserved but not used
         , WINDOWED_CUME_DIST    = 103 // reserved but not used
         , WINDOWED_ROW_NUMBER   = 105
+        , USER_DEFINE_AGGREGATE = 106
 
         // A VoltDB extension of STARTS WITH
         , STARTS_WITH = 150
