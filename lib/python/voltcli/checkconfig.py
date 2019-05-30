@@ -91,7 +91,7 @@ def test_os_release(output):
             if releaseNum >= "6.6":
                 supported = True
         elif "ubuntu" in distInfo[0].lower():
-            if distInfo[1] in ("14.04", "16.04"):
+            if distInfo[1] in ("14.04", "16.04", "18.04"):
                 supported = True
     elif platform.system() == "Darwin":
         output["OS"] = ["PASS", "MacOS X"]
@@ -101,7 +101,7 @@ def test_os_release(output):
             supported = True
     else:
         output['OS'] = ["WARN", "Only supports Linux based platforms"]
-        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 12.04/14.04 and RedHat/CentOS 6.6 or later"]
+        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 14.04/16.04/18.04 and RedHat/CentOS 6.6 or later"]
     if not supported:
         formatString = "Unsupported release: " + formatString
     output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
