@@ -603,8 +603,8 @@ public class SynchronizedStatesManager {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
                                 m_zk.create(m_myParticipantPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                                // force the participant count to be 1, so that lock notifications can be correctly guarded
-                                m_currentParticipants = 1;
+                                // increment the participant count by 1, so that lock notifications can be correctly guarded
+                                m_currentParticipants += 1;
 
                                 m_pendingProposal = existingAndProposedStates.m_proposal;
                                 ByteBuffer proposedState = m_pendingProposal.asReadOnlyBuffer();

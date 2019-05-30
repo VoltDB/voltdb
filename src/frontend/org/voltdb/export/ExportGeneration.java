@@ -63,6 +63,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
@@ -86,7 +87,8 @@ public class ExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     // Rate-limit message delivery warnings to 1 per minutes
-    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.WARN);
+    private static final RateLimitedLogger exportLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.INFO);
+    private static final RateLimitedLogger exportLogLimitedPush =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), exportLog, Level.INFO);
 
     public final File m_directory;
 
@@ -338,8 +340,9 @@ public class ExportGeneration implements Generation {
                         String tableName = new String(stringBytes, Constants.UTF8ENCODING);
                         if (partitionSources == null) {
                             if (!m_removingPartitions.contains(partition)) {
-                                exportLog.error("Received an export message " + msgType + " for partition " + partition +
-                                        " which does not exist on this node");
+                                exportLogLimited.log("Received an export message " + msgType + " for partition " + partition +
+                                        " which does not exist on this node: this should be a transient condition.",
+                                        EstTime.currentTimeMillis());
                             }
                             return;
                         }
@@ -347,7 +350,8 @@ public class ExportGeneration implements Generation {
                         if (eds == null) {
                             exportLogLimited.log("Received export message " + msgType + " for partition "
                                     + partition + " source " + tableName +
-                                    " which does not exist on this node, sources = " + partitionSources,
+                                    " which does not exist on this node: this should be a transient condition."
+                                    + " Sources = " + partitionSources,
                                     EstTime.currentTimeMillis());
                             return;
                         }
@@ -615,7 +619,9 @@ public class ExportGeneration implements Generation {
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        source.setupMigrateRowsDeleter(migrateBatchSize);
+        source.setupMigrateRowsDeleter(migrateBatchSize,
+                CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
+
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -680,7 +686,7 @@ public class ExportGeneration implements Generation {
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
                         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize);
+                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize, table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
@@ -820,7 +826,7 @@ public class ExportGeneration implements Generation {
             /*
              * When dropping a stream, the EE pushes the outstanding buffers: ignore them.
              */
-            exportLogLimited.log("PUSH on unknown export data source for partition " + partitionId +
+            exportLogLimitedPush.log("PUSH on unknown export data source for partition " + partitionId +
                     " Table " + tableName + ". The export data ("
                     + "seq: " + startSequenceNumber + ", count: " + tupleCount
                     + ") is being discarded.",

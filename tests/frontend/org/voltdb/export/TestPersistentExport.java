@@ -67,7 +67,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                          createSocketExportProperties("T1", false /* is replicated stream? */),
                          "FOO1");
-
         builder.addExport(true /* enabled */,
                 ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
                 createSocketExportProperties("T3", false /* is replicated stream? */),
@@ -106,6 +105,9 @@ public class TestPersistentExport extends ExportLocalClusterBase {
 
     @Test
     public void testInsertDeleteUpdate() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
         Client client = getClient(m_cluster);
 
         //add data to stream table
@@ -118,7 +120,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T1", 200, false);
         m_verifier.verifyRows();
 
-        // On replicated table
+        // test update on replicated table
         insertToStream("T3", 0, 100, client, data);
         client.callProcedure("@AdHoc", "update T3 set b = 100 where a < 10000;");
         client.drain();
@@ -126,11 +128,16 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
-        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW)");
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW,DELETE)");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
         checkTupleCount(client, "T3", 300, true);
+
+        client.callProcedure("@AdHoc", "delete from T3 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 400, true);
     }
 
     private static void checkTupleCount(Client client, String tableName, long expectedCount, boolean replicated){
@@ -143,14 +150,16 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             try {
                 VoltTable vt = client.callProcedure("@Statistics", "EXPORT").getResults()[0];
                 long count = 0;
-                vt.resetRowPosition();
                 while (vt.advanceRow()) {
                     if (tableName.equalsIgnoreCase(vt.getString("SOURCE"))
                             && "TRUE".equalsIgnoreCase(vt.getString("ACTIVE"))) {
-                        count +=vt.getLong("TUPLE_COUNT");
-                        if (replicated && count > 0) {
-                            assert(count == expectedCount);
-                            return;
+                        if (replicated) {
+                            if (0 == vt.getLong("PARTITION_ID")) {
+                                count = vt.getLong("TUPLE_COUNT");
+                                break;
+                            }
+                        } else {
+                            count +=vt.getLong("TUPLE_COUNT");
                         }
                     }
                 }

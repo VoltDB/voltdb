@@ -105,6 +105,9 @@ StreamedTable::~StreamedTable() {
 // Stream writes were done so commit all the writes
 void StreamedTable::notifyQuantumRelease() {
     if (m_wrapper) {
+        if (m_migrateTxnSizeGuard.undoToken == getLastSeenUndoToken()) {
+            m_migrateTxnSizeGuard.reset();
+        }
         m_wrapper->commit(m_executorContext->getContextEngine(),
                 m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
     }
@@ -138,7 +141,7 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
-void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type) {
+void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream) {
     if (m_executorContext->externalStreamsEnabled()) {
         int64_t currSequenceNo = ++m_sequenceNo;
         assert(m_columnNames.size() == source.columnCount());
@@ -156,6 +159,25 @@ void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_RO
             return;
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo), this);
+        if (drStream != NULL) {
+            if (m_migrateTxnSizeGuard.undoToken == 0L) {
+                // The buffer size includes the row length and null array, as DR buffer also has those.
+                int64_t rawExportBufSize =
+                        m_wrapper->getUso() - mark - ExportTupleStream::getExportMetaHeaderSize();
+                m_migrateTxnSizeGuard.undoToken = uq->getUndoToken();
+                m_migrateTxnSizeGuard.estimatedDRLogSize += rawExportBufSize + DRTupleStream::getDRLogHeaderSize();
+            } else {
+                // The buffer size includes the row length and null array, as DR buffer also has those.
+                int64_t rawExportBufSize =
+                        m_wrapper->getUso() - m_migrateTxnSizeGuard.uso - ExportTupleStream::getExportMetaHeaderSize();
+                m_migrateTxnSizeGuard.estimatedDRLogSize += rawExportBufSize + DRTupleStream::getDRLogHeaderSize();
+            }
+            m_migrateTxnSizeGuard.uso = m_wrapper->getUso();
+            if (m_migrateTxnSizeGuard.estimatedDRLogSize >= voltdb::SECONDARY_BUFFER_SIZE) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  "Migrate transaction failed, exceeding 50MB DR buffer size limit.");
+            }
+        }
     }
 }
 
@@ -172,7 +194,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
     }
 
     if (m_wrapper) {
-        streamTuple(source, ExportTupleStream::INSERT);
+        streamTuple(source, ExportTupleStream::INSERT, NULL);
     }
     return true;
 }
@@ -202,6 +224,16 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
+        if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
+            m_migrateTxnSizeGuard.estimatedDRLogSize -=
+                    m_migrateTxnSizeGuard.uso - mark -
+                    ExportTupleStream::getExportMetaHeaderSize() + DRTupleStream::getDRLogHeaderSize();
+            assert (m_migrateTxnSizeGuard.estimatedDRLogSize >= 0);
+            m_migrateTxnSizeGuard.uso = mark;
+            if (m_migrateTxnSizeGuard.estimatedDRLogSize == 0) {
+                m_migrateTxnSizeGuard.reset();
+            }
+        }
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //than having gaps.

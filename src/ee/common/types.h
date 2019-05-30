@@ -523,6 +523,7 @@ enum DREventType {
 // Types of DR records
 // ------------------------------------------------------------------
 enum DRRecordType {
+    DR_RECORD_INVALID = -1,
     DR_RECORD_INSERT = 0,
     DR_RECORD_DELETE = 1,
     DR_RECORD_UPDATE = 2,

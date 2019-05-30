@@ -786,3 +786,7 @@ int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
 }
+
+int DRTupleStream::getDRLogHeaderSize() {
+    return DR_LOG_HEADER_SIZE + ExecutorContext::getEngine()->getDRHiddenColumnSize();
+}
