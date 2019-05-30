@@ -19,6 +19,8 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.client.ClientResponse;
+
 /**
  * Thrown when it has been decided that a query is taking too
  * long and needs to stop.
@@ -46,5 +48,15 @@ public class InterruptException extends SerializableException {
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.GRACEFUL_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "Transaction Interrupted";
     }
 }
