@@ -89,12 +89,12 @@ public class StreamBlockQueue {
     /**
      * A deque for persisting data to disk both for persistence and as a means of overflowing storage
      */
-    private BinaryDeque m_persistentDeque;
+    private BinaryDeque<DeferredSerialization> m_persistentDeque;
 
     private final String m_nonce;
     private final String m_path;
     private final String m_streamName;
-    private BinaryDequeReader m_reader;
+    private BinaryDequeReader<?> m_reader;
 
     public StreamBlockQueue(String path, String nonce, String streamName)
             throws java.io.IOException {
@@ -103,7 +103,8 @@ public class StreamBlockQueue {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 streamTable, m_streamName, catalogContext.m_genId);
-        m_persistentDeque = new PersistentBinaryDeque(nonce, ds, new VoltFile(path), exportLog, !DISABLE_COMPRESSION);
+        m_persistentDeque = PersistentBinaryDeque.builder(nonce, new VoltFile(path), exportLog).initialExtraHeader(ds)
+                .compression(!DISABLE_COMPRESSION).build();
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
@@ -392,8 +393,8 @@ public class StreamBlockQueue {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
         StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(
                 streamTable, m_streamName, catalogContext.m_genId);
-        m_persistentDeque = new PersistentBinaryDeque(m_nonce, ds, new VoltFile(m_path), exportLog,
-                !DISABLE_COMPRESSION);
+        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
+                .initialExtraHeader(ds).compression(!DISABLE_COMPRESSION).build();
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
