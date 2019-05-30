@@ -842,12 +842,18 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
     private PBDSegment<M> initializeNewSegment(long segmentIndex, long segmentId, File file, String reason)
             throws IOException {
+        return initializeNewSegment(segmentIndex, segmentId, file, reason, m_extraHeader);
+    }
+
+    private PBDSegment<M> initializeNewSegment(long segmentIndex, long segmentId, File file, String reason,
+            M extraHeader)
+            throws IOException {
         PBDSegment<M> segment = m_pbdSegmentFactory.create(segmentIndex, segmentId, file, m_usageSpecificLog,
                 m_extraHeaderSerializer);
         try {
             segment.openNewSegment(m_compress);
-            if (m_extraHeader != null) {
-                segment.writeExtraHeader(m_extraHeader);
+            if (extraHeader != null) {
+                segment.writeExtraHeader(extraHeader);
             }
 
             if (m_usageSpecificLog.isDebugEnabled()) {
@@ -950,7 +956,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     }
 
     @Override
-    public synchronized void push(BBContainer objects[], DeferredSerialization ds) throws IOException {
+    public synchronized void push(BBContainer[] objects) throws IOException {
+        push(objects, m_extraHeader);
+    }
+
+    @Override
+    public synchronized void push(BBContainer objects[], M extraHeader) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Cannot push(): PBD has been Closed");
@@ -962,8 +973,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         //Take the objects that were provided and separate them into deques of objects
         //that will fit in a single write segment
         int maxObjectSize = PBDSegment.CHUNK_SIZE - PBDSegment.SEGMENT_HEADER_BYTES;
-        if (ds != null) {
-            maxObjectSize -= ds.getSerializedSize();
+        if (extraHeader != null) {
+            maxObjectSize -= m_extraHeaderSerializer.getMaxSize(extraHeader);
         }
 
         int available = maxObjectSize;
@@ -999,7 +1010,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             long prevId = getNextSegmentId();
             String fname = getSegmentFileName(curId, prevId);
 
-            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "a push");
+            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, curId, new VoltFile(m_path, fname), "a push",
+                    extraHeader);
 
             // Prepare for next file
             nextIndex--;
