@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 import static org.voltdb.utils.TestPersistentBinaryDeque.defaultBuffer;
 import static org.voltdb.utils.TestPersistentBinaryDeque.defaultContainer;
-import static org.voltdb.utils.TestPersistentBinaryDeque.pollOnceAndVerify;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,8 +50,8 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.test.utils.RandomTestRule;
+import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
@@ -80,8 +79,8 @@ public class TestPersistentBinaryDequeCorruption {
 
     private final Map<String, Long> m_corruptionPoints;
     private final CorruptionChecker m_checker;
-    private PersistentBinaryDeque<DeferredSerialization> m_pbd;
-    private DeferredSerialization m_ds;
+    private PersistentBinaryDeque<ExtraHeaderMetadata> m_pbd;
+    private ExtraHeaderMetadata m_extraHeader;
 
     @Parameters
     public static Collection<Object[]> parameters() {
@@ -104,27 +103,7 @@ public class TestPersistentBinaryDequeCorruption {
 
     @Before
     public void setup() throws IOException {
-        m_ds = new DeferredSerialization() {
-            private final ByteBuffer data = ByteBuffer.allocate(245);
-
-            {
-                random.nextBytes(data.array());
-            }
-
-            @Override
-            public void serialize(ByteBuffer buf) throws IOException {
-                data.rewind();
-                buf.put(data);
-            }
-
-            @Override
-            public int getSerializedSize() throws IOException {
-                return data.limit();
-            }
-
-            @Override
-            public void cancel() {}
-        };
+        m_extraHeader = new ExtraHeaderMetadata(random);
         m_pbd = newPbd();
     }
 
@@ -298,7 +277,7 @@ public class TestPersistentBinaryDequeCorruption {
             for (int j = 0; j < 5; ++j) {
                 m_pbd.offer(defaultContainer());
             }
-            m_pbd.updateExtraHeader(m_ds);
+            m_pbd.updateExtraHeader(m_extraHeader);
         }
         assertEquals(6, testDir.getRoot().list().length);
 
@@ -317,8 +296,8 @@ public class TestPersistentBinaryDequeCorruption {
         verifySegmentCount(6, 0);
 
         m_checker.run(m_pbd);
-        BinaryDequeReader<?> reader = m_pbd.openForRead(CURSOR_ID);
-        BinaryDequeReader<?> reader2 = m_pbd.openForRead(CURSOR_ID + 2);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader2 = m_pbd.openForRead(CURSOR_ID + 2);
 
         verifySegmentCount(6, 2);
 
@@ -367,7 +346,7 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     private int startOfEntry(int entryNumber, int entrySize) throws IOException {
-        return PBDSegment.SEGMENT_HEADER_BYTES + m_ds.getSerializedSize()
+        return PBDSegment.SEGMENT_HEADER_BYTES + TestPersistentBinaryDeque.SERIALIZER.getMaxSize(m_extraHeader)
                 + ((entryNumber - 1) * (entrySize + PBDSegment.ENTRY_HEADER_BYTES));
     }
 
@@ -407,8 +386,8 @@ public class TestPersistentBinaryDequeCorruption {
     private void runCheckerNewPbd(int corruptedEntry) throws IOException {
         // Use a parallel PBD instance since PBD finalizes all entries on close and that is not wanted
         verifySegmentCount(1, 0);
-        PersistentBinaryDeque<?> pbd = newPbd();
-        BinaryDequeReader<?> reader = pbd.openForRead(CURSOR_ID);
+        PersistentBinaryDeque<ExtraHeaderMetadata> pbd = newPbd();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = pbd.openForRead(CURSOR_ID);
         try {
             ByteBuffer data = defaultBuffer();
             m_checker.run(pbd);
@@ -447,15 +426,21 @@ public class TestPersistentBinaryDequeCorruption {
                 .getDeclaredField(PersistentBinaryDeque.class, "m_segments", true).get(m_pbd));
     }
 
-    private PersistentBinaryDeque<DeferredSerialization> newPbd() throws IOException {
-        PersistentBinaryDeque.Builder<DeferredSerialization> builder = PersistentBinaryDeque
-                .builder(TEST_NONCE, testDir.getRoot(), LOG).initialExtraHeader(m_ds);
+    private PersistentBinaryDeque<ExtraHeaderMetadata> newPbd() throws IOException {
+        PersistentBinaryDeque.Builder<ExtraHeaderMetadata> builder = PersistentBinaryDeque
+                .builder(TEST_NONCE, testDir.getRoot(), LOG)
+                .initialExtraHeader(m_extraHeader, TestPersistentBinaryDeque.SERIALIZER);
 
         if (m_corruptionPoints != null) {
             builder.pbdSegmentFactory(CorruptingPBDSegment::new);
         }
 
         return builder.build();
+    }
+
+    private void pollOnceAndVerify(BinaryDequeReader<ExtraHeaderMetadata> reader, ByteBuffer expectedData)
+            throws IOException {
+        TestPersistentBinaryDeque.pollOnceAndVerify(reader, expectedData, m_extraHeader);
     }
 
     private interface CorruptionChecker {
