@@ -42,6 +42,7 @@
 
 package voter;
 
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -56,7 +57,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class AsyncBenchmark {
@@ -142,6 +145,9 @@ public class AsyncBenchmark {
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
+        
+        @Option(desc = "Use TTL Migration from the Votes mirror table")
+        boolean usemigrate = false;
 
         @Override
         public void validate() {
@@ -290,6 +296,25 @@ public class AsyncBenchmark {
             System.out.printf(", Avg/95%% Latency %.2f/%.2fms", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
         }
+        if (this.config.usemigrate) {
+            VoltTable rowcount = null;
+            try {
+                rowcount = client.callProcedure("Count").getResults()[0];
+            } catch (NoConnectionsException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (ProcCallException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            System.out.printf("Migration progress rows remaining");
+            while (rowcount.advanceRow()) {
+                System.out.printf(" %d", rowcount.getLong(0));
+            }
+        }
         System.out.printf("\n");
     }
 
@@ -299,7 +324,7 @@ public class AsyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
+    public synchronized void printResults() {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Voting Board statistics, Voting results and performance statistics

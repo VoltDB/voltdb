@@ -329,7 +329,6 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExp
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateCount;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE PARTITION ON TABLE export_done_table COLUMN txnid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportDoneTable;
