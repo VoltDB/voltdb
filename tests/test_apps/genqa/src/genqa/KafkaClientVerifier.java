@@ -46,10 +46,10 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltcore.logging.VoltLogger;
 
 /**
- * This verifier connects to kafka and consumes messages from a topic, it then
+ * This verifier connects to kafka and consumes messsages from a topic, it then
  * looks for inconsistencies in the data.
  *
- * It requires a field with a sequence number and another field with an
+ * It requires a field with a seqeuence number and another field with an
  * unique index. It will compute gaps in the sequence and check for
  * duplicates based on the index.  It expects that the max sequence number should
  * match the expected number of unique records.
@@ -57,7 +57,7 @@ import org.voltcore.logging.VoltLogger;
  * Partition information will also be verified.  It expects that the voltdb partition in the
  * metadata fields matches the computed partition from org.voltdb.iv2.TxnEgo.
  *
- * it will also check that there are not too many duplicates.
+ * it will also check that their are not too many duplicates.
  *
  */
 public class KafkaClientVerifier {
@@ -88,8 +88,8 @@ public class KafkaClientVerifier {
         @Option(desc = "Kafka brokers host:port")
         String brokers = "localhost";
 
-        // Topic prefixes maybe used when two or more instances of a test share the same kafka cluster
-        // as a means to distinguish each tests data.
+        // Topic prefixes maybe used when two or more instances of a tests share the same kafka cluster
+        // as a means to distinquish each tests data.
         @Option(desc = "topic prefix")
         String topicprefix = "";
 
@@ -349,13 +349,6 @@ public class KafkaClientVerifier {
         log.info("Total attempted rows submitted from client (max client row ID) = " + lastId);
         log.info("max row ID number should = received count - duplicates + missing row ids");
         log.info(lastId + " should = " + ids.size() + " - " + duplicateCnt + " + " + missingCnt);
-        // log.info("missing records: " + realMissing );
-
-        /*
-         * if (realMissing > 0) { System.err.println("\nERROR There are '" + realMissing
-         * + "' missing rows"); testGood.set(false); } else {
-         * log.info("There were no missing rows"); }
-         */
 
         // duplicates may be expected in some situations where only part of a buffer was transferred before
         // a failure and we and  volt re-submits the entire buffer

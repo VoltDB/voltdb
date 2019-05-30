@@ -99,7 +99,7 @@ public class AsyncExportClient
             File logPath = new File(m_txnLogPath);
             if (!logPath.exists()) {
                 if (!logPath.mkdir()) {
-                    System.err.println("Problem creating log directory " + logPath);
+                    log.error("Problem creating log directory " + logPath);
                 }
             }
         }
@@ -109,7 +109,7 @@ public class AsyncExportClient
             if (dh == null) {
                 dh = new File(m_txnLogPath, Integer.toString(partId));
                 if (!dh.mkdir()) {
-                    System.err.println("Problem createing log directory " + dh);
+                    log.error("Problem createing log directory " + dh);
                 }
                 m_baseDirs.put(partId, dh);
             }
@@ -198,7 +198,7 @@ public class AsyncExportClient
                 }
                 catch (IOException e)
                 {
-                    System.err.println("Exception: " + e);
+                    log.error("Exception: " + e);
                     e.printStackTrace();
                 }
             }
@@ -356,7 +356,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
-                    System.err.println("FATAL Exception: " + e);
+                    log.fatal("Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
@@ -430,12 +430,12 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.err.println("FATAL Exception: " + x);
+            log.fatal("Exception: " + x);
             x.printStackTrace();
         }
         // if we didn't get any successes we need to fail
         if ( TrackingResults.get(0) == 0 ) {
-            System.err.println("ERROR No successful transactions");
+            log.error("No successful transactions");
             System.exit(-1);
         }
     }
@@ -459,7 +459,7 @@ public class AsyncExportClient
                 client.createConnection(server, config.port);
                 break;
             }catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed.\n");
+                log.error("Connection to " + server + " failed.\n");
             }
         }
     }
@@ -503,12 +503,11 @@ public class AsyncExportClient
                 .getStatsByProc()
                 .get(config.procedure);
 
-        // long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
-        // switch from app's runtime to clock time so results line up
+        if (stats == null) return;
+        
+        // switch from app's runtime to VoltLogger clock time so results line up
         // with apprunner if running in that framework
-        //long now = System.currentTimeMillis();
 
-        // System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         String stats_out = String.format(" Throughput %d/s, ", stats.getTxnThroughput());
         stats_out += String.format("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
@@ -552,7 +551,7 @@ public class AsyncExportClient
             catch (Exception ex) {
                 // Export Statistics are updated asynchronously and may not be up to date immediately on all hosts
                 // retry a few times if we don't get an answer
-                System.err.println("Problem getting @Statistics export: "+ex.getMessage());
+                log.error("Problem getting @Statistics export: "+ex.getMessage());
             }
             if (stats == null) {
                 Thread.sleep(5000);
