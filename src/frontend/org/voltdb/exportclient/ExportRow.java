@@ -85,7 +85,7 @@ public class ExportRow {
     }
 
     public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize,
-            int partitionCol, long generation) throws IOException {
+            int partitionId, long generation) throws IOException {
         String tableName = ExportRow.decodeString(bb);
         List<String> colNames = new ArrayList<>();
         List<Integer> colLengths = new ArrayList<>();
@@ -96,7 +96,7 @@ public class ExportRow {
             colLengths.add(bb.getInt());
         }
         return new ExportRow(tableName, colNames, colTypes, colLengths,
-                new Object[] {}, null, -1, partitionCol, generation);
+                new Object[] {}, null, -1, partitionId, generation);
     }
 
     /**
