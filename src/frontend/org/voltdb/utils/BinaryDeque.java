@@ -59,16 +59,29 @@ public interface BinaryDeque<M> {
     int offer(DeferredSerialization ds) throws IOException;
 
     /**
-     * A push creates a new file each time to be "the head" so it is more efficient to pass
-     * in all the objects you want to push at once so that they can be packed into
-     * as few files as possible. IOException may be thrown if the object
-     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
-     * If there is an exception attempting to write the buffers then all the buffers will be discarded
+     * A push creates a new file each time to be "the head" so it is more efficient to pass in all the objects you want
+     * to push at once so that they can be packed into as few files as possible. IOException may be thrown if the object
+     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque. If there is an
+     * exception attempting to write the buffers then all the buffers will be discarded
+     * <p>
+     * The current extraHeader metadata if any will be associated with these entries.
+     *
      * @param objects Array of buffers representing the objects to be pushed to the head of the queue
-     * @param DeferredSerialization serializer method to write subsystem-specific meta data.
+     * @throws IOException
+     */
+    public void push(BBContainer objects[]) throws IOException;
+
+    /**
+     * A push creates a new file each time to be "the head" so it is more efficient to pass in all the objects you want
+     * to push at once so that they can be packed into as few files as possible. IOException may be thrown if the object
+     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque. If there is an
+     * exception attempting to write the buffers then all the buffers will be discarded
+     *
+     * @param objects     Array of buffers representing the objects to be pushed to the head of the queue
+     * @param extraHeader header metadata to associate with entries.
      * @throws java.io.IOException
      */
-    public void push(BBContainer objects[], DeferredSerialization ds) throws IOException;
+    public void push(BBContainer objects[], M extraHeader) throws IOException;
 
     /**
      * Start a BinaryDequeReader for reading, positioned at the start of the deque.
