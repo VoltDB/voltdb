@@ -2170,7 +2170,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                     final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                     m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                            () -> startMigratePartitionLeader(message.isForStopNode()),
+                            () -> {
+                                try {
+                                    startMigratePartitionLeader(message.isForStopNode());
+                                } catch (Exception e) {
+                                    tmLog.error("Migrate partition leader encountered unexpected error", e);
+                                } catch (Throwable t) {
+                                    VoltDB.crashLocalVoltDB("Migrate partition leader encountered unexpected error",
+                                            true, t);
+                                }
+                            },
                             delay, interval, TimeUnit.SECONDS);
                 }
                 hostLog.info("MigratePartitionLeader task is started.");
