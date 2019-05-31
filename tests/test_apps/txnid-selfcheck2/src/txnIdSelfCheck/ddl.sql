@@ -422,15 +422,24 @@ CREATE TABLE importbr
 , UNIQUE ( cid, seq )
 );
 
--- TTL with migrate to stream
-CREATE TABLE ttl_migrate
+-- TTL with migrate to stream -- partitioned
+CREATE TABLE ttl_migrate_p
 (
   big1                     BIGINT        NOT NULL
 , big2                     BIGINT        NOT NULL
 , ts1                      TIMESTAMP     DEFAULT NOW NOT NULL
-) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc ;
-PARTITION TABLE ttl_migrate ON COLUMN big1;
-CREATE INDEX ttl_migrate_idx ON ttl_migrate(ts1) WHERE NOT MIGRATING;
+) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc1;
+PARTITION TABLE ttl_migrate_p ON COLUMN big1;
+CREATE INDEX ttl_migrate_idx_p ON ttl_migrate_p(ts1) WHERE NOT MIGRATING;
+
+-- TTL with migrate to stream -- replicated
+CREATE TABLE ttl_migrate_r
+(
+  big1                     BIGINT        NOT NULL
+, big2                     BIGINT        NOT NULL
+, ts1                      TIMESTAMP     DEFAULT NOW NOT NULL
+) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc2 ;
+CREATE INDEX ttl_migrate_idx_r ON ttl_migrate_r(ts1) WHERE NOT MIGRATING;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -457,10 +466,10 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMigrateInsert;
-PARTITION PROCEDURE TTLMigrateInsert ON TABLE ttl_migrate COLUMN big1;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMigrateInsertR;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMigrateInsertP;
+PARTITION PROCEDURE TTLMigrateInsertP ON TABLE ttl_migrate_p COLUMN big1;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;

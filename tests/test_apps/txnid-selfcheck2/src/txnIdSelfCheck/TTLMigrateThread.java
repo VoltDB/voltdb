@@ -52,12 +52,6 @@ public class TTLMigrateThread extends BenchmarkThread {
         this.m_permits = permits;
     }
 
-    private String nextTTLMigrate() {
-
-        // mpRatio % of all transactions are MP
-        boolean replicated = (counter % 100) < (this.mpRatio * 100.);
-        boolean batched = (counter % 11) == 0 && this.mpRatio > 0.0;
-
     void shutdown() {
         m_shouldContinue.set(false);
         this.interrupt();
@@ -107,7 +101,7 @@ public class TTLMigrateThread extends BenchmarkThread {
             // call a transaction
             try {
                 m_permits.acquire();
-                client.callProcedure(new TTLMigrateCallback(), "TTLMigrateInsert", counter, r.nextint());
+                client.callProcedure(new TTLMigrateCallback(), "TTLMigrateInsertP", counter++, r.nextInt());
             }
             catch (NoConnectionsException e) {
                 log.error("TTLMigrateThread got NoConnectionsException on proc call. Will sleep.");

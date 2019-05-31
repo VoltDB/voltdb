@@ -561,7 +561,7 @@ public class Benchmark {
     UpdateClassesThread updcls = null;
     NibbleDeleteLoader partNDlt = null;
     NibbleDeleteLoader replNDlt = null;
-    TTLMigrate ttlMigratelt = null;
+    TTLMigrateThread ttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -765,7 +765,7 @@ public class Benchmark {
         }
 
         if (!config.disabledThreads.contains("ttlMigratelt")) {
-            ttlMigratelt = new TTLMigrateThread(client, config.duration);
+            ttlMigratelt = new TTLMigrateThread(client, config.mpratio, permits);
             ttlMigratelt.start();
         }
         log.info("All threads started...");

@@ -27,8 +27,8 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class TTLMigrateInsert extends VoltProcedure {
-    final SQLStmt insert = new SQLStmt("insert into ttl_migrate values (?,?);");
+public class TTLMigrateInsertR extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into ttl_migrate_r(big1, big2) values (?,?);");
 
     public VoltTable[] run(long counter, long randInt) {
         voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), counter, randInt);
