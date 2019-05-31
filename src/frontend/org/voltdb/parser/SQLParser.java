@@ -122,7 +122,7 @@ public class SQLParser extends SQLPatternFactory
      *  (1) table name
      *  [(2) target name]
      */
-    private static final Pattern PAT_CREATE_TABLE_MIGRATE_TO =
+    private static final Pattern PAT_CREATE_TABLE =
             SPF.statement(
                     SPF.token("create"), SPF.token("table"),
                     SPF.capture("tableName", SPF.databaseObjectName()),
@@ -132,22 +132,7 @@ public class SQLParser extends SQLPatternFactory
                     new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
                     SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
                     SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
-            ).compile("PAT_CREATE_TABLE_MIGRATE_TO");
-
-    /**
-     * Pattern: CREATE TABLE tablename
-     *
-     *
-     * Capture groups:
-     *  (1) table name
-     */
-    private static final Pattern PAT_CREATE_TABLE =
-        SPF.statement(
-            SPF.token("create"), SPF.token("table"), SPF.capture("name", SPF.databaseObjectName()),
-            new SQLPatternPartString("\\s*"),
-            SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
-            SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
-        ).compile("PAT_CREATE_TABLE");
+            ).compile("PAT_CREATE_TABLE");
 
     /**
      * Pattern: CREATE TABLE tablename
@@ -762,11 +747,6 @@ public class SQLParser extends SQLPatternFactory
      * @return          pattern matcher object
      */
     public static Matcher matchCreateTableMigrateTo(String statement) {
-        return PAT_CREATE_TABLE_MIGRATE_TO.matcher(statement);
-    }
-
-    public static Matcher matchCreateTable(String statement)
-    {
         return PAT_CREATE_TABLE.matcher(statement);
     }
 
