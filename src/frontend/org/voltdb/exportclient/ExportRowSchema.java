@@ -211,6 +211,8 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
         StringBuilder sb = new StringBuilder(this.tableName)
                 .append(":")
                 .append(this.partitionId)
+                .append(":")
+                .append(this.generation)
                 .append(" - [");
 
         Iterator<String> itNames = this.names.iterator();
