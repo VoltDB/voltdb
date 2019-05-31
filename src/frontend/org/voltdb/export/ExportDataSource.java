@@ -49,7 +49,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
@@ -61,12 +60,13 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
-import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportRowSchema;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -176,13 +176,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private static final boolean ENABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("ENABLE_AUTO_GAP_RELEASE");
 
-    private static final String VOLT_TRANSACTION_ID = "VOLT_TRANSACTION_ID";
-    private static final String VOLT_EXPORT_TIMESTAMP = "VOLT_EXPORT_TIMESTAMP";
-    private static final String VOLT_EXPORT_SEQUENCE_NUMBER = "VOLT_EXPORT_SEQUENCE_NUMBER";
-    private static final String VOLT_PARTITION_ID = "VOLT_PARTITION_ID";
-    private static final String VOLT_SITE_ID = "VOLT_SITE_ID";
-    private static final String VOLT_EXPORT_OPERATION = "VOLT_EXPORT_OPERATION";
-
     static enum StreamStatus {
         ACTIVE,
         DROPPED,
@@ -207,19 +200,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private static class PollTask {
         private SettableFuture<AckingContainer> m_pollFuture;
-        private boolean m_forcePollSchema;
 
-        public PollTask(SettableFuture<AckingContainer> fut, Boolean forcePollSchema) {
+        public PollTask(SettableFuture<AckingContainer> fut) {
             m_pollFuture = fut;
-            m_forcePollSchema = forcePollSchema;
-        }
-
-        public void setForcePollSchema(boolean force) {
-            m_forcePollSchema = force;
-        }
-
-        public boolean getForcePollSchema() {
-            return m_forcePollSchema;
         }
 
         public void setFuture(AckingContainer cont) {
@@ -229,7 +212,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         public void setException(Throwable t) {
             m_pollFuture.setException(t);
         }
-
     }
 
     /**
@@ -259,7 +241,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_tableName = tableName;
         m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
         String nonce = m_tableName + "_" + partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, partitionId);
         m_gapTracker = m_committedBuffers.scanForGap();
         // Pretend it's rejoin so we set first unpolled to a safe place
         resetStateInRejoinOrRecover(0L, true);
@@ -404,7 +386,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         final String nonce = m_tableName + "_" + m_partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName);
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, m_partitionId);
         m_gapTracker = m_committedBuffers.scanForGap();
 
         // Pretend it's rejoin so we set first unpolled to a safe place
@@ -747,7 +729,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             long genId,
             ByteBuffer buffer,
             boolean poll) throws Exception {
-        final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
@@ -781,19 +762,33 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
 
             try {
+                // Create a block to offer: NOTE this block should not
+                // be used for anything else than offering, as it doesn't have metadata.
+                BinaryDequeReader.Entry<ExportRowSchema> entry = new BinaryDequeReader.Entry<ExportRowSchema>() {
+
+                    @Override
+                    public ExportRowSchema getExtraHeader() {
+                        return null;
+                    }
+
+                    @Override
+                    public ByteBuffer getData() {
+                        return cont.b();
+                    }
+
+                    @Override
+                    public void release() {
+                        cont.discard();
+                    }
+                };
+
                 StreamBlock sb = new StreamBlock(
-                        new BBContainer(buffer) {
-                            @Override
-                            public void discard() {
-                                checkDoubleFree();
-                                cont.discard();
-                                deleted.set(true);
-                            }
-                        },
-                        null,
+                        entry,
                         startSequenceNumber,
                         committedSequenceNumber,
-                        tupleCount, uniqueId, -1, false);
+                        tupleCount,
+                        uniqueId,
+                        false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -1030,13 +1025,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Poll request from {@code GuestProcessor}
      *
-     * @param forcePollSchema
      * @return
      */
-    public ListenableFuture<AckingContainer> poll(boolean forcePollSchema) {
+    public ListenableFuture<AckingContainer> poll() {
         //ENG-15763, create SettableFuture that lets us handle executor exceptions
         final SettableFuture<AckingContainer> fut = SettableFuture.create(false);
-        PollTask pollTask = new PollTask(fut, forcePollSchema);
+        PollTask pollTask = new PollTask(fut);
         try {
             m_es.execute(new Runnable() {
                 @Override
@@ -1090,27 +1084,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         AckingContainer cont = m_pendingContainer.getAndSet(null);
         if (cont == null) {
             return false;
-        }
-        if (cont.schema() == null && pollTask.getForcePollSchema()) {
-            // Ensure this first block has a schema
-            BBContainer schemaContainer = m_committedBuffers.pollSchema();
-            if (schemaContainer == null) {
-                try {
-                    pollTask.setException(new IOException("No schema for committedSeqNo " + cont.m_commitSeqNo
-                            + ", discarding buffer (rows may be lost)."));
-                } catch (RejectedExecutionException reex) {
-                    exportLog.error("Failed to set exception for no schema for committedSeqNo " + cont.m_commitSeqNo
-                            + ", discarding buffer (rows may be lost).");
-                }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Pending " + m_pendingContainer.get().toString()
-                            + " failed to get schema.");
-                }
-                cont.internalDiscard();
-                return true;
-            } else {
-                cont.setSchema(schemaContainer);
-            }
         }
 
         try {
@@ -1203,8 +1176,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         // Put the poll aside until we become Export Master
                         m_pollTask = pollTask;
-                        // Next time we are Export Master, we must force a schema
-                        m_pollTask.setForcePollSchema(true);
                         return;
                     }
 
@@ -1254,8 +1225,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // changed while we were not Export Master).
 
                 final AckingContainer ackingContainer = AckingContainer.create(
-                        this, first_unpolled_block, m_committedBuffers,
-                        pollTask.getForcePollSchema());
+                        this, first_unpolled_block, m_committedBuffers);
 
                 try {
                     if (exportLog.isDebugEnabled()) {
@@ -1740,10 +1710,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 if (m_previousGenId < genId) {
-                    // This serializer is used to write stream schema to pbd
-                    StreamTableSchemaSerializer ds = new StreamTableSchemaSerializer(table, table.getTypeName(), genId);
                     try {
-                        m_committedBuffers.updateSchema(ds);
+                        ExportRowSchema schema = ExportRowSchema.create(table, m_partitionId, genId);
+                        m_committedBuffers.updateSchema(schema);
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
                     }
@@ -1751,136 +1720,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
-    }
-
-    public static class StreamTableSchemaSerializer implements DeferredSerialization {
-        private final Table m_streamTable;
-        private final String m_streamName;
-        private final long m_generationId;
-        public StreamTableSchemaSerializer(Table streamTable, String streamName, long genId) {
-            Preconditions.checkNotNull(streamTable, "Failed to find catalog table for stream: " + streamName);
-            m_streamTable = streamTable;
-            m_streamName = streamName;
-            m_generationId = genId;
-        }
-
-        public static void writeMetaColumns(ByteBuffer buf) {
-            // VOLT_TRANSACTION_ID, VoltType.BIGINT
-            buf.putInt(VOLT_TRANSACTION_ID.length());
-            buf.put(VOLT_TRANSACTION_ID.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.BIGINT.getValue());
-            buf.putInt(Long.BYTES);
-
-            // VOLT_EXPORT_TIMESTAMP, VoltType.BIGINT
-            buf.putInt(VOLT_EXPORT_TIMESTAMP.length());
-            buf.put(VOLT_EXPORT_TIMESTAMP.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.BIGINT.getValue());
-            buf.putInt(Long.BYTES);
-
-            // VOLT_EXPORT_SEQUENCE_NUMBER, VoltType.BIGINT
-            buf.putInt(VOLT_EXPORT_SEQUENCE_NUMBER.length());
-            buf.put(VOLT_EXPORT_SEQUENCE_NUMBER.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.BIGINT.getValue());
-            buf.putInt(Long.BYTES);
-
-            // VOLT_PARTITION_ID, VoltType.BIGINT
-            buf.putInt(VOLT_PARTITION_ID.length());
-            buf.put(VOLT_PARTITION_ID.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.BIGINT.getValue());
-            buf.putInt(Long.BYTES);
-
-            // VOLT_SITE_ID, VoltType.BIGINT
-            buf.putInt(VOLT_SITE_ID.length());
-            buf.put(VOLT_SITE_ID.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.BIGINT.getValue());
-            buf.putInt(Long.BYTES);
-
-            // VOLT_EXPORT_OPERATION, VoltType.TINYINT
-            buf.putInt(VOLT_EXPORT_OPERATION.length());
-            buf.put(VOLT_EXPORT_OPERATION.getBytes(Constants.UTF8ENCODING));
-            buf.put(VoltType.TINYINT.getValue());
-            buf.putInt(Byte.BYTES);
-        }
-        /*
-         * Export PBD segment schema layout:
-         *
-         * export buffer version(1)
-         * generation ID(8)
-         * schema length(4)
-         * stream name length(4)
-         * stream name
-         * (meta columns)
-         * column name length(4)
-         * column name(VOLT_TRANSACTION_ID)
-         * column type(1, VoltType.BIGINT)
-         * column length(4)
-         * column name length(4)
-         * column name(VOLT_EXPORT_TIMESTAMP)
-         * column type(1, VoltType.BIGINT)
-         * column length(4)
-         * column name length(4)
-         * column name(VOLT_EXPORT_SEQUENCE_NUMBER)
-         * column type(1, VoltType.BIGINT)
-         * column length(4)
-         * column name length(4)
-         * column name(VOLT_PARTITION_ID)
-         * column type(1, VoltType.BIGINT)
-         * column length(4)
-         * column name length(4)
-         * column name(VOLT_SITE_ID)
-         * column type(1, VoltType.BIGINT)
-         * column length(4)
-         * column name length(4)
-         * column name(VOLT_EXPORT_OPERATION)
-         * column type(1, VoltType.TINYINT)
-         * column length(4)
-         * (every column)
-         * column name length(4)
-         * column name
-         * column type(1)
-         * column length(4)
-         *
-         */
-        @Override
-        public void serialize(ByteBuffer buf) throws IOException {
-            buf.put((byte)StreamBlockQueue.EXPORT_BUFFER_VERSION);
-            buf.putLong(m_generationId);
-            buf.putInt(buf.limit() - EXPORT_SCHEMA_HEADER_BYTES); // size of schema
-            buf.putInt(m_streamName.length());
-            buf.put(m_streamName.getBytes(Constants.UTF8ENCODING));
-
-            // write export meta columns
-            writeMetaColumns(buf);
-            // column name length, name, type, length
-            assert (m_streamTable != null);
-            for (Column c : CatalogUtil.getSortedCatalogItems(m_streamTable.getColumns(), "index")) {
-                buf.putInt(c.getName().length());
-                buf.put(c.getName().getBytes(Constants.UTF8ENCODING));
-                buf.put((byte)c.getType());
-                buf.putInt(c.getSize());
-            }
-        }
-
-        @Override
-        public void cancel() {}
-
-        @Override
-        public int getSerializedSize() throws IOException {
-            int size = 0;
-            // column name length, name, type, length
-            for (Column c : CatalogUtil.getSortedCatalogItems(m_streamTable.getColumns(), "index")) {
-                size += 4 + c.getName().length() + 1 + 4;
-            }
-            return EXPORT_SCHEMA_HEADER_BYTES + /* schema size */
-                    4 /*name length*/ + m_streamName.length() +
-                    4 /*name length*/ + VOLT_TRANSACTION_ID.length() + 1 /*column type*/ + 4 /*column length*/ +
-                    4 + VOLT_EXPORT_TIMESTAMP.length() + 1 + 4 +
-                    4 + VOLT_EXPORT_SEQUENCE_NUMBER.length() + 1 + 4 +
-                    4 + VOLT_PARTITION_ID.length() + 1 + 4 +
-                    4 + VOLT_SITE_ID.length() + 1 + 4 +
-                    4 + VOLT_EXPORT_OPERATION.length() + 1 + 4 +
-                    size;
-        }
     }
 
     // This is called when schema update doesn't affect export

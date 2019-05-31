@@ -49,15 +49,6 @@ public interface BinaryDequeReader<M> {
     public Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException;
 
     /**
-     * @param segmentIndex index of the segment to get schema from, -1 means get schema from current segment
-     * @return The extra header metadata in the segment header or {@code null} if there is none
-     * @throws IOException If an error occurs reading the extra header
-     * @deprecated use {@link #pollEntry(OutputContainerFactory)} to retrieve full entry
-     */
-    @Deprecated
-    public BBContainer getExtraHeader(long segmentIndex) throws IOException;
-
-    /**
      * Number of bytes left to read for this reader.
      * @return number of bytes left to read for this reader.
      * @throws IOException
@@ -77,21 +68,6 @@ public interface BinaryDequeReader<M> {
      * @throws IOException
      */
     public boolean isEmpty() throws IOException;
-
-    /**
-     * Is the object this reader going to read the first object of segment?
-     * @return true if the object this reader going to read is the first object of segment
-     * throws IOException
-     */
-    @Deprecated
-    public boolean isStartOfSegment() throws IOException;
-
-    /**
-     * Returns the index of the segment that reader currently reads on
-     * @return
-     */
-    @Deprecated
-    public long getSegmentIndex();
 
     /**
      * Entry class to hold all metadata and data associated with an entry in a {@link BinaryDeque}

@@ -168,38 +168,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
-        @Deprecated
-        @Override
-        public BBContainer getExtraHeader(long segmentIndex) throws IOException {
-            synchronized (PersistentBinaryDeque.this) {
-                if (m_cursorClosed) {
-                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
-                }
-                PBDSegmentReader<M> segmentReader = null;
-                PBDSegment<M> segment = null;
-                moveToValidSegment();
-                if (segmentIndex != -1) {
-                    // looking for schema from a specific segment
-                    segment = m_segments.get(segmentIndex);
-                    if (segment == null) {
-                        return null;
-                    }
-                } else {
-                    // looking for schema from the segment that cursor is currently reading on
-                    segment = m_segment;
-                }
-
-                segmentReader = segment.getReader(m_cursorId);
-                if (segmentReader == null) {
-                    segmentReader = segment.openForRead(m_cursorId);
-                } else if (segmentReader.isClosed()) {
-                    segmentReader.reopen();
-                }
-                // need to restore the read offset
-                return segmentReader.getExtraHeader();
-            }
-        }
-
         void rewindTo(PBDSegment<M> segment) {
             if (m_rewoundFromId == -1 && m_segment != null) {
                 m_rewoundFromId = m_segment.segmentId();
@@ -320,50 +288,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     }
                 }
             };
-        }
-
-        @Override
-        public boolean isStartOfSegment() throws IOException {
-            synchronized(PersistentBinaryDeque.this) {
-                if (m_cursorClosed) {
-                    throw new IOException("Cannot call isStartOfSegment: PBD has been closed");
-                }
-                assertions();
-                moveToValidSegment();
-                PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
-                // push to PBD will rewind cursors. So, this cursor may have already opened this segment
-                if (segmentReader == null) {
-                    segmentReader = m_segment.openForRead(m_cursorId);
-                }
-                long lastSegmentId = peekLastSegment().segmentIndex();
-                while (!segmentReader.hasMoreEntries()) {
-                    if (m_segment.segmentIndex() == lastSegmentId) { // nothing more to read
-                        return false;
-                    }
-
-                    segmentReader.close();
-                    m_segment = m_segments.higherEntry(m_segment.segmentIndex()).getValue();
-                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
-                    segmentReader = m_segment.getReader(m_cursorId);
-                    if (segmentReader == null) {
-                        segmentReader = m_segment.openForRead(m_cursorId);
-                    }
-                }
-                if (segmentReader.readIndex() == 0) {
-                    return true;
-                }
-                return false;
-            }
-        }
-
-        @Override
-        public long getSegmentIndex() {
-            synchronized(PersistentBinaryDeque.this) {
-                if (m_segment == null) {
-                    return -1;
-                }
-                return m_segment.segmentIndex();
-            }
         }
 
         void close() {
@@ -1385,26 +1309,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         public Builder<M> compression(boolean enabled) {
             m_useCompression = enabled;
             return this;
-        }
-
-        /**
-         * Add extra header metadata which can be written but not read. This means
-         * {@link BinaryDequeReader#pollEntry(org.voltdb.utils.BinaryDeque.OutputContainerFactory)} method can not be
-         * used.
-         *
-         * @param extraHeader Instance of extra header metadata
-         * @return An updated {@link Builder} instance
-         * @deprecated use {@link #initialExtraHeader(Object, BinaryDequeSerializer)
-         */
-        @Deprecated
-        public Builder<DeferredSerialization> initialExtraHeader(DeferredSerialization extraHeader) {
-            return initialExtraHeader(extraHeader,
-                    new DeferredSerializationBinaryDequeSerializer<DeferredSerialization>() {
-                        @Override
-                        public DeferredSerialization read(ByteBuffer buffer) throws IOException {
-                            throw new UnsupportedOperationException();
-                        }
-                    });
         }
 
         /**

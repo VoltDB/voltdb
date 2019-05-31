@@ -15,27 +15,22 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.utils.BinaryDequeDeferredSerializer;
 
 /**
- * Simple base class for handling the writing of any {@link DeferredSerialization} object
+ * @author rdykiel
  *
- * @param <T> Type of {@link DeferredSerialization} which this serializer operates on
  */
-public abstract class DeferredSerializationBinaryDequeSerializer<T extends DeferredSerialization>
-        implements BinaryDequeSerializer<T> {
-    @Override
-    public int getMaxSize(T object) throws IOException {
-        return object.getSerializedSize();
-    };
+public class ExportRowSchemaSerializer extends BinaryDequeDeferredSerializer<ExportRowSchema> {
 
     @Override
-    public void write(T object, ByteBuffer buffer) throws IOException {
-        object.serialize(buffer);
+    public ExportRowSchema read(ByteBuffer buffer) throws IOException {
+        return ExportRowSchema.deserialize(buffer);
     }
+
 }
