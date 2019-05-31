@@ -116,19 +116,23 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_TABLE");
 
     /**
-     * Pattern: CREATE TABLE tablename
-     *
+     * Pattern: CREATE TABLE table_name [MIGRATE TO target migrate_target_name].
      *
      * Capture groups:
      *  (1) table name
+     *  [(2) target name]
      */
     private static final Pattern PAT_CREATE_TABLE =
-        SPF.statement(
-            SPF.token("create"), SPF.token("table"), SPF.capture("name", SPF.databaseObjectName()),
-            new SQLPatternPartString("\\s*"),
-            SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
-            SPF.anythingOrNothing()
-        ).compile("PAT_CREATE_TABLE");
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture("tableName", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(SPF.token("migrate"), SPF.token("to"),
+                            SPF.token("target"),
+                            SPF.capture("migrateTargetName", SPF.databaseObjectName()))),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_TABLE");
 
     /**
      * Pattern: CREATE TABLE tablename
@@ -737,8 +741,12 @@ public class SQLParser extends SQLPatternFactory
         return PAT_CREATE_STREAM.matcher(statement);
     }
 
-    public static Matcher matchCreateTable(String statement)
-    {
+    /**
+     * Match statement against create table ... migrate to target ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableMigrateTo(String statement) {
         return PAT_CREATE_TABLE.matcher(statement);
     }
 

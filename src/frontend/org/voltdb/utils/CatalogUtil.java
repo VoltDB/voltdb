@@ -3254,7 +3254,7 @@ public abstract class CatalogUtil {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null && table.getTimetolive() != null ) {
             TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl != null && !StringUtil.isEmpty(ttl.getMigrationtarget())) {
+            if (ttl != null && !StringUtil.isEmpty(table.getMigrationtarget())) {
                 return ttl.getBatchsize();
             }
         }
