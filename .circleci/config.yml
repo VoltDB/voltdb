@@ -25,7 +25,7 @@ jobs:
           at: .
       - run: ant junit_regression_h1
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   junit_regression_h2:
     machine:
       image: ubuntu-1604:201903-01
@@ -37,7 +37,7 @@ jobs:
           at: .
       - run: ant junit_regression_h2
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   junit_other_p1:
     machine:
       image: ubuntu-1604:201903-01
@@ -49,7 +49,7 @@ jobs:
           at: .
       - run: ant junit_other_p1
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   junit_other_p2:
     machine:
       image: ubuntu-1604:201903-01
@@ -61,7 +61,7 @@ jobs:
           at: .
       - run: ant junit_other_p2
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   junit_other_p3:
     machine:
       image: ubuntu-1604:201903-01
@@ -73,7 +73,7 @@ jobs:
           at: .
       - run: ant junit_other_p3
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   junit_other_p4:
     machine:
       image: ubuntu-1604:201903-01
@@ -85,7 +85,7 @@ jobs:
           at: .
       - run: ant junit_other_p4
       - store_test_results:
-          path: obj/release/testoutput/TESTS-TestSuites.xml
+          path: obj/release/testoutput
   package:
     machine:
       image: ubuntu-1604:201903-01
