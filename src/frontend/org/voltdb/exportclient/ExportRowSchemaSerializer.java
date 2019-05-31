@@ -20,23 +20,13 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.utils.BinaryDequeSerializer;
+import org.voltdb.utils.BinaryDequeDeferredSerializer;
 
 /**
  * @author rdykiel
  *
  */
-public class ExportRowSchemaSerializer implements BinaryDequeSerializer<ExportRowSchema> {
-
-    @Override
-    public int getMaxSize(ExportRowSchema object) throws IOException {
-        return object.getSerializedSize();
-    }
-
-    @Override
-    public void write(ExportRowSchema object, ByteBuffer buffer) throws IOException {
-        object.serialize(buffer);
-    }
+public class ExportRowSchemaSerializer extends BinaryDequeDeferredSerializer<ExportRowSchema> {
 
     @Override
     public ExportRowSchema read(ByteBuffer buffer) throws IOException {

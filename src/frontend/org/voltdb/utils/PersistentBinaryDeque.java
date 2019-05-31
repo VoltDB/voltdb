@@ -1399,7 +1399,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         @Deprecated
         public Builder<DeferredSerialization> initialExtraHeader(DeferredSerialization extraHeader) {
             return initialExtraHeader(extraHeader,
-                    new DeferredSerializationBinaryDequeSerializer<DeferredSerialization>() {
+                    new BinaryDequeDeferredSerializer<DeferredSerialization>() {
                         @Override
                         public DeferredSerialization read(ByteBuffer buffer) throws IOException {
                             throw new UnsupportedOperationException();

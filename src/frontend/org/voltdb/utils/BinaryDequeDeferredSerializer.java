@@ -27,7 +27,7 @@ import org.voltcore.utils.DeferredSerialization;
  *
  * @param <T> Type of {@link DeferredSerialization} which this serializer operates on
  */
-public abstract class DeferredSerializationBinaryDequeSerializer<T extends DeferredSerialization>
+public abstract class BinaryDequeDeferredSerializer<T extends DeferredSerialization>
         implements BinaryDequeSerializer<T> {
     @Override
     public int getMaxSize(T object) throws IOException {

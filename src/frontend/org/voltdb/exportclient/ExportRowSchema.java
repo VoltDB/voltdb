@@ -31,6 +31,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+
 /**
  * {@code ExportRowSchema} is a specialized form of {@code ExportRow}
  * that only has column definitions but no column values. It has its
@@ -54,35 +56,29 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
     private static final String VOLT_SITE_ID = "VOLT_SITE_ID";
     private static final String VOLT_EXPORT_OPERATION = "VOLT_EXPORT_OPERATION";
 
-    private static List<String> META_COL_NAMES = new LinkedList<>();
-    static {
-        META_COL_NAMES.add(VOLT_TRANSACTION_ID);
-        META_COL_NAMES.add(VOLT_EXPORT_TIMESTAMP);
-        META_COL_NAMES.add(VOLT_EXPORT_SEQUENCE_NUMBER);
-        META_COL_NAMES.add(VOLT_PARTITION_ID);
-        META_COL_NAMES.add(VOLT_SITE_ID);
-        META_COL_NAMES.add(VOLT_EXPORT_OPERATION);
-    }
+    private static final List<String> META_COL_NAMES = ImmutableList.of(
+            VOLT_TRANSACTION_ID,
+            VOLT_EXPORT_TIMESTAMP,
+            VOLT_EXPORT_SEQUENCE_NUMBER,
+            VOLT_PARTITION_ID,
+            VOLT_SITE_ID,
+            VOLT_EXPORT_OPERATION);
 
-    private static List<VoltType> META_COL_TYPES = new LinkedList<>();
-    static {
-        META_COL_TYPES.add(VoltType.BIGINT);
-        META_COL_TYPES.add(VoltType.BIGINT);
-        META_COL_TYPES.add(VoltType.BIGINT);
-        META_COL_TYPES.add(VoltType.BIGINT);
-        META_COL_TYPES.add(VoltType.BIGINT);
-        META_COL_TYPES.add(VoltType.TINYINT);
-    }
+    private static final List<VoltType> META_COL_TYPES = ImmutableList.of(
+            VoltType.BIGINT,
+            VoltType.BIGINT,
+            VoltType.BIGINT,
+            VoltType.BIGINT,
+            VoltType.BIGINT,
+            VoltType.TINYINT);
 
-    private static List<Integer> META_COL_SIZES = new LinkedList<>();
-    static {
-        META_COL_SIZES.add(Long.BYTES);
-        META_COL_SIZES.add(Long.BYTES);
-        META_COL_SIZES.add(Long.BYTES);
-        META_COL_SIZES.add(Long.BYTES);
-        META_COL_SIZES.add(Long.BYTES);
-        META_COL_SIZES.add(Byte.BYTES);
-    }
+    private static final List<Integer> META_COL_SIZES = ImmutableList.of(
+            Long.BYTES,
+            Long.BYTES,
+            Long.BYTES,
+            Long.BYTES,
+            Long.BYTES,
+            Byte.BYTES);
 
     // private constructor
     private ExportRowSchema(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,

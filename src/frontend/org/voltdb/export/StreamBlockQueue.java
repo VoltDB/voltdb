@@ -109,10 +109,10 @@ public class StreamBlockQueue {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
         ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
-        ExportRowSchemaSerializer ds = new ExportRowSchemaSerializer();
+        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, ds)
+                .initialExtraHeader(schema, serializer)
                 .compression(!DISABLE_COMPRESSION).build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
@@ -168,7 +168,7 @@ public class StreamBlockQueue {
             }
         }
         catch (Exception e) {
-            exportLog.error("Failed to poll from persistent binary deque:" + e);
+            exportLog.error("Failed to poll from persistent binary deque", e);
         }
         return block;
     }
@@ -367,10 +367,10 @@ public class StreamBlockQueue {
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
         ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
-        ExportRowSchemaSerializer ds = new ExportRowSchemaSerializer();
+        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, ds)
+                .initialExtraHeader(schema, serializer)
                 .compression(!DISABLE_COMPRESSION).build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);

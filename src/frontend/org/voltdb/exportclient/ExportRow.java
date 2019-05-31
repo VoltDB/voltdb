@@ -299,8 +299,7 @@ public class ExportRow {
         String decoded = null;
         if (bb.hasArray()) {
             decoded = new String(bb.array(), bb.arrayOffset() + position, strlength, Charsets.UTF_8);
-        }
-        else {
+        } else {
             // Must be a direct buffer
             byte[] dst = new byte[strlength];
             bb.get(dst, 0, strlength);
