@@ -22,6 +22,7 @@ import java.util.*;
 import com.google_voltpatches.common.base.Preconditions;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -144,17 +145,15 @@ public abstract class SubPlanAssembler {
             // are tracked in exactMatchCoveringExprs so that they
             // can be eliminated from the post-filter expressions.
             final List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<>();
-            boolean hasCoveredPredicate = false;
             String predicatejson = index.getPredicatejson();
-            if (path == null) {
-                if (predicatejson.isEmpty()) {
-                    // Skip the uselessly irrelevant whole-table index.
-                    continue;
-                }
-                hasCoveredPredicate = isPartialIndexPredicateCovered(
+            Pair<Boolean, AbstractExpression> partialIndexInfo =
+                    evaluatePartialIndexPredicate(
                             tableScan, allExprs,
                             predicatejson, exactMatchCoveringExprs);
-                if ( ! hasCoveredPredicate) {
+            boolean hasCoveredPredicate = partialIndexInfo.getFirst();
+            if (path == null) {
+                if (partialIndexInfo.getSecond() == null || ! hasCoveredPredicate) {
+                    // Skip the uselessly irrelevant whole-table index.
                     // Skip the index with the inapplicable predicate.
                     continue;
                 }
@@ -168,18 +167,18 @@ public abstract class SubPlanAssembler {
                 path = getRelevantNaivePath(allJoinExprs, filterExprs);
                 path.index = index;
                 path.lookupType = IndexLookupType.GTE;
+                path.setPartialIndexExpression(partialIndexInfo.getSecond());
             } else {
                 assert(path.index != null);
                 assert(path.index == index);
                 // This index on relevant column(s) may need to be rejected if
                 // its predicate is not applicable.
-                if ( ! predicatejson.isEmpty()) {
-                    hasCoveredPredicate = isPartialIndexPredicateCovered(
-                            tableScan, allExprs, predicatejson, exactMatchCoveringExprs);
+                if ( partialIndexInfo.getSecond() != null) {
                     if ( ! hasCoveredPredicate) {
                         // Skip the index with the inapplicable predicate.
                         continue;
                     }
+                    path.setPartialIndexExpression(partialIndexInfo.getSecond());
                 }
             }
 
@@ -218,20 +217,17 @@ public abstract class SubPlanAssembler {
      * @param filterExprs
      * @return
      */
-    public static AccessPath processPartialIndex(
+    public static AccessPath verifyIfPartialIndex(
             Index index, StmtTableScan tableScan, AccessPath path, Collection<AbstractExpression> allExprs,
             Collection<AbstractExpression> allJoinExprs, Collection<AbstractExpression> filterExprs) {
         final List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<>();
-        boolean hasCoveredPredicate = false;
         final String predicatejson = index.getPredicatejson();
+        Pair<Boolean, AbstractExpression> partialIndexInfo =
+                evaluatePartialIndexPredicate(tableScan, allExprs, predicatejson, exactMatchCoveringExprs);
+        boolean hasCoveredPredicate = partialIndexInfo.getFirst();
         if (path == null) {
-            if (predicatejson.isEmpty()) {
+            if (partialIndexInfo.getSecond() == null || ! hasCoveredPredicate) {
                 // Skip the uselessly irrelevant whole-table index.
-                return null;
-            }
-            hasCoveredPredicate = isPartialIndexPredicateCovered(
-                        tableScan, allExprs, predicatejson, exactMatchCoveringExprs);
-            if ( ! hasCoveredPredicate) {
                 // Skip the index with the inapplicable predicate.
                 return null;
             }
@@ -249,15 +245,13 @@ public abstract class SubPlanAssembler {
             assert path.index == index;
             // This index on relevant column(s) may need to be rejected if
             // its predicate is not applicable.
-            if (! predicatejson.isEmpty()) {
-                hasCoveredPredicate = isPartialIndexPredicateCovered(
-                        tableScan, allExprs, predicatejson, exactMatchCoveringExprs);
-                if ( ! hasCoveredPredicate) {
-                    // Skip the index with the inapplicable predicate.
-                    return null;
-                }
+            if (partialIndexInfo.getSecond() != null && ! hasCoveredPredicate) {
+                // Skip the index with the inapplicable predicate.
+                return null;
             }
         }
+
+        path.setPartialIndexExpression(partialIndexInfo.getSecond());
 
         if (hasCoveredPredicate) {
             filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
@@ -404,12 +398,17 @@ public abstract class SubPlanAssembler {
      * @param index The partial index to cover.
      * @param exactMatchCoveringExprs The output subset of the query predicates that EXACTLY match the
      *        index predicate expression(s)
-     * @return TRUE if the index has a predicate that is completely covered by the query expressions.
+     * @return Pair<Boolean, AbstractExpression>
+     *         TRUE if the index has a predicate that is completely covered by the query expressions.
+     *         Partial Predicate or NULL
      */
-    public static boolean isPartialIndexPredicateCovered(
+    public static Pair<Boolean, AbstractExpression> evaluatePartialIndexPredicate(
             StmtTableScan tableScan, Collection<AbstractExpression> coveringExprs,
             String predicatejson, List<AbstractExpression> exactMatchCoveringExprs) {
-        Preconditions.checkArgument(! predicatejson.isEmpty(), "Precondition JSON cannot be empty");
+        if (predicatejson.isEmpty()) {
+            // Skip the uselessly irrelevant whole-table index.
+            return Pair.of(false,  null);
+        }
         final AbstractExpression indexPredicate;
         try {
             indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
@@ -443,7 +442,8 @@ public abstract class SubPlanAssembler {
 
         // Handle the remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
         // All index predicate expressions must be covered for index to be selected
-        return removeNotNullCoveredExpressions(tableScan, coveringExprs, exprsToCover).isEmpty();
+        boolean isIndexPredicateCovered = removeNotNullCoveredExpressions(tableScan, coveringExprs, exprsToCover).isEmpty();
+        return Pair.of(isIndexPredicateCovered, indexPredicate);
     }
 
     private static final class AccessPathLoopHelper {
@@ -1849,7 +1849,11 @@ public abstract class SubPlanAssembler {
                 result = null;
             } else if (coveringExpr == null) {
                 // Match only the table's column that has the coveringColId
-                if ((indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE)) {
+                // There could be a CAST operator on the indexable expression side. Skip it
+                if (indexableExpr.getExpressionType() == ExpressionType.OPERATOR_CAST) {
+                    indexableExpr = indexableExpr.getLeft();
+                }
+                if (indexableExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     result = null;
                 } else if ((coveringColId == ((TupleValueExpression) indexableExpr).getColumnIndex()) &&
                         (tableScan.getTableAlias().equals(((TupleValueExpression) indexableExpr).getTableAlias()))) {

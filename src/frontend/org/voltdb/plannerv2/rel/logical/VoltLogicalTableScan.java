@@ -21,13 +21,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptSchema;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
+import org.voltdb.plannerv2.rules.physical.Constants;
 
 /**
  * Relational expression representing a scan of a {@link VoltTable}, in the logical phase.
@@ -70,4 +74,16 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
         return new VoltLogicalTableScan(
                 getCluster(), traits, getTable(), getVoltTable());
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return Constants.MAX_TABLE_ROW_COUNT;
+    }
+
 }
