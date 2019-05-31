@@ -75,8 +75,6 @@ import org.voltdb.utils.VoltFile;
 public class StreamBlockQueue {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    // FIXME: remove once {@code ExportRowSchema} is integrated
-    public static final int EXPORT_BUFFER_VERSION = 1;
 
     public static final String EXPORT_DISABLE_COMPRESSION_OPTION = "EXPORT_DISABLE_COMPRESSION";
     private static final boolean DISABLE_COMPRESSION = Boolean.getBoolean(EXPORT_DISABLE_COMPRESSION_OPTION);
