@@ -39,14 +39,16 @@ public class TTLMigrateThread extends BenchmarkThread {
     Random r = new Random(0);
     long counter = 0;
     final Client client;
+    final String type;
     final float mpRatio;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
     final Semaphore m_permits;
 
-    public TTLMigrateThread(Client client, float mpRatio, Semaphore permits) {
+    public TTLMigrateThread(Client client, String type, float mpRatio, Semaphore permits) {
         setName("TTLMigrateThread");
+        this.type = type;
         this.client = client;
         this.mpRatio = mpRatio;
         this.m_permits = permits;
@@ -101,7 +103,7 @@ public class TTLMigrateThread extends BenchmarkThread {
             // call a transaction
             try {
                 m_permits.acquire();
-                client.callProcedure(new TTLMigrateCallback(), "TTLMigrateInsertP", counter++, r.nextInt());
+                client.callProcedure(new TTLMigrateCallback(), "TTLMigrateInsert"+this.type, counter++, r.nextInt());
             }
             catch (NoConnectionsException e) {
                 log.error("TTLMigrateThread got NoConnectionsException on proc call. Will sleep.");

@@ -169,7 +169,7 @@ public class Benchmark {
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> enabledThreads = null;
 
-        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt".split(",")));
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -561,7 +561,8 @@ public class Benchmark {
     UpdateClassesThread updcls = null;
     NibbleDeleteLoader partNDlt = null;
     NibbleDeleteLoader replNDlt = null;
-    TTLMigrateThread ttlMigratelt = null;
+    TTLMigrateThread partttlMigratelt = null;
+    TTLMigrateThread replttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -764,9 +765,14 @@ public class Benchmark {
             updcls.start();
         }
 
-        if (!config.disabledThreads.contains("ttlMigratelt")) {
-            ttlMigratelt = new TTLMigrateThread(client, config.mpratio, permits);
-            ttlMigratelt.start();
+        if (!config.disabledThreads.contains("partttlMigratelt")) {
+            partttlMigratelt = new TTLMigrateThread(client, "R", config.mpratio, permits);
+            partttlMigratelt.start();
+        }
+
+        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replttlMigratelt")) {
+            replttlMigratelt = new TTLMigrateThread(client, "P", config.mpratio, permits);
+            replttlMigratelt.start();
         }
         log.info("All threads started...");
 
