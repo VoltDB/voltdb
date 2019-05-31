@@ -55,7 +55,7 @@ public class StreamBlock {
     public static final int ROW_NUMBER_OFFSET = 16;
     public static final int UNIQUE_ID_OFFSET = 20;
 
-    StreamBlock(BinaryDequeReader.Entry<ExportRowSchema> entry, long startSequenceNumber, long committedSequenceNumber,
+    public StreamBlock(BinaryDequeReader.Entry<ExportRowSchema> entry, long startSequenceNumber, long committedSequenceNumber,
             int rowCount, long uniqueId, boolean isPersisted) {
         assert(entry != null);
         m_entry  = entry;
@@ -85,11 +85,11 @@ public class StreamBlock {
         }
     }
 
-    ExportRowSchema getSchema() {
+    public ExportRowSchema getSchema() {
         return m_entry.getExtraHeader();
     }
 
-    long startSequenceNumber() {
+    public long startSequenceNumber() {
         return m_startSequenceNumber;
     }
 
@@ -98,7 +98,7 @@ public class StreamBlock {
     }
 
 
-    long committedSequenceNumber() {
+    public long committedSequenceNumber() {
         return m_committedSequenceNumber;
     }
 
@@ -187,7 +187,7 @@ public class StreamBlock {
      * Does not increment the refcount, uses the implicit 1 count
      * and should only be called once to get a container for pushing the data to disk.
      */
-    BBContainer asBBContainer() {
+    public BBContainer asBBContainer() {
         ByteBuffer b = m_entry.getData();
         b.order(ByteOrder.LITTLE_ENDIAN);
         b.putLong(SEQUENCE_NUMBER_OFFSET, startSequenceNumber());
