@@ -766,9 +766,8 @@ public class Benchmark {
 
         if (!config.disabledThreads.contains("ttlMigratelt")) {
             ttlMigratelt = new TTLMigrateThread(client, config.duration);
-            updcls.start();
+            ttlMigratelt.start();
         }
-        log.info("All threads started...");
         log.info("All threads started...");
 
         while (true) {
