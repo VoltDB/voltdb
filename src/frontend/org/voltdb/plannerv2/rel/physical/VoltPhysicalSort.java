@@ -21,14 +21,12 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -92,7 +90,6 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
         //the worst-case time complexity is mandated to be O(nlogn)
-        // TODO: should we set it to 1 when index is available?
         double cpu = rowCount * Math.log(rowCount);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }

@@ -29,6 +29,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -943,10 +944,11 @@ public class MaterializedViewProcessor {
                     return null;
                 }
                 String predicatejson = index.getPredicatejson();
-                if ( ! predicatejson.isEmpty() &&
-                        ! SubPlanAssembler.isPartialIndexPredicateCovered(
+                Pair<Boolean, AbstractExpression> partialIndexInfo =
+                        SubPlanAssembler.evaluatePartialIndexPredicate(
                                 tableScan, coveringExprs,
-                                predicatejson, exactMatchCoveringExprs)) {
+                                predicatejson, exactMatchCoveringExprs);
+                if ( ! partialIndexInfo.getFirst()) {
                     // the partial index predicate does not match the MatView's
                     // where clause -- give up on this index
                     continue;

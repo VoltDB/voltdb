@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.SortDirectionType;
 
@@ -77,6 +78,9 @@ public class AccessPath {
     // if there is no index in this access path.
     //
     final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
+
+    // Partial Index predicates if any
+    final List<AbstractExpression> m_partialIndexPredicate = new ArrayList<>();
 
     /**
      * For Calcite
@@ -178,6 +182,14 @@ public class AccessPath {
 
     public List<AbstractExpression> getOtherExprs() {
         return otherExprs;
+    }
+
+    public void setPartialIndexExpression(AbstractExpression partialPredicate) {
+        m_partialIndexPredicate.addAll(ExpressionUtil.uncombineAny(partialPredicate));
+    }
+
+    public List<AbstractExpression> getPartialIndexExpression() {
+        return m_partialIndexPredicate;
     }
 
     public Index getIndex() {

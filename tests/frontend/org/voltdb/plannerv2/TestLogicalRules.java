@@ -740,5 +740,4 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
-
 }

@@ -71,7 +71,7 @@ public class IndexUtil {
                             program, numOuterFieldsForJoin, isInnerTable));
             final StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
             // Partial Index Check
-            return SubPlanAssembler.processPartialIndex(index, tableScan,
+            return SubPlanAssembler.verifyIfPartialIndex(index, tableScan,
                     SubPlanAssembler.getRelevantAccessPathForIndexForCalcite(
                             tableScan, voltSubExprs, index, sortDirection),
                     voltSubExprs, null, null);
