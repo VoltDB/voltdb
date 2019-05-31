@@ -657,6 +657,16 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    public static String getDisabledConnectors() {
+        StringBuilder sb = new StringBuilder();
+        for (Connector conn : getConnectors(VoltDB.instance().getCatalogContext())) {
+            if (!conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                sb.append(conn.getTypeName() + "\t");
+            }
+        }
+        return sb.toString();
+    }
+
     public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
         for (Connector conn : connectors) {
             if (!conn.getTableinfo().isEmpty()) {
