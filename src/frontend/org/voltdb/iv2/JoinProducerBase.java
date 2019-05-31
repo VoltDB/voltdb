@@ -30,11 +30,14 @@ import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.CachedByteBufferAllocator;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.ProClass;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -50,6 +53,8 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
     protected TaskLog m_taskLog;
+    // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
+    protected String m_commaSeparatedNameOfViewsToPause = null;
     private String m_snapshotNonce = null;
 
     /**
@@ -140,6 +145,28 @@ public abstract class JoinProducerBase extends SiteTasker {
     public void setMailbox(InitiatorMailbox mailbox)
     {
         m_mailbox = mailbox;
+    }
+
+    protected boolean shouldAddToViewsToPause(Database db, Table table) {
+        return CatalogUtil.isSnapshotablePersistentTableView(db, table);
+    }
+
+    protected void initListOfViewsToPause() {
+        // The very first execution of runForRejoin will lead us here.
+        StringBuilder commaSeparatedViewNames = new StringBuilder();
+        Database db = VoltDB.instance().getCatalogContext().database;
+        for (Table table : VoltDB.instance().getCatalogContext().tables) {
+            if (shouldAddToViewsToPause(db, table)) {
+                // If the table is a snapshotted persistent table view, we will try to
+                // temporarily disable its maintenance job to boost restore performance.
+                commaSeparatedViewNames.append(table.getTypeName()).append(",");
+            }
+        }
+        // Get rid of the trailing comma.
+        if (commaSeparatedViewNames.length() > 0) {
+            commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
+        }
+        m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
     }
 
     // Load the pro task log

@@ -35,15 +35,12 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.CatalogUtil;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -56,8 +53,6 @@ public class RejoinProducer extends JoinProducerBase {
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor = null;
-    // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
-    private String m_commaSeparatedNameOfViewsToPause = null;
 
     // True if we're handling a table-less rejoin.
     boolean m_schemaHasNoTables = false;
@@ -286,21 +281,7 @@ public class RejoinProducer extends JoinProducerBase {
         // we need to figure out which views to pause so that they are handled properly
         // before the snapshot streams arrive.
         if (m_commaSeparatedNameOfViewsToPause == null) {
-            // The very first execution of runForRejoin will lead us here.
-            StringBuilder commaSeparatedViewNames = new StringBuilder();
-            Database db = VoltDB.instance().getCatalogContext().database;
-            for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                if (CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
-                    // If the table is a snapshotted persistent table view, we will try to
-                    // temporarily disable its maintenance job to boost restore performance.
-                    commaSeparatedViewNames.append(table.getTypeName()).append(",");
-                }
-            }
-            // Get rid of the trailing comma.
-            if (commaSeparatedViewNames.length() > 0) {
-                commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
-            }
-            m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
+            initListOfViewsToPause();
             // Set enabled to false for the views we found.
             siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
         }

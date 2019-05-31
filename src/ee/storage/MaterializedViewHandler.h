@@ -87,6 +87,7 @@ public:
     virtual void pollute() { m_dirty = true; }
     virtual void setEnabled(bool enabled);
     virtual bool isEnabled() { return m_enabled; }
+    virtual bool snapshotable() { return m_supportSnapshot; }
 
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
@@ -193,6 +194,7 @@ public:
     virtual void pollute() { m_partitionedHandler->pollute(); }
     virtual void setEnabled(bool enabled) { m_partitionedHandler->setEnabled(enabled); }
     virtual bool isEnabled() { return m_partitionedHandler->isEnabled(); }
+    virtual bool snapshotable() { return m_partitionedHandler->snapshotable(); }
 
     virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
     virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
