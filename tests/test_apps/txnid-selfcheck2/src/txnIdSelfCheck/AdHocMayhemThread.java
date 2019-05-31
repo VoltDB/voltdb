@@ -117,36 +117,6 @@ public class AdHocMayhemThread extends BenchmarkThread {
         return sql;
     }
 
-    /* this should cause a constraint violation */
-    private String nextWriteAdHocFailureStmt(boolean replicated) {
-        String sql = "insert into ";
-        sql += replicated ? " adhocr " : " adhocp";
-        sql += " (id, ts, inc, jmp) values(";
-        sql += r.nextInt(10) +",";
-        sql += new Date().getTime() + ",";
-        sql += "0,";
-        sql += r.nextInt(10)+")";
-
-        sql += ";";
-
-        return sql;
-    }
-
-    /* this should cause a constraint violation */
-    private String nextWriteAdHocFailureStmt(boolean replicated) {
-        String sql = "insert into ";
-        sql += replicated ? " adhocr " : " adhocp";
-        sql += " (id, ts, inc, jmp) values(";
-        sql += r.nextInt(10) +",";
-        sql += new Date().getTime() + ",";
-        sql += "0,";
-        sql += r.nextInt(10)+")";
-
-        sql += ";";
-
-        return sql;
-    }
-
     private String nextReadAdHocStmt(boolean replicated) {
         String sql = "select * from";
         sql += replicated ? " adhocr " : " adhocp";
