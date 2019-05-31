@@ -66,6 +66,8 @@ public final class PlanCostUtil {
     // I can't quite justify that rationally, but it "seems reasonable". --paul
     private static final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
 
+    private static final double E_CONST = Math.exp(1);
+
     private PlanCostUtil() {
     }
 
@@ -91,24 +93,32 @@ public final class PlanCostUtil {
 
     public static double discountTableScanRowCount(double rowCount, RexProgram program) {
         if (program != null && program.getCondition() != null) {
-            double discountFactor = 1.0;
-            // Eliminated filters discount the cost of processing tuples with a rapidly
-            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
-            // to a discount approaching 0.888... (=8/9) for many skipped filters.
-
-            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
             int condSize = RelOptUtil.conjunctions(program.getCondition()).size();
-            for (int i = 0; i < condSize; ++i) {
-                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
-            }
-            if (discountFactor < 1.0) {
-                rowCount *= discountFactor;
-                if (rowCount < 4) {
-                    rowCount = 4;
-                }
-            }
+            return calculateFilterDiscount(rowCount, condSize);
+        } else {
+            return rowCount;
         }
-        return rowCount == 0 ? 1 : rowCount;
+    }
+
+    public static double discountPartialIndexRowCount(double rowCount, AccessPath accessPath) {
+        Preconditions.checkArgument(accessPath != null);
+        int condSize = accessPath.getPartialIndexExpression().size();
+        return calculateFilterDiscount(rowCount, condSize);
+    }
+
+    private static double calculateFilterDiscount(double rowCount, int filterCount) {
+        double discountFactor = 1.0;
+        // Eliminated filters discount the cost of processing tuples with a rapidly
+        // diminishing effect that ranges from a discount of 0.9 for one skipped filter
+        // to a discount approaching 0.888... (=8/9) for many skipped filters.
+
+        // Avoid applying the discount to an initial tie-breaker value of 2 or 3
+        for (int i = 0; i < filterCount; ++i) {
+            discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
+        }
+        rowCount *= discountFactor;
+        // Ensure non-zero cost
+        return Math.max(1., rowCount);
     }
 
     public static double discountSerialAggregateRowCount(double rowCount, int groupCount) {
@@ -183,7 +193,7 @@ public final class PlanCostUtil {
         // the opposite direction is sparsity == 1/N, where the cost becomes N, and index is not useful at all!
         //
         // To account for a multi-column indexes and partial coverage, Sparsity is adjusted to be
-        // Adjusted sparsity = sparsity * log(|Index Column Count - Key Width + 1|)
+        // Adjusted sparsity = sparsity / log(|Index Column Count - Key Width + e|)
         // where the Index Column Count denotes number of columns / expressions in the index
         // and Key Width denotes the number of Index columns / expressions covered by a given access path.
         // The motivation is that we favor fuller coverage of an index, by dis-favoring more partial coverage that
@@ -203,9 +213,19 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
-        double sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
-        sparsity *= Math.log(Math.abs(colCount - keyWidth + 1));
-        double tuplesToRead = Math.log(Math.exp(1) - 1 + rowCount * sparsity) / sparsity;
+        double sparsity = (index.getUnique() || index.getAssumeunique())? // && colCount == keyWidth?
+               1 : TABLE_COLUMN_SPARSITY;
+        sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
+        // Promote multi-columns indexes
+        sparsity *= Math.log(Math.abs(colCount + E_CONST));
+        // Promote partial indexes that eliminates the most filters
+        if (!accessPath.getEliminatedPostExpressions().isEmpty()) {
+            double partialFilterMultiplier =
+                    Math.abs(accessPath.getOtherExprs().size() - accessPath.getEliminatedPostExpressions().size()) + E_CONST;
+            sparsity *= Math.log(partialFilterMultiplier);
+        }
+
+        double tuplesToRead = Math.log(E_CONST - 1 + rowCount * sparsity) / sparsity;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
             tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;

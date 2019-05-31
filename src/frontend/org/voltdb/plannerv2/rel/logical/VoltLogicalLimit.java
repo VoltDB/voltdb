@@ -20,10 +20,13 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
 import com.google.common.base.Preconditions;
@@ -86,4 +89,11 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
                 .itemIf("limit", m_limit, m_limit != null)
                 .itemIf("offset", m_offset, m_offset != null);
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+    }
+
 }

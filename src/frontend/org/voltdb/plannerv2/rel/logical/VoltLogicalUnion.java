@@ -20,9 +20,12 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
 import com.google.common.base.Preconditions;
 
@@ -54,6 +57,12 @@ public class VoltLogicalUnion extends Union implements VoltLogicalRel {
 
     @Override public VoltLogicalUnion copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         return new VoltLogicalUnion(getCluster(), traitSet, inputs, all);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
     }
 
 }
