@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 import static org.voltdb.utils.TestPersistentBinaryDeque.defaultBuffer;
 import static org.voltdb.utils.TestPersistentBinaryDeque.defaultContainer;
-import static org.voltdb.utils.TestPersistentBinaryDeque.pollOnceAndVerify;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,8 +50,8 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.test.utils.RandomTestRule;
+import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
@@ -80,8 +79,8 @@ public class TestPersistentBinaryDequeCorruption {
 
     private final Map<String, Long> m_corruptionPoints;
     private final CorruptionChecker m_checker;
-    private PersistentBinaryDeque m_pbd;
-    private DeferredSerialization m_ds;
+    private PersistentBinaryDeque<ExtraHeaderMetadata> m_pbd;
+    private ExtraHeaderMetadata m_extraHeader;
 
     @Parameters
     public static Collection<Object[]> parameters() {
@@ -104,33 +103,15 @@ public class TestPersistentBinaryDequeCorruption {
 
     @Before
     public void setup() throws IOException {
-        m_ds = new DeferredSerialization() {
-            private final ByteBuffer data = ByteBuffer.allocate(245);
-
-            {
-                random.nextBytes(data.array());
-            }
-
-            @Override
-            public void serialize(ByteBuffer buf) throws IOException {
-                data.rewind();
-                buf.put(data);
-            }
-
-            @Override
-            public int getSerializedSize() throws IOException {
-                return data.limit();
-            }
-
-            @Override
-            public void cancel() {}
-        };
+        m_extraHeader = new ExtraHeaderMetadata(random);
         m_pbd = newPbd();
     }
 
     @After
     public void tearDown() throws IOException {
-        m_pbd.close();
+        if (m_pbd != null) {
+            m_pbd.close();
+        }
     }
 
     /**
@@ -296,12 +277,12 @@ public class TestPersistentBinaryDequeCorruption {
             for (int j = 0; j < 5; ++j) {
                 m_pbd.offer(defaultContainer());
             }
-            m_pbd.updateExtraHeader(m_ds);
+            m_pbd.updateExtraHeader(m_extraHeader);
         }
         assertEquals(6, testDir.getRoot().list().length);
 
         int i = 0;
-        for (PBDSegment segment : getSegmentMap().values()) {
+        for (PBDSegment<?> segment : getSegmentMap().values()) {
             switch (i++) {
             case 1:
                 corruptSegment(segment, ByteBuffer.allocateDirect(10), PBDSegment.HEADER_NUM_OF_ENTRY_OFFSET);
@@ -315,8 +296,8 @@ public class TestPersistentBinaryDequeCorruption {
         verifySegmentCount(6, 0);
 
         m_checker.run(m_pbd);
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
-        BinaryDequeReader reader2 = m_pbd.openForRead(CURSOR_ID + 2);
+        BinaryDequeReader<ExtraHeaderMetadata> reader = m_pbd.openForRead(CURSOR_ID);
+        BinaryDequeReader<ExtraHeaderMetadata> reader2 = m_pbd.openForRead(CURSOR_ID + 2);
 
         verifySegmentCount(6, 2);
 
@@ -365,7 +346,7 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     private int startOfEntry(int entryNumber, int entrySize) throws IOException {
-        return PBDSegment.SEGMENT_HEADER_BYTES + m_ds.getSerializedSize()
+        return PBDSegment.SEGMENT_HEADER_BYTES + TestPersistentBinaryDeque.SERIALIZER.getMaxSize(m_extraHeader)
                 + ((entryNumber - 1) * (entrySize + PBDSegment.ENTRY_HEADER_BYTES));
     }
 
@@ -405,8 +386,8 @@ public class TestPersistentBinaryDequeCorruption {
     private void runCheckerNewPbd(int corruptedEntry) throws IOException {
         // Use a parallel PBD instance since PBD finalizes all entries on close and that is not wanted
         verifySegmentCount(1, 0);
-        PersistentBinaryDeque pbd = newPbd();
-        BinaryDequeReader reader = pbd.openForRead(CURSOR_ID);
+        PersistentBinaryDeque<ExtraHeaderMetadata> pbd = newPbd();
+        BinaryDequeReader<ExtraHeaderMetadata> reader = pbd.openForRead(CURSOR_ID);
         try {
             ByteBuffer data = defaultBuffer();
             m_checker.run(pbd);
@@ -428,7 +409,7 @@ public class TestPersistentBinaryDequeCorruption {
         corruptSegment(getSegmentMap().lastEntry().getValue(), corruptData, position);
     }
 
-    private void corruptSegment(PBDSegment segment, ByteBuffer corruptData, int position) throws IOException {
+    private void corruptSegment(PBDSegment<?> segment, ByteBuffer corruptData, int position) throws IOException {
         File file = segment.file();
         if (m_corruptionPoints == null) {
         try (FileChannel channel = FileChannel.open(Paths.get(file.getPath()), StandardOpenOption.WRITE)) {
@@ -440,63 +421,74 @@ public class TestPersistentBinaryDequeCorruption {
     }
 
     @SuppressWarnings("unchecked")
-    private NavigableMap<Long, PBDSegment> getSegmentMap() throws IllegalArgumentException, IllegalAccessException {
-        return ((NavigableMap<Long, PBDSegment>) FieldUtils
+    private NavigableMap<Long, PBDSegment<?>> getSegmentMap() throws IllegalArgumentException, IllegalAccessException {
+        return ((NavigableMap<Long, PBDSegment<?>>) FieldUtils
                 .getDeclaredField(PersistentBinaryDeque.class, "m_segments", true).get(m_pbd));
     }
 
-    private PersistentBinaryDeque newPbd() throws IOException {
-        if (m_corruptionPoints == null) {
-            return new PersistentBinaryDeque(TEST_NONCE, m_ds, testDir.getRoot(), LOG);
+    private PersistentBinaryDeque<ExtraHeaderMetadata> newPbd() throws IOException {
+        PersistentBinaryDeque.Builder<ExtraHeaderMetadata> builder = PersistentBinaryDeque
+                .builder(TEST_NONCE, testDir.getRoot(), LOG)
+                .initialExtraHeader(m_extraHeader, TestPersistentBinaryDeque.SERIALIZER);
+
+        if (m_corruptionPoints != null) {
+            builder.pbdSegmentFactory(CorruptingPBDSegment::new);
         }
-        return new PersistentBinaryDeque(TEST_NONCE, m_ds, testDir.getRoot(), LOG) {
-            @Override
-            PBDSegment newSegment(long segmentIndex, long segmentId, File file) {
-                return new PBDRegularSegment(segmentIndex, segmentId, file, LOG) {
-                    @Override
-                    FileChannelWrapper openFile(File file, boolean forWrite) throws IOException {
-                        return new PBDRegularSegment.FileChannelWrapper(file, forWrite) {
-                            // Only need to track position changes from read since position is set before any read
-                            private long m_position = 0;
 
-                            @Override
-                            public int read(ByteBuffer dst) throws IOException {
-                                throwIfCorrupt(m_position, dst.remaining());
-                                int read = super.read(dst);
-                                if (read > 0) {
-                                    m_position += read;
-                                }
-                                return read;
-                            }
+        return builder.build();
+    }
 
-                            @Override
-                            public int read(ByteBuffer dst, long position) throws IOException {
-                                throwIfCorrupt(position, dst.remaining());
-                                return super.read(dst, position);
-                            }
-
-                            @Override
-                            public FileChannel position(long newPosition) throws IOException {
-                                super.position(newPosition);
-                                m_position = newPosition;
-                                return this;
-                            }
-
-                            private void throwIfCorrupt(long position, int length) throws IOException {
-                                Long corruptionPoint = m_corruptionPoints.get(file.getName());
-                                if (corruptionPoint != null && corruptionPoint >= position
-                                        && corruptionPoint < position + length) {
-                                    throw new IOException("Imaginary corruption");
-                                }
-                            }
-                        };
-                    }
-                };
-            }
-        };
+    private void pollOnceAndVerify(BinaryDequeReader<ExtraHeaderMetadata> reader, ByteBuffer expectedData)
+            throws IOException {
+        TestPersistentBinaryDeque.pollOnceAndVerify(reader, expectedData, m_extraHeader);
     }
 
     private interface CorruptionChecker {
-        void run(PersistentBinaryDeque pbd) throws IOException;
+        void run(PersistentBinaryDeque<?> pbd) throws IOException;
+    }
+
+    private class CorruptingPBDSegment<M> extends PBDRegularSegment<M> {
+        CorruptingPBDSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+                BinaryDequeSerializer<M> extraHeaderSerializer) {
+            super(index, id, file, usageSpecificLog, extraHeaderSerializer);
+        }
+
+        @Override
+        FileChannelWrapper openFile(File file, boolean forWrite) throws IOException {
+            return new PBDRegularSegment.FileChannelWrapper(file, forWrite) {
+                // Only need to track position changes from read since position is set before any read
+                private long m_position = 0;
+
+                @Override
+                public int read(ByteBuffer dst) throws IOException {
+                    throwIfCorrupt(m_position, dst.remaining());
+                    int read = super.read(dst);
+                    if (read > 0) {
+                        m_position += read;
+                    }
+                    return read;
+                }
+
+                @Override
+                public int read(ByteBuffer dst, long position) throws IOException {
+                    throwIfCorrupt(position, dst.remaining());
+                    return super.read(dst, position);
+                }
+
+                @Override
+                public FileChannel position(long newPosition) throws IOException {
+                    super.position(newPosition);
+                    m_position = newPosition;
+                    return this;
+                }
+
+                private void throwIfCorrupt(long position, int length) throws IOException {
+                    Long corruptionPoint = m_corruptionPoints.get(file.getName());
+                    if (corruptionPoint != null && corruptionPoint >= position && corruptionPoint < position + length) {
+                        throw new IOException("Imaginary corruption");
+                    }
+                }
+            };
+        }
     }
 }

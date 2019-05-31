@@ -49,7 +49,7 @@ import com.google_voltpatches.common.base.Preconditions;
  * to insert an object that exceeds the remaining space is made. A segment can be used
  * for reading and writing, but not both at the same time.
  */
-class PBDRegularSegment extends PBDSegment {
+class PBDRegularSegment<M> extends PBDSegment<M> {
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     private static final String SCANNER_CURSOR = "__scanner__";
     private static final int VERSION = 2;
@@ -70,6 +70,9 @@ class PBDRegularSegment extends PBDSegment {
     // Whether or not this is the current active segment being written to
     private boolean m_isActive = false;
 
+    private final BinaryDequeSerializer<M> m_extraHeaderSerializer;
+    private M m_extraHeaderCache;
+
     private int m_numOfEntries = -1;
     private int m_size = -1;
     private boolean m_compress;
@@ -82,11 +85,13 @@ class PBDRegularSegment extends PBDSegment {
     private DBBPool.BBContainer m_entryHeaderBuf = null;
     Boolean INJECT_PBD_CHECKSUM_ERROR = Boolean.getBoolean("INJECT_PBD_CHECKSUM_ERROR");
 
-    PBDRegularSegment(long index, long id, File file, VoltLogger usageSpecificLog) {
+    PBDRegularSegment(long index, long id, File file, VoltLogger usageSpecificLog,
+            BinaryDequeSerializer<M> extraHeaderSerializer) {
         super(file, index, id);
         m_crc = new CRC32();
         m_isFinal = PBDSegment.isFinal(m_file);
         m_usageSpecificLog = usageSpecificLog;
+        m_extraHeaderSerializer = extraHeaderSerializer;
         reset();
     }
 
@@ -137,8 +142,8 @@ class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    PBDSegmentReader getReader(String cursorId) {
-        PBDSegmentReader reader = m_closedCursors.get(cursorId);
+    PBDSegmentReader<M> getReader(String cursorId) {
+        PBDSegmentReader<M> reader = m_closedCursors.get(cursorId);
         return (reader == null) ? m_readCursors.get(cursorId) : reader;
     }
 
@@ -737,16 +742,16 @@ class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    void writeExtraHeader(DeferredSerialization ds) throws IOException {
+    void writeExtraHeader(M extraHeader) throws IOException {
         if (!(m_numOfEntries == 0 && m_extraHeaderSize == 0)) {
             throw new IllegalStateException("Extra header must be written before any entries");
         }
-        int size = ds.getSerializedSize();
+        int size = m_extraHeaderSerializer.getMaxSize(extraHeader);
         DBBPool.BBContainer destBuf = DBBPool.allocateDirect(size);
         try {
             ByteBuffer b = destBuf.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
-            ds.serialize(b);
+            m_extraHeaderSerializer.write(extraHeader, b);
             b.flip();
             do {
                 m_fc.write(b);
@@ -754,6 +759,7 @@ class PBDRegularSegment extends PBDSegment {
             b.flip();
             m_extraHeaderCrc = calculateExtraHeaderCrc(b);
             m_extraHeaderSize = b.position();
+            m_extraHeaderCache = extraHeader;
         } finally {
             destBuf.discard();
         }
@@ -770,7 +776,50 @@ class PBDRegularSegment extends PBDSegment {
         return false;
     }
 
-    private class SegmentReader implements PBDSegmentReader {
+    DBBPool.BBContainer readExtraHeader() throws IOException {
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        if (m_extraHeaderSize == 0) {
+            return null;
+        }
+
+        DBBPool.BBContainer schemaBuf = null;
+        try {
+            schemaBuf = DBBPool.allocateDirect(m_extraHeaderSize);
+            PBDUtils.readBufferFully(m_fc, schemaBuf.b().order(ByteOrder.LITTLE_ENDIAN), HEADER_EXTRA_HEADER_OFFSET);
+            return schemaBuf;
+        } catch (Exception e) {
+            if (schemaBuf != null) {
+                schemaBuf.discard();
+            }
+            m_usageSpecificLog.error("Error reading extra header of file: " + m_file.getName(), e);
+            return null;
+        }
+    }
+
+    @Override
+    M getExtraHeader() throws IOException {
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        if (m_extraHeaderSize != 0 && m_extraHeaderCache == null) {
+            BBContainer container = readExtraHeader();
+            if (container != null) {
+                try {
+                    m_extraHeaderCache = m_extraHeaderSerializer.read(container.b());
+                } finally {
+                    container.discard();
+                }
+            }
+        }
+
+        return m_extraHeaderCache;
+    }
+
+    private class SegmentReader implements PBDSegmentReader<M> {
         private final String m_cursorId;
         private long m_readOffset;
         //Index of the next object to read, not an offset into the file
@@ -978,23 +1027,7 @@ class PBDRegularSegment extends PBDSegment {
                 throw new IOException("Reader closed");
             }
 
-            if (m_extraHeaderSize == 0) {
-                return null;
-            }
-
-            DBBPool.BBContainer schemaBuf = null;
-            try {
-                schemaBuf = DBBPool.allocateDirect(m_extraHeaderSize);
-                PBDUtils.readBufferFully(m_fc, schemaBuf.b().order(ByteOrder.LITTLE_ENDIAN),
-                        HEADER_EXTRA_HEADER_OFFSET);
-                return schemaBuf;
-            } catch (Exception e) {
-                if (schemaBuf != null) {
-                    schemaBuf.discard();
-                }
-                m_usageSpecificLog.error("Error reading extra header of file: " + m_file.getName(), e);
-                return null;
-            }
+            return PBDRegularSegment.this.readExtraHeader();
         }
 
         @Override

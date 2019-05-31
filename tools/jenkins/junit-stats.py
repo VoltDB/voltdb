@@ -94,6 +94,10 @@ JENKINS_JOB_NICKNAMES = {
 BAD_URL_PREFIX  = 'ci:8080'
 GOOD_URL_PREFIX = 'ci.voltdb.lan:8080'
 
+# Used to count errors and warnings encountered during execution
+ERROR_COUNT   = 0
+WARNING_COUNT = 0
+
 # Use to modify URLs by changing problematic characters into underscores
 from string import maketrans
 TT = maketrans("[]-<> ", "______")
@@ -219,6 +223,28 @@ class Stats(object):
         logging.info("starting... %s" % sys.argv)
 
 
+    def error(self, message, caused_by=None):
+        """TODO
+        :param 
+        """
+        global ERROR_COUNT
+        ERROR_COUNT = ERROR_COUNT + 1
+        if caused_by:
+            message = message + '\nCaused by:\n' + str(caused_by)
+        logging.error(message)
+
+
+    def warn(self, message, caused_by=None):
+        """TODO
+        :param 
+        """
+        global WARNING_COUNT
+        WARNING_COUNT = WARNING_COUNT + 1
+        if caused_by:
+            message = message + '\nCaused by:\n' + str(caused_by)
+        logging.warn(message)
+
+
     def fix_url(self, url):
         """
         :param url: url to download data from
@@ -247,8 +273,9 @@ class Stats(object):
             if (ignore404 and type(e) is HTTPError and e.code == 404):
                 logging.debug('Ignoring HTTPError (%s) at URL:\n    %s' % (str(e), str(url)))
             else:
-                logging.exception('Exception (%s) trying to open data from URL:\n    %s\n'
-                                  '    The URL may not be formed correctly.' % (str(e), str(url)))
+                self.error('Exception trying to open data from URL:\n    %s'
+                           '\n    The URL may not be formed correctly.'
+                           % str(url), e )
         return data
 
 
@@ -552,9 +579,9 @@ class Stats(object):
         summary = issue['type']+' '+failure_percent+'%: '+issue['className']+'.'+issue['testName']
         descriptions = []
         descriptions.append('Failing Test:\n' + fullTestName + '\n')
+        descriptions.append(SEPARATOR_LINE   + 'Failure history, in ' + jenkins_job_nickname + ':\n' + history + '\n')
         if error_report.get('errorStackTrace'):
             descriptions.append(STACK_TRACE_LINE + str(error_report['errorStackTrace']))
-        descriptions.append(SEPARATOR_LINE   + 'Failure history, in ' + jenkins_job_nickname + ':\n' + history + '\n')
         if failed_since:
             consistently_or_intermittently = 'intermittently'
             if failing_consistently:
@@ -585,8 +612,8 @@ class Stats(object):
                             priority, attachments, existing_ticket,
                             max_num_attachments=MAX_NUM_ATTACHMENTS_PER_JIRA_TICKET,
                             DRY_RUN=DRY_RUN)
-        except:
-            logging.exception('Error with filing issue, in file_jira_issue / create_or_modify_jira_bug_ticket')
+        except Exception as e:
+            self.error('Error with filing issue, in file_jira_issue / create_or_modify_jira_bug_ticket', e)
             new_issue = None
 
         return new_issue
@@ -655,8 +682,8 @@ class Stats(object):
                             labels, DRY_RUN)
             if closed_issue:
                 closed_issue_url = "https://issues.voltdb.com/browse/" + closed_issue.key
-        except:
-            logging.exception('Error with closing issue')
+        except Exception as e:
+            self.error('Error with closing issue', e)
             closed_issue_url = None
 
         return closed_issue_url
@@ -673,7 +700,7 @@ class Stats(object):
         logging.debug('In get_build_data:')
 
         if job is None or build_range is None:
-            logging.error('Either the job ('+str(job)+') or build range ('+str(build_range)+') was not specified.')
+            self.error('Either the job ('+str(job)+') or build range ('+str(build_range)+') was not specified.')
             print(self.cmdhelp)
             return
 
@@ -693,7 +720,7 @@ class Stats(object):
         url = self.jhost + '/job/' + job + '/lastCompletedBuild/api/python'
         build = self.read_url(url)
         if build is None:
-            logging.warn('Could not retrieve last completed build. Job: %s' % job)
+            self.warn('Could not retrieve last completed build. Job: %s' % job)
             build = {
                 'number': 'unknown',
                 'builtOn': 'unknown'
@@ -714,8 +741,8 @@ class Stats(object):
         try:
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
-        except MySQLError:
-            logging.exception('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
+        except MySQLError as e:
+            self.error('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass), e)
             return
 
         query_last_build = ("select max(build) FROM `junit-builds` where name='%s'" % job)
@@ -733,9 +760,9 @@ class Stats(object):
             else:
                 build_low = last_build_recorded + 1
                 build_high = latest_build
-        except:
-            logging.exception("Couldn't extrapolate build range, from %s, with latest %s, so %s - %s." \
-                              & (build_range, latest_build, build_low, build_high))
+        except Exception as e:
+            self.error("Couldn't extrapolate build range, from %s, with latest %s, so %s - %s." \
+                              & (build_range, latest_build, build_low, build_high), e )
             print(self.cmdhelp)
             return
 
@@ -758,10 +785,10 @@ class Stats(object):
             #logging.debug('  test_report  : '+str(test_report))
 
             if test_report is None:
-                logging.warn(
+                self.warn(
                     'Could not retrieve report because URL (%s) is invalid. This may be '
                     'because build #%d might not exist on Jenkins' % (test_url, build))
-                logging.warn('Last completed build for this job is: %s\n' % latest_build)
+                self.warn('Last completed build for this job is: %s\n' % latest_build)
                 continue
 
             try:
@@ -781,10 +808,10 @@ class Stats(object):
                 job_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
                 job_report = self.read_url(job_url)
                 if job_report is None:
-                    logging.warn(
+                    self.warn(
                         'Could not retrieve report because URL (%s) is invalid. This may be '
                         'because the build %d might not exist on Jenkins' % (job_url, build))
-                    logging.warn('Last completed build for this job is: %s\n' % latest_build)
+                    self.warn('Last completed build for this job is: %s\n' % latest_build)
                     continue
 
                 # Job stamp is already in EST (or EDT)
@@ -829,24 +856,24 @@ class Stats(object):
                     try:
                         cursor.execute(delete_job, job_data)
                     except MySQLError as e:
-                        logging.exception('Could not delete job data from database')
+                        self.error('Could not delete job data from database', e)
                     try:
                         cursor.execute(delete_target, job_data)
                         db.commit()
                     except MySQLError as e:
-                        logging.exception('Could not delete target data from database')
+                        self.error('Could not delete target data from database', e)
                     try:
                         cursor.execute(delete_test, job_data)
                         db.commit()
                     except MySQLError as e:
-                        logging.exception('Could not delete test data from database')
+                        self.error('Could not delete test data from database', e)
 
                     try:
                         cursor.execute(add_job, job_data)
                         db.commit()
                     except MySQLError as e:
                         if e.errno != 1062:
-                            logging.exception('Could not add job data to database')
+                            self.error('Could not add job data to database', e)
 
                 logging.debug('  deletes & add_job complete.')
                 logging.debug('  job_report size: '+str(len(job_report)))
@@ -861,7 +888,7 @@ class Stats(object):
 
                     # very strange but sometimes there is a run from a different build??
                     if run['number'] != build:
-                        logging.warn('Build number is %s, but run number is %s !?! (ignoring)'
+                        self.warn('Build number is %s, but run number is %s !?! (ignoring)'
                                      % (build, run['number']))
                         continue
 
@@ -869,7 +896,7 @@ class Stats(object):
                         raise RuntimeError("build # not correct %s %s" % (build, run['url']))
 
                     tr_url = run['url'] + "testReport/api/python"
-                    child = self.read_url(tr_url, True)
+                    child = self.read_url(tr_url, ignore404=True)
 
                     if child is None:
                         child = {'duration': None,
@@ -878,7 +905,7 @@ class Stats(object):
                                  'passCount': None,
                                  'skipCount': None
                                  }
-                        logging.warn('child: '+str(child))
+                        self.warn('child: '+str(child))
 
                     # Compile job data to write to database
                     target_data = {
@@ -906,13 +933,13 @@ class Stats(object):
                             db.commit()
                         except MySQLError as e:
                             if e.errno != 1062:  # duplicate entry
-                                logging.exception('Could not add duplicate target data to database')
+                                self.error('Could not add duplicate target data to database', e)
                             else:
                                 raise e
 
                     # if there is no test report, for some reason, maybe the build timed out, just move on
                     if child['empty'] is True:
-                        logging.warning("No test report found for URL: %s" % tr_url)
+                        self.warn("No test report found for URL: %s" % tr_url)
                         continue
 
                     # Traverse through reports into test suites and get failed test case data to write to database.
@@ -965,20 +992,34 @@ class Stats(object):
                                 testcase_url = run['url'] + 'testReport/(root)/' + fullTestName
                             else:
                                 testcase_url = run['url'] + 'testReport/' + fullTestName
-                            n = testcase_url.count('.')
+                            orig_testcase_url = testcase_url
+
                             # find the testcase url that "works"
-                            for i in range(n+1):
+                            dot_count = fullTestName.count('.')
+                            separator = '/'
+                            # Special case for "junit framework" failures:
+                            if fullTestName.startswith('junit.framework.TestSuite.'):
+                                testcase_url = testcase_url.replace('junit.framework.TestSuite.',
+                                                                    'junit.framework/TestSuite/')
+                                separator = '_'
+                            for i in range(dot_count):
                                 page = None
                                 try:
-                                    page = self.read_url(testcase_url+"/api/python", ignore404=True)
-                                except:
+                                    page = self.read_url(testcase_url+'/api/python', ignore404=True)
+                                except Exception as e:
+                                    self.warn("Failed to find URL, with dot_count %d, i %d, original "
+                                              "URL '%s':\n    %s\n    current URL:\n    %s"
+                                              % (dot_count, i, orig_testcase_url,
+                                                 testcase_url+' [/api/python]'), e )
                                     pass
                                 if type(page) == dict and 'status' in page:
                                     break
-                                testcase_url = '/'.join(testcase_url.rsplit('.', 1))
+                                testcase_url = separator.join(testcase_url.rsplit('.', 1))
                             if page is None:
-                                logging.error("testcase URL invalid: " + str(testcase_url))
-                                ####raise RuntimeError("testcase url invalid: " + testcase_url)
+                                self.error("Testcase URL invalid:\n    %s"
+                                           "\n    Skipping (in build %d) test: %s"
+                                           % (testcase_url+' [/api/python]', build, fullTestName) )
+                                continue
 
                             test_data = {
                                 'fullTestName': fullTestName,
@@ -1000,7 +1041,7 @@ class Stats(object):
                                 test_data['channel'] = None
 
                             logging.debug('  testcase_url : '+str(testcase_url))
-                            logging.debug('  n            : '+str(n))
+                            logging.debug('  dot_count    : '+str(dot_count))
                             logging.debug('  test_data    : '+str(test_data))
 
                             # We need to record 'FIXED' and 'FAILED' and 'REGRESSION'
@@ -1026,7 +1067,7 @@ class Stats(object):
                                         db.commit()
                                     except MySQLError as e:
                                         if e.errno != 1062:
-                                            logging.exception('Could not add test data to database')
+                                            self.error('Could not add test data to database', e)
 
 
 
@@ -1065,19 +1106,20 @@ class Stats(object):
                             # either of type 'NEW' or 'INTERMITTENT'
                             if (not previous_ticket_failure_type) or (previous_ticket_failure_type not in
                                         ['NEW', 'INTERMITTENT', 'CONSISTENT', 'INCONSISTENT', 'OLD']):
-                                failure_percent = self.qualifies_as_intermittent_failure(
-                                                            cursor, fullTestName, job, build)
-                                if failure_percent:
-                                    self.file_jira_intermittent_issue(test_data, failure_percent, DRY_RUN)
-                                else:
-                                    failure_percent = self.qualifies_as_new_failure(
-                                                            cursor, fullTestName, job, build, status)
+                                if (status in ['REGRESSION', 'FAILED']):
+                                    failure_percent = self.qualifies_as_intermittent_failure(
+                                                                cursor, fullTestName, job, build)
                                     if failure_percent:
-                                        self.file_jira_new_issue(test_data, failure_percent, DRY_RUN)
-                                    elif status != 'PASSED':
-                                        logging.info(('No Jira ticket filed for test %s, '
-                                                      'in job %s, build #%s')
-                                                      % (fullTestName, job, str(build)) )
+                                        self.file_jira_intermittent_issue(test_data, failure_percent, DRY_RUN)
+                                    else:
+                                        failure_percent = self.qualifies_as_new_failure(
+                                                                cursor, fullTestName, job, build, status)
+                                        if failure_percent:
+                                            self.file_jira_new_issue(test_data, failure_percent, DRY_RUN)
+                                        else:
+                                            logging.info(('No Jira ticket filed for test %s, '
+                                                          'in job %s, build #%s')
+                                                          % (fullTestName, job, str(build)) )
 
                             # When a current, open Jira bug ticket exists, of type 'NEW',
                             # consider upgrading it to 'CONSISTENT' or 'INTERMITTENT',
@@ -1165,7 +1207,7 @@ class Stats(object):
                             # before recent changes, whose type could not be identified
                             # in the same way: then issue a warning
                             else:
-                                logging.warn("Unrecognized failure type '%s' ignored, for ticket: %s"
+                                self.warn("Unrecognized failure type '%s' ignored, for ticket: %s"
                                              + (str(previous_ticket_failure_type),
                                                 str(previous_ticket.get(key)) ))
 
@@ -1174,12 +1216,12 @@ class Stats(object):
                                 logging.info('     - processed %d test cases (in %s)'
                                              % (count_test_cases, str(run.get('url'))) )
 
-            except KeyError:
-                logging.exception('Error retrieving test data for this particular build: %d\n' % build)
-            except Exception:
+            except KeyError as ke:
+                self.error('Error retrieving test data for this particular build: %d\n' % build, ke)
+            except Exception as e:
                 # Catch all errors to avoid causing a failing build for the upstream job in case this is being
                 # called from the junit-test-branch on Jenkins
-                logging.exception('Catching unexpected errors to avoid causing a failing build for the upstream job')
+                self.error('Catching unexpected errors to avoid causing a failing build for the upstream job', e)
                 # re-raise the exception, cause the build to fail (until the bugs are worked out)
                 raise
 
@@ -1350,3 +1392,14 @@ if __name__ == '__main__':
 
     stats.get_build_data(job, build_range, process_passed,
                          post_to_slack, file_jira_ticket=not DRY_RUN)
+
+    if ERROR_COUNT:
+        logging.info("Processing of Jenkins builds failed with %d ERROR(s) "
+                     "(and %d WARNING(s))" % (ERROR_COUNT, WARNING_COUNT) )
+        sys.exit(11)
+    elif WARNING_COUNT:
+        logging.info("Processing of Jenkins builds failed with %d WARNING(s) "
+                     "(and %d ERROR(s))" % (WARNING_COUNT, ERROR_COUNT) )
+        sys.exit(10)
+    else:
+        logging.info("Processing of Jenkins build(s) succeeded, without ERRORs or (major) WARNINGs.")

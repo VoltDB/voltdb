@@ -144,8 +144,11 @@ public class ExportBenchmark {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
-        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka)")
+        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka|other)")
         String target = "socket";
+
+        @Option(desc = "if a socket target, act as a client only 'client', socket 'receiver', or default 'both' ")
+        String socketmode = "both";
 
         @Option(desc = "How many tuples to push includes priming count.")
         int count = 0; // 10000000+40000
@@ -153,17 +156,25 @@ public class ExportBenchmark {
         @Option(desc="How many tuples to insert for each procedure call (default = 1)")
         int multiply = 1;
 
+        @Option(desc="How many targets to divide the multiplier into (default = 1)")
+        int targets = 1;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (count < 0) exitWithMessageAndUsage("count must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("measuring")) {
-                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"measuring\"");
+            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("other")) {
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\" or \"other\"");
+            }
+            if (target.equals("socket")) {
+                if ( !socketmode.equals("client") && !socketmode.equals("receiver") && !socketmode.equals("both")) {
+                    exitWithMessageAndUsage("socketmode must be either \"client\" or \"reciever\" or \"both\"");
+                }
             }
             if (multiply <= 0) exitWithMessageAndUsage("multiply must be >= 0");
-            if (target.equals("measuring")) {
+            if (target.equals("other") && count == 0 ) {
                count = 10000000+40000;
                System.out.println("Using count mode with count: " + count);
             }
@@ -365,7 +376,8 @@ public class ExportBenchmark {
                             new NullCallback(),
                             "InsertExport",
                             rowId.getAndIncrement(),
-                            config.multiply);
+                            config.multiply,
+                            config.targets);
                     // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                     if (++totalInserts % 50 == 0) {
                         now = System.currentTimeMillis();
@@ -398,7 +410,8 @@ public class ExportBenchmark {
                         new ExportCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
-                        config.multiply);
+                        config.multiply,
+                        config.targets);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
@@ -566,36 +579,49 @@ public class ExportBenchmark {
      */
     private void runTest() throws InterruptedException {
 
-        boolean isSocketTest = config.target.equals("socket");
-
+        boolean isSocketTest = config.target.equals("socket") && (config.socketmode.equals("both") || config.socketmode.equals("receiver"));
+        boolean success = true;
         // Connect to servers
         try {
             System.out.println("Test initialization");
             connect(config.servers);
         } catch (InterruptedException e) {
-            System.err.println("Error connecting to VoltDB");
+            System.err.println("ERROR: Error connecting to VoltDB");
             e.printStackTrace();
             System.exit(1);
         }
 
-        // Figure out how long to run for
-        benchmarkStartTS = System.currentTimeMillis();
-        if (config.warmup == 0) {
-            benchmarkWarmupEndTS = 0;
-        } else {
-            benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
-        }
-        //If we are going by count turn of end by timestamp.
-        if (config.count > 0) {
-            benchmarkEndTS = 0;
-        } else {
-            benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
+        Thread writes = null;
+        if ( !config.socketmode.equals("receiver")) {
+            // Figure out how long to run for
+            benchmarkStartTS = System.currentTimeMillis();
+            if (config.warmup == 0) {
+                benchmarkWarmupEndTS = 0;
+            } else {
+                benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
+            }
+            //If we are going by count turn of end by timestamp.
+            if (config.count > 0) {
+                benchmarkEndTS = 0;
+            } else {
+                benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
+            }
+
+            // Do the inserts in a separate thread
+            writes = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    doInserts(client);
+                }
+            });
+            writes.start();
+            Thread.sleep(config.warmup * 1000);
         }
 
-        // On a socket test, listen for stats until the exports are drained
-        // don't do this for Kafka -- nothing to listen to
         Thread statsListener = null;
         if (isSocketTest) {
+            // On a socket test, listen for stats until the exports are drained
+            // don't do this for other export types
             final CountDownLatch listenerRunning = new CountDownLatch(1);
             statsListener = new Thread(new Runnable() {
                 @Override
@@ -609,23 +635,14 @@ public class ExportBenchmark {
             listenerRunning.await();
         }
 
-        // Do the inserts in a separate thread
-        Thread writes = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                doInserts(client);
-            }
-        });
-        writes.start();
-        Thread.sleep(config.warmup * 1000);
+        if (!config.socketmode.equals("receiver")) {
+            writes.join();
+            periodicStatsTimer.cancel();
+            System.out.println("Client finished; ready for export to finish");
+        }
 
-        writes.join();
-        periodicStatsTimer.cancel();
-        System.out.println("Client flushed; waiting for export to finish");
-
-        // Wait until export is done -- socket target only
-        boolean success = false;
-        if (config.target.equals("socket")) {
+        // wait for export to finish draining if we are receiver..
+        if (isSocketTest) {
             try {
                 success = waitForStreamedAllocatedMemoryZero();
             } catch (IOException e) {
@@ -635,8 +652,6 @@ public class ExportBenchmark {
                 System.err.println("Error while calling procedures: ");
                 e.getLocalizedMessage();
             }
-        } else {
-            success = true; // kafka case -- no waiting
         }
 
         System.out.println("Finished benchmark");
@@ -651,17 +666,27 @@ public class ExportBenchmark {
 
         // Print results & close
         printResults(benchmarkEndTS-benchmarkWarmupEndTS);
-        client.close();
-
-        // Make sure we got serverside stats
-        if (config.target.equals("socket") && serverStats.size() == 0) {
-            System.err.println("ERROR: Never received stats from export clients");
-            success = false;
+        if (!config.socketmode.equals("receiver")) {
+            client.close();
         }
+
+        // Make sure we got serverside stats if we are acting as a receiver
+        if (isSocketTest) {
+            if (serverStats.size() == 0 ) {
+                System.err.println("ERROR: Never received stats from export clients");
+                success = false;
+            }
+        }
+
 
         if (!success) {
+            System.err.println("Export client failed");
             System.exit(-1);
+        } else {
+            System.out.println("Export client finished successfully");
+            System.exit(0);
         }
+
     }
 
     /**

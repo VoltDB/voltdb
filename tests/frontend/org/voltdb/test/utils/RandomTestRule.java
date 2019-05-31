@@ -23,6 +23,7 @@
 
 package org.voltdb.test.utils;
 
+import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.junit.rules.TestRule;
@@ -46,6 +47,19 @@ public class RandomTestRule extends Random implements TestRule {
         initializeSeed(seed);
     }
 
+    public void nextBytes(ByteBuffer buffer) {
+        while (buffer.remaining() > Integer.BYTES) {
+            buffer.putInt(nextInt());
+        }
+        if (buffer.hasRemaining()) {
+            int value = nextInt();
+            do {
+                buffer.put((byte) value);
+                value >>>= Byte.SIZE;
+            } while (buffer.hasRemaining());
+        }
+    }
+
     /**
      * @param origin inclusive lower bound of the returned value
      * @param bound  exclusive upper bound of the returned value
@@ -61,13 +75,7 @@ public class RandomTestRule extends Random implements TestRule {
     @Override
     public Statement apply(Statement base, Description description) {
         m_name = description.getDisplayName();
-
-        return new Statement() {
-            @Override
-            public void evaluate() throws Throwable {
-                base.evaluate();
-            }
-        };
+        return base;
     }
 
     @Override

@@ -39,7 +39,8 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */#ifndef TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
+ */
+#ifndef TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
 #define TESTS_EE_TEST_UTILS_TESTING_TOPEND_H_
 #include <map>
 #include "common/Topend.h"

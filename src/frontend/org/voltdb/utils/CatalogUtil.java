@@ -3260,4 +3260,11 @@ public abstract class CatalogUtil {
         }
         return -1;
     }
+    public static boolean getIsreplicated(String tableName) {
+        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
+        if (table != null) {
+            return table.getIsreplicated();
+        }
+        return false;
+    }
 }
