@@ -293,7 +293,7 @@ public class TestExportDataSource extends TestCase {
 
             assertEquals( 60, s.sizeInBytes());
 
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
@@ -310,7 +310,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             //Should lose 20 bytes for the stuff in memory
@@ -322,7 +322,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
@@ -333,7 +333,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<AckingContainer> fut = s.poll(false);
+            ListenableFuture<AckingContainer> fut = s.poll();
             try {
                 cont = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
@@ -370,7 +370,7 @@ public class TestExportDataSource extends TestCase {
             foo0.duplicate().put(new byte[buffSize]);
             s.pushExportBuffer(1, 1, 1, 0, 0, foo0);
 
-            AckingContainer cont0 = s.poll(false).get();
+            AckingContainer cont0 = s.poll().get();
             cont0.updateStartTime(System.currentTimeMillis());
 
             cont0.discard();
@@ -378,11 +378,11 @@ public class TestExportDataSource extends TestCase {
             System.gc(); System.runFinalization(); Thread.sleep(200);
 
             // Poll once with no data left - EDS sould set m_pollFuture
-            ListenableFuture<AckingContainer> fut1 = s.poll(false);
+            ListenableFuture<AckingContainer> fut1 = s.poll();
             assertFalse(fut1.isDone());
 
             // Do a reentrant poll - the returned fut should have the expected exception
-            ListenableFuture<AckingContainer> fut2 = s.poll(false);
+            ListenableFuture<AckingContainer> fut2 = s.poll();
             try {
                 AckingContainer c = fut2.get();
                 fail("Did not get expected exception");
@@ -466,7 +466,7 @@ public class TestExportDataSource extends TestCase {
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        AckingContainer cont = s.poll(false).get();
+        AckingContainer cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
@@ -490,7 +490,7 @@ public class TestExportDataSource extends TestCase {
                 );
 
         // Poll and discard buffer 2, too
-        cont = s.poll(false).get();
+        cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         cont.discard();
 
@@ -501,7 +501,7 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        cont = s.poll(false).get();
+        cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
         assertEquals(3, cont.m_lastSeqNo);
@@ -567,7 +567,7 @@ public class TestExportDataSource extends TestCase {
             waitForMaster(s);
 
             //Poll and check before and after discard segment files.
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
@@ -622,18 +622,18 @@ public class TestExportDataSource extends TestCase {
             s.pushExportBuffer(11, 11, 1, 0, 0, foo);
 
             // Poll the 2 first buffers
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 1, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 2, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll once more, should hit the gap (wait for the state to be changed)
-            ListenableFuture<AckingContainer> fut1 = s.poll(false);
+            ListenableFuture<AckingContainer> fut1 = s.poll();
 
             Thread.sleep(1000);
             assertFalse(fut1.isDone());
@@ -654,7 +654,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(10, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals(11, cont.m_lastSeqNo);
             cont.discard();
@@ -696,30 +696,30 @@ public class TestExportDataSource extends TestCase {
             s.pushExportBuffer(4, 4, 1, 0, 0, foo);
 
             // Poll the 2 first buffers
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 1, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 2, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll 3rd buffer but set it pending
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 3, cont.m_lastSeqNo);
             s.setPendingContainer(cont);
 
             // Poll 3rd buffer once more
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 3, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll last buffer
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 4, cont.m_lastSeqNo);
             cont.discard();
