@@ -343,4 +343,7 @@ void ExportTupleStream::extendBufferChain(size_t minLength) {
     m_currBlock->recordStartSequenceNumber(m_nextSequenceNumber);
 }
 
+size_t ExportTupleStream::getExportMetaHeaderSize() {
+    return EXPORT_ROW_HEADER_SIZE + EXPORT_BUFFER_METADATA_HEADER_SIZE;
+}
 

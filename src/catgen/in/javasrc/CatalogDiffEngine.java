@@ -929,18 +929,8 @@ public class CatalogDiffEngine {
             suspect instanceof GroupRef ||
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
-            suspect instanceof PlanFragment) {
-            return null;
-        }
-
-        if (suspect instanceof TimeToLive) {
-            TimeToLive current = (TimeToLive)suspect;
-            if (prevType != null) {
-                TimeToLive previous = (TimeToLive)prevType;
-                if (previous.getMigrationtarget() == null && current.getMigrationtarget() != null) {
-                    m_requiresNewExportGeneration= true;
-                }
-            }
+            suspect instanceof PlanFragment ||
+            suspect instanceof TimeToLive) {
             return null;
         }
 
@@ -1036,6 +1026,13 @@ public class CatalogDiffEngine {
                     m_requiresNewExportGeneration = true;
                     return null;
                 }
+            }
+
+            if (field.equals("migrationTarget")) {
+                if (prevType != null && ((Table) suspect).getMigrationtarget() != ((Table) prevType).getMigrationtarget()) {
+                    m_requiresNewExportGeneration = true;
+                }
+                return null;
             }
             // Always allow disabling DR on table
             if (field.equalsIgnoreCase("isdred")) {

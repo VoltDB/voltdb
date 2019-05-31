@@ -15,29 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UNDOQUANTUM_RELEASE_INTEREST_H_
-#define UNDOQUANTUM_RELEASE_INTEREST_H_
+package org.voltdb.utils;
 
-namespace voltdb {
-class UndoQuantumReleaseInterest {
-public:
-    UndoQuantumReleaseInterest() : m_lastSeenUndoToken(-1) {}
-    virtual void notifyQuantumRelease() = 0;
-    virtual ~UndoQuantumReleaseInterest() {}
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
-    inline bool isNewReleaseInterest(int64_t currentUndoToken) {
-        if (m_lastSeenUndoToken == currentUndoToken) {
-            return false;
-        }
-        else {
-            m_lastSeenUndoToken = currentUndoToken;
-            return true;
-        }
+import org.voltcore.utils.DeferredSerialization;
+
+/**
+ * Simple base class for handling the writing of any {@link DeferredSerialization} object
+ *
+ * @param <T> Type of {@link DeferredSerialization} which this serializer operates on
+ */
+public abstract class BinaryDequeDeferredSerializer<T extends DeferredSerialization>
+        implements BinaryDequeSerializer<T> {
+    @Override
+    public int getMaxSize(T object) throws IOException {
+        return object.getSerializedSize();
+    };
+
+    @Override
+    public void write(T object, ByteBuffer buffer) throws IOException {
+        object.serialize(buffer);
     }
-    inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
-private:
-    int64_t m_lastSeenUndoToken;
-};
 }
-
-#endif /* UNDOQUANTUM_H_ */

@@ -272,7 +272,7 @@ public class TestExportGeneration {
                     System.currentTimeMillis(),
                     foo.duplicate()
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll(false).get();
+            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));

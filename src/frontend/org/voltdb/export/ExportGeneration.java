@@ -63,6 +63,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
@@ -618,7 +619,9 @@ public class ExportGeneration implements Generation {
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        source.setupMigrateRowsDeleter(migrateBatchSize);
+        source.setupMigrateRowsDeleter(migrateBatchSize,
+                CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
+
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
@@ -683,7 +686,7 @@ public class ExportGeneration implements Generation {
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
                         int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize);
+                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize, table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);

@@ -42,11 +42,11 @@ import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.Generation;
-import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.exportclient.ExportRow;
+import org.voltdb.exportclient.ExportRowSchema;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -222,7 +222,7 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<AckingContainer> fut = m_source.poll(true);
+            final ListenableFuture<AckingContainer> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
             m_source.forwardAckToOtherReplicas();
         }
@@ -369,33 +369,9 @@ public class GuestProcessor implements ExportDataProcessor {
                          */
                         while (!m_shutdown) {
                             try {
-                                ByteBuffer sbuf = null;
-                                int schemaSize = 0;
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                ByteBuffer schemaBuf = cont.schema();
-                                if (schemaBuf != null) {
-                                    schemaBuf.position(0);
-                                    schemaBuf.order(ByteOrder.LITTLE_ENDIAN);
-                                    byte version = schemaBuf.get();
-                                    assert(version == StreamBlockQueue.EXPORT_BUFFER_VERSION);
-                                    // update the global generation id of guest processor
-                                    m_genId = schemaBuf.getLong();
-                                    schemaSize = schemaBuf.getInt();
-                                    ExportRow previousRow = edb.getExportRowSchema();
-                                    // update the decoder if current generation is different than previous row
-                                    if (previousRow == null || previousRow.generation != m_genId) {
-                                        byte[] schemadata = new byte[schemaSize];
-                                        schemaBuf.get(schemadata, 0, schemaSize);
-                                        sbuf = ByteBuffer.wrap(schemadata);
-                                        sbuf.order(ByteOrder.LITTLE_ENDIAN);
-                                        edb.setExportRowSchema(
-                                                ExportRow.decodeBufferSchema(
-                                                        sbuf, schemaSize,
-                                                        source.getPartitionId(), m_genId));
-                                    }
-                                }
                                 ExportRow row = null;
                                 boolean firstRowOfBlock = true;
                                 while (buf.hasRemaining() && !m_shutdown) {
@@ -413,14 +389,16 @@ public class GuestProcessor implements ExportDataProcessor {
                                         //New style connector.
                                         try {
                                             cont.updateStartTime(System.currentTimeMillis());
-                                            if (edb.getExportRowSchema() == null && sbuf != null) {
-                                                edb.setExportRowSchema(
-                                                        ExportRow.decodeBufferSchema(
-                                                                sbuf, schemaSize,
-                                                                source.getPartitionId(), m_genId));
+                                            ExportRow schema = edb.getExportRowSchema();
+                                            if (schema == null || schema.generation != cont.getSchema().generation) {
+                                                // Note {@code ExportRowSchema} is a special {@code ExportRow}
+                                                ExportRowSchema newSchema = cont.getSchema();
+                                                if (EXPORTLOG.isDebugEnabled()) {
+                                                    EXPORTLOG.debug("Set schema to: " + newSchema);
+                                                }
+                                                edb.setExportRowSchema(newSchema);
                                             }
                                             row = ExportRow.decodeRow(edb.getExportRowSchema(), source.getPartitionId(), m_startTS, rowdata);
-                                            edb.setExportRowSchema(row);
                                         } catch (IOException ioe) {
                                             EXPORTLOG.warn("Failed decoding row for partition " + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
@@ -509,7 +487,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(false), edb);
+                    addBlockListener(source, source.poll(), edb);
                 }
             }
         }, edb.getExecutor());

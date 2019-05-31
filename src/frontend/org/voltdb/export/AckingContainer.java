@@ -16,11 +16,11 @@
  */
 package org.voltdb.export;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.exportclient.ExportRowSchema;
 
 public class AckingContainer extends BBContainer {
     ExportDataSource m_source;
@@ -28,35 +28,31 @@ public class AckingContainer extends BBContainer {
     final long m_lastSeqNo;
     final long m_commitSeqNo;
     final BBContainer m_backingCont;
-    BBContainer m_schemaCont;
+    // Note: the schema doesn't need an explicit discard
+    ExportRowSchema m_schema;
     long m_startTime = 0;
     long m_commitSpHandle = 0;
     private static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     private AckingContainer(ExportDataSource source, BBContainer cont,
-                            BBContainer schemaCont, long startSeqNo, long lastSeqNo, long commitSeq) {
+                            ExportRowSchema schema, long startSeqNo, long lastSeqNo, long commitSeq) {
         super(cont.b());
         m_source = source;
         m_startSeqNo = startSeqNo;
         m_lastSeqNo = lastSeqNo;
         m_commitSeqNo = commitSeq;
         m_backingCont = cont;
-        m_schemaCont = schemaCont;
+        m_schema = schema;
     }
 
     public static AckingContainer create(ExportDataSource source,
                                      StreamBlock sb,
-                                     StreamBlockQueue sbq,
-                                     boolean forcePollSchema) {
-        BBContainer schemaContainer = null;
-        if (forcePollSchema) {
-            schemaContainer = sbq.pollSchema();
-        } else {
-            schemaContainer = sb.getSchemaContainer();
-        }
+                                     StreamBlockQueue sbq) {
+        // We always want to have a schema
+        assert(sb.getSchema() != null);
         return new AckingContainer(source,
                         sb.unreleasedContainer(),
-                        schemaContainer,
+                        sb.getSchema(),
                         sb.startSequenceNumber(),
                         sb.startSequenceNumber() + sb.rowCount() - 1,
                         sb.committedSequenceNumber());
@@ -66,19 +62,8 @@ public class AckingContainer extends BBContainer {
         m_startTime = startTime;
     }
 
-    // Synchronized because schema is settable
-    public synchronized ByteBuffer schema() {
-        if (m_schemaCont == null) {
-            return null;
-        }
-        return m_schemaCont.b();
-    }
-
-    public synchronized void setSchema(BBContainer schemaCont) {
-        if (m_schemaCont != null) {
-            throw new IllegalStateException("Overwriting schema");
-        }
-        m_schemaCont = schemaCont;
+    public ExportRowSchema getSchema() {
+        return m_schema;
     }
 
     public long getCommittedSeqNo() {
@@ -103,12 +88,8 @@ public class AckingContainer extends BBContainer {
             checkDoubleFree();
         }
         m_backingCont.discard();
-        synchronized(this) {
-            if (m_schemaCont != null) {
-                m_schemaCont.discard();
-            }
-        }
     }
+
     // Package private
     void internalDiscard() {
         internalDiscard(true);

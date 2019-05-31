@@ -88,10 +88,12 @@ public class TTLManager extends StatsSource{
         final String tableName;
         final TTLStats stats;
         AtomicReference<TimeToLive> ttlRef;
+        AtomicReference<Table> tableRef;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        public TTLTask(String table, TimeToLive timeToLive, TTLStats ttlStats) {
-            tableName = table;
+        public TTLTask(String tableName, TimeToLive timeToLive, Table table, TTLStats ttlStats) {
+            this.tableName = tableName;
             ttlRef = new AtomicReference<>(timeToLive);
+            tableRef = new AtomicReference<>(table);
             stats = ttlStats;
         }
 
@@ -105,7 +107,7 @@ public class TTLManager extends StatsSource{
             }
             ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
-                String stream = ttlRef.get().getMigrationtarget();
+                String stream = tableRef.get().getMigrationtarget();
                 if (!StringUtil.isEmpty(stream)) {
                     migrate(cl, this);
                 } else {
@@ -123,8 +125,9 @@ public class TTLManager extends StatsSource{
             }
         }
 
-        public void updateTask(TimeToLive updatedTTL) {
+        public void updateTask(TimeToLive updatedTTL, Table updatedTable) {
             ttlRef.compareAndSet(ttlRef.get(), updatedTTL);
+            tableRef.compareAndSet(tableRef.get(), updatedTable);
         }
 
         long getValue() {
@@ -162,7 +165,7 @@ public class TTLManager extends StatsSource{
         }
 
         String getStream() {
-            return ttlRef.get().getMigrationtarget();
+            return tableRef.get().getMigrationtarget();
         }
     }
 
@@ -263,7 +266,7 @@ public class TTLManager extends StatsSource{
                     stats = new TTLStats(t.getTypeName());
                     m_stats.put(t.getTypeName(), stats);
                 }
-                task = new TTLTask(t.getTypeName(), ttl, stats);
+                task = new TTLTask(t.getTypeName(), ttl, t, stats);
                 m_tasks.put(t.getTypeName(), task);
                 m_futures.put(t.getTypeName(),
                               m_timeToLiveExecutor.scheduleAtFixedRate(task,
@@ -271,7 +274,7 @@ public class TTLManager extends StatsSource{
                                       INTERVAL, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
-                task.updateTask(ttl);
+                task.updateTask(ttl, t);
                 hostLog.info(String.format(info + " has been updated.", t.getTypeName()));
             }
         }

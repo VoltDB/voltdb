@@ -17,7 +17,9 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
@@ -25,7 +27,7 @@ import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
  * Reader interface used to read entries from the deque. Multiple readers may be active at the same time,
  * each of them maintaining their own read location within the deque.
  */
-public interface BinaryDequeReader {
+public interface BinaryDequeReader<M> {
     /**
      * Read and return the object at the current read position of this reader.
      * The entry will be removed once all active readers have read the entry.
@@ -36,11 +38,15 @@ public interface BinaryDequeReader {
     public BBContainer poll(OutputContainerFactory ocf) throws IOException;
 
     /**
-     * @param segmentIndex index of the segment to get schema from, -1 means get schema from current segment
-     * @return The extra header metadata in the segment header or {@code null} if there is none
-     * @throws IOException If an error occurs reading the extra header
+     * Read and return the full entry at the current read position of this reader. The entry will be removed once all
+     * active readers have read the entry.
+     *
+     * @param ocf Factory used to create {@link DBBPool.BBContainer} as destinations for the entry data
+     * @return {@link Entry} containing data entry and any extra header associated with it or {@code null} if there is
+     *         no entry
+     * @throws IOException
      */
-    public BBContainer getExtraHeader(long segmentIndex) throws IOException;
+    public Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException;
 
     /**
      * Number of bytes left to read for this reader.
@@ -64,15 +70,25 @@ public interface BinaryDequeReader {
     public boolean isEmpty() throws IOException;
 
     /**
-     * Is the object this reader going to read the first object of segment?
-     * @return true if the object this reader going to read is the first object of segment
-     * throws IOException
+     * Entry class to hold all metadata and data associated with an entry in a {@link BinaryDeque}
+     *
+     * @param <M> Type of extra header metadata
      */
-    public boolean isStartOfSegment() throws IOException;
+    public interface Entry<M> {
+        /**
+         * @return any associated extra header metadata. May return {@code null} if there was none
+         */
+        M getExtraHeader();
 
-    /**
-     * Returns the index of the segment that reader currently reads on
-     * @return
-     */
-    public long getSegmentIndex();
+        /**
+         * @return A {@link ByteBuffer} holding the entry data
+         */
+        ByteBuffer getData();
+
+        /**
+         * Indicates that this entry has been consumed and is eligible for deletion with respect to the
+         * {@link BinaryDequeReader} which returned this entry.
+         */
+        void release();
+    }
 }
