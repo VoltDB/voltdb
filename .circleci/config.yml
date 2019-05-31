@@ -1,0 +1,120 @@
+version: 2
+
+jobs:
+  build:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - run: ant
+      - persist_to_workspace:
+          root: .
+          paths:
+            - voltdb
+            - obj
+  junit_regression_h1:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_regression_h1
+  junit_regression_h2:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_regression_h2
+  junit_other_p1:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_other_p1
+  junit_other_p2:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_other_p2
+  junit_other_p3:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_other_p3
+  junit_other_p4:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant junit_other_p4
+  package:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y openjdk-8-jdk-headless ant build-essential cmake python git
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: ant dist_internal
+      - store_artifacts:
+          path: obj/release/voltdb-community-*.tar.gz
+
+workflows:
+  version: 2
+  build_test_package:
+    jobs:
+      - build
+      - junit_regression_h1:
+          requires:
+            - build
+      - junit_regression_h2:
+          requires:
+            - build
+      - junit_other_p1:
+          requires:
+            - build
+      - junit_other_p2:
+          requires:
+            - build
+      - junit_other_p3:
+          requires:
+            - build
+      - junit_other_p4:
+          requires:
+            - build
+      - package:
+          requires:
+            - junit_regression_h1
+            - junit_regression_h2
+            - junit_other_p1
+            - junit_other_p2
+            - junit_other_p3
+            - junit_other_p4
