@@ -164,6 +164,7 @@ public class ProcedureRunnerNT {
     public void allHostNTProcedureCallback(ClientResponse clientResponse) {
         synchronized(m_allHostCallbackLock) {
             int hostId = Integer.parseInt(clientResponse.getAppStatusString());
+            assert (m_outstandingAllHostProcedureHostIds != null);
             boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
             // log this for now... I don't expect it to ever happen, but will be interesting to see...
             if (!removed) {
@@ -547,6 +548,9 @@ public class ProcedureRunnerNT {
      * ICH and the other plumbing should handle regular, txn procs.
      */
     public void processAnyCallbacksFromFailedHosts(Set<Integer> failedHosts) {
+        if (m_outstandingAllHostProcedureHostIds == null) {
+            return;
+        }
         synchronized(m_allHostCallbackLock) {
             failedHosts.stream()
                 .forEach(i -> {
