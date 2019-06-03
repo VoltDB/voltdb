@@ -321,7 +321,7 @@ public class Cartographer extends StatsSource
     /**
      * Convenience method: Get the HSID of the master for the specified partition ID, SP or MP
      */
-    public long getHSIdForMaster(int partitionId)
+    public Long getHSIdForMaster(int partitionId)
     {
         if (partitionId == MpInitiator.MP_INIT_PID) {
             return getHSIdForMultiPartitionInitiator();
@@ -354,7 +354,7 @@ public class Cartographer extends StatsSource
     /**
      * Get the HSID of the single partition master for the specified partition ID
      */
-    public long getHSIdForSinglePartitionMaster(int partitionId)
+    public Long getHSIdForSinglePartitionMaster(int partitionId)
     {
         return m_iv2Masters.get(partitionId);
     }

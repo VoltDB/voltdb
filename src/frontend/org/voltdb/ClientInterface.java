@@ -2018,9 +2018,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendEOLMessage(int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
-        m_mailbox.send(initiatorHSId, message);
+        final Long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
+        if (initiatorHSId == null) {
+            log.warn("ClientInterface.sendEOLMessage: Master does not exist for partition: " + partitionId);
+        } else {
+            Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
+            m_mailbox.send(initiatorHSId, message);
+        }
     }
 
     public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
@@ -2340,7 +2344,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 } catch (InterruptedException ignoreIt) {
                 }
                 remainingWaitTime -= waitingInterval;
-                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                Long hsId = m_cartographer.getHSIdForMaster(partitionId);
+                if (hsId == null) {
+                    log.warn("ClientInterface.startMigratePartitionLeader: Master does not exist for partition: "
+                            + partitionId);
+                    break;
+                }
+                if (CoreUtils.getHostIdFromHSId(hsId) == targetHostId) {
                     migrationComplete = true;
                     break;
                 }
