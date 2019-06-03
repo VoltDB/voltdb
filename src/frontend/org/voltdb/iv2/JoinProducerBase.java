@@ -37,7 +37,7 @@ import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.ProClass;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
