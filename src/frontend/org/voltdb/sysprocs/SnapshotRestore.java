@@ -73,6 +73,7 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StartAction;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableCompressor;
@@ -294,8 +295,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
                 //Sequence numbers for every table and partition
                 @SuppressWarnings("unchecked")
-                Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers =
-                        (Map<String, Map<Integer, Pair<Long, Long>>>)ois.readObject();
+                Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers =
+                        (Map<String, Map<Integer, ExportSnapshotTuple>>)ois.readObject();
 
                 @SuppressWarnings("unchecked")
                 Set<Integer> disabledStreams = (Set<Integer>) ois.readObject();
@@ -1076,7 +1077,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         DigestScanResult digestScanResult = null;
         try {
             // Digest scan.
-            digestScanResult = performRestoreDigestScanWork(isRecover);
+            digestScanResult = performRestoreDigestScanWork(ctx, isRecover);
 
             if (!isRecover || digestScanResult.perPartitionTxnIds.length == 0) {
                 digestScanResult.perPartitionTxnIds = new long[] {
@@ -1384,7 +1385,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             boolean isRecover,
             long snapshotTxnId,
             long perPartitionTxnIds[],
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers) {
 
         // Choose the lowest site ID on this host to truncate export data
         if (isRecover && context.isLowestSiteId()) {
@@ -1407,7 +1408,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             String name = t.getTypeName();
 
             //Sequence numbers for this table for every partition
-            Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
             if (sequenceNumberPerPartition == null) {
                 SNAP_LOG.warn("Could not find export sequence number for table " + name +
                         ". This warning is safe to ignore if you are loading a pre 1.3 snapshot" +
@@ -1417,9 +1418,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            Pair<Long, Long> pair =
+            ExportSnapshotTuple sequences =
                     sequenceNumberPerPartition.get(myPartitionId);
-            if (pair == null) {
+            if (sequences == null) {
                 SNAP_LOG.warn("Could not find an export sequence number for table " + name +
                         " partition " + myPartitionId +
                         ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
@@ -1428,14 +1429,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         " are reset to 0");
                 continue;
             }
-            long uso = pair.getFirst();
-            long sequenceNumber = pair.getSecond();
 
             //Forward the sequence number to the EE
             context.getSiteProcedureConnection().exportAction(
                     true,
-                    uso,
-                    sequenceNumber,
+                    sequences,
                     myPartitionId,
                     name);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
@@ -1610,7 +1608,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private static class DigestScanResult {
         List<JSONObject> digests;
-        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
+        Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers;
         Set<Integer> disabledStreams;
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
@@ -1619,14 +1617,14 @@ public class SnapshotRestore extends VoltSystemProcedure {
         long drVersion;
     }
 
-    private final DigestScanResult performRestoreDigestScanWork(boolean isRecover)
+    private final DigestScanResult performRestoreDigestScanWork(SystemProcedureExecutionContext ctx, boolean isRecover)
     {
         // This fragment causes each execution site to confirm the likely
         // success of writing tables to disk
         VoltTable[] results = createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDigestScan,
                 SysProcFragmentId.PF_restoreDigestScanResults);
 
-        HashMap<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers = new HashMap<>();
+        HashMap<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers = new HashMap<>();
         Set<Integer> disabledStreams = new HashSet<>();
         Map<Integer, Long> drSequenceNumbers = new HashMap<>();
 
@@ -1704,10 +1702,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         JSONObject tableSequenceNumbers = sequenceNumbers.getJSONObject(ii);
                         String tableName = tableSequenceNumbers.getString(ExtensibleSnapshotDigestData.EXPORT_TABLE_NAME);
 
-                        Map<Integer,Pair<Long, Long>> partitionSequenceNumbers =
+                        Map<Integer, ExportSnapshotTuple> partitionSequenceNumbers =
                                 exportSequenceNumbers.get(tableName);
                         if (partitionSequenceNumbers == null) {
-                            partitionSequenceNumbers = new HashMap<Integer, Pair<Long, Long>>();
+                            partitionSequenceNumbers = new HashMap<Integer, ExportSnapshotTuple>();
                             exportSequenceNumbers.put(tableName, partitionSequenceNumbers);
                         }
 
@@ -1715,10 +1713,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
                          * Array of objects containing partition and sequence number pairs
                          */
                         JSONArray sourcePartitionSequenceNumbers =
-                                tableSequenceNumbers.getJSONArray(ExtensibleSnapshotDigestData.SEQUENCE_NUM_PER_PARTITION);
+                                tableSequenceNumbers.getJSONArray(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUM_PER_PARTITION);
                         for (int zz = 0; zz < sourcePartitionSequenceNumbers.length(); zz++) {
                             JSONObject obj = sourcePartitionSequenceNumbers.getJSONObject(zz);
-                            int partition = obj.getInt(ExtensibleSnapshotDigestData.PARTITION);
+                            int partition = obj.getInt(ExtensibleSnapshotDigestData.EXPORT_PARTITION);
                             long sequenceNumber = obj.getInt(ExtensibleSnapshotDigestData.EXPORT_SEQUENCE_NUMBER);
                             long uso = 0;
                             // Snapshots didn't save export USOs pre-8.1
@@ -1732,7 +1730,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                         " are reset to 0");
                                 warningLogged = true;
                             }
-                            partitionSequenceNumbers.put(partition, new Pair<Long, Long>(uso, sequenceNumber));
+                            long genId = ctx.getGenerationId();
+                            // Snapshots didn't save export generation id pre-9.1
+                            if (obj.has(ExtensibleSnapshotDigestData.EXPORT_GENERATION_ID)) {
+                                genId = obj.getLong(ExtensibleSnapshotDigestData.EXPORT_GENERATION_ID);
+                            } else if (!warningLogged){
+                                SNAP_LOG.warn("Could not find export generation ID in snapshot. " +
+                                        "This warning is safe to ignore if you are loading a pre 9.1 snapshot" +
+                                        " which would not contain these generation IDs (added in 9.1)." +
+                                        " If this is a post 9.1 snapshot then the restore has failed and initial export" +
+                                        " generation ID are reset to current generation ID.");
+                                warningLogged = true;
+                            }
+                            partitionSequenceNumbers.put(partition, new ExportSnapshotTuple(uso, sequenceNumber, genId));
                         }
                     }
                 }
@@ -1797,8 +1807,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private void externalStreamsStatesFromDigest(JSONObject digest, Set<Integer> disabledStreams)
             throws JSONException {
-        if (digest.has(ExtensibleSnapshotDigestData.DISABLED_EXTERNAL_STREAMS)) {
-            JSONArray disabledStreamsJson = digest.getJSONArray(ExtensibleSnapshotDigestData.DISABLED_EXTERNAL_STREAMS);
+        if (digest.has(ExtensibleSnapshotDigestData.EXPORT_DISABLED_EXTERNAL_STREAMS)) {
+            JSONArray disabledStreamsJson = digest.getJSONArray(ExtensibleSnapshotDigestData.EXPORT_DISABLED_EXTERNAL_STREAMS);
             for (int i=0; i<disabledStreamsJson.length(); i++) {
                 disabledStreams.add(disabledStreamsJson.getInt(i));
             }

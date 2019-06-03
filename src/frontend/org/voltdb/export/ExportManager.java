@@ -39,6 +39,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.SimpleClientResponseAdapter;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -498,7 +499,6 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            long genId,
             long bufferPtr,
             ByteBuffer buffer) {
         //For validating that the memory is released
@@ -506,7 +506,7 @@ public class ExportManager implements ExportManagerInterface
         ExportManagerInterface instance = ExportManagerInterface.instance();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, genId, bufferPtr, buffer);
+                tupleCount, uniqueId, buffer);
     }
 
     @Override
@@ -517,8 +517,6 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            long genId,
-            long bufferPtr,
             ByteBuffer buffer) {
 
         try {
@@ -531,7 +529,7 @@ public class ExportManager implements ExportManagerInterface
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, genId, buffer);
+                    (int)tupleCount, uniqueId, buffer);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
@@ -541,9 +539,9 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, boolean isRejoin,
-                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
-                                                boolean isLowestSite) {
+            boolean isRecover, boolean isRejoin,
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
+            boolean isLowestSite) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();

@@ -20,8 +20,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -37,10 +37,10 @@ public interface Generation {
 
     public void pushExportBuffer(int partitionId, String signature,
                                 long seqNo, long committedSeqNo, int tupleCount,
-                                 long uniqueId, long genId, ByteBuffer buffer);
+                                 long uniqueId, ByteBuffer buffer);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, boolean isRejoin,
-                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();

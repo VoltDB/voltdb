@@ -27,12 +27,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -41,23 +44,29 @@ import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.Maps;
+
 public class TestExportEndToEnd extends ExportLocalClusterBase {
 
     private LocalCluster m_cluster;
 
     private static int KFACTOR = 1;
-    private static final String SCHEMA =
+    private static int HOST_COUNT = 3;
+    private static int SPH = 2;
+    private static final String T1_SCHEMA =
             "CREATE STREAM t_1 "
             + "PARTITION ON COLUMN a "
             + "EXPORT TO TARGET export_target_a ("
             + "     a integer not null, "
             + "     b integer not null"
-            + ");"
-            + "CREATE STREAM t_2 "
-            + "EXPORT TO TARGET export_target_b ("
-            + "     a integer not null, "
-            + "     b integer not null"
             + ");";
+
+    private static final String T2_SCHEMA =
+                "CREATE STREAM t_2 "
+                + "EXPORT TO TARGET export_target_b ("
+                + "     a integer not null, "
+                + "     b integer not null"
+                + ");";
 
     @Before
     public void setUp() throws Exception
@@ -67,7 +76,8 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
 
         VoltProjectBuilder builder = null;
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(SCHEMA);
+        builder.addLiteralSchema(T1_SCHEMA);
+        builder.addLiteralSchema(T2_SCHEMA);
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
@@ -83,7 +93,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         // Start socket exporter client
         startListener();
 
-        m_cluster = new LocalCluster("testFlushExportBuffer.jar", 2, 2, KFACTOR, BackendTarget.NATIVE_EE_JNI);
+        m_cluster = new LocalCluster("testFlushExportBuffer.jar", SPH, HOST_COUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setNewCli(true);
         m_cluster.setHasLocalServer(false);
         m_cluster.overrideAnyRequestForValgrind();
@@ -128,9 +138,65 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
 
         // rejoin node back
         m_cluster.rejoinOne(1);
-
         client.drain();
+
+        client = getClient(m_cluster);
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-        assertEquals(2, m_cluster.getLiveNodeCount());
+        assertEquals(3, m_cluster.getLiveNodeCount());
+    }
+
+    @Test
+    @Ignore
+    public void testExportRejoinOldGenerationStream_ENG_16239() throws Exception
+    {
+        Client client = getClient(m_cluster);
+        // Generate PBD files
+        Object[] data = new Object[3];
+        Arrays.fill(data, 1);
+        int pkeyStart = 0;
+        insertToStream("t_1", pkeyStart, 1000, client, data);
+
+        // Write some data to PBD then kill one node
+        client.drain();
+        client.callProcedure("@Quiesce");
+        m_cluster.killSingleHost(0);
+
+        // drop stream
+        ClientResponse response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("@AdHoc", T1_SCHEMA);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        pkeyStart = 1000;
+        insertToStream("t_1", pkeyStart, 100, client, data);
+        client.drain();
+        // rejoin node back
+        m_cluster.rejoinOne(0);
+
+        client = getClient(m_cluster);
+        client.drain();
+        client.callProcedure("@Quiesce");
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        // make sure no partition has more than active stream
+        VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        Map<String, Integer> masterCounters = Maps.newHashMap();
+        while (stats.advanceRow()) {
+            String target = stats.getString("TARGET");
+            String ttable = stats.getString("SOURCE");
+            String isMaster = stats.getString("ACTIVE");
+            Long pid = stats.getLong("PARTITION_ID");
+            String key = "TARGET: " + target + " SOURCE: " + ttable + " PARTITION_ID: " + pid + " ACTIVE: " + isMaster;
+            Integer count = masterCounters.get(key);
+            if (count == null) {
+                masterCounters.put(key, 1);
+            } else {
+                masterCounters.put(key, count + 1);
+            }
+        }
+        for (Entry<String, Integer> e : masterCounters.entrySet()) {
+            if (e.getValue() > 1) {
+                assertEquals("Stream (" + e.getKey() + ") has more than one master", 1, (int)e.getValue());
+            }
+        }
     }
 }

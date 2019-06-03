@@ -30,6 +30,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -125,7 +126,7 @@ public interface ExportManagerInterface {
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
             boolean isRecover, boolean isRejoin,
-            Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+            Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
             boolean isLowestSite);
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
@@ -138,8 +139,6 @@ public interface ExportManagerInterface {
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            long genId,
-            long bufferPtr,
             ByteBuffer buffer);
 
     public void sync();

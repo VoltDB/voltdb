@@ -51,8 +51,9 @@ public:
         }
         int64_t seqNo;
         size_t streamBytesUsed;
+        int64_t generationId;
         int64_t nextSeqNoFromWrapper = wrapper->getSequenceNumber();
-        streamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
+        streamedTable->getExportStreamPositions(seqNo, streamBytesUsed, generationId);
         // Verify the sequence number.
         ASSERT_EQ(seqNo + 1, nextSeqNoFromWrapper);
     }

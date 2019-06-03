@@ -56,6 +56,7 @@ import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
@@ -349,6 +350,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
+        }
+
+        @Override
+        public long getGenerationId() {
+            return m_context.m_genId;
         }
 
         @Override
@@ -1420,12 +1426,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId, String streamName)
     {
-        m_ee.exportAction(syncAction, uso, sequenceNumber,
-                          partitionId, streamName);
+        m_ee.exportAction(syncAction, sequences, partitionId, streamName);
     }
 
     @Override
@@ -1462,7 +1466,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -1481,7 +1485,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.instance().setClusterCreateTime(clusterCreateTime);
         }
 
-        for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+        for (Map.Entry<String, Map<Integer, ExportSnapshotTuple>> tableEntry : exportSequenceNumbers.entrySet()) {
             final Table catalogTable = m_context.tables.get(tableEntry.getKey());
             if (catalogTable == null) {
                 VoltDB.crashLocalVoltDB(
@@ -1489,7 +1493,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         true,
                         null);
             }
-            Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            ExportSnapshotTuple sequenceNumbers = tableEntry.getValue().get(m_partitionId);
 
             if (sequenceNumbers == null) {
                 if (requireExistingSequenceNumbers) {
@@ -1498,14 +1502,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                     m_partitionId + " table " +
                                     tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
                 } else {
-                    sequenceNumbers = Pair.of(0L,0L);
+                    sequenceNumbers = new ExportSnapshotTuple();
                 }
             }
 
             exportAction(
                     true,
-                    sequenceNumbers.getFirst().longValue(),
-                    sequenceNumbers.getSecond(),
+                    sequenceNumbers,
                     m_partitionId,
                     catalogTable.getTypeName());
             // assign the stats to the other partition's value
