@@ -1722,12 +1722,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void setupMigrateRowsDeleter(int batchSize, int partitionId) {
-        if (batchSize > 0) {
-            m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId, batchSize);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
-            }
+    public void setupMigrateRowsDeleter(int partitionId) {
+        m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
         }
     }
 

@@ -57,7 +57,7 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
                 boolean txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
                         txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
                         tableName, deletableTxnId);
-                VoltTable results = new VoltTable(new ColumnInfo("RowsRemainingDeleted", VoltType.BIGINT));
+                VoltTable results = new VoltTable(new ColumnInfo(MigrateRowsDeleterNT.ROWS_TO_BE_DELETED, VoltType.BIGINT));
                 results.addRow(txnRemainingDeleted ? 1 : 0);
                 return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_migrateRows, results);
             }
@@ -72,10 +72,14 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable run(SystemProcedureExecutionContext ctx,
-                           String tableName,            // Name of table that can have rows deleted
-                           long deletableTxnId          // All rows with TxnIds before this can be deleted
-                          ) {
+    /**
+    *
+    * @param ctx execution context
+    * @param tableName Name of table that can have rows deleted
+    * @param deletableTxnId All rows with this transaction or the first transaction before this can be deleted
+    * @return
+    */
+    public VoltTable run(SystemProcedureExecutionContext ctx, String tableName, long deletableTxnId) {
         VoltTable result = null;
 
         try {

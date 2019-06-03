@@ -2525,30 +2525,30 @@ uint16_t PersistentTable::getMigrateColumnIndex() {
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
-   if (!isTableWithMigrate(m_tableType)) {
+   if (!isTableWithMigrate(m_tableType) || m_migratingRows.size() == 0) {
        return false;
    }
    assert(m_shadowStream != nullptr);
-   MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
-   if (it == m_migratingRows.end()) {
+   MigratingRows::iterator currIt = m_migratingRows.begin();
+   if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
    TableTuple targetTuple(m_schema);
-   MigratingRows::iterator currIt = m_migratingRows.begin();
    MigratingBatch& batch = currIt->second;
-
-   // Delete the batch within the transaction boundary
+   // Delete the first batch which has a sphandle <= deletableTxnId. Other batches with sphandle <= deletableTxnId
+   // will be deleted next round, one batch at a time
    BOOST_FOREACH (auto toDelete, batch) {
       targetTuple.move(toDelete);
       assert(ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())) == currIt->first);
       deleteTuple(targetTuple, true, false);
    }
    currIt = m_migratingRows.erase(currIt);
-   VOLT_TRACE("Migrated rows deleted: %d", batch.size());
-   if (currIt == m_migratingRows.end()) {
-      return false;
+   if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
+       return false;
    }
-   return (currIt->first <= it->first);
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
+        name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
+   return true;
 }
 
 } // namespace voltdb

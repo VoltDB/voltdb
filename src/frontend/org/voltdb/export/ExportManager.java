@@ -688,8 +688,8 @@ public class ExportManager
         m_ci.bindAdapter(m_adapter, null);
     }
 
-    public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb) {
+    public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb) {
         m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
-                "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId, batchSize});
+                "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
     }
 }
