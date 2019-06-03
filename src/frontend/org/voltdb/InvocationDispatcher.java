@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -803,8 +802,8 @@ public final class InvocationDispatcher {
 
            // shutdown partition leader migration
            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
-           for (Iterator<Integer> it = liveHids.iterator(); it.hasNext();) {
-               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(it.next(),
+           for (Integer integer : liveHids) {
+               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(integer,
                            HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
            }
 
@@ -896,8 +895,12 @@ public final class InvocationDispatcher {
      * @param partitionId
      */
     public final void sendSentinel(long txnId, int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
-        sendSentinel(txnId, initiatorHSId, -1, -1, true);
+        final Long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
+        if (initiatorHSId == null) {
+            log.error("InvocationDispatcher.sendSentinel: Master does not exist for partition: " + partitionId);
+        } else {
+            sendSentinel(txnId, initiatorHSId, -1, -1, true);
+        }
     }
 
     private final void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
