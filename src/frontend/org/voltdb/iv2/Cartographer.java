@@ -905,6 +905,9 @@ public class Cartographer extends StatsSource
 
         // Sort the hosts by partition leader count, descending
         LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        if (hostList == null) {
+            return Pair.of(-1, -1);
+        }
 
         // only move SPI from the one with most partition leaders
         // The local ClientInterface will pick it up and start @MigratePartitionLeader
@@ -1005,6 +1008,9 @@ public class Cartographer extends StatsSource
 
         // Sort the hosts by partition leader count, descending
         LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        if (hostList == null) {
+            return Pair.of(-1, -1);
+        }
         Host srcHost = null;
         for (Host host : hostList) {
             if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
