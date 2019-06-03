@@ -23,8 +23,8 @@ import java.util.concurrent.Future;
 
 import javax.annotation_voltpatches.Nullable;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
@@ -215,7 +215,7 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -234,8 +234,7 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId,
                              String tableSignature);
 
