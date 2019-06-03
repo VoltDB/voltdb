@@ -1623,12 +1623,13 @@ public class ParserDQL extends ParserBase {
     private Expression readAggregate() {
 
         int        tokenT = token.tokenType;
+        String     udaf   = token.tokenString;
         Expression aggExpr;
 
         read();
         readThis(Tokens.OPENBRACKET);
 
-        aggExpr = readAggregateExpression(tokenT);
+        aggExpr = readAggregateExpression(tokenT, udaf);
 
         readThis(Tokens.CLOSEBRACKET);
         if (token.tokenType == Tokens.OVER) {
@@ -1645,7 +1646,7 @@ public class ParserDQL extends ParserBase {
         return aggExpr;
     }
 
-    private ExpressionAggregate readAggregateExpression(int tokenT) {
+    private ExpressionAggregate readAggregateExpression(int tokenT, String udaf) {
 
         int     type     = ParserDQL.getExpressionType(tokenT);
         boolean distinct = false;
@@ -1707,6 +1708,11 @@ public class ParserDQL extends ParserBase {
                                                              .T_DISTINCT);
                 }
                 break;
+
+            case OpTypes.USER_DEFINE_AGGREGATE :
+                int functionid = FunctionForVoltDB.newVoltDBFunctionID(udaf);
+                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid);
+                return aggregateExp;
 
             default :
                 if (e.getType() == OpTypes.ASTERISK) {
@@ -3241,7 +3247,7 @@ public class ParserDQL extends ParserBase {
             default :
                 rewind(position);
 
-                e = readAggregateExpression(tokenT);
+                e = readAggregateExpression(tokenT, "");
 
                 if (e == null) {
                     throw Error.error("Unsupported aggregate expression " + Tokens.getKeyword(tokenT), "", 0);

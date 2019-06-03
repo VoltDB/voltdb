@@ -1216,6 +1216,7 @@ public abstract class AbstractParsedStmt {
 
     private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("optype");
+        String user_aggregate_id = exprNode.attributes.get("user_aggregate_id");
         ExpressionType exprType = ExpressionType.get(type);
 
         if (exprType == ExpressionType.INVALID) {
@@ -1240,7 +1241,7 @@ public abstract class AbstractParsedStmt {
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
 
-        AggregateExpression expr = new AggregateExpression(exprType);
+        AggregateExpression expr = new AggregateExpression(exprType, user_aggregate_id);
         expr.setLeft(childExpr);
 
         String node;

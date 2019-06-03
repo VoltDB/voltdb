@@ -2683,6 +2683,7 @@ public class PlanAssembler {
                     tve.setDifferentiator(col.m_differentiator);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
+                    agg_input_expr.setUserAggregateId(rootExpr.getUserAggregateId());
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,

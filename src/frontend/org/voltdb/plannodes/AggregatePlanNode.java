@@ -39,6 +39,7 @@ import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+import org.hsqldb_voltpatches.ParserBase;
 
 public class AggregatePlanNode extends AbstractPlanNode {
 
@@ -376,12 +377,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add(aggInputExpr.clone());
         }
-        if (m_userAggregateId.isEmpty()) {
-            m_userAggregateId.add(0);
-        }
-        else {
-            int size = m_userAggregateId.size();
-            m_userAggregateId.add(size);
+        if (aggInputExpr.getUserAggregateId() != null) {
+            m_userAggregateId.add(Integer.parseInt(aggInputExpr.getUserAggregateId()));
         }
     }
 
@@ -419,7 +416,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
-            stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
+            if (m_userAggregateId.get(ii) != null) {
+                stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
+            }
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));

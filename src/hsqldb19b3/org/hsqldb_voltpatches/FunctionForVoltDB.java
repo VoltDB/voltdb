@@ -538,6 +538,14 @@ public class FunctionForVoltDB extends FunctionSQL {
         return function;
     }
 
+    public static Integer newVoltDBFunctionID(String token) {
+        FunctionDescriptor def = FunctionDescriptor.fn_by_name(token);
+        if (def == null) {
+            return null;
+        }
+        return def.getId();
+    }
+
     public static int getFunctionID(String token) {
         return FunctionDescriptor.fn_by_name(token).getId();
     }

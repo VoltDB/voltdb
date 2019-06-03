@@ -221,6 +221,9 @@ public class Expression {
     //
     boolean isColumnEqual;
 
+    // if it's a user-defined aggregate function, we will give it an id
+    int user_aggregate_id;
+
     Expression(int type) {
         opType = type;
         nodes  = emptyExpressionArray;
@@ -1697,6 +1700,10 @@ public class Expression {
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
         exp.attributes.put("id", getUniqueId(context.m_session));
+
+        if (opType == OpTypes.USER_DEFINE_AGGREGATE) {
+            exp.attributes.put("user_aggregate_id", Integer.toString(user_aggregate_id));
+        }
 
         if (realAlias != null) {
             exp.attributes.put("alias", realAlias);

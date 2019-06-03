@@ -65,6 +65,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
+    protected String user_aggregate_id;
 
     /**
      * We set this to non-null iff the expression has a non-deterministic
@@ -260,7 +261,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public AbstractExpression getRight() {
         return m_right;
     }
-
     /**
      * @param right the right to set
      */
@@ -329,6 +329,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public void setInBytes(boolean inBytes) {
         m_inBytes = inBytes;
     }
+
+    /**
+     * @return user aggregate id
+     */
+    public String getUserAggregateId() {
+        return user_aggregate_id;
+    }
+
+    /**
+     * @param user aggregate id
+     */
+    public void setUserAggregateId(String id) {
+        user_aggregate_id = id;
+    }
+
 
     @Override
     public String toString() {

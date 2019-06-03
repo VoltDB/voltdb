@@ -63,6 +63,17 @@ public class ExpressionAggregate extends Expression {
 
         isDistinctAggregate = e.isDistinctAggregate;
         nodes               = e.nodes;
+        user_aggregate_id   = e.user_aggregate_id;
+    }
+
+    ExpressionAggregate(int type, boolean distinct, Expression e, int id) {
+
+        super(type);
+
+        nodes               = new Expression[UNARY];
+        isDistinctAggregate = distinct;
+        nodes[LEFT]         = e;
+        user_aggregate_id   = id;
     }
 
     @Override

@@ -30,6 +30,11 @@ public class AggregateExpression extends AbstractExpression {
         super(type);
     }
 
+    public AggregateExpression(ExpressionType type, String id) {
+        super(type);
+        user_aggregate_id = id;
+    }
+
     public AggregateExpression() {
         //
         // This is needed for serialization
