@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.TTLManager;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltProcedure;
@@ -82,7 +83,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         } else {
             cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId);
         }
-        ClientResponse resp = cf.get(5, TimeUnit.MINUTES);
+        ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
             if (resp.getStatus() != ClientResponse.SUCCESS) {
                 exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,

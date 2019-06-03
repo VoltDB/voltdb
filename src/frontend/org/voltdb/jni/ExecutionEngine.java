@@ -1185,7 +1185,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param mTableName The name of the table that the deletes should be applied to.
      * @param deletableTxnId The transactionId of the last row that can be deleted
      * @param undoToken The token marking the rollback point for this transaction
-     * @return true if all tuples are deleted less than or equals to deletableTxnId
+     * @return true if more rows to be deleted
      */
     protected native boolean nativeDeleteMigratedRows(long pointer,
             long txnid, long spHandle, long uniqueId,
