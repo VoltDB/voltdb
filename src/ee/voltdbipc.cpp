@@ -144,7 +144,7 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block, int64_t generationId);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block);
     void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
@@ -359,6 +359,7 @@ typedef struct {
     int32_t isSync;
     int64_t offset;
     int64_t seqNo;
+    int64_t genId;
     int32_t tableSignatureLength;
     char tableSignature[0];
 }__attribute__((packed)) export_action;
@@ -1520,6 +1521,7 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
     int64_t result = m_engine->exportAction(action->isSync,
                                             static_cast<int64_t>(ntohll(action->offset)),
                                             static_cast<int64_t>(ntohll(action->seqNo)),
+                                            static_cast<int64_t>(ntohll(action->genId)),
                                             tableSignature);
 
     // write offset across bigendian.
@@ -1552,7 +1554,8 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
 
     size_t ackOffset;
     int64_t seqNo;
-    m_engine->getUSOForExportTable(ackOffset, seqNo, streamNameStr);
+    int64_t genId;
+    m_engine->getUSOForExportTable(ackOffset, seqNo, genId, streamNameStr);
 
     // write offset across bigendian.
     int64_t ackOffsetI64 = static_cast<int64_t>(ackOffset);
@@ -1562,6 +1565,9 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
     // write the poll data. It is at least 4 bytes of length prefix.
     seqNo = htonll(seqNo);
     writeOrDie(m_fd, (unsigned char*)&seqNo, sizeof(seqNo));
+
+    genId = htonll(genId);
+    writeOrDie(m_fd, (unsigned char*)&genId, sizeof(genId));
 }
 
 void VoltDBIPC::hashinate(struct ipc_command* cmd) {
@@ -1640,8 +1646,7 @@ void VoltDBIPC::threadLocalPoolAllocations() {
 void VoltDBIPC::pushExportBuffer(
         int32_t partitionId,
         std::string signature,
-        voltdb::ExportStreamBlock *block,
-        int64_t generationId) {
+        voltdb::ExportStreamBlock *block) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
@@ -1662,7 +1667,6 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+24]) = 0;
     }
     index += 32;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonll(generationId);
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);

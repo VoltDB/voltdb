@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table
+CREATE TABLE export_partitioned_table MIGRATE TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -73,11 +73,11 @@ CREATE TABLE export_partitioned_table
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET abc ;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_idx ON  export_partitioned_table(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_partitioned_table_foo
+CREATE TABLE export_partitioned_table_foo MIGRATE TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -102,11 +102,11 @@ CREATE TABLE export_partitioned_table_foo
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET foo ;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table_foo ON COLUMN rowid;
 CREATE INDEX export_partitioned_table_foo_idx ON  export_partitioned_table_foo(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_partitioned_table2
+CREATE TABLE export_partitioned_table2 MIGRATE TO TARGET default1
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -131,7 +131,7 @@ CREATE TABLE export_partitioned_table2
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET default1;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
 CREATE INDEX export_partitioned_table2_idx ON  export_partitioned_table2(type_not_null_timestamp)  where not migrating;
 
@@ -246,7 +246,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE TABLE  export_replicated_table
+CREATE TABLE  export_replicated_table MIGRATE TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -271,10 +271,10 @@ CREATE TABLE  export_replicated_table
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET abc;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 CREATE INDEX export_replicated_table_idx ON  export_replicated_table(type_not_null_timestamp)  where not migrating;
 
-CREATE TABLE export_replicated_table_foo
+CREATE TABLE export_replicated_table_foo MIGRATE TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -299,7 +299,7 @@ CREATE TABLE export_replicated_table_foo
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp MIGRATE TO TARGET foo;
+) USING TTL 5 SECONDS ON COLUMN type_not_null_timestamp;
 CREATE INDEX export_replicated_table_foo_idx ON  export_replicated_table_foo(type_not_null_timestamp)  where not migrating;
 
 CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc

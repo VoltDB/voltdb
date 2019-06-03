@@ -1125,6 +1125,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
+   jlong genId,
    jbyteArray streamName) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1138,6 +1139,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
             return engine->exportAction(syncAction,
                                         static_cast<int64_t>(ackOffset),
                                         static_cast<int64_t>(seqNo),
+                                        static_cast<int64_t>(genId),
                                         streamNameStr);
         } catch (const SQLException &e) {
             throwFatalException("%s", e.message().c_str());
@@ -1206,14 +1208,16 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
     std::string streamNameStr(reinterpret_cast<char *>(streamNameChars), env->GetArrayLength(streamName));
     env->ReleaseByteArrayElements(streamName, streamNameChars, JNI_ABORT);
     try {
-        jlong data[2];
+        jlong data[3];
         size_t ackOffset;
         int64_t seqNo;
-        engine->getUSOForExportTable(ackOffset, seqNo, streamNameStr);
+        int64_t generationId;
+        engine->getUSOForExportTable(ackOffset, seqNo, generationId, streamNameStr);
         data[0] = ackOffset;
         data[1] = seqNo;
-        jlongArray retval = env->NewLongArray(2);
-        env->SetLongArrayRegion(retval, 0, 2, data);
+        data[2] = generationId;
+        jlongArray retval = env->NewLongArray(3);
+        env->SetLongArrayRegion(retval, 0, 3, data);
         return retval;
     }
     catch (const FatalException &e) {

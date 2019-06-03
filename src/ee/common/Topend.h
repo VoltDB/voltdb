@@ -67,8 +67,7 @@ class Topend {
     virtual void pushExportBuffer(
             int32_t partitionId,
             std::string tableName,
-            ExportStreamBlock *block,
-            int64_t generationId) = 0;
+            ExportStreamBlock *block) = 0;
     // Not used right now and will be removed or altered after a decision has been made on how Schema changes
     // are managed (they really don't belong in row buffers).
     virtual void pushEndOfStream(
@@ -136,7 +135,7 @@ public:
     void crashVoltDB(voltdb::FatalException e);
 
     int64_t getFlushedExportBytes(int32_t partitionId);
-    virtual void pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block, int64_t generationId);
+    virtual void pushExportBuffer(int32_t partitionId, std::string signature, ExportStreamBlock *block);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
@@ -164,7 +163,6 @@ public:
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
-    std::queue<int64_t> generationIds;
     std::deque<boost::shared_ptr<DrStreamBlock> > drBlocks;
     std::deque<boost::shared_ptr<ExportStreamBlock> > exportBlocks;
     std::deque<boost::shared_array<char> > data;

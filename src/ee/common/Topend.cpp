@@ -70,13 +70,12 @@ namespace voltdb {
     }
 
     void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature,
-            ExportStreamBlock *block, int64_t generationId) {
+            ExportStreamBlock *block) {
         if (!block) {
             return;
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        generationIds.push(generationId);
         exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;

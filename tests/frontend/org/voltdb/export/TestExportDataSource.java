@@ -60,6 +60,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -127,13 +128,13 @@ public class TestExportDataSource extends TestCase {
         @Override
         public void pushExportBuffer(int partitionId, String signature,
                 long seqNo, long committedSeqNo, int tupleCount,
-                long uniqueId, long genId, ByteBuffer buffer) {
+                long uniqueId, ByteBuffer buffer) {
         }
 
         @Override
         public void updateInitialExportStateToSeqNo(int partitionId,
                 String signature, boolean isRecover, boolean isRejoin,
-                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                 boolean isLowestSite) {
         }
 
@@ -273,27 +274,27 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, 0, foo);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
             assertEquals(s.sizeInBytes(), 40);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, 0, foo);
+            s.pushExportBuffer(3, 3, 1, 0, foo);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(3, -1L, 1, 0, 0, null);
+            s.pushExportBuffer(3, -1L, 1, 0, null);
 
             assertEquals( 60, s.sizeInBytes());
 
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
@@ -310,7 +311,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             //Should lose 20 bytes for the stuff in memory
@@ -322,7 +323,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
@@ -333,7 +334,7 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<AckingContainer> fut = s.poll(false);
+            ListenableFuture<AckingContainer> fut = s.poll();
             try {
                 cont = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
@@ -368,9 +369,9 @@ public class TestExportDataSource extends TestCase {
             // Push a first buffer - and read it back
             ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
             foo0.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, 0, foo0);
+            s.pushExportBuffer(1, 1, 1, 0, foo0);
 
-            AckingContainer cont0 = s.poll(false).get();
+            AckingContainer cont0 = s.poll().get();
             cont0.updateStartTime(System.currentTimeMillis());
 
             cont0.discard();
@@ -378,11 +379,11 @@ public class TestExportDataSource extends TestCase {
             System.gc(); System.runFinalization(); Thread.sleep(200);
 
             // Poll once with no data left - EDS sould set m_pollFuture
-            ListenableFuture<AckingContainer> fut1 = s.poll(false);
+            ListenableFuture<AckingContainer> fut1 = s.poll();
             assertFalse(fut1.isDone());
 
             // Do a reentrant poll - the returned fut should have the expected exception
-            ListenableFuture<AckingContainer> fut2 = s.poll(false);
+            ListenableFuture<AckingContainer> fut2 = s.poll();
             try {
                 AckingContainer c = fut2.get();
                 fail("Did not get expected exception");
@@ -399,7 +400,7 @@ public class TestExportDataSource extends TestCase {
             // Push a buffer - should satisfy fut1
             ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
             foo1.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, 0, foo1);
+            s.pushExportBuffer(2, 2, 1, 0, foo1);
 
             // Verify the pushed buffer can be got
             AckingContainer cont1 = fut1.get();
@@ -446,27 +447,27 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(1, 1, 1, 0, 0, foo);
+        s.pushExportBuffer(1, 1, 1, 0, foo);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(2, 2, 1, 0, 0, foo);
+        s.pushExportBuffer(2, 2, 1, 0, foo);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(3, 3, 1, 0, 0, foo);
+        s.pushExportBuffer(3, 3, 1, 0, foo);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(3, -1L, 1, 0, 0, null);
+        s.pushExportBuffer(3, -1L, 1, 0, null);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        AckingContainer cont = s.poll(false).get();
+        AckingContainer cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
@@ -486,11 +487,11 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 1, 0))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 1, s.getGenerationIdCreated()))
                 );
 
         // Poll and discard buffer 2, too
-        cont = s.poll(false).get();
+        cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         cont.discard();
 
@@ -501,7 +502,7 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        cont = s.poll(false).get();
+        cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
         assertEquals(3, cont.m_lastSeqNo);
@@ -534,7 +535,7 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(101, 101, 1, 0, 0, foo);
+            s.pushExportBuffer(101, 101, 1, 0, foo);
             long sz = s.sizeInBytes();
             assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();
@@ -550,7 +551,7 @@ public class TestExportDataSource extends TestCase {
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(111, 111, 1, 0, 0, foo2);
+            s.pushExportBuffer(111, 111, 1, 0, foo2);
             sz = s.sizeInBytes();
             assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
@@ -567,7 +568,7 @@ public class TestExportDataSource extends TestCase {
             waitForMaster(s);
 
             //Poll and check before and after discard segment files.
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
@@ -608,32 +609,32 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, 0, foo);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
 
             // Push 2 more creating a gap
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(10, 10, 1, 0, 0, foo);
+            s.pushExportBuffer(10, 10, 1, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(11, 11, 1, 0, 0, foo);
+            s.pushExportBuffer(11, 11, 1, 0, foo);
 
             // Poll the 2 first buffers
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 1, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 2, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll once more, should hit the gap (wait for the state to be changed)
-            ListenableFuture<AckingContainer> fut1 = s.poll(false);
+            ListenableFuture<AckingContainer> fut1 = s.poll();
 
             Thread.sleep(1000);
             assertFalse(fut1.isDone());
@@ -654,7 +655,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(10, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals(11, cont.m_lastSeqNo);
             cont.discard();
@@ -684,42 +685,42 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 1, 0, 0, foo);
+            s.pushExportBuffer(1, 1, 1, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(2, 2, 1, 0, 0, foo);
+            s.pushExportBuffer(2, 2, 1, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(3, 3, 1, 0, 0, foo);
+            s.pushExportBuffer(3, 3, 1, 0, foo);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(4, 4, 1, 0, 0, foo);
+            s.pushExportBuffer(4, 4, 1, 0, foo);
 
             // Poll the 2 first buffers
-            AckingContainer cont = s.poll(false).get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 1, cont.m_lastSeqNo);
             cont.discard();
 
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 2, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll 3rd buffer but set it pending
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 3, cont.m_lastSeqNo);
             s.setPendingContainer(cont);
 
             // Poll 3rd buffer once more
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 3, cont.m_lastSeqNo);
             cont.discard();
 
             // Poll last buffer
-            cont = s.poll(false).get();
+            cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             assertEquals( 4, cont.m_lastSeqNo);
             cont.discard();

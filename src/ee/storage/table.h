@@ -233,7 +233,7 @@ class Table {
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated) {
         // this should be overidden by any table involved in an export
         assert(false);
     }
@@ -242,7 +242,7 @@ class Table {
      * Get the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed) {
+    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed, int64_t &genId) {
         // this should be overidden by any table involved in an export
         assert(false);
     }

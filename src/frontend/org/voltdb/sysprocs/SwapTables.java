@@ -50,8 +50,7 @@ public class SwapTables extends AdHocNTBase {
         Map<String, Table> ttlTables = CatalogUtil.getTimeToLiveTables(context.database);
         Table ttlTable = ttlTables.get(theTable.toUpperCase());
         if (ttlTable != null) {
-            TimeToLive ttl = ttlTable.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (!StringUtil.isEmpty(ttl.getMigrationtarget())) {
+            if (!StringUtil.isEmpty(ttlTable.getMigrationtarget())) {
                 return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                         String.format("Table %s cannot be swapped since it uses TTL.",theTable));
             }

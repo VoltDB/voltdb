@@ -100,9 +100,9 @@ public class TestMaxMpResponseSize extends JUnit4LocalClusterTest {
                     + "PARTITION TABLE my_table ON COLUMN key;"
                     + "CREATE PROCEDURE Insert PARTITION ON TABLE my_table COLUMN key AS INSERT INTO my_table (key, value) VALUES (?, ?);");
             cluster.setHasLocalServer(false);
+            cluster.overrideAnyRequestForValgrind();
             cluster.compile(builder);
             cluster.startCluster();
-            cluster.overrideAnyRequestForValgrind();
 
             ClientConfig config = new ClientConfig();
             config.setTopologyChangeAware(true);

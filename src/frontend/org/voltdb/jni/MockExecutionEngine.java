@@ -26,6 +26,7 @@ import java.util.Random;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
@@ -197,8 +198,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mStreamName) {
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String mStreamName) {
     }
 
     @Override

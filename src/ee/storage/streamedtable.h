@@ -114,13 +114,13 @@ public:
      * Get the current offset in bytes of the export stream for this Table
      * since startup.
      */
-    void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed);
+    void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed, int64_t &genId);
 
     /**
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed);
+    void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated);
 
     int partitionColumn() const { return m_partitionColumn; }
 

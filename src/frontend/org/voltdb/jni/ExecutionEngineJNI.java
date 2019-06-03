@@ -27,6 +27,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -678,20 +679,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String streamName)
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String streamName)
     {
         if (EXPORT_LOG.isDebugEnabled()) {
             EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
-                    uso + ", seqNo: " + seqNo + ", streamName: " + streamName);
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", streamName: " + streamName);
         }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
-                                         syncAction, uso, seqNo, getStringBytes(streamName));
+                                         syncAction,
+                                         sequences.getAckOffset(),
+                                         sequences.getSequenceNumber(),
+                                         sequences.getGenerationId(),
+                                         getStringBytes(streamName));
         if (retval < 0) {
             LOG.info("exportAction failed.  syncAction: " + syncAction + ", uso: " +
-                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId:" + sequences.getGenerationId() + ", partitionId: " + partitionId +
                     ", streamName: " + streamName);
         }
     }

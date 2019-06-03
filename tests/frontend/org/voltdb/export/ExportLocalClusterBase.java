@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
@@ -82,8 +83,12 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
     }
 
     public Client getClient(LocalCluster cluster) throws IOException {
-        Client client = ClientFactory.createClient();
-        client.createConnection(cluster.getListenerAddress(0));
+        ClientConfig config = new ClientConfig();
+        config.setTopologyChangeAware(true);
+        Client client = ClientFactory.createClient(config);
+        for (String connectStr : cluster.getListenerAddresses()) {
+            client.createConnection(connectStr);
+        }
         int sleptTimes = 0;
         while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
             try {

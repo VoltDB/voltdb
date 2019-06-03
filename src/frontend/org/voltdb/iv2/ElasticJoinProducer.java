@@ -39,7 +39,6 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.CatalogUtil;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private static final VoltLogger ELASTICLOG = new VoltLogger("ELASTIC");
@@ -258,6 +257,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
+    protected boolean shouldAddToViewsToPause(Database db, Table table) {
+        return table.getIsreplicated() && super.shouldAddToViewsToPause(db, table);
+    }
+
+    @Override
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException
     {
         if (!m_receivedFirstFragment) {
@@ -269,23 +273,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             applyPerPartitionTxnId(siteConnection);
         } else {
             if (m_commaSeparatedNameOfViewsToPause == null) {
-                // The very first execution of runForRejoin will lead us here.
-                StringBuilder commaSeparatedViewNames = new StringBuilder();
-                Database db = VoltDB.instance().getCatalogContext().database;
-                for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                    if (table.getIsreplicated() && CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
-                        // If the table is a snapshotted persistent table view, we will try to
-                        // temporarily disable its maintenance job to boost restore performance.
-                        // Only replicated table views are considered here.
-                        // Partitioned ones are going to be taken care of by BalancePartition.
-                        commaSeparatedViewNames.append(table.getTypeName()).append(",");
-                    }
-                }
-                // Get rid of the trailing comma.
-                if (commaSeparatedViewNames.length() > 0) {
-                    commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
-                }
-                m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
+                initListOfViewsToPause();
                 // Set enabled to false for the views we found.
                 siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
             }
