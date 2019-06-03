@@ -745,7 +745,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
         // 5.0 is parsed as a DOUBLE and 2 is parsed as an INT
         // si(SMALLINT) requires a cast to double to be compared to 5.0.
         // f(FLOAT) does not need a cast because the underlying type being used for FLOAT is actually DOUBLE
-        m_tester.sql("select * from R2 where si = 5.0 and i = 2 and f = 5.1")
+        m_tester.sql("select * from R2 where si = 5.0 and i = 2 and f = 5.0")
         .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):DOUBLE], expr#7=[5.0], expr#8=[=($t6, $t7)], " +
                     "expr#9=[2], expr#10=[=($t0, $t9)], expr#11=[5.0], expr#12=[=($t4, $t11)], expr#13=[AND($t8, $t10, $t12)], "  +
                     "proj#0..5=[{exprs}], $condition=[$t13])\n" +
