@@ -78,6 +78,18 @@ public class PlannerStatsCollector extends StatsSource {
     long m_lastCache1Level = 0;
 
     /**
+     * Calcite L1 cache level
+     */
+    long m_calciteL1CacheLevel = 0;
+    long m_lastCalciteL1CacheLevel = 0;
+
+    /**
+     * Calcite L2 cache level
+     */
+    long m_calciteL2CacheLevel = 0;
+    long m_lastCalciteL2CacheLevel = 0;
+
+    /**
      * Cache 2 level
      */
     long m_cache2Level = 0;
@@ -96,10 +108,28 @@ public class PlannerStatsCollector extends StatsSource {
     long m_lastCache2Hits = 0;
 
     /**
+     * Calcite L1 cache hits
+     */
+    long m_calciteL1CacheHits = 0;
+    long m_lastCalciteL1CacheHits = 0;
+
+    /**
+     * Calcite L2 cache hits
+     */
+    long m_calciteL2CacheHits = 0;
+    long m_lastCalciteL2CacheHits = 0;
+
+    /**
      * Cache misses
      */
     long m_cacheMisses = 0;
     long m_lastCacheMisses = 0;
+
+    /**
+     * Calcite Cache misses
+     */
+    long m_calciteCacheMisses = 0;
+    long m_lastCalciteCacheMisses = 0;
 
     /**
      * Time of last planning start
@@ -221,6 +251,8 @@ public class PlannerStatsCollector extends StatsSource {
 
         m_cache1Level = cache1Size;
         m_cache2Level = cache2Size;
+        m_calciteL1CacheLevel = cache1Size;
+        m_calciteL2CacheLevel = cache2Size;
 
         switch(cacheUse) {
           case HIT1:
@@ -234,6 +266,17 @@ public class PlannerStatsCollector extends StatsSource {
             break;
           case FAIL:
             m_failures++;
+            break;
+        case CHIT1:
+            m_calciteL1CacheHits++;
+            break;
+        case CHIT2:
+            m_calciteL2CacheHits++;
+            break;
+        case CMISS:
+            m_calciteCacheMisses++;
+            break;
+        default:
             break;
         }
         m_invocations++;
@@ -257,10 +300,15 @@ public class PlannerStatsCollector extends StatsSource {
         long maxExecutionTime = m_maxPlanningTime;
         long cache1Level = m_cache1Level;
         long cache2Level = m_cache2Level;
+        long calciteL1CacheLevel = m_calciteL1CacheLevel;
+        long calciteL2CacheLevel = m_calciteL2CacheLevel;
         long cache1Hits  = m_cache1Hits;
         long cache2Hits  = m_cache2Hits;
         long cacheMisses = m_cacheMisses;
         long failureCount = m_failures;
+        long calciteL1CacheHits = m_calciteL1CacheHits;
+        long calciteL2CacheHits = m_calciteL2CacheHits;
+        long calciteCacheMisses = m_calciteCacheMisses;
 
         if (m_interval) {
             totalTimedExecutionTime = m_totalPlanningTime - m_lastTimedPlanningTime;
@@ -277,14 +325,29 @@ public class PlannerStatsCollector extends StatsSource {
             cache2Level = m_cache2Level - m_lastCache2Level;
             m_lastCache2Level = m_cache2Level;
 
+            calciteL1CacheLevel = m_calciteL1CacheLevel - m_lastCalciteL1CacheLevel;
+            m_lastCalciteL1CacheLevel = m_calciteL1CacheLevel;
+
+            calciteL2CacheLevel = m_calciteL2CacheLevel - m_lastCalciteL2CacheLevel;
+            m_lastCalciteL2CacheLevel = m_calciteL2CacheLevel;
+
             cache1Hits = m_cache1Hits - m_lastCache1Hits;
             m_lastCache1Hits = m_cache1Hits;
 
             cache2Hits = m_cache2Hits - m_lastCache2Hits;
             m_lastCache2Hits = m_cache2Hits;
 
+            calciteL1CacheHits = m_calciteL1CacheHits - m_lastCalciteL1CacheHits;
+            m_lastCalciteL1CacheHits = m_calciteL1CacheHits;
+
+            calciteL2CacheHits = m_calciteL2CacheHits - m_lastCalciteL2CacheHits;
+            m_lastCalciteL2CacheHits = m_calciteL2CacheHits;
+
             cacheMisses = m_cacheMisses - m_lastCacheMisses;
             m_lastCacheMisses = m_cacheMisses;
+
+            calciteCacheMisses = m_calciteCacheMisses - m_lastCalciteCacheMisses;
+            m_lastCalciteCacheMisses = m_calciteCacheMisses;
 
             failureCount = m_failures - m_lastFailures;
             m_lastFailures = m_failures;
@@ -296,9 +359,14 @@ public class PlannerStatsCollector extends StatsSource {
         rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
         rowValues[columnNameToIndex.get("CACHE1_LEVEL")] = cache1Level;
         rowValues[columnNameToIndex.get("CACHE2_LEVEL")] = cache2Level;
+        rowValues[columnNameToIndex.get("CalciteL1Cache_LEVEL")] = calciteL1CacheLevel;
+        rowValues[columnNameToIndex.get("CalciteL2Cache_LEVEL")] = calciteL2CacheLevel;
         rowValues[columnNameToIndex.get("CACHE1_HITS" )] = cache1Hits;
         rowValues[columnNameToIndex.get("CACHE2_HITS" )] = cache2Hits;
+        rowValues[columnNameToIndex.get("CalciteL1Cache_HITS")] = calciteL1CacheHits;
+        rowValues[columnNameToIndex.get("CalciteL2Cache_HITS")] = calciteL2CacheHits;
         rowValues[columnNameToIndex.get("CACHE_MISSES")] = cacheMisses;
+        rowValues[columnNameToIndex.get("CalciteCache_MISSES")] = calciteCacheMisses;
         rowValues[columnNameToIndex.get("PLAN_TIME_MIN")] = minExecutionTime;
         rowValues[columnNameToIndex.get("PLAN_TIME_MAX")] = maxExecutionTime;
         if (getSampleCount() != 0) {
@@ -321,9 +389,14 @@ public class PlannerStatsCollector extends StatsSource {
         columns.add(new ColumnInfo("PARTITION_ID",  VoltType.INTEGER));
         columns.add(new ColumnInfo("CACHE1_LEVEL",  VoltType.INTEGER));
         columns.add(new ColumnInfo("CACHE2_LEVEL",  VoltType.INTEGER));
+        columns.add(new ColumnInfo("CalciteL1Cache_LEVEL",  VoltType.INTEGER));
+        columns.add(new ColumnInfo("CalciteL2Cache_LEVEL",  VoltType.INTEGER));
         columns.add(new ColumnInfo("CACHE1_HITS",   VoltType.BIGINT));
         columns.add(new ColumnInfo("CACHE2_HITS",   VoltType.BIGINT));
+        columns.add(new ColumnInfo("CalciteL1Cache_HITS", VoltType.BIGINT));
+        columns.add(new ColumnInfo("CalciteL2Cache_HITS", VoltType.BIGINT));
         columns.add(new ColumnInfo("CACHE_MISSES",  VoltType.BIGINT));
+        columns.add(new ColumnInfo("CalciteCache_MISSES", VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT));
