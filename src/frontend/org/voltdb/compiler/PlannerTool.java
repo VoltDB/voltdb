@@ -313,8 +313,7 @@ public class PlannerTool {
 
         // make a copy because the following sql task visiter will change the sql node
         SqlNode node = task.getParsedQuery();
-        SqlNode node0 = node.clone(node.getParserPosition());
-        //getCompiledPlanCalcite(m_schemaPlus, node);
+
         // start planner cache stats collection
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
