@@ -144,7 +144,7 @@ public class HSQLAdHocCompilerCache implements Serializable {
     // without changing Map.Entry, only works for value of type AdHocPlannedStatement
     // only extend put, remove,clear and removeEldestEntry methods to account weight
     public class AdHocStatementCache extends LinkedHashMap<String, AdHocPlannedStatement>{
-       private static final long serialVersionUID = 2988383448026641836L;
+        private static final long serialVersionUID = 2988383448026641836L;
         private final int maxEntries;
         private final long maxMemory; // in bytes
         private long currentMemory;   // in bytes

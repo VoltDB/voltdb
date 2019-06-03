@@ -99,6 +99,8 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         // Visit the operands in the order of their positions in the query.
         for (Pair<Integer, SqlNode> indexedOperand : indexedOperands) {
             SqlNode operand = indexedOperand.getSecond();
+            // this is to solve the order by 1, 2, 3, 4 query, all of the column index will turn to ?
+            // TODO Figure out how order by column index is implemented in Hsql and patch to Calcite
             if (call instanceof SqlOrderBy && operand.equals(((SqlOrderBy) call).orderList)) {
                 continue;
             }

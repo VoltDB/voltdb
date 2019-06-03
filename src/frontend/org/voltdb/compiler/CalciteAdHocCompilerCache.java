@@ -74,17 +74,12 @@ public class CalciteAdHocCompilerCache implements Serializable {
     // PER-INSTANCE AWESOMEC CACHING CODE
     //////////////////////////////////////////////////////////////////////////
 
-    // cache sizes determined at construction time
-    final int MAX_LITERAL_ENTRIES;
-    // max cache size for parameterized plans
+    // max memory space for parameterized plans
     final long MAX_LITERAL_MEM  = Long.getLong("ADHOC_COMPILER_CACHE_MAX_LITERAL_MEM_BYTES", 32*1024*1024);
-    final int MAX_CORE_ENTRIES;
 
     /** cache of literals to full plans */
     final Map<String, AdHocPlannedStatement> m_literalCache;
-    /** cache of parameterized plan descriptions to one or more core parameterized plans,
-     *  each plan optionally has its own requirements for which parameters need to be bound
-     *  to what values to enable its specialized (expression-indexed) plan. */
+    /** cache of parameterized plan */
     final Map<String, CorePlan> m_coreCache;
 
     // placeholder stats used during development that may/may not survive
@@ -113,21 +108,18 @@ public class CalciteAdHocCompilerCache implements Serializable {
      * @param maxLiteralMem cache memory for literals
      */
     CalciteAdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries) {
-        MAX_LITERAL_ENTRIES = maxLiteralEntries;
-        MAX_CORE_ENTRIES = maxCoreEntries;
 
         // an LRU cache map
-        m_literalCache = new AdHocStatementCache(MAX_LITERAL_ENTRIES, MAX_LITERAL_MEM);
+        m_literalCache = new AdHocStatementCache(maxLiteralEntries, MAX_LITERAL_MEM);
 
         // an LRU cache map which contains many caches
-        // TODO change the key type to SqlNode???
-        m_coreCache = new LinkedHashMap<String, CorePlan>(MAX_CORE_ENTRIES * 2, .75f, true) {
+        m_coreCache = new LinkedHashMap<String, CorePlan>(maxCoreEntries, .75f, true) {
             private static final long serialVersionUID = 1L;
 
             // This method is called just after a new entry has been added
             @Override
             public boolean removeEldestEntry(Map.Entry<String, CorePlan> eldest) {
-                if (size() > MAX_CORE_ENTRIES) {
+                if (size() > maxCoreEntries) {
                     ++m_planEvictions;
                     return true;
                 }
@@ -260,25 +252,24 @@ public class CalciteAdHocCompilerCache implements Serializable {
      * L1 cache (literal cache) cache SQL queries without user provided parameters.
      * L2 cache (core cache) cache parameterized queries: including user parameters and auto extracted parameters.
      *
-     * @param sql               original query text
-     * @param parsedToken       massaged query text, possibly with literals purged
+     * @param originalQuery               original query text
+     * @param parameterizedQuery          parameterized query with literals take out
      * @param planIn
-     * @param extractedLiterals the basis values for any "bound parameter" restrictions to plan re-use
+     * @param extractedLiterals           the basis values for any "bound parameter" restrictions to plan re-use
      * @param hasUserQuestionMarkParameters is user provided parameterized query
      * @param hasAutoParameterizedException is the auto parameterized query has parameter exception
      */
     public synchronized void put(String originalQuery,
-                                 String parsedQuery,
+                                 String parameterizedQuery,
                                  AdHocPlannedStatement planIn,
                                  String[] extractedLiterals,
                                  boolean hasUserQuestionMarkParameters,
                                  boolean hasAutoParameterizedException)
     {
         assert(originalQuery != null);
-        assert(parsedQuery != null);
+        assert(parameterizedQuery != null);
         assert(planIn != null);
         AdHocPlannedStatement plan = planIn;
-        //assert(new String(plan.sql, Constants.UTF8ENCODING).equals(task.getSQL()));
 
         // hasUserQuestionMarkParameters and hasAutoParameterizedException can not be true at the same time
         // it means that a query can not be both user parameterized query and auto parameterized query.
@@ -290,18 +281,14 @@ public class CalciteAdHocCompilerCache implements Serializable {
         // deal with L2 cache
         if (! hasAutoParameterizedException) {
             // deal with the parameterized plan cache first
-            CorePlan corePlan = m_coreCache.get(parsedQuery);
+            CorePlan corePlan = m_coreCache.get(parameterizedQuery);
 
             if (corePlan == null) {
                 corePlan = planIn.core;
-                m_coreCache.put(parsedQuery, corePlan);
-                // Note that there is an edge case in which more than one plan is getting counted as one
-                // "plan insertion". This only happens when two different plans arose from the same parameterized
-                // query (token) because one invocation used the correct constants to trigger an expression index and
-                // another invocation did not.  These are not counted separately (which would have to happen below
-                // after each call to boundVariants.add) because they are not evicted separately.
-                // It seems saner to use consistent units when counting insertions vs. evictions.
+                m_coreCache.put(parameterizedQuery, corePlan);
                 ++m_planInsertions;
+            } else {
+                assert(corePlan.equals(plan.core));
             }
         }
 
@@ -312,8 +299,7 @@ public class CalciteAdHocCompilerCache implements Serializable {
                 //* enable to debug */ System.out.println("DEBUG: Caching literal '" + sql + "'");
                 m_literalCache.put(originalQuery, plan);
                 ++m_literalInsertions;
-            }
-            else {
+            } else {
                 assert(cachedPlan.equals(plan));
             }
         }
