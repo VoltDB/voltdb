@@ -34,6 +34,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -442,7 +443,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
-                    long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             partitionId,
@@ -451,7 +451,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             committedSequenceNumber,
                             tupleCount,
                             uniqueId,
-                            genId,
                             0,
                             length == 0 ? null : getBytes(length));
                 }
@@ -1550,14 +1549,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mStreamName) {
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String mStreamName) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
-            m_data.putLong(uso);
-            m_data.putLong(seqNo);
+            m_data.putLong(sequences.getAckOffset());
+            m_data.putLong(sequences.getSequenceNumber());
+            m_data.putLong(sequences.getGenerationId());
             if (mStreamName == null) {
                 m_data.putInt(-1);
             } else {
@@ -1575,7 +1575,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long result_offset = results.getLong();
             if (result_offset < 0) {
                 System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
-                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId: " + sequences.getGenerationId() +
+                    ", partitionId: " + partitionId +
                     ", streamName: " + mStreamName);
             }
         } catch (final IOException e) {

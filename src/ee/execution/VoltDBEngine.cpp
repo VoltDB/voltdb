@@ -966,7 +966,6 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
                 if (streamedtable) {
                     VOLT_DEBUG("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
                     const std::string& name = streamedtable->name();
-                    streamedtable->setGeneration(timestamp);
                     //Maintain the streams that will go away for which wrapper needs to be cleaned;
                     auto wrapper = streamedtable->getWrapper();
                     if (wrapper) {
@@ -992,7 +991,6 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string& name = streamedtable->name();
-                streamedtable->setGeneration(timestamp);
                 //Maintain the streams that will go away for which wrapper needs to be cleaned;
                 purgedStreams[name] = streamedtable->getWrapper();
                 //Unset wrapper so it can be deleted after last push.
@@ -1159,7 +1157,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 else {
                     // The table/stream type has been changed
                     streamedTable->setWrapper(NULL);
-                    streamedTable->setExportStreamPositions(0, 0);
+                    streamedTable->setExportStreamPositions(0, 0, 0);
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -1517,7 +1515,6 @@ void VoltDBEngine::attachTupleStream(StreamedTable* streamedTable,
         // A case when exact same stream is dropped and added.
         assert(purgedStreams[streamName] == NULL);
     }
-    streamedTable->setGeneration(timestamp);
 }
 
 /*
@@ -2603,6 +2600,7 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 int64_t VoltDBEngine::exportAction(bool syncAction,
                                    int64_t uso,
                                    int64_t seqNo,
+                                   int64_t generationIdCreated,
                                    std::string streamName) {
     std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
@@ -2624,7 +2622,7 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
 
     Table *table_for_el = pos->second;
     if (syncAction) {
-        table_for_el->setExportStreamPositions(seqNo, (size_t) uso);
+        table_for_el->setExportStreamPositions(seqNo, (size_t) uso, generationIdCreated);
     }
     return 0;
 }
@@ -2691,11 +2689,12 @@ int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_
     return 0;
 }
 
-void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string streamName) {
+void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, int64_t &genId, std::string streamName) {
 
     // defaults mean failure
     ackOffset = 0;
     seqNo = -1;
+    genId = 0;
 
     std::map<std::string, StreamedTable*>::iterator pos = m_exportingTables.find(streamName);
 
@@ -2705,7 +2704,7 @@ void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::
     }
 
     Table *table_for_el = pos->second;
-    table_for_el->getExportStreamPositions(seqNo, ackOffset);
+    table_for_el->getExportStreamPositions(seqNo, ackOffset, genId);
     return;
 }
 

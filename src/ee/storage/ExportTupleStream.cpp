@@ -38,7 +38,7 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
     : TupleStreamBase(EL_BUFFER_SIZE, s_EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
-      m_generation(generation),
+      m_generationIdCreated(generation),
       m_tableName(tableName),
       m_nextSequenceNumber(1),
       m_committedSequenceNumber(0),
@@ -49,9 +49,12 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
     extendBufferChain(m_defaultCapacity);
 }
 
-void ExportTupleStream::setGeneration(int64_t generation) {
-    assert(generation >= m_generation);
-    m_generation = generation;
+void ExportTupleStream::setGenerationIdCreated(int64_t generation) {
+    // If stream is initialized first with the current generation ID, it may
+    // move backward after restoring from snapshot digest. However it should
+    // never go forward.
+    assert(generation <= m_generationIdCreated);
+    m_generationIdCreated = generation;
 }
 
 /*
@@ -276,8 +279,7 @@ void ExportTupleStream::pushStreamBuffer(ExportStreamBlock *block) {
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_tableName,
-                    block,
-                    m_generation);
+                    block);
 }
 
 void ExportTupleStream::pushEndOfStream() {

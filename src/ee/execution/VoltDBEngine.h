@@ -493,15 +493,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Perform an action on behalf of Export.
          *
-         * @param if syncAction is true, the stream offset being set for a table
-         * @param the reference to the USO of the next row inserted in the stream
-         * @param the reference to the sequenceNumber of the next inserted row
-         * @param the name of the stream we want to update the state for
+         * @param syncAction if syncAction is true, the stream offset being set for a table
+         * @param ackOffset the reference to the USO of the next row inserted in the stream
+         * @param seqNo the reference to the sequenceNumber of the next inserted row
+         * @param generationIdCreated the reference to the initial creation generation ID of the export stream
+         * @param streamName the name of the stream we want to update the state for
          * @return the universal offset for any poll results
          * (results returned separately via QueryResults buffer)
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                             std::string streamName);
+                             int64_t generationIdCreated, std::string streamName);
 
         /**
          * Complete the deletion of the Migrated Table rows.
@@ -518,7 +519,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
                 std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken);
 
-        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string streamName);
+        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, int64_t &genId, std::string streamName);
 
         /**
          * Retrieve a hash code for the specified table
