@@ -416,7 +416,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
-            if (m_userAggregateId.get(ii) != null) {
+            if (m_userAggregateId.size() > ii) {
                 stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
             }
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
