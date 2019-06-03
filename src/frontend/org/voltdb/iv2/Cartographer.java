@@ -24,8 +24,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -904,15 +904,14 @@ public class Cartographer extends StatsSource
         final int minMastersPerHost = (getPartitionCount() / hostCount);
 
         // Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        List<Host> hostList = getHostsByPartionMasterCount();
         if (hostList == null) {
             return Pair.of(-1, -1);
         }
 
         // only move SPI from the one with most partition leaders
         // The local ClientInterface will pick it up and start @MigratePartitionLeader
-        Iterator<Host> it = hostList.iterator();
-        Host srcHost = it.next();
+        Host srcHost = hostList.get(0);
 
         // @MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         // If current host does not have the most partition leaders, give it up.
@@ -922,19 +921,19 @@ public class Cartographer extends StatsSource
         }
 
         // The new host is the one with least number of partition leaders and the partition replica
-        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-            Host targetHost = reverseIt.next();
+        for (ListIterator<Host> reverseIt = hostList.listIterator(hostList.size()); reverseIt.hasPrevious();) {
+            Host targetHost = reverseIt.previous();
             int partitionCandidate = findNewHostForPartitionLeader(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
             if (partitionCandidate > -1){
-                return new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+                return Pair.of(partitionCandidate, targetHost.m_hostId);
             }
         }
 
         // indicate that the cluster is balanced.
-        return  new Pair<Integer, Integer> (-1, -1);
+        return Pair.of(-1, -1);
     }
 
-    private LinkedList<Host> getHostsByPartionMasterCount() {
+    private List<Host> getHostsByPartionMasterCount() {
         Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
         if (liveHosts.size() == 1) {
             return null;
@@ -971,7 +970,7 @@ public class Cartographer extends StatsSource
         }
 
         //Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = new LinkedList<Host>(hostsMap.values());
+        List<Host> hostList = new ArrayList<>(hostsMap.values());
         Collections.sort(hostList);
         return hostList;
     }
@@ -1007,36 +1006,38 @@ public class Cartographer extends StatsSource
     public Pair<Integer, Integer> getPartitionLeaderMigrationTargetForStopNode(int localHostId) {
 
         // Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        List<Host> hostList = getHostsByPartionMasterCount();
         if (hostList == null) {
             return Pair.of(-1, -1);
         }
         Host srcHost = null;
         for (Host host : hostList) {
-            if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
-                srcHost = host;
+            if (host.m_hostId == localHostId) {
+                if (!host.m_masterPartitionIDs.isEmpty()) {
+                    srcHost = host;
+                }
                 break;
             }
         }
 
         if (srcHost == null) {
-            return new Pair<Integer, Integer> (-1, -1);
+            return Pair.of(-1, -1);
         }
 
         // The new host is the one with least number of partition leaders and the partition replica
-        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-            Host targetHost = reverseIt.next();
+        for (ListIterator<Host> reverseIt = hostList.listIterator(hostList.size()); reverseIt.hasPrevious();) {
+            Host targetHost = reverseIt.previous();
             if (!targetHost.equals(srcHost)) {
                 for (Integer partition : srcHost.m_masterPartitionIDs) {
                     if (targetHost.m_replicaPartitionIDs.contains(partition)) {
-                        return new Pair<Integer, Integer> (partition, targetHost.m_hostId);
+                        return Pair.of(partition, targetHost.m_hostId);
                     }
                 }
             }
         }
 
         // Indicate that all the partition leaders have been relocated.
-        return new Pair<Integer, Integer> (-1, -1);
+        return Pair.of(-1, -1);
     }
 
     //return the number of masters on a host
