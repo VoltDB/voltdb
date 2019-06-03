@@ -425,21 +425,25 @@ CREATE TABLE importbr
 -- TTL with migrate to stream -- partitioned
 CREATE TABLE ttl_migrate_p
 (
-  big1                     BIGINT        NOT NULL
-, big2                     BIGINT        NOT NULL
-, ts1                      TIMESTAMP     DEFAULT NOW NOT NULL
-) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc1;
-PARTITION TABLE ttl_migrate_p ON COLUMN big1;
-CREATE INDEX ttl_migrate_idx_p ON ttl_migrate_p(ts1) WHERE NOT MIGRATING;
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc1;
+PARTITION TABLE ttl_migrate_p ON COLUMN p;
+CREATE INDEX ttl_migrate_idx_p ON ttl_migrate_p(ts) WHERE NOT MIGRATING;
 
 -- TTL with migrate to stream -- replicated
 CREATE TABLE ttl_migrate_r
 (
-  big1                     BIGINT        NOT NULL
-, big2                     BIGINT        NOT NULL
-, ts1                      TIMESTAMP     DEFAULT NOW NOT NULL
-) USING TTL 30 SECONDS ON COLUMN ts1 MIGRATE TO TARGET abc2 ;
-CREATE INDEX ttl_migrate_idx_r ON ttl_migrate_r(ts1) WHERE NOT MIGRATING;
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc2 ;
+CREATE INDEX ttl_migrate_idx_r ON ttl_migrate_r(ts) WHERE NOT MIGRATING;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -467,9 +471,9 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMigrateInsertR;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMigrateInsertP;
-PARTITION PROCEDURE TTLMigrateInsertP ON TABLE ttl_migrate_p COLUMN big1;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTL_MIGRATE_PTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTL_MIGRATE_RTableInsert;
+PARTITION PROCEDURE TTL_MIGRATE_PTableInsert ON TABLE ttl_migrate_p COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;

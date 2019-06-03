@@ -27,11 +27,11 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class TTLMigrateInsertP extends VoltProcedure {
-    final SQLStmt insert = new SQLStmt("insert into ttl_migrate_p(big1, big2) values (?,?);");
+public class TTL_MIGRATE_PTableInsert extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into ttl_migrate_p (p, id, value) values (?,?,?);");
 
-    public VoltTable[] run(long counter, long randInt) {
-        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), counter, randInt);
+    public VoltTable[] run(long p, byte[] data) {
+        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
         return voltExecuteSQL(true);
     }
 }

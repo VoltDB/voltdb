@@ -559,10 +559,10 @@ public class Benchmark {
     DdlThread ddlt = null;
     List<ClientThread> clientThreads = null;
     UpdateClassesThread updcls = null;
-    NibbleDeleteLoader partNDlt = null;
-    NibbleDeleteLoader replNDlt = null;
-    TTLMigrateThread partttlMigratelt = null;
-    TTLMigrateThread replttlMigratelt = null;
+    TTLLoader partNDlt = null;
+    TTLLoader replNDlt = null;
+    TTLLoader partttlMigratelt = null;
+    TTLLoader replttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -663,18 +663,29 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
 
         // Nibble delete Loader
-        partNDlt = null;
         if (!(config.disabledThreads.contains("partNDlt") || config.disabledThreads.contains("NDlt"))) {
-            partNDlt = new NibbleDeleteLoader(client, "nibdp",
+            partNDlt = new TTLLoader(client, "nibdp",
                     100000, 1024, 50, permits, partitionCount);
             partNDlt.start();
         }
 
-        replNDlt = null;
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
-            replNDlt = new NibbleDeleteLoader(client, "nibdr",
+            replNDlt = new TTLLoader(client, "nibdr",
                     100000, 1024, 3, permits, partitionCount);
             replNDlt.start();
+        }
+
+        // TTL/Migrate to Export
+        if (!config.disabledThreads.contains("partttlMigratelt")) {
+            partttlMigratelt = new TTLLoader(client, "ttl_migrate_p",
+                    100000, 1024, 50, permits, partitionCount);
+            partttlMigratelt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
+            replttlMigratelt = new TTLLoader(client, "ttl_migrate_r",
+                    100000, 1024, 3, permits, partitionCount);
+            replttlMigratelt.start();
         }
 
         // print periodic statistics to the console
@@ -749,7 +760,7 @@ public class Benchmark {
                 adHocMayhemThread.start();
             }
         }
- 
+
         if (!config.disabledThreads.contains("idpt")) {
             idpt = new InvokeDroppedProcedureThread(client);
             idpt.start();
@@ -765,15 +776,7 @@ public class Benchmark {
             updcls.start();
         }
 
-        if (!config.disabledThreads.contains("partttlMigratelt")) {
-            partttlMigratelt = new TTLMigrateThread(client, "R", config.mpratio, permits);
-            partttlMigratelt.start();
-        }
 
-        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replttlMigratelt")) {
-            replttlMigratelt = new TTLMigrateThread(client, "P", config.mpratio, permits);
-            replttlMigratelt.start();
-        }
         log.info("All threads started...");
 
         while (true) {
