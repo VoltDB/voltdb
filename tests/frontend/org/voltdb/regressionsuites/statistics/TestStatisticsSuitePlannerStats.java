@@ -27,13 +27,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import junit.framework.Test;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuitePlannerStats extends StatisticsTestSuiteBase {
 
@@ -48,7 +48,7 @@ public class TestStatisticsSuitePlannerStats extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING PLANNER STATS\n\n\n");
         Client client  = getClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[14];
+        ColumnInfo[] expectedSchema = new ColumnInfo[19];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -56,13 +56,18 @@ public class TestStatisticsSuitePlannerStats extends StatisticsTestSuiteBase {
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
         expectedSchema[5] = new ColumnInfo("CACHE1_LEVEL", VoltType.INTEGER);
         expectedSchema[6] = new ColumnInfo("CACHE2_LEVEL", VoltType.INTEGER);
-        expectedSchema[7] = new ColumnInfo("CACHE1_HITS", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("CACHE2_HITS", VoltType.BIGINT);
-        expectedSchema[9] = new ColumnInfo("CACHE_MISSES", VoltType.BIGINT);
-        expectedSchema[10] = new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT);
-        expectedSchema[12] = new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT);
-        expectedSchema[13] = new ColumnInfo("FAILURES", VoltType.BIGINT);
+        expectedSchema[7] = new ColumnInfo("CalciteL1Cache_LEVEL", VoltType.INTEGER);
+        expectedSchema[8] = new ColumnInfo("CalciteL2Cache_LEVEL", VoltType.INTEGER);
+        expectedSchema[9] = new ColumnInfo("CACHE1_HITS", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("CACHE2_HITS", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("CalciteL1Cache_HITS", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("CalciteL2Cache_HITS", VoltType.BIGINT);
+        expectedSchema[13] = new ColumnInfo("CACHE_MISSES", VoltType.BIGINT);
+        expectedSchema[14] = new ColumnInfo("CalciteCache_MISSES", VoltType.BIGINT);
+        expectedSchema[15] = new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT);
+        expectedSchema[16] = new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT);
+        expectedSchema[17] = new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT);
+        expectedSchema[18] = new ColumnInfo("FAILURES", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
