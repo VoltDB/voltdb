@@ -1,1 +1,0 @@
-cmd='/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/openssl/src/openssl-1.0.2d/Configure;--prefix=/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-install;darwin64-x86_64-cc'

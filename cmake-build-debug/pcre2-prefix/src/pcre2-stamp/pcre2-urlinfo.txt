@@ -1,3 +1,0 @@
-repository='external project URL'
-module='/Users/russelhu/Github/voltdb/third_party/cpp/tarballs/pcre2-10.33.tar.gz'
-tag=''

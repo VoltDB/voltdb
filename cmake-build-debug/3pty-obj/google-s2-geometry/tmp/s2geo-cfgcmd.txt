@@ -1,1 +1,0 @@
-cmd='/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake;-DCXX_VERSION_FLAG=-std=c++11;-DVOLTDB_THIRD_PARTY_CPP_DIR=/Users/russelhu/Github/voltdb/third_party/cpp;-DCMAKE_INSTALL_PREFIX=/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-install/;-DCMAKE_BUILD_TYPE=DEBUG;-GUnix Makefiles;<SOURCE_DIR><SOURCE_SUBDIR>'

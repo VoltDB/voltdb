@@ -1,3 +1,0 @@
-repository='external project URL'
-module='/Users/russelhu/Github/voltdb/third_party/cpp/tarballs/openssl-1.0.2d.tgz'
-tag=''
