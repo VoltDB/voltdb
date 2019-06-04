@@ -139,6 +139,12 @@ public class NonDdlBatchPlanner {
             // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
         } catch (Exception ex) {
+            // TODO ENG-15255
+            // A lot of tests fail due to lack of support for ? in expressions
+            // Shortcut this type of exception temporarily
+            if (ex.getMessage().contains("class org.apache.calcite.sql.SqlDynamicParam: ?")) {
+                throw new PlannerFallbackException();
+            }
             Throwable cause = ex.getCause();
             while(cause != null && cause.getCause() != null) {
                 cause = cause.getCause();
