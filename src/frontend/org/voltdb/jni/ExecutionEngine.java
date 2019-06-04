@@ -36,6 +36,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -795,7 +796,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long uso, long seqNo, int partitionId, String streamName);
+            ExportSnapshotTuple sequences, int partitionId, String streamName);
 
     /**
      * Execute an Delete of migrated rows in the execution engine.
@@ -1162,6 +1163,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckOffset The offset being ACKd.
+     * @param seqNo The current export sequence number
+     * @param generationId The timestamp from the most-recently restored snapshot
      * @param mStreamName Name of the stream being acted against
      * @return
      */
@@ -1170,6 +1173,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
+            long generationId,
             byte mStreamName[]);
 
     /**

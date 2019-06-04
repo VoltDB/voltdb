@@ -29,10 +29,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
@@ -373,7 +373,7 @@ public class RejoinProducer extends JoinProducerBase {
                 // Resume the views.
                 siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, true);
                 SnapshotCompletionEvent event = null;
-                Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
+                Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers = null;
                 long clusterCreateTime = -1;
@@ -405,7 +405,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 if (exportSequenceNumbers == null) {
                     // Send empty sequence number map if the schema is empty (no tables).
-                    exportSequenceNumbers = new HashMap<String, Map<Integer, Pair<Long,Long>>>();
+                    exportSequenceNumbers = new HashMap<String, Map<Integer, ExportSnapshotTuple>>();
                 }
                 setJoinComplete(
                         siteConnection,
