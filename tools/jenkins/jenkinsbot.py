@@ -794,7 +794,7 @@ tr:hover{
         summary_partial_query = " AND summary ~ '" + "' AND summary ~ '".join(summary_keys)
         full_jira_query = ("project = %s AND status != Closed"
                            + summary_partial_query + labels_partial_query
-                           + "' ORDER BY key DESC"
+                           + "' ORDER BY key ASC"
                            ) % str(project)
         tickets = []
         try:
@@ -911,7 +911,7 @@ tr:hover{
 
     def create_jira_bug_ticket(self, channel, test_suite, summary,
                                jenkins_job, build_number,
-                               descriptions, version, labels,
+                               description, version, labels,
                                priority='Major', attachments={},
                                jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                project=JIRA_PROJECT, component='Core',
@@ -924,7 +924,7 @@ tr:hover{
                are marked 'is related to'.
         :param summary: The Summary to be used in the Jira ticket that is to
                be created.
-        :param descriptions: One or more pieces of the Description to be added to
+        :param description: One or more pieces of the Description to be added to
                the Jira ticket; each one will be checked separately for being too
                long (more than MAX_NUM_CHARS_PER_DESCRIPTION_PIECE characters).
         :param version: The (VoltDB) Version that this bug affects.
@@ -945,7 +945,7 @@ tr:hover{
         logging.debug('  channel     : '+str(channel))
         logging.debug('  test_suite  : '+str(test_suite))
         logging.debug('  summary     : '+str(summary))
-        logging.debug('  descriptions:\n'+str(descriptions)+'\n')
+        logging.debug('  description :\n'+str(description)+'\n')
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -968,19 +968,9 @@ tr:hover{
             'labels': labels
         }
 
-        new_description = ''
-        for dp in descriptions:
-            if len(dp) <= MAX_NUM_CHARS_PER_DESCRIPTION_PIECE:
-                new_description = new_description + dp
-            else:
-                half_length  = int(MAX_NUM_CHARS_PER_DESCRIPTION_PIECE / 2)
-                truncated_dp = dp[:half_length] +'\n...[truncated]...\n' \
-                             + dp[-half_length:]
-                new_description  = new_description + truncated_dp
-                logging.warn('Description piece of length %d characters '
-                             'truncated to %d characters:\n    %s'
-                             % (len(dp), len(truncated_dp), truncated_dp) )
-        issue_dict['description'] = new_description
+        if isinstance(description, list):
+            description = self.get_modified_description('', description)
+        issue_dict['description'] = description
 
         issue_dict['components'] = self.get_jira_component_list(jira, component, project)
         issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
@@ -1071,7 +1061,7 @@ tr:hover{
 #             if not (dp in old_description):
 #                 new_description = new_description + dp
 
-        logging.debug('In get_modified_description')
+        logging.info('In [old] get_modified_description')
         logging.debug('    old_description:\n'+str(old_description))
         logging.debug('    new_description_pieces:\n'+str(new_description_pieces))
 
@@ -1191,7 +1181,7 @@ tr:hover{
 
     def modify_jira_bug_ticket(self, channel, summary_keys, summary,
                                jenkins_job, build_number,
-                               descriptions, version, labels,
+                               description, version, labels,
                                priority='Major', attachments={}, ticket_to_modify=None,
                                jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                project=JIRA_PROJECT, component='Core',
@@ -1206,9 +1196,8 @@ tr:hover{
                be created or modified
         :param jenkins_job ????: One or more substrings of the Summary, used to
                determine whether a Jira ticket already exists for this issue
-        :param descriptions: One or more pieces of the Description to be added
-               to the Jira ticket; the pieces that already exist in the existing
-               ticket do not get added, to avoid redundancy.
+        :param description: One or more pieces of the Description for the
+               modified Jira ticket.
         :param version ???: The (VoltDB) Version that this bug affects
         :param labels ??: The Labels to list in the Jira ticket
         :param priority: The Priority of the Jira ticket
@@ -1229,7 +1218,7 @@ tr:hover{
         logging.debug('  summary     : '+str(summary))
         logging.debug('  jenkins_job : '+str(jenkins_job))
         logging.debug('  build_number: '+str(build_number))
-        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  description : '+str(description))
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -1253,32 +1242,33 @@ tr:hover{
             # Update the Jira ticket's summary, description, etc.
             previous_summary  = ticket_to_modify.fields.summary
             old_description   = ticket_to_modify.fields.description
-            new_description   = self.get_modified_description(old_description, descriptions)
+            if isinstance(description, list):
+                description = self.get_modified_description(old_description, description)
             previous_priority = ticket_to_modify.fields.priority
-#             logging.info('previous_priority: '+str(previous_priority))
+
             # If ticket has been marked as a "Blocker" (presumably manually),
             # then do not downgrade it
             if previous_priority == 'Blocker':
                 priority = previous_priority
             try:
                 ticket_to_modify.update(fields={'summary'    : summary,
-                                                'description': new_description,
+                                                'description': description,
 #                                                 'fixVersions': [{"set":[{"name" : version}]}],
                                                 'labels'     : labels,
                                                 'priority'   : {'name': priority}
-                                                })
+                                                },
+                                        notify=False)
             except Exception as e:
                 logging.exception("Jira ticket update failed with Exception:\n    %s"
                                   "\n    for Jira ticket %s, using:"
                                   "\n    version '%s', priority '%s', labels %s;"
                                   "\n    old and new summaries:\n    '%s'\n    '%s'"
                                   "\n    old description:\n    %s"
-                                  "\n    new description pieces:\n    %s"
-                                  "\n    new (combined) description:\n    %s\n"
+                                  "\n    new (updated) description:\n    %s\n"
                                   % (str(e), str(ticket_to_modify.key),
                                      version, priority, str(labels),
-                                     previous_summary, summary, old_description,
-                                     str(descriptions), new_description) )
+                                     previous_summary, summary,
+                                     old_description, description) )
                 return ticket_to_modify
 
             # Add attachments to the Jira ticket
@@ -1329,7 +1319,7 @@ tr:hover{
 
     def create_or_modify_jira_bug_ticket(self, channel, summary_keys, summary,
                                          jenkins_job, build_number,
-                                         descriptions, version, labels,
+                                         description, version, labels,
                                          priority='Major', attachments={}, existing_ticket=None,
                                          jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                          project=JIRA_PROJECT, component='Core',
@@ -1344,7 +1334,7 @@ tr:hover{
         :param summary: The Summary to be used in the Jira ticket that is to
                be created or modified.
         :param jenkins_job ????
-        :param descriptions: One or more pieces of the Description to be used
+        :param description: One or more pieces of the Description to be used
                in (or added to) the Jira ticket; if there is an existing bug
                ticket that gets modified, the pieces that already exist in the
                existing ticket do not get added, to avoid redundancy.
@@ -1375,7 +1365,7 @@ tr:hover{
         logging.debug('  summary_keys: '+str(summary_keys))
         logging.debug('  summary     : '+str(summary))
         logging.debug('  jenkins_job : '+str(jenkins_job))
-        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  description : '+str(description))
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -1404,7 +1394,7 @@ tr:hover{
 
             return self.modify_jira_bug_ticket(channel, summary_keys, summary,
                                                jenkins_job, build_number,
-                                               descriptions, version, labels,
+                                               description, version, labels,
                                                priority, attachments, existing_ticket,
                                                jira, user, passwd,
                                                project, component,
@@ -1416,7 +1406,7 @@ tr:hover{
 
             return self.create_jira_bug_ticket(channel, summary_keys[0], summary,
                                                jenkins_job, build_number,
-                                               descriptions, version, labels,
+                                               description, version, labels,
                                                priority, attachments,
                                                jira, user, passwd,
                                                project, component, DRY_RUN)
