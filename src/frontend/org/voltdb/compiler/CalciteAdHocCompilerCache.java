@@ -269,7 +269,6 @@ public class CalciteAdHocCompilerCache implements Serializable {
         assert(originalQuery != null);
         assert(parameterizedQuery != null);
         assert(planIn != null);
-        AdHocPlannedStatement plan = planIn;
 
         // hasUserQuestionMarkParameters and hasAutoParameterizedException can not be true at the same time
         // it means that a query can not be both user parameterized query and auto parameterized query.
@@ -288,7 +287,7 @@ public class CalciteAdHocCompilerCache implements Serializable {
                 m_coreCache.put(parameterizedQuery, corePlan);
                 ++m_planInsertions;
             } else {
-                assert(corePlan.equals(plan.core));
+                assert(corePlan.equals(planIn.core));
             }
         }
 
@@ -297,10 +296,10 @@ public class CalciteAdHocCompilerCache implements Serializable {
             AdHocPlannedStatement cachedPlan = m_literalCache.get(originalQuery);
             if (cachedPlan == null) {
                 //* enable to debug */ System.out.println("DEBUG: Caching literal '" + sql + "'");
-                m_literalCache.put(originalQuery, plan);
+                m_literalCache.put(originalQuery, planIn);
                 ++m_literalInsertions;
             } else {
-                assert(cachedPlan.equals(plan));
+                assert(cachedPlan.equals(planIn));
             }
         }
     }
