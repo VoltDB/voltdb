@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
@@ -152,17 +153,20 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected void initListOfViewsToPause() {
         // The very first execution of runForRejoin will lead us here.
         StringBuilder commaSeparatedViewNames = new StringBuilder();
-        Database db = VoltDB.instance().getCatalogContext().database;
-        for (Table table : VoltDB.instance().getCatalogContext().tables) {
-            if (shouldAddToViewsToPause(db, table)) {
-                // If the table is a snapshotted persistent table view, we will try to
-                // temporarily disable its maintenance job to boost restore performance.
-                commaSeparatedViewNames.append(table.getTypeName()).append(",");
+        CatalogContext ctx = VoltDB.instance().getCatalogContext();
+        if (ctx != null) {
+            Database db = ctx.database;
+            for (Table table : VoltDB.instance().getCatalogContext().tables) {
+                if (shouldAddToViewsToPause(db, table)) {
+                    // If the table is a snapshotted persistent table view, we will try to
+                    // temporarily disable its maintenance job to boost restore performance.
+                    commaSeparatedViewNames.append(table.getTypeName()).append(",");
+                }
             }
-        }
-        // Get rid of the trailing comma.
-        if (commaSeparatedViewNames.length() > 0) {
-            commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
+            // Get rid of the trailing comma.
+            if (commaSeparatedViewNames.length() > 0) {
+                commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
+            }
         }
         m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
     }
