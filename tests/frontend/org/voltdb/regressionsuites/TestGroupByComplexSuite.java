@@ -290,7 +290,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         System.out.println("Test complex group by...");
         complexGroupby();
         complexGroupbyDistinctLimit();
-        // ENG-16141 remove comment once resolved
         complexGroupbyOrderbySuite();
         orderbyColumnsNotInDisplayList();
     }

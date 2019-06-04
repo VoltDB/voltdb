@@ -29,6 +29,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.utils.Encoder;
 
+import com.google.common.base.Preconditions;
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
 
@@ -121,7 +122,20 @@ public class HSQLAdHocCompilerCache implements Serializable {
         MAX_CORE_ENTRIES = maxCoreEntries;
 
         // an LRU cache map
-        m_literalCache = new AdHocStatementCache(MAX_LITERAL_ENTRIES, MAX_LITERAL_MEM);
+        m_literalCache = new AdHocStatementCache(MAX_LITERAL_ENTRIES, MAX_LITERAL_MEM) {
+            private static final long serialVersionUID = 1L;
+
+            // This method is called just after a new entry has been added
+            @Override
+            public boolean removeEldestEntry(final Map.Entry<String, AdHocPlannedStatement> eldest) {
+                if ((size() > maxEntries) || (this.currentMemory > this.maxMemory))  {
+                    ++m_literalEvictions;
+                    this.currentMemory -= eldest.getValue().getSerializedSize();
+                    return true;
+                }
+                return false;
+            }
+        };
 
         // an LRU cache map
         m_coreCache = new LinkedHashMap<String, List<BoundPlan> >(MAX_CORE_ENTRIES * 2, .75f, true) {
@@ -138,66 +152,6 @@ public class HSQLAdHocCompilerCache implements Serializable {
             }
 
         };
-    }
-
-    // define a LinkedHashMap based LRU cache bounds by both entry number and entry value on-heap size
-    // without changing Map.Entry, only works for value of type AdHocPlannedStatement
-    // only extend put, remove,clear and removeEldestEntry methods to account weight
-    public class AdHocStatementCache extends LinkedHashMap<String, AdHocPlannedStatement>{
-        private static final long serialVersionUID = 2988383448026641836L;
-        private final int maxEntries;
-        private final long maxMemory; // in bytes
-        private long currentMemory;   // in bytes
-
-        public AdHocStatementCache() {
-            // default max entry of 1000
-            // default max value size of 32MB
-            this(1000, 32 * 1024 * 1024);
-        }
-
-        public AdHocStatementCache(final int maxEntries) {
-            this(maxEntries, 32 * 1024 * 1024);
-        }
-
-        public AdHocStatementCache(final int maxEntries, final long maxMemory) {
-            // set accessOrder to true for LRU
-            super(maxEntries * 2, .75f, true);
-            this.maxEntries = maxEntries;
-            this.maxMemory = maxMemory;
-            this.currentMemory = 0;
-        }
-
-        // This method is called just after a new entry has been added
-        @Override
-        public boolean removeEldestEntry(final Map.Entry<String, AdHocPlannedStatement> eldest) {
-            if ((size() > maxEntries) || (this.currentMemory > this.maxMemory))  {
-                ++m_literalEvictions;
-                this.currentMemory -= eldest.getValue().getSerializedSize();
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public AdHocPlannedStatement put(String key, AdHocPlannedStatement value) {
-            this.currentMemory += value.getSerializedSize();
-            return super.put(key,value);
-        }
-
-        @Override
-        public AdHocPlannedStatement remove(Object key) {
-            AdHocPlannedStatement value = super.remove(key);
-            if (value != null) {
-                this.currentMemory -= value.getSerializedSize();
-            }
-            return value;
-        }
-
-        @Override
-        public void clear() {
-            super.clear();
-            this.currentMemory = 0;
-        }
     }
 
     /**
@@ -278,9 +232,9 @@ public class HSQLAdHocCompilerCache implements Serializable {
                                  boolean hasUserQuestionMarkParameters,
                                  boolean hasAutoParameterizedException)
     {
-        assert(sql != null);
-        assert(parsedToken != null);
-        assert(planIn != null);
+        Preconditions.checkNotNull(sql != null);
+        Preconditions.checkNotNull(parsedToken != null);
+        Preconditions.checkNotNull(planIn != null);
         AdHocPlannedStatement plan = planIn;
         assert(new String(plan.sql, Constants.UTF8ENCODING).equals(sql));
 

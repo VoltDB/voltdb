@@ -2469,7 +2469,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
             if (isHSQL()) {
                 verifyStmtFails(client, sql, "Decimal 111111111111111111111111111111111111111.111100000000 has more than 38 digits of precision.");
             } else {
-                // TODO related to ENG-15053 and ENG-15353
                 // TODO related to ENG-15978
                 verifyStmtFails(client, sql, "Decimal 111111111111111111111111111111111111111.111100000000 has more than 38 digits of precision.");
             }

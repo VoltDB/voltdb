@@ -55,8 +55,7 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
         m_calcite_cache_misses = 0;
     }
 
-    private void checkCacheStatistics(Client client, long cache1_level, long cache2_level,
-            long cache1_hits, long cache2_hits, long cache_misses)
+    private void checkCacheStatistics(Client client)
             throws IOException, ProcCallException {
         VoltTable vt;
 
@@ -72,11 +71,11 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
                 continue;
             }
             // The global cache is identified by a site and partition ID of minus one
-            assertEquals(cache1_level, vt.getLong("CalciteL1Cache_LEVEL"));
-            assertEquals(cache2_level, vt.getLong("CalciteL2Cache_LEVEL"));
-            assertEquals(cache1_hits,  vt.getLong("CalciteL1Cache_HITS"));
-            assertEquals(cache2_hits,  vt.getLong("CalciteL2Cache_HITS"));
-            assertEquals(cache_misses, vt.getLong("CalciteCache_MISSES"));
+            assertEquals(m_calcite_cache1_level, vt.getLong("CalciteL1Cache_LEVEL"));
+            assertEquals(m_calcite_cache2_level, vt.getLong("CalciteL2Cache_LEVEL"));
+            assertEquals(m_calcite_cache1_hits,  vt.getLong("CalciteL1Cache_HITS"));
+            assertEquals(m_calcite_cache2_hits,  vt.getLong("CalciteL2Cache_HITS"));
+            assertEquals(m_calcite_cache_misses, vt.getLong("CalciteCache_MISSES"));
 
             checked = true;
             break;
@@ -85,8 +84,8 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
         assertTrue(checked);
     }
 
-    private void checkCalcitePlannerCache(Client client, int... cacheTypes) throws IOException, ProcCallException {
-        for (int cacheType : cacheTypes) {
+    private void checkCalcitePlannerCache(Client client, int... expectedCacheTypes) throws IOException, ProcCallException {
+        for (int cacheType : expectedCacheTypes) {
             if (cacheType == Calcite_CACHE_MISS2) {
                 ++m_calcite_cache1_level;
                 ++m_calcite_cache2_level;
@@ -106,7 +105,7 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
         }
 
         // check statistics
-        checkCacheStatistics(client, m_calcite_cache1_level, m_calcite_cache2_level, m_calcite_cache1_hits, m_calcite_cache2_hits, m_calcite_cache_misses);
+        checkCacheStatistics(client);
     }
 
     public void testCalciteCacheHitMiss() throws IOException, ProcCallException {
@@ -142,7 +141,7 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
-    static public junit.framework.Test suite() {
+    static public junit.framework.Test suite() throws IOException {
         VoltServerConfig config;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestCalciteAdHocPlannerCache.class);
@@ -154,11 +153,7 @@ public class TestCalciteAdHocPlannerCache extends RegressionSuite {
                 + "NUM bigint,"
                 + "RATIO FLOAT, "
                 + "PRIMARY KEY (desc)); ";
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
+        project.addLiteralSchema(literalSchema);
 
         boolean success;
 
