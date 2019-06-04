@@ -55,11 +55,7 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
      * @param limit     The Limit
      */
     public VoltLogicalLimit(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexNode offset,
-            RexNode limit) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
             super(cluster, traitSet, input);
             Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
             m_offset = offset;
@@ -93,7 +89,7 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
     }
 
 }

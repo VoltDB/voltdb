@@ -35,12 +35,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.DoubleFunction;
 
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -421,8 +421,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testAbsWithLimit_ENG3572() throws Exception
-    {
+    public void testAbsWithLimit_ENG3572() throws Exception {
         System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
         /*
@@ -440,7 +439,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initialLoad(Client client, String tableName) throws IOException, NoConnectionsException, InterruptedException {
+    private void initialLoad(Client client, String tableName) throws IOException, InterruptedException {
         ProcedureCallback callback = new ProcedureCallback() {
             @Override
             public void clientCallback(ClientResponse clientResponse) throws Exception {
@@ -471,8 +470,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testAbs() throws Exception
-    {
+    public void testAbs() throws Exception {
         System.out.println("STARTING testAbs");
         Client client = getClient();
         initialLoad(client, "P1");
@@ -736,8 +734,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals( ! isHSQL(), caught);
     }
 
-    public void testSubstring() throws Exception
-    {
+    public void testSubstring() throws Exception {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
         initialLoad(client, "P1");
@@ -904,8 +901,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testCurrentTimestamp() throws Exception
-    {
+    public void testCurrentTimestamp() throws Exception {
         System.out.println("STARTING testCurrentTimestamp");
         /**
          *      "CREATE TABLE R_TIME ( " +
@@ -963,8 +959,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 
-    public void testTimestampConversions() throws Exception
-    {
+    public void testTimestampConversions() throws Exception {
         Client client = getClient();
         ClientResponse cr = null;
         VoltTable r = null;
@@ -1074,8 +1069,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestExtract(client, "ALT_EXTRACT_TIMESTAMP");
     }
 
-    void subtestExtract(Client client, String extractProc)
-            throws NoConnectionsException, IOException, ProcCallException {
+    void subtestExtract(Client client, String extractProc) throws IOException, ProcCallException {
         ClientResponse cr = null;
         VoltTable r = null;
         long result;
@@ -1350,7 +1344,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(extractFailed, EXPECTED_WEEKDAY, result);
     }
 
-    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
+    public void testParams() throws IOException, ProcCallException {
         System.out.println("STARTING testParams");
         Client client = getClient();
         ClientResponse cr;
@@ -1396,8 +1390,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     private static final double nonnegs[] = new double[NONNEGCOUNT];
     private static final int POSCOUNT = ((ROWCOUNT - 1) / 2) * COLUMNCOUNT;
     private static final double nonnegnonzeros[] = new double[POSCOUNT];
-    static
-    {
+    static {
         assert(numTypeNames[FLOATCOLINDEX].equals("FLOAT"));
         assert(numTypeNames[DECIMALCOLINDEX].equals("DECIMAL"));
         int kk = 0;
@@ -1419,8 +1412,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assert(POSCOUNT == pp);
     }
 
-    private static void insertNumbers(Client client, double[] rawData, int nRaws) throws Exception
-    {
+    private static void insertNumbers(Client client, double[] rawData, int nRaws) throws Exception {
         client.callProcedure("@AdHoc", "delete from NUMBER_TYPES;");
         // Insert non-negative or all input values with and without whole number and fractional parts.
         for (int kk = 0; kk < nRaws; kk += COLUMNCOUNT) {
@@ -1430,21 +1422,18 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     private static double normalizeZero(double result) { return (result == -0.0) ? 0.0 : result; }
 
-    private static class FunctionTestCase
-    {
+    private static class FunctionTestCase {
         public final String m_case;
         public final double m_result;
         public final double m_filter;
 
-        public FunctionTestCase(String proc, double result)
-        {
+        public FunctionTestCase(String proc, double result) {
             m_case = proc;
             m_filter = 0.0;
             // Believe it or not, "negative 0" results were causing problems.
             m_result = normalizeZero(result);
         }
-        public FunctionTestCase(String proc, double filter, long result)
-        {
+        public FunctionTestCase(String proc, double filter, long result) {
             m_case = proc;
             m_filter = normalizeZero(filter);
             m_result = result;
@@ -1457,8 +1446,7 @@ public class TestFunctionsSuite extends RegressionSuite {
      * @param jj
      * @return
      */
-    private double getColumnValue(String expectedFormat, VoltTable result, int jj)
-    {
+    private double getColumnValue(String expectedFormat, VoltTable result, int jj) {
         double value;
         if (expectedFormat == null) {
             if (jj < FLOATCOLINDEX) {
@@ -1491,12 +1479,10 @@ public class TestFunctionsSuite extends RegressionSuite {
      * @param filter
      * @return
      * @throws IOException
-     * @throws NoConnectionsException
      * @throws ProcCallException
      */
     private static ClientResponse callWithParameter(String expectedFormat, Client client, String proc, int jj, double filter)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
+            throws IOException, ProcCallException {
         ClientResponse cr;
         if (expectedFormat == null) {
             if (jj < FLOATCOLINDEX) {
@@ -1520,8 +1506,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         return cr;
     }
 
-    private FunctionTestCase[] displayFunctionRun(Client client, String fname, int rowCount, String expectedFormat) throws Exception
-    {
+    private FunctionTestCase[] displayFunctionRun(Client client, String fname, int rowCount, String expectedFormat) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -1543,8 +1528,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         return resultSet;
     }
 
-    private FunctionTestCase[] orderFunctionRun(Client client, String fname, int rowCount) throws Exception
-    {
+    private FunctionTestCase[] orderFunctionRun(Client client, String fname, int rowCount) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -1587,8 +1571,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         return resultSet;
     }
 
-    private FunctionTestCase[] whereFunctionRun(Client client, String fname, Set<Double> filters, String expectedFormat) throws Exception
-    {
+    private FunctionTestCase[] whereFunctionRun(
+            Client client, String fname, Set<Double> filters, String expectedFormat) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -1610,16 +1594,14 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     private static int complaintCount = 1;
-    private static void complain(String complaint)
-    {
+    private static void complain(String complaint) {
         System.out.println("Complaint #" + complaintCount + ": " + complaint);
         ++complaintCount; // NICE PLACE FOR A BREAKPOINT.
     }
 
     static String formatForFuzziness = "%14e";
     private void functionTest(String fname, double rawData[], double[] resultValues, Set<Double> filters,
-                              boolean monotonic, boolean ascending, String expectedFormat) throws Exception
-    {
+                              boolean monotonic, boolean ascending, String expectedFormat) throws Exception {
         System.out.println("STARTING test of " + fname);
 
         Client client = getClient();
@@ -1727,28 +1709,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of " + fname);
     }
 
-    public void testManyNumericFunctions() throws Exception
-    {
-        subtestFromVarCharCasts();
-        subtestToVarCharCasts();
-        subtestNumericCasts();
-        subtestCeiling();
-        subtestExp();
-        subtestFloor();
-        subtestPowerx7();
-        subtestPowerx07();
-        subtestPower7x();
-        subtestPower07x();
-        subtestSqrt();
-        subtestNaturalLog();
-        subtestNaturalLog10();
-        subtestTrig();
-        subtestDegrees();
-        subtestRadians();
-    }
-
-    public void subtestCeiling() throws Exception
-    {
+    @Test
+    public void testCeiling() throws Exception {
         String fname = "CEILING";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1763,8 +1725,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestExp() throws Exception
-    {
+    @Test
+    public void testExp() throws Exception {
         String fname = "EXP";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1778,8 +1740,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestFloor() throws Exception
-    {
+    @Test
+    public void testFloor() throws Exception {
         String fname = "FLOOR";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1794,8 +1756,8 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void subtestPowerx7() throws Exception
-    {
+    @Test
+    public void testPowerx7() throws Exception {
         final String fname = "POWERX7";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1809,8 +1771,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestPowerx07() throws Exception
-    {
+    @Test
+    public void testPowerx07() throws Exception {
         final String fname = "POWERX07";
         final double[] resultValues = new double[nonnegnonzeros.length];
         final Set<Double> filters = new HashSet<>();
@@ -1824,8 +1786,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestPower7x() throws Exception
-    {
+    @Test
+    public void testPower7x() throws Exception {
         final String fname = "POWER7X";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1839,8 +1801,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestPower07x() throws Exception
-    {
+    @Test
+    public void testPower07x() throws Exception {
         final String fname = "POWER07X";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1854,8 +1816,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    public void subtestSqrt() throws Exception
-    {
+    @Test
+    public void testSqrt() throws Exception {
         final String fname = "SQRT";
         final double[] resultValues = new double[nonnegs.length];
         final Set<Double> filters = new HashSet<>();
@@ -1869,8 +1831,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
-    private void subtestTrig() throws Exception
-    {
+    @Test
+    private void testTrig() throws Exception {
         final boolean monotonic = false;
         final boolean ascending = false;
         final String expectedFormat = "DOUBLE";
@@ -1913,8 +1875,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void subtestDegrees() throws Exception
-    {
+    @Test
+    public void testDegrees() throws Exception {
         String fname = "DEGREES";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1929,8 +1891,8 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void subtestRadians() throws Exception
-    {
+    @Test
+    public void testRadians() throws Exception {
         String fname = "RADIANS";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
@@ -1945,8 +1907,8 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void subtestNaturalLog() throws Exception
-    {
+    @Test
+    public void testNaturalLog() throws Exception {
         final String[] fname = {"LOG", "LN"};
         final double[] resultValues = new double[nonnegnonzeros.length];
         final Set<Double> filters = new HashSet<>();
@@ -1999,8 +1961,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void subtestNaturalLog10() throws Exception
-    {
+    @Test
+    public void testNaturalLog10() throws Exception {
         final String[] fname = {"LOG10"};
         final double[] resultValues = new double[nonnegnonzeros.length];
         final Set<Double> filters = new HashSet<>();
@@ -2053,28 +2015,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    private static class FunctionVarCharTestCase
-    {
+    private static class FunctionVarCharTestCase {
         public final String m_case;
         public final String m_filter;
         public final long m_result;
 
-        public FunctionVarCharTestCase(String proc, String filter)
-        {
+        public FunctionVarCharTestCase(String proc, String filter) {
             m_case = proc;
             m_filter = filter;
             m_result = 0;
         }
-        public FunctionVarCharTestCase(String proc, String filter, long l)
-        {
+        public FunctionVarCharTestCase(String proc, String filter, long l) {
             m_case = proc;
             m_filter = filter;
             m_result = l;
         }
     };
 
-    private FunctionVarCharTestCase[] displayVarCharCastRun(Client client, int rowCount) throws Exception
-    {
+    private FunctionVarCharTestCase[] displayVarCharCastRun(Client client, int rowCount) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -2098,8 +2056,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         return resultSet;
     }
 
-    private FunctionVarCharTestCase[] whereVarCharCastRun(Client client, Set<String> filters) throws Exception
-    {
+    private FunctionVarCharTestCase[] whereVarCharCastRun(Client client, Set<String> filters) throws Exception {
         ClientResponse cr;
         VoltTable result;
 
@@ -2173,8 +2130,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         return resultSet;
     }
 
-    public void subtestNumericCasts() throws Exception
-    {
+    @Test
+    public void testNumericCasts() throws Exception {
         System.out.println("STARTING test of numeric CAST");
         final double[] rawData = values;
         final double[] resultIntValues = new double[values.length];
@@ -2285,8 +2242,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of numeric CAST");
     }
 
-    private static void insertNumbersViaVarChar(Client client, double[] rawData, int nRaws) throws Exception
-    {
+    private static void insertNumbersViaVarChar(Client client, double[] rawData, int nRaws) throws Exception {
         client.callProcedure("@AdHoc", "delete from NUMBER_TYPES;");
         // Insert inputs via string values to test casts from VARCHAR
         for (int kk = 0; kk < nRaws; kk += COLUMNCOUNT) {
@@ -2301,8 +2257,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    private void subtestFromVarCharCasts() throws Exception
-    {
+    @Test
+    public void testFromVarCharCasts() throws Exception {
         System.out.println("STARTING test of FROM VARCHAR CAST");
         Client client = getClient();
         insertNumbersViaVarChar(client, values, values.length);
@@ -2311,8 +2267,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of FROM VARCHAR CAST");
     }
 
-    private void subtestToVarCharCasts() throws Exception
-    {
+    @Test
+    public void testToVarCharCasts() throws Exception {
         System.out.println("STARTING test of TO VARCHAR CAST");
         Client client = getClient();
         insertNumbers(client, values, values.length);
@@ -2337,8 +2293,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(VoltTable.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
     }
 
-    private void subtestVarCharCasts(Client client) throws Exception
-    {
+    private void subtestVarCharCasts(Client client) throws Exception {
         final String[] resultValues = new String[values.length];
         final Set<String> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
@@ -2385,6 +2340,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             //*VERBOSIFY TO DEBUG:*/ System.out.println("VARCHAR REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
             if (count < result.m_result) {
                 complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+                System.err.println(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
             }
             assertTrue(count >= result.m_result);
             valueBag.put(result.m_filter, count-(int)result.m_result);
@@ -2424,7 +2380,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+    public void testLeftAndRight() throws IOException, ProcCallException {
         System.out.println("STARTING Left and Right");
         Client client = getClient();
         ClientResponse cr;
@@ -2541,7 +2497,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
+    public void testSpace() throws IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2573,7 +2529,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+    public void testLowerUpper() throws IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2635,7 +2591,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 //        }
     }
 
-    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+    public void testTrim() throws IOException, ProcCallException {
         System.out.println("STARTING test Trim");
         Client client = getClient();
 
@@ -2648,8 +2604,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestTrimAny(client, "ALT_TRIM_ANY");
     }
 
-    private void subtestTrimSpace(Client client, String trimProc)
-            throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestTrimSpace(Client client, String trimProc) throws IOException, ProcCallException {
         ClientResponse cr;
         VoltTable result;
 
@@ -2679,8 +2634,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(trimFailed, "VoltDB",  result.getString(6));
     }
 
-    private void subtestTrimAny(Client client, String trimProc)
-            throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestTrimAny(Client client, String trimProc) throws IOException, ProcCallException {
         ClientResponse cr;
         VoltTable result;
 
@@ -2825,7 +2779,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRepeat() throws IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
         ClientResponse cr;
@@ -2877,7 +2831,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue("Repeat with empty string took too long!", elapsedNanos < 1000000000L * 60L);
     }
 
-    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+    public void testReplace() throws IOException, ProcCallException {
         System.out.println("STARTING test Replace");
         Client client = getClient();
         ClientResponse cr;
@@ -2921,7 +2875,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
-    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+    public void testOverlay() throws IOException, ProcCallException {
         System.out.println("STARTING test Overlay");
         Client client = getClient();
         subtestOverlay(client, "OVERLAY", "OVERLAY_FULL_LENGTH");
@@ -2930,7 +2884,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     public void subtestOverlay(Client client, String overlayProc, String overlayFullLengthProc)
-            throws NoConnectionsException, IOException, ProcCallException {
+            throws IOException, ProcCallException {
         ClientResponse cr;
         VoltTable result;
         String overlayFailed = overlayProc + " got a wrong answer";
@@ -3090,7 +3044,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // Unicode character to UTF8 string character
-    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+    public void testChar() throws IOException, ProcCallException {
         System.out.println("STARTING test CHAR");
 
         // Hsql has wrong answers.
@@ -3137,8 +3091,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // concat params with a sql query string, and test the return value
-    private void doTestCoalesceWithoutConst(Client cl, String[] params,
-                                                   String expect, String id) throws Exception {
+    private void doTestCoalesceWithoutConst(
+            Client cl, String[] params, String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
         String sql;
         if (expect=="NULL"){
@@ -3159,8 +3113,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfLongs(cl, sql, new long[][] {{0}});
     }
 
-    private void doTestCoalesceWithConst(Client cl, String[] params,
-                                                String cst ,String expect, String id) throws Exception {
+    private void doTestCoalesceWithConst(
+            Client cl, String[] params, String cst ,String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
         allPara += ","+cst;
         String sql;
@@ -3204,8 +3158,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // All the columns are not null
-    private void doTestCoalesceTriNotNull(Client cl, String col1,
-                                                 String col2, String col3, String cst) throws Exception {
+    private void doTestCoalesceTriNotNull(
+            Client cl, String col1, String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
         // coalesce(col1, col3, col2) == col1
@@ -3233,8 +3187,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // col3 is null
-    private void doTestCoalesceTriOneNull(Client cl, String col1,
-                                                 String col2, String col3, String cst) throws Exception {
+    private void doTestCoalesceTriOneNull(
+            Client cl, String col1, String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
         // coalesce(col1, col3, col2) == col1
@@ -3262,8 +3216,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // col2 and col3 are null
-    private void doTestCoalesceTriTwoNull(Client cl, String col1,
-                                                 String col2, String col3, String cst) throws Exception {
+    private void doTestCoalesceTriTwoNull(
+            Client cl, String col1, String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
         // coalesce(col1, col3, col2) == col1

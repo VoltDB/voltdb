@@ -78,7 +78,7 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
     }
 
     @Override
