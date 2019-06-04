@@ -163,7 +163,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target ABC3
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL

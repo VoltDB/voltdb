@@ -18,12 +18,17 @@
         </configuration>
         <configuration enabled="true" type="file" target="ABC1">
             <property name="type">csv</property>
-            <property name="nonce">TTLMigrate2</property>
+            <property name="nonce">TTLMigrate1</property>
             <property name="skipinternals">true</property>
         </configuration>
         <configuration enabled="true" type="file" target="ABC2">
             <property name="type">csv</property>
-            <property name="nonce">TTLMigrate1</property>
+            <property name="nonce">TTLMigrate3</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="ABC3">
+            <property name="type">csv</property>
+            <property name="nonce">PARTITIONED_EXPORT</property>
             <property name="skipinternals">true</property>
         </configuration>
     </export>

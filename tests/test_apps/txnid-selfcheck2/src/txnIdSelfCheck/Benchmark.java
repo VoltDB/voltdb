@@ -665,26 +665,26 @@ public class Benchmark {
         // Nibble delete Loader
         if (!(config.disabledThreads.contains("partNDlt") || config.disabledThreads.contains("NDlt"))) {
             partNDlt = new TTLLoader(client, "nibdp",
-                    100000, 1024, 50, permits, partitionCount);
+                    100000, 1024, 50, permits, partitionCount, "TTL");
             partNDlt.start();
         }
 
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
             replNDlt = new TTLLoader(client, "nibdr",
-                    100000, 1024, 3, permits, partitionCount);
+                    100000, 1024, 3, permits, partitionCount, "TTL");
             replNDlt.start();
         }
 
         // TTL/Migrate to Export
         if (!config.disabledThreads.contains("partttlMigratelt")) {
             partttlMigratelt = new TTLLoader(client, "ttl_migrate_p",
-                    100000, 1024, 50, permits, partitionCount);
+                    100000, 1024, 50, permits, partitionCount, "EXPORT");
             partttlMigratelt.start();
         }
 
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
             replttlMigratelt = new TTLLoader(client, "ttl_migrate_r",
-                    100000, 1024, 3, permits, partitionCount);
+                    100000, 1024, 3, permits, partitionCount, "EXPORT");
             replttlMigratelt.start();
         }
 
