@@ -487,6 +487,37 @@ public:
     }
 };
 
+
+template<class D>
+class UserDefineAgg : public Agg {
+    public:
+    UserDefineAgg(Pool* memoryPool)
+        : ifDistinct(memoryPool)
+    {
+    }
+
+    virtual void advance(const NValue& val)
+    {
+        if (val.isNull() || ifDistinct.excludeValue(val)) {
+            return;
+        }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        ifDistinct.clear();
+        return ValueFactory::getBigIntValue(0).castAs(type);
+    }
+
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+    }
+
+private:
+    D ifDistinct;
+};
+
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
@@ -521,6 +552,11 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
+    case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
+        if (isDistinct) {
+            return new (memoryPool) UserDefineAgg<Distinct>(&memoryPool);
+        }
+        return new (memoryPool) UserDefineAgg<NotDistinct>(&memoryPool);
     default:
         {
             char message[128];

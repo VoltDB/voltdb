@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/crypto"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/crypto.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/crypto-complete.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-install.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-mkdir.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-download.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-update.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-patch.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-configure.rule"
+		},
+		{
+			"file" : "/Users/russelhu/Github/voltdb/cmake-build-debug/crypto-prefix/src/crypto-stamp/crypto-build.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"crypto"
+		],
+		"name" : "crypto"
+	}
+}

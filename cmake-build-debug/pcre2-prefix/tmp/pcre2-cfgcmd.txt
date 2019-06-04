@@ -1,0 +1,1 @@
+cmd='/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/pcre2/src/pcre2-10.33/configure;--disable-shared;--with-pic;--prefix=/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-install'

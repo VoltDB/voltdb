@@ -1,0 +1,13 @@
+# Target labels
+ pcre2
+# Source files and their labels
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/pcre2
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/pcre2.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/pcre2-complete.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-install.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-mkdir.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-download.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-update.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-patch.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-configure.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/pcre2-prefix/src/pcre2-stamp/pcre2-build.rule

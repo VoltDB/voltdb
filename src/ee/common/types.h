@@ -315,6 +315,10 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT = 46,
     EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG   = 47,
     EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD  = 48,
+    // -----------------------------
+    // User-defined Aggregates
+    // -----------------------------
+    EXPRESSION_TYPE_AGGREGATE_USER_DEFINE           = 106,
 
     // -----------------------------
     // Windowed Expression Aggregates.

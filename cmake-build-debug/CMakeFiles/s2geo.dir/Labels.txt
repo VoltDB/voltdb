@@ -1,0 +1,13 @@
+# Target labels
+ s2geo
+# Source files and their labels
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/s2geo
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/s2geo.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/CMakeFiles/s2geo-complete.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-install.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-mkdir.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-download.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-update.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-patch.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-configure.rule
+/Users/russelhu/Github/voltdb/cmake-build-debug/3pty-obj/google-s2-geometry/src/s2geo-stamp/s2geo-build.rule
