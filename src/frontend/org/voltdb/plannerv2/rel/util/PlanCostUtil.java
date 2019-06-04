@@ -213,6 +213,7 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
+//<<<<<<< HEAD
         double sparsity = (index.getUnique() || index.getAssumeunique())? // && colCount == keyWidth?
                1 : TABLE_COLUMN_SPARSITY;
         sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
@@ -225,6 +226,10 @@ public final class PlanCostUtil {
             sparsity *= Math.log(partialFilterMultiplier);
         }
 
+//=======
+//        double sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
+//        sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
+//>>>>>>> Make cpu estimates to be equal row count for all logical rels to make new VoltRelOptCost.isLT behaive as old Calcite's implementation
         double tuplesToRead = Math.log(E_CONST - 1 + rowCount * sparsity) / sparsity;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
