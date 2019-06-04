@@ -40,7 +40,9 @@ import java.util.List;
  * @since 9.0
  */
 public class VoltLogicalValues extends Values implements VoltLogicalRel {
-    public VoltLogicalValues(RelOptCluster cluster, RelTraitSet traitSet, RelDataType rowType, ImmutableList<ImmutableList<RexLiteral>> tuples) {
+    public VoltLogicalValues(
+            RelOptCluster cluster, RelTraitSet traitSet, RelDataType rowType,
+            ImmutableList<ImmutableList<RexLiteral>> tuples) {
         // VoltLogicalValues is always SP
         super(cluster, rowType, tuples, traitSet.replace(RelDistributions.SINGLETON.with(null, true)));
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
@@ -54,7 +56,7 @@ public class VoltLogicalValues extends Values implements VoltLogicalRel {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
     }
 
     @Override

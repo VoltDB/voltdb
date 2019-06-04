@@ -239,6 +239,7 @@ public class PlannerTool {
                 requiredLogicalOutputTraits, rel);
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
+        System.err.println(RelOptUtil.toString(transformed));
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         //
@@ -305,8 +306,8 @@ public class PlannerTool {
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO: enable when we are ready
-        throw new PlannerFallbackException("planSqlCalcite not ready");
-        //return new AdHocPlannedStatement(plan, core);
+        // throw new PlannerFallbackException("planSqlCalcite not ready");
+        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(

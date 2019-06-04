@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
+public class VoltLogicalCalc extends Calc implements VoltLogicalRel {
 
     /**
      * Create a VoltLogicalCalc.
@@ -74,7 +74,7 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
     }
 
 }

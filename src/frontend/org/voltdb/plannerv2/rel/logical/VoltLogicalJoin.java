@@ -69,14 +69,8 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
      * @see #isSemiJoinDone()
      */
     public VoltLogicalJoin(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode left,
-            RelNode right,
-            RexNode condition,
-            Set<CorrelationId> variablesSet,
-            JoinRelType joinType,
-            boolean semiJoinDone,
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
@@ -108,7 +102,7 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
     }
 
 }

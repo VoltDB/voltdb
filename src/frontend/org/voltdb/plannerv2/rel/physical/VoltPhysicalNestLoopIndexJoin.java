@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
@@ -86,7 +87,8 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         double rowCount = estimateRowCount(mq);
         double outerRowCount = getInput(0).estimateRowCount(mq);
         double innerRowCount = getInput(1).estimateRowCount(mq);
-        double innerCpu = PlanCostUtil.computeIndexCost(m_innerIndex, m_accessPath, innerRowCount, mq);
+        double innerCpu = PlanCostUtil.computeIndexCost(m_innerIndex, m_accessPath,
+                getTraitSet().getTrait(RelCollationTraitDef.INSTANCE),  innerRowCount);
         return planner.getCostFactory().makeCost(rowCount, outerRowCount * innerCpu, 0.);
     }
 
