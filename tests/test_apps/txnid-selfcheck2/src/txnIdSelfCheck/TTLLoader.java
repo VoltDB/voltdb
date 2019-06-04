@@ -215,7 +215,7 @@ public class TTLLoader extends BenchmarkThread {
                 log.info("Invalid type, " + type + " in getStats");
                 break;
             }
-            return stats; 
+            return stats;
         }
 
         public long getRemainingRowCount(String tableName, String type) {
