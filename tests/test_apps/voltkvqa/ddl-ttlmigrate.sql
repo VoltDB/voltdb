@@ -1,13 +1,13 @@
 LOAD CLASSES voltkv.jar;
 
-CREATE TABLE store MIGRATE TO TARGET ABC1
+CREATE TABLE store 
 (
   key      varchar(250) not null
 , value    varbinary(1048576) not null
 , inserttime     timestamp DEFAULT NOW not null
 , PRIMARY KEY (key)
 ,
-) USING TTL 5 MINUTES ON COLUMN inserttime;
+) USING TTL 1 seconds ON COLUMN inserttime MIGRATE TO TARGET ABC1;
 PARTITION TABLE store ON COLUMN key;
 CREATE INDEX inserttimeidx ON store (inserttime) WHERE NOT MIGRATING;
 
