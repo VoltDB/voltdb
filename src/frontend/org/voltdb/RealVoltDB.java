@@ -1603,6 +1603,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
+            logLicensingInfo();
             logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
 
 
@@ -1895,6 +1896,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
+            logLicensingInfo();
             m_myHostId = m_messenger.getHostId();
             hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
             hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
@@ -1908,6 +1910,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // daily maintenance
             EnterpriseMaintenance em = EnterpriseMaintenance.get();
             if (em != null) { em.dailyMaintenaceTask(); }
+        }
+    }
+
+    private void logLicensingInfo() {
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+
+        hostLog.info("LICENSE INFORMATION: " + m_licenseApi.getLicenseType() + " license issued by VoltDB to " + m_licenseApi.licensee() + " on "
+                + sdf.format(m_licenseApi.issued().getTime()));
+        hostLog.info("LICENSE KEY: " + m_licenseApi.getSignature());
+        hostLog.info("LICENSE EXPIRES: " + sdf.format(m_licenseApi.expires().getTime()));
+        hostLog.info("LICENSE CONSTRAINTS: " + m_licenseApi.maxHostcount() + " nodes");
+
+        if(m_licenseApi.isUnrestricted()) {
+            hostLog.info("LICENSE FEATURES: Unrestricted");
+        }
+        else {
+            hostLog.info("LICENSE FEATURES: " + "commandLoggingEnabled=" + m_licenseApi.isCommandLoggingAllowed()
+                + ", activeActiveDREnabled=" + m_licenseApi.isDrActiveActiveAllowed() + ", isDatabaseReplicationAllowed=" + m_licenseApi.isDrReplicationAllowed());
         }
     }
 
