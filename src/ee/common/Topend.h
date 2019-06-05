@@ -104,7 +104,7 @@ class Topend {
     // The VoltDBEngine will serialize them into the buffer before calling this function.
     virtual int32_t callJavaUserDefinedFunction() = 0;
     virtual int32_t callJavaUserDefinedAggregateStart() = 0;
-    // virtual int32_t callJavaUserDefinedAggregateAssemble() = 0;
+    virtual int32_t callJavaUserDefinedAggregateAssemble() = 0;
     // virtual int32_t callJavaUserDefinedAggregateWorkerEnd() = 0;
     // virtual int32_t callJavaUserDefinedAggregateCoordinatorEnd() = 0;
 
@@ -164,6 +164,7 @@ public:
 
     int32_t callJavaUserDefinedFunction();
     int32_t callJavaUserDefinedAggregateStart();
+    int32_t callJavaUserDefinedAggregateAssemble();
     void resizeUDFBuffer(int32_t size);
 
     std::queue<int32_t> partitionIds;

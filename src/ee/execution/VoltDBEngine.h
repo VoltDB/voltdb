@@ -234,7 +234,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
 
         void callJavaUserDefinedAggregateStart(int32_t functionId);
-        // void callJavaUserDefinedAggregateAssemble(int32_t functionId, std::vector<NValue>& arguments);
+        void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument);
         // void callJavaUserDefinedAggregateWorkerEnd(int32_t functionId);
         // NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId);
 

@@ -501,7 +501,7 @@ class UserDefineAgg : public Agg {
         if (val.isNull()) {
             return;
         }
-        //ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
+        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
     }
 
     virtual NValue finalize(ValueType type)

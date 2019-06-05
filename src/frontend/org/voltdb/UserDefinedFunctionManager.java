@@ -375,6 +375,7 @@ public class UserDefinedFunctionManager {
         }
         
         public void start() throws Throwable {
+            initFunctionInstance(m_funcClass);
             m_startMethod.invoke(m_functionInstance);
         }
 
