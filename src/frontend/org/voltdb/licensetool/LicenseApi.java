@@ -43,4 +43,7 @@ public interface LicenseApi {
     public boolean isDrReplicationAllowed();
     public boolean isDrActiveActiveAllowed();
     public boolean isCommandLoggingAllowed();
+    public String getSignature();
+    public String getLicenseType();
+    public boolean isUnrestricted();
 }

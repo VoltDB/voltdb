@@ -790,6 +790,22 @@ public class MockVoltDB implements VoltDBInterface
             public boolean secondaryInitialization() {
                 return true;
             }
+
+            @Override
+            public String getSignature() {
+                return null;
+            }
+
+            @Override
+            public String getLicenseType() {
+                return null;
+            }
+
+            @Override
+            public boolean isUnrestricted()
+            {
+                return false;
+            }
         };
     }
 
