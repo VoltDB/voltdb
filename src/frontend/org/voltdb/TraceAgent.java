@@ -110,8 +110,6 @@ public class TraceAgent extends OpsAgent {
 
             // check the validity of argument after enable/disable
             String categoryItem = paramsArray[1].toString();
-            String categoryList = "";
-            boolean isFirst = true;
             for (VoltTrace.Category cat : VoltTrace.Category.values()) {
                 if (cat.toString().equalsIgnoreCase(categoryItem)) {
                     obj.put("subselector", subselector);
@@ -119,13 +117,6 @@ public class TraceAgent extends OpsAgent {
                     obj.put("interval", false);
                     return null;               
                 }
-                // construct a list of valid category items
-                if (isFirst) {
-                    categoryList += cat.toString();
-                    isFirst = false;
-                } else {
-                    categoryList += ", " + cat.toString();
-                }  
             }
 
             return "Second argument to @Trace " + 
