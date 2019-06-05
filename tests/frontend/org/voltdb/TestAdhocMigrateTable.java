@@ -62,17 +62,21 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
 
     @Test
     public void testSimple() throws Exception {
-        testMigrate("CREATE TABLE with_ttl(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
-                        "CREATE TABLE without_ttl(i int NOT NULL, j FLOAT);",
+        testMigrate(
+                "CREATE TABLE with_ttl(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                        "CREATE TABLE without_ttl(i int NOT NULL, j FLOAT);\n" +
+                        "CREATE TABLE with_ttl_no_target(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                        "CREATE TABLE without_ttl_no_target(i int NOT NULL, j FLOAT);",
                 Stream.of(
                         Pair.of("MIGRATE FROM without_ttl;", false),
-                        Pair.of("MIGRATE FROM without_ttl WHERE i > 0;", false),
+                        Pair.of("MIGRATE FROM without_ttl WHERE not migrating;", true),
+                        Pair.of("MIGRATE FROM without_ttl WHERE i < 0 and not migrating;", true),
                         Pair.of("MIGRATE FROM with_ttl;", false),
                         Pair.of("MIGRATE FROM with_ttl WHERE j > 0;", false),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i = 0;", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i = 0 OR j > 0;", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i + j > 0", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE power(i, j) > 0;", true)
+                        Pair.of("MIGRATE FROM with_ttl WHERE not migrating;", true),
+                        Pair.of("MIGRATE FROM with_ttl WHERE not migrating() and j > 0;", true),
+                        Pair.of("MIGRATE FROM with_ttl_no_target where not migrating;", false),
+                        Pair.of("MIGRATE FROM without_ttl_no_target where not migrating();", false)
                 ).collect(Collectors.toList()));
     }
 
