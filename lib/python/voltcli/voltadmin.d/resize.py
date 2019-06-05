@@ -16,7 +16,6 @@
 import sys
 from voltcli.hostinfo import Hosts
 
-# TODO: change to specific version when feature branch merge into master
 RELEASE_MAJOR_VERSION = 9
 RELEASE_MINOR_VERSION = 1
 
@@ -54,7 +53,7 @@ def procedureCaller(runner, type):
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
 
-    # @ElasticRemoveNT is added in v8.5?, so must check the version of target cluster to make it work properly.
+    # check the version of target cluster to make it work properly.
     version = host.version
     versionStr = version.split('.')
     majorVersion = int(versionStr[0])
@@ -78,7 +77,7 @@ def procedureCaller(runner, type):
     options = (
             VOLT.StringListOption(None, '--ignore', 'skip_requirements',
                                   '''requirements to skip when start resizing:
-                      export - Checking for Export has been disabled. ''',
+                      disabled_export - Checking for disabled target has been disabled. ''',
                                   default = ''),
     ),
     modifiers = (
