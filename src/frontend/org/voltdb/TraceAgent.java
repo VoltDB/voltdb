@@ -60,6 +60,7 @@ public class TraceAgent extends OpsAgent {
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
     // return null.  Yes, ugly.  Bang it out, then refactor later.
+    // Uppdated by Xiang Gao on Jun. 05, 2019
     private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
     {
         // Default with no args is OVERVIEW
@@ -68,6 +69,7 @@ public class TraceAgent extends OpsAgent {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
                    params.toArray().length + ")";
         }
+
         if (params.toArray().length >= 1) {
             Object first = params.toArray()[0];
             if (!(first instanceof String)) {
@@ -75,6 +77,7 @@ public class TraceAgent extends OpsAgent {
                        first;
             }
             subselector = (String)first;
+            // check the validity of selector following @Trace
             if (!(subselector.equalsIgnoreCase("enable") ||
                   subselector.equalsIgnoreCase("disable") ||
                   subselector.equalsIgnoreCase("status") ||
@@ -82,14 +85,41 @@ public class TraceAgent extends OpsAgent {
                 return "Invalid @Trace selector " + subselector;
             }
         }
-        // Would be nice to have subselector validation here, maybe.  Maybe later.
-        obj.put("subselector", subselector);
-        if (params.toArray().length >= 2) {
-            obj.put("categories", params.toArray()[1]);
-        }
-        obj.put("interval", false);
+        
+        // check number of arguments and then check the validity of arguments
+        if (subselector.equalsIgnoreCase("status") || subselector.equalsIgnoreCase("dump")) {
+            if (params.toArray().length != 1) {
+                return "Incorrect number of arguments to @Trace (expected: 1,  received: " + 
+                        params.toArray().length + ")";
+            }
 
-        return null;
+            obj.put("subselector", subselector);
+            obj.put("interval", false);
+            return null;
+        }
+
+        if (subselector.equalsIgnoreCase("enable") || subselector.equalsIgnoreCase("disable")) {
+            if (params.toArray().length != 2) {
+                return "Incorrect number of arguments to @Trace (expected: 2,  received: " + 
+                        params.toArray().length + ")";
+            }
+
+            // check the validity of argument after enable/disable
+            String categoryItem = params.toArray()[1].toString();
+            for (VoltTrace.Category cat : VoltTrace.Category.values()) {
+                if (cat.toString().equalsIgnoreCase(categoryItem)) {
+                    obj.put("subselector", subselector);
+                    obj.put("categories", params.toArray()[1]);
+                    obj.put("interval", false);
+                    return null;               
+                }
+            }
+
+            return "Second argument to @Trace must be a valid STRING category, instead was " + 
+                   categoryItem;
+        }
+
+       return "Invalid argument list to @Trace";
     }
 
     @Override
