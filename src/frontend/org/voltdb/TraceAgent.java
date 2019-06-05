@@ -59,19 +59,21 @@ public class TraceAgent extends OpsAgent {
 
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
-    // return null.  Yes, ugly.  Bang it out, then refactor later.
-    // Uppdated by Xiang Gao on Jun. 05, 2019
+    // return null.
     private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
     {
         // Default with no args is OVERVIEW
         String subselector = "status";
-        if (params.toArray().length < 1) {
+        Object[] paramsArray = params.toArray();
+        int numOfParams = paramsArray.length;
+
+        if (numOfParams < 1) {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
-                   params.toArray().length + ")";
+                   numOfParams + ")";
         }
 
-        if (params.toArray().length >= 1) {
-            Object first = params.toArray()[0];
+        if (numOfParams >= 1) {
+            Object first = paramsArray[0];
             if (!(first instanceof String)) {
                 return "First argument to @Trace must be a valid STRING selector, instead was " +
                        first;
@@ -88,9 +90,10 @@ public class TraceAgent extends OpsAgent {
         
         // check number of arguments and then check the validity of arguments
         if (subselector.equalsIgnoreCase("status") || subselector.equalsIgnoreCase("dump")) {
-            if (params.toArray().length != 1) {
-                return "Incorrect number of arguments to @Trace (expected: 1,  received: " + 
-                        params.toArray().length + ")";
+            if (numOfParams != 1) {
+                return "Incorrect number of arguments to @Trace " + 
+                        subselector + " (expected: 1,  received: " + 
+                        numOfParams + ")";
             }
 
             obj.put("subselector", subselector);
@@ -99,13 +102,16 @@ public class TraceAgent extends OpsAgent {
         }
 
         if (subselector.equalsIgnoreCase("enable") || subselector.equalsIgnoreCase("disable")) {
-            if (params.toArray().length != 2) {
-                return "Incorrect number of arguments to @Trace (expected: 2,  received: " + 
-                        params.toArray().length + ")";
+            if (numOfParams != 2) {
+                return "Incorrect number of arguments to @Trace " + 
+                        subselector + " (expected: 2,  received: " + 
+                        numOfParams + ")";
             }
 
             // check the validity of argument after enable/disable
-            String categoryItem = params.toArray()[1].toString();
+            String categoryItem = paramsArray[1].toString();
+            String categoryList = "";
+            boolean isFirst = true;
             for (VoltTrace.Category cat : VoltTrace.Category.values()) {
                 if (cat.toString().equalsIgnoreCase(categoryItem)) {
                     obj.put("subselector", subselector);
@@ -113,10 +119,18 @@ public class TraceAgent extends OpsAgent {
                     obj.put("interval", false);
                     return null;               
                 }
+                // construct a list of valid category items
+                if (isFirst) {
+                    categoryList += cat.toString();
+                    isFirst = false;
+                } else {
+                    categoryList += ", " + cat.toString();
+                }  
             }
 
-            return "Second argument to @Trace must be a valid STRING category, instead was " + 
-                   categoryItem;
+            return "Second argument to @Trace " + 
+                    subselector + " must be a valid STRING category, instead was " + 
+                    categoryItem;
         }
 
        return "Invalid argument list to @Trace";
