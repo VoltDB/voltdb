@@ -63,6 +63,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
@@ -875,7 +876,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
-                                                boolean isRecover, boolean isRejoin,
+                                                StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
@@ -888,7 +889,7 @@ public class ExportGeneration implements Generation {
             if (source != null) {
                 ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(partitionId);
                 if (sequences != null) {
-                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                     tasks.add(task);
                 }
             }
@@ -902,7 +903,7 @@ public class ExportGeneration implements Generation {
                         if (!source.inCatalog()) {
                             ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(source.getPartitionId());
                             if (sequences != null) {
-                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                                 tasks.add(task);
                             }
                         }

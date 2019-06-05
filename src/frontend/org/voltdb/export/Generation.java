@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -39,7 +40,7 @@ public interface Generation {
                                 long seqNo, long committedSeqNo, int tupleCount,
                                  long uniqueId, ByteBuffer buffer);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, boolean isRejoin,
+                                                StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite);
 
