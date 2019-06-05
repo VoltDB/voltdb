@@ -209,6 +209,21 @@ public class MiscUtils {
                 public boolean secondaryInitialization() {
                     return true;
                 }
+
+                @Override
+                public String getSignature() {
+                    return null;
+                }
+
+                @Override
+                public String getLicenseType() {
+                    return "Community Edition";
+                }
+
+                @Override
+                public boolean isUnrestricted() {
+                    return false;
+                }
             };
         }
 
