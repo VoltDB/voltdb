@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -277,15 +278,27 @@ public final class ExpressionUtil {
         }
     }
 
-    // A terminal node of an expression is the one that does not have left/right child, nor any parameters;
+    // A terminal node of an expression is the one that does not have left/right child, nor any parameters (null / 0 parameter);
     private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
         if (expr != null) {
             collectTerminals(expr.getLeft(), accum);
             collectTerminals(expr.getRight(), accum);
-            if (expr.getArgs() != null) {
+            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
                 expr.getArgs().forEach(e -> collectTerminals(e, accum));
             } else if (expr.getLeft() == null && expr.getRight() == null) {
                 accum.add(expr);
+            }
+        }
+    }
+
+    private static void collectTerminalParentPairs(AbstractExpression expr, AbstractExpression parent, List<Pair<AbstractExpression, AbstractExpression>> accum) {
+        if (expr != null) {
+            collectTerminalParentPairs(expr.getLeft(), expr, accum);
+            collectTerminalParentPairs(expr.getRight(), expr, accum);
+            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
+                expr.getArgs().forEach(e -> collectTerminalParentPairs(e, expr, accum));
+            } else if (expr.getLeft() == null && expr.getRight() == null) {
+                accum.add(Pair.of(expr, parent));
             }
         }
     }
@@ -298,6 +311,17 @@ public final class ExpressionUtil {
     public static Set<AbstractExpression> collectTerminals(AbstractExpression expr) {
         final Set<AbstractExpression> result = new HashSet<>();
         collectTerminals(expr, result);
+        return result;
+    }
+
+    /**
+     * Collect/dedup all terminal/leaf nodes and their parents of an expression tree
+     * @param expr source expression tree
+     * @return dedup-ed (terminal, terminal's parent) expression pairs
+     */
+    public static List<Pair<AbstractExpression, AbstractExpression>> collectTerminalParentPairs(AbstractExpression expr) {
+        final List<Pair<AbstractExpression, AbstractExpression>> result = new ArrayList<>();
+        collectTerminalParentPairs(expr, null, result);
         return result;
     }
 

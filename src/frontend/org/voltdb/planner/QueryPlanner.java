@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.*;
@@ -30,12 +31,14 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.compiler.VoltXMLElementHelper;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -205,26 +208,28 @@ public class QueryPlanner implements AutoCloseable {
         assert attributes.size() == 1;
         final Table targetTable = db.getTables().get(attributes.get("table"));
         assert targetTable != null;
-        final CatalogMap<TimeToLive> ttls = targetTable.getTimetolive();
-        if (ttls.isEmpty()) {
-            throw new PlanningErrorException(String.format(
-                    "%s: Cannot migrate from table %s because it does not have a TTL column",
-                    sql, targetTable.getTypeName()));
-        } else {
-            final Column ttl = ttls.iterator().next().getTtlcolumn();
-            final TupleValueExpression columnExpression = new TupleValueExpression(
-                    targetTable.getTypeName(), ttl.getName(), ttl.getIndex());
-            if (! ExpressionUtil.collectTerminals(
-                    ExpressionUtil.from(db,
-                            VoltXMLElementHelper.getFirstChild(
-                                    VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
-                                    "operation")))
-                    .contains(columnExpression)) {
-                throw new PlanningErrorException(String.format(
-                        "%s: Cannot migrate from table %s because the WHERE clause does not contain TTL column %s",
-                        sql, targetTable.getTypeName(), ttl.getName()));
+        // extract all the <leaf, parent> pairs in the where conditions.
+        List<Pair<AbstractExpression, AbstractExpression>> leafAndParentList = ExpressionUtil.collectTerminalParentPairs(
+                ExpressionUtil.from(db,
+                        VoltXMLElementHelper.getFirstChild(
+                                VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
+                                "operation")));
+        // check if "not migrating" exists in the where condition
+        for (Pair<AbstractExpression, AbstractExpression> leafAndParent : leafAndParentList) {
+            if (leafAndParent.getFirst() instanceof FunctionExpression) {
+                // the migrating function expression somehow takes function_id = 1,
+                // so compare the function name is safer than function id.
+                if (((FunctionExpression) leafAndParent.getFirst()).getFunctionName().equals("migrating") &&
+                        leafAndParent.getSecond().getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                    // hit "NOT MIGRATING", valid statement
+                    return;
+                }
             }
         }
+        // not hit "NOT MIGRATING", invalid statement
+        throw new PlanningErrorException(String.format(
+                "%s: Cannot migrate from table %s because the WHERE clause does not contain NOT MIGRATING()",
+                sql, targetTable.getTypeName()));
     }
 
     // Generate a Volt XML tree for a hypothetical SWAP TABLE statement.
