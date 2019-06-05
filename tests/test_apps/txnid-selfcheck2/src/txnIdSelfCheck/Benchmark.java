@@ -677,13 +677,13 @@ public class Benchmark {
 
         // TTL/Migrate to Export
         if (!config.disabledThreads.contains("partttlMigratelt")) {
-            partttlMigratelt = new TTLLoader(client, "ttl_migrate_p",
+            partttlMigratelt = new TTLLoader(client, "ttlmigratep",
                     100000, 1024, 50, permits, partitionCount, "EXPORT");
             partttlMigratelt.start();
         }
 
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
-            replttlMigratelt = new TTLLoader(client, "ttl_migrate_r",
+            replttlMigratelt = new TTLLoader(client, "ttlmigrater",
                     100000, 1024, 3, permits, partitionCount, "EXPORT");
             replttlMigratelt.start();
         }
