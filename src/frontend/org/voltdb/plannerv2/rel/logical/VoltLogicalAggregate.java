@@ -65,8 +65,10 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }
