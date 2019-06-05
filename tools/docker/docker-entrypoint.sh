@@ -39,7 +39,7 @@ function execVoltdbStart() {
     fi
 
     if [ -n "${HOST_COUNT}" ]; then
-        OPTIONS=" -c $HOST_COUNT"
+        OPTIONS="$OPTIONS -c $HOST_COUNT"
     fi
 
     if [ -n "${HOSTS}" ]; then
