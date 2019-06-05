@@ -87,8 +87,7 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
     @Override public RelWriter explainTerms(RelWriter pw) {
         // Don't ever print semiJoinDone=false. This way, we
         // don't clutter things up in optimizers that don't use semi-joins.
-        return super.explainTerms(pw)
-                .itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
+        return super.explainTerms(pw).itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
     }
 
     @Override public boolean isSemiJoinDone() {
@@ -101,8 +100,10 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }

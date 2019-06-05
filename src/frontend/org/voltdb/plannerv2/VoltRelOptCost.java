@@ -46,26 +46,26 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
         }
     };
 
-    static final VoltRelOptCost INFINITY = new VoltRelOptCost(
+    private static final VoltRelOptCost INFINITY = new VoltRelOptCost(
             Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY) {
         public String toString() {
             return "{inf}";
         }
     };
 
-    static final VoltRelOptCost HUGE = new VoltRelOptCost(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE) {
+    private static final VoltRelOptCost HUGE = new VoltRelOptCost(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE) {
         public String toString() {
             return "{huge}";
         }
     };
 
-    static final VoltRelOptCost ZERO = new VoltRelOptCost(0.0, 0.0, 0.0) {
+    private static final VoltRelOptCost ZERO = new VoltRelOptCost(0.0, 0.0, 0.0) {
         public String toString() {
             return "{0}";
         }
     };
 
-    static final VoltRelOptCost TINY = new VoltRelOptCost(1.0, 1.0, 0.0) {
+    private static final VoltRelOptCost TINY = new VoltRelOptCost(1.0, 1.0, 0.0) {
         public String toString() {
             return "{tiny}";
         }
@@ -120,8 +120,8 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
     }
 
     @Override public boolean isLt(RelOptCost other) {
-        return getRows() < other.getRows();
-        //return compare(this, (VoltRelOptCost) other) < 0;
+        // return getRows() < other.getRows();
+        return compare(this, (VoltRelOptCost) other) < 0;
     }
 
     @Override public boolean equals(RelOptCost other) {

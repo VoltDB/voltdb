@@ -46,11 +46,7 @@ public class VoltLogicalIntersect extends Intersect implements VoltLogicalRel {
      * @param inputs           inputs
      * @param all              SetOps ALL qualifier
      */
-    public VoltLogicalIntersect(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all) {
+    public VoltLogicalIntersect(RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
@@ -61,8 +57,10 @@ public class VoltLogicalIntersect extends Intersect implements VoltLogicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getCpu(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }
