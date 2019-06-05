@@ -168,6 +168,39 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
         }
 
+        @Override
+        public Entry<M> pollHeader()
+                throws IOException {
+            synchronized (PersistentBinaryDeque.this) {
+                if (m_cursorClosed) {
+                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
+                }
+                assertions();
+
+                moveToValidSegment();
+                PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
+                if (segmentReader == null) {
+                    segmentReader = m_segment.openForRead(m_cursorId);
+                }
+                M extraHeader = m_segment.getExtraHeader();
+
+                return new BinaryDequeReader.Entry<M>() {
+                    @Override
+                    public M getExtraHeader() {
+                        return extraHeader;
+                    }
+
+                    @Override
+                    public ByteBuffer getData() {
+                        return null;
+                    }
+
+                    @Override
+                    public void release() {}
+                };
+            }
+        }
+
         void rewindTo(PBDSegment<M> segment) {
             if (m_rewoundFromId == -1 && m_segment != null) {
                 m_rewoundFromId = m_segment.segmentId();
@@ -304,7 +337,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             }
             m_cursorClosed = true;
         }
-
     }
 
     public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();

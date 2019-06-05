@@ -94,19 +94,21 @@ public class StreamBlockQueue {
     private final String m_path;
     private final int m_partitionId;
     private final String m_streamName;
+    // The initial generation id of the stream that SBQ currently represents.
+    private long m_initialGenerationId;
     private BinaryDequeReader<ExportRowSchema> m_reader;
 
-    public StreamBlockQueue(String path, String nonce, String streamName, int partitionId)
+    public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId)
             throws java.io.IOException {
         m_path = path;
         m_nonce = nonce;
         m_streamName = streamName;
         m_partitionId = partitionId;
+        long initialGenId = genId;
 
-        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
+        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, initialGenId, genId);
         ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
@@ -114,8 +116,18 @@ public class StreamBlockQueue {
                 .compression(!DISABLE_COMPRESSION).build();
 
         m_reader = m_persistentDeque.openForRead(m_nonce);
+        BinaryDequeReader.Entry<ExportRowSchema> entry = m_reader.pollHeader();
+        // Update the header schema with initial generation id from existing PBD file if possible
+        if (entry != null) {
+            initialGenId = entry.getExtraHeader().initialGenerationId;
+            schema = ExportRowSchema.create(streamTable, m_partitionId, initialGenId, genId);
+            m_persistentDeque.updateExtraHeader(schema);
+        }
+        m_initialGenerationId = initialGenId;
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
+                    (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())) +
+                    " initial generation ID is " + m_initialGenerationId);
         }
     }
 
@@ -358,13 +370,13 @@ public class StreamBlockQueue {
                 }
             }
         });
-
         // close reopen reader
         m_persistentDeque.close();
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
 
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
+        ExportRowSchema schema =
+                ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, catalogContext.m_genId);
         ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
 
         m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
@@ -374,6 +386,20 @@ public class StreamBlockQueue {
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+    }
+
+    public boolean deletePBDFromOlderGeneration(long generationId) throws IOException {
+        // Different generation id from snapshot indicates current PBDs are from previous life of this stream,
+        // delete all segments.
+        if (generationId != m_initialGenerationId) {
+            m_persistentDeque.closeAndDelete();
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Delete all pbds from older generation " + m_initialGenerationId);
+            }
+            m_initialGenerationId = generationId;
+            return true;
+        }
+        return false;
     }
 
     public ExportSequenceNumberTracker scanForGap() throws IOException {
@@ -394,6 +420,10 @@ public class StreamBlockQueue {
 
         });
         return tracker;
+    }
+
+    public long getGenerationIdCreated() {
+        return m_initialGenerationId;
     }
 
     @Override

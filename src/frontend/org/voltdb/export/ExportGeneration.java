@@ -361,7 +361,7 @@ public class ExportGeneration implements Generation {
                             final long seqNo = buf.getLong();
                             final long generationIdCreated = buf.getLong();
                             try {
-                                if (generationIdCreated < eds.getGenerationIdCreated()) {
+                                if (generationIdCreated != eds.getGenerationIdCreated()) {
                                     if (exportLog.isDebugEnabled()) {
                                         exportLog.debug("Ignored staled RELEASE_BUFFER message for " + eds.toString() +
                                                 " , sequence number: " + seqNo + ", generationIdCreated: " + generationIdCreated +
