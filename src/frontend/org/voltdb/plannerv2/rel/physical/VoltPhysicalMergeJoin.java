@@ -34,6 +34,7 @@ import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MergeJoinPlanNode;
 import org.voltdb.types.JoinType;
 
@@ -109,7 +110,10 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         final MergeJoinPlanNode mjpn = new MergeJoinPlanNode();
         mjpn.setJoinType(JoinType.INNER);
         mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
-        mjpn.addAndLinkChild(inputRelNodeToPlanNode(this, 1));
+        // Inline inner index scan
+        AbstractPlanNode innerScan = inputRelNodeToPlanNode(this, 1);
+        Preconditions.checkState(innerScan instanceof IndexScanPlanNode);
+        mjpn.addInlinePlanNode(innerScan);
         // Set join predicate
         mjpn.setJoinPredicate(RexConverter.convertJoinPred(getInput(0).getRowType().getFieldCount(), getCondition()));
         // Inline LIMIT / OFFSET

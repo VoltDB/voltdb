@@ -45,10 +45,13 @@
 #include "mergejoinexecutor.h"
 
 #include "executors/aggregateexecutor.h"
+#include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
-#include "plannodes/mergejoinnode.h"
+
+#include "plannodes/indexscannode.h"
 #include "plannodes/limitnode.h"
+#include "plannodes/mergejoinnode.h"
 
 using namespace std;
 using namespace voltdb;
@@ -65,10 +68,16 @@ bool MergeJoinExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVec
     // Init parent first
     if (!AbstractJoinExecutor::p_init(abstractNode, executorVector)) {
         return false;
-    } else { // NULL tuples for left and full joins
-       p_init_null_tuples(node->getInputTable(), node->getInputTable(1));
-       return true;
     }
+    m_innerIndexNode =
+        dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
+    assert(m_innerIndexNode);
+    VOLT_TRACE("<MergeJoinPlanNode> %s, <IndexScanPlanNode> %s",
+               m_abstractNode->debug().c_str(), m_innerIndexNode->debug().c_str());
+
+    // NULL tuples for left and full joins
+    p_init_null_tuples(node->getInputTable(), m_innerIndexNode->getTargetTable());
+    return true;
 }
 
 bool MergeJoinExecutor::p_execute(const NValueArray &params) {
@@ -76,7 +85,7 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
 
     MergeJoinPlanNode* node = dynamic_cast<MergeJoinPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getInputTableCount() == 2);
+    assert(node->getInputTableCount() == 1);
 
     // output table must be a temp table
     assert(m_tmpOutputTable);
@@ -84,7 +93,9 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
     Table* outerTable = node->getInputTable();
     assert(outerTable);
 
-    Table* innerTable = node->getInputTable(1);
+    // inner table is a persistent table
+    assert(dynamic_cast<PersistentTable*>(m_innerIndexNode->getTargetTable()));
+    PersistentTable* innerTable = static_cast<PersistentTable*>(m_innerIndexNode->getTargetTable());
     assert(innerTable);
 
     VOLT_TRACE ("input table left:\n %s", outerTable->debug().c_str());
@@ -132,8 +143,8 @@ bool MergeJoinExecutor::p_execute(const NValueArray &params) {
 
     int const outerCols = outerTable->columnCount();
     int const innerCols = innerTable->columnCount();
-    TableTuple outerTuple(node->getInputTable(0)->schema());
-    TableTuple innerTuple(node->getInputTable(1)->schema());
+    TableTuple outerTuple(outerTable->schema());
+    TableTuple innerTuple(innerTable->schema());
     const TableTuple& nullInnerTuple = m_null_inner_tuple.tuple();
 
     TableIterator outerIterator = outerTable->iteratorDeletingAsWeGo();
