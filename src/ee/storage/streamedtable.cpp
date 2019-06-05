@@ -211,15 +211,6 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis) {
     }
 }
 
-/**
- * Inform the tuple stream wrapper of the table's delegate id
- */
-void StreamedTable::setGeneration(int64_t generation) {
-    if (m_wrapper) {
-        m_wrapper->setGeneration(generation);
-    }
-}
-
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
         assert(seqNo == m_sequenceNo);
@@ -253,10 +244,11 @@ int64_t StreamedTable::allocatedTupleMemory() const {
  * Get the current offset in bytes of the export stream for this Table
  * since startup.
  */
-void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
+void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed, int64_t &genIdCreated) {
     seqNo = m_sequenceNo;
     if (m_wrapper) {
         streamBytesUsed = m_wrapper->bytesUsed();
+        genIdCreated = m_wrapper->getGenerationIdCreated();
     }
 }
 
@@ -264,11 +256,12 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  * Set the current offset in bytes of the export stream for this Table
  * since startup (used for rejoin/recovery).
  */
-void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated) {
     // assume this only gets called from a fresh rejoined node or after the reset of a wrapper
     assert(m_sequenceNo == 0 || seqNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
         m_wrapper->setBytesUsed(seqNo, streamBytesUsed);
+        m_wrapper->setGenerationIdCreated(generationIdCreated);
     }
 }

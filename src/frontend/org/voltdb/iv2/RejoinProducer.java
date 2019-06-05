@@ -29,21 +29,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.CatalogUtil;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -305,21 +302,7 @@ public class RejoinProducer extends JoinProducerBase {
         // we need to figure out which views to pause so that they are handled properly
         // before the snapshot streams arrive.
         if (m_commaSeparatedNameOfViewsToPause == null) {
-            // The very first execution of runForRejoin will lead us here.
-            StringBuilder commaSeparatedViewNames = new StringBuilder();
-            Database db = VoltDB.instance().getCatalogContext().database;
-            for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                if (CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
-                    // If the table is a snapshotted persistent table view, we will try to
-                    // temporarily disable its maintenance job to boost restore performance.
-                    commaSeparatedViewNames.append(table.getTypeName()).append(",");
-                }
-            }
-            // Get rid of the trailing comma.
-            if (commaSeparatedViewNames.length() > 0) {
-                commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
-            }
-            m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
+            initListOfViewsToPause();
             // Set enabled to false for the views we found.
             siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
         }
@@ -390,7 +373,7 @@ public class RejoinProducer extends JoinProducerBase {
                 // Resume the views.
                 siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, true);
                 SnapshotCompletionEvent event = null;
-                Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
+                Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers = null;
                 long clusterCreateTime = -1;
@@ -422,7 +405,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 if (exportSequenceNumbers == null) {
                     // Send empty sequence number map if the schema is empty (no tables).
-                    exportSequenceNumbers = new HashMap<String, Map<Integer, Pair<Long,Long>>>();
+                    exportSequenceNumbers = new HashMap<String, Map<Integer, ExportSnapshotTuple>>();
                 }
                 setJoinComplete(
                         siteConnection,

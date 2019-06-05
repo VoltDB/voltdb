@@ -36,9 +36,10 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 
-public class TestMaxMpResponseSize {
+public class TestMaxMpResponseSize extends JUnit4LocalClusterTest {
     @Test
     public void calculateMpMaxTotalResponse() {
         long systemMemory = Runtime.getRuntime().maxMemory();
@@ -99,6 +100,7 @@ public class TestMaxMpResponseSize {
                     + "PARTITION TABLE my_table ON COLUMN key;"
                     + "CREATE PROCEDURE Insert PARTITION ON TABLE my_table COLUMN key AS INSERT INTO my_table (key, value) VALUES (?, ?);");
             cluster.setHasLocalServer(false);
+            cluster.overrideAnyRequestForValgrind();
             cluster.compile(builder);
             cluster.startCluster();
 

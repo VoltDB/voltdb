@@ -152,6 +152,7 @@ public class Table extends TableBase implements SchemaObject {
     TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
     PersistentExport      persistentExport;    //export to target(VOLTDB)
     private boolean isStream = false;          //is this a stream (VOLTDB)
+    private boolean hasMigrationTarget = false; // does the table has a migration target (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2737,7 +2738,6 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
-            ttl.attributes.put("migrationTarget", timeToLive.migrationTarget);
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
@@ -2777,10 +2777,10 @@ public class Table extends TableBase implements SchemaObject {
 
     // A VoltDB extension to support TTL
     public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize,
-            int maxFrequency, String streamName) {
+            int maxFrequency) {
         dropTTL();
         timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)),
-                batchSize, maxFrequency, streamName);
+                batchSize, maxFrequency);
     }
 
     public TimeToLiveVoltDB getTTL() {
@@ -2788,8 +2788,8 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn,
-            int batchSize, int maxFrequency, String streamName) {
-        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, streamName);
+            int batchSize, int maxFrequency) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
     }
 
     public void dropTTL() {
@@ -2825,7 +2825,11 @@ public class Table extends TableBase implements SchemaObject {
         this.isStream = isStream;
     }
 
-    public boolean isForMigration() {
-        return (timeToLive != null && !StringUtil.isEmpty(timeToLive.migrationTarget));
+    public boolean hasMigrationTarget() {
+        return hasMigrationTarget;
+    }
+
+    public void setHasMigrationTarget(boolean hasMigrationTarget) {
+        this.hasMigrationTarget = hasMigrationTarget;
     }
 }

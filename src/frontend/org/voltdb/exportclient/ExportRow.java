@@ -84,6 +84,7 @@ public class ExportRow {
         return ROW_OPERATION.values()[(byte)values[INTERNAL_OPERATION_COLUMN]];
     }
 
+    // Note: used to decode schemas in encoded rows produced by {@code ExportEncoder.encodeRow}
     public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize,
             int partitionCol, long generation) throws IOException {
         String tableName = ExportRow.decodeString(bb);
@@ -295,7 +296,15 @@ public class ExportRow {
     static public String decodeString(final ByteBuffer bb) {
         final int strlength = bb.getInt();
         final int position = bb.position();
-        String decoded = new String(bb.array(), bb.arrayOffset() + position, strlength, Charsets.UTF_8);
+        String decoded = null;
+        if (bb.hasArray()) {
+            decoded = new String(bb.array(), bb.arrayOffset() + position, strlength, Charsets.UTF_8);
+        } else {
+            // Must be a direct buffer
+            byte[] dst = new byte[strlength];
+            bb.get(dst, 0, strlength);
+            decoded = new String(dst, Charsets.UTF_8);
+        }
         bb.position(position + strlength);
         return decoded;
     }
@@ -397,5 +406,4 @@ public class ExportRow {
         assert(bb.position() - startPosition == strLength);
         return gv;
     }
-
 }

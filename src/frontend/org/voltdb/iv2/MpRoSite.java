@@ -41,6 +41,7 @@ import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
@@ -199,6 +200,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
+        }
+
+        @Override
+        public long getGenerationId() {
+            return m_context.m_genId;
         }
 
         @Override
@@ -562,8 +568,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId, String tableSignature)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -596,7 +601,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,

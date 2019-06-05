@@ -2018,9 +2018,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendEOLMessage(int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
-        m_mailbox.send(initiatorHSId, message);
+        final Long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
+        if (initiatorHSId == null) {
+            log.warn("ClientInterface.sendEOLMessage: Master does not exist for partition: " + partitionId);
+        } else {
+            Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
+            m_mailbox.send(initiatorHSId, message);
+        }
     }
 
     public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
@@ -2166,7 +2170,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                     final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                     m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                            () -> startMigratePartitionLeader(message.isForStopNode()),
+                            () -> {
+                                try {
+                                    startMigratePartitionLeader(message.isForStopNode());
+                                } catch (Exception e) {
+                                    tmLog.error("Migrate partition leader encountered unexpected error", e);
+                                } catch (Throwable t) {
+                                    VoltDB.crashLocalVoltDB("Migrate partition leader encountered unexpected error",
+                                            true, t);
+                                }
+                            },
                             delay, interval, TimeUnit.SECONDS);
                 }
                 hostLog.info("MigratePartitionLeader task is started.");
@@ -2340,7 +2353,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 } catch (InterruptedException ignoreIt) {
                 }
                 remainingWaitTime -= waitingInterval;
-                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                Long hsId = m_cartographer.getHSIdForMaster(partitionId);
+                if (hsId == null) {
+                    log.warn("ClientInterface.startMigratePartitionLeader: Master does not exist for partition: "
+                            + partitionId);
+                    break;
+                }
+                if (CoreUtils.getHostIdFromHSId(hsId) == targetHostId) {
                     migrationComplete = true;
                     break;
                 }

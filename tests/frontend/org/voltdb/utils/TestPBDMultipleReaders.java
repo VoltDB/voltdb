@@ -41,12 +41,12 @@ public class TestPBDMultipleReaders {
 
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
-    private PersistentBinaryDeque m_pbd;
+    private PersistentBinaryDeque<?> m_pbd;
 
     private class PBDReader {
         private String m_readerId;
         private int m_totalRead;
-        private BinaryDequeReader m_reader;
+        private BinaryDequeReader<?> m_reader;
 
         public PBDReader(String readerId) throws IOException {
             m_readerId = readerId;
@@ -108,9 +108,9 @@ public class TestPBDMultipleReaders {
     @Test
     public void testOpenReaders() throws Exception {
         String cursorId = "reader";
-        BinaryDequeReader reader1 = m_pbd.openForRead(cursorId);
-        BinaryDequeReader reader2 = m_pbd.openForRead(cursorId);
-        BinaryDequeReader another = m_pbd.openForRead("another");
+        BinaryDequeReader<?> reader1 = m_pbd.openForRead(cursorId);
+        BinaryDequeReader<?> reader2 = m_pbd.openForRead(cursorId);
+        BinaryDequeReader<?> another = m_pbd.openForRead("another");
         assertTrue(reader1==reader2);
         assertFalse(reader1==another);
 
@@ -140,8 +140,8 @@ public class TestPBDMultipleReaders {
             assertEquals(1, m_pbd.numOpenSegments());
         }
 
-        BinaryDequeReader reader0 = m_pbd.openForRead("reader0");
-        BinaryDequeReader reader1 = m_pbd.openForRead("reader1");
+        BinaryDequeReader<?> reader0 = m_pbd.openForRead("reader0");
+        BinaryDequeReader<?> reader1 = m_pbd.openForRead("reader1");
         // Position first reader0 on penultimate segment and reader1 on first segment
         for (int i=0; i<numSegments-1; i++) {
             for (int j = 0; j < SEGMENT_FILL_COUNT - (i == 0 ? 0 : 1); j++) {
@@ -193,7 +193,8 @@ public class TestPBDMultipleReaders {
     @Before
     public void setUp() throws Exception {
         TestPersistentBinaryDeque.setupTestDir();
-        m_pbd = new PersistentBinaryDeque(TestPersistentBinaryDeque.TEST_NONCE, null, TestPersistentBinaryDeque.TEST_DIR, logger );
+        m_pbd = PersistentBinaryDeque
+                .builder(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, logger).build();
     }
 
     @After
