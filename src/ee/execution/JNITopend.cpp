@@ -96,6 +96,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_callJavaUserDefinedAggregateStartMID = m_jniEnv->GetMethodID(
+            jniClass, "callJavaUserDefinedAggregateStart", "()I");
+    if (m_callJavaUserDefinedAggregateStartMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_callJavaUserDefinedAggregateStartMID != 0);
+        throw std::exception();
+    }
+
     m_resizeUDFBufferMID = m_jniEnv->GetMethodID(
             jniClass, "resizeUDFBuffer", "(I)V");
     if (m_resizeUDFBufferMID == NULL) {
@@ -477,6 +485,11 @@ bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
 int32_t JNITopend::callJavaUserDefinedFunction() {
     return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
                                             m_callJavaUserDefinedFunctionMID);
+}
+
+int32_t JNITopend::callJavaUserDefinedAggregateStart() {
+    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                            m_callJavaUserDefinedAggregateStartMID);
 }
 
 void JNITopend::resizeUDFBuffer(int32_t size) {

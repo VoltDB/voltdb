@@ -75,6 +75,7 @@ public:
         //kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats (DEPRECATED)
         kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
         kErrorCode_callJavaUserDefinedFunction = 107,  // Notify the frontend to call a Java user-defined function.
+        kErrorCode_callJavaUserDefinedAggregateStart = 108,  // Notify the frontend to call a Java user-defined aggregate function start method.
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
         kErrorCode_progressUpdate = 111,               // Update Java on execution progress
         kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
@@ -205,6 +206,8 @@ private:
     void sendPerFragmentStatsBuffer();
 
     int callJavaUserDefinedFunction();
+
+    int callJavaUserDefinedAggregateStart();
 
     void setViewsEnabled(struct ipc_command*);
 
@@ -934,6 +937,39 @@ void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::strin
 int VoltDBIPC::callJavaUserDefinedFunction() {
     // Send a special status code indicating that a UDF invocation request is coming on the wire.
     int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedFunction);
+    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
+
+    // Get the UDF buffer size.
+    int32_t* udfBufferInInt32 = reinterpret_cast<int32_t*>(m_udfBuffer);
+    int32_t udfBufferSizeToSend = ntohl(*udfBufferInInt32);
+    // Send the whole UDF buffer to the wire.
+    // Note that the number of bytes we sent includes the bytes for storing the buffer size.
+    writeOrDie(m_fd, (unsigned char*)m_udfBuffer, sizeof(udfBufferSizeToSend) + udfBufferSizeToSend);
+
+    // Wait for the UDF result.
+
+    int32_t retval, udfBufferSizeToRecv;
+    // read buffer length
+    ssize_t bytes = read(m_fd, &udfBufferSizeToRecv, sizeof(int32_t));
+    checkBytesRead(sizeof(int32_t), bytes, "UDF return value buffer size");
+    // The buffer size should exclude the size of the buffer size value
+    // and the returning status code value (2 * sizeof(int32_t)).
+    udfBufferSizeToRecv = ntohl(udfBufferSizeToRecv) - 2 * sizeof(int32_t);
+
+    // read return value, 0 means success, failure otherwise.
+    bytes = read(m_fd, &retval, sizeof(int32_t));
+    checkBytesRead(sizeof(int32_t), bytes, "UDF execution return code");
+    retval = ntohl(retval);
+
+    // read buffer content, includes the return value of the UDF.
+    bytes = read(m_fd, m_udfBuffer, udfBufferSizeToRecv);
+    checkBytesRead(udfBufferSizeToRecv, bytes, "UDF return value buffer content");
+    return retval;
+}
+
+int VoltDBIPC::callJavaUserDefinedAggregateStart() {
+    // Send a special status code indicating that a UDAF invocation request is coming on the wire.
+    int8_t statusCode = static_cast<int8_t>(kErrorCode_callJavaUserDefinedAggregateStart);
     writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
 
     // Get the UDF buffer size.

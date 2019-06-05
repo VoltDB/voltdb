@@ -374,11 +374,11 @@ public class UserDefinedFunctionManager {
             }
         }
         
-        public void init() throws Throwable {
+        public void start() throws Throwable {
             m_startMethod.invoke(m_functionInstance);
         }
 
-        public void accumulate(ByteBuffer udfBuffer) throws Throwable {
+        public void assemble(ByteBuffer udfBuffer) throws Throwable {
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
@@ -389,11 +389,11 @@ public class UserDefinedFunctionManager {
             m_assembleMethod.invoke(m_functionInstance, paramsIn);
         }
 
-        public void merge() throws Throwable {
+        public void combine() throws Throwable {
             // m_combineMethod.invoke(m_functionInstance, another instance);
         }
 
-        public Object terminate() throws Throwable {
+        public Object end() throws Throwable {
             return m_endMethod.invoke(m_functionInstance);
         }
         

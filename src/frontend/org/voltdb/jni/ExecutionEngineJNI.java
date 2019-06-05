@@ -775,6 +775,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         Object returnValue = null;
         Throwable throwable = null;
     	try {
+            assert(udfRunner != null);
             // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);
 
@@ -840,6 +841,46 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         return -1;
     } 
+
+    public int callJavaUserDefinedAggregateStart() {
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        Throwable throwable = null;
+        try {
+            assert(udafRunner != null);
+            // Call the user-defined function start method
+            udafRunner.start();
+            m_udfBuffer.clear();
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            throwable = ex1.getCause();
+        }
+        catch (Throwable ex2) {
+            throwable = ex2;
+        }
+        // Getting here means the execution was not successful.
+        try {
+            assert(throwable != null);
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+            // But you never know.
+            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(errorMsg.length + 4);
+            }
+            m_udfBuffer.clear();
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return -1;
+    }
 
     /**
      * Store a large temp table block to disk.

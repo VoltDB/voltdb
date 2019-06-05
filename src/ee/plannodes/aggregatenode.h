@@ -72,6 +72,8 @@ public:
 
     const std::vector<ExpressionType> getAggregates() const { return m_aggregates; }
 
+    const std::vector<int> getAggregateIds() const { return m_aggregateIds; }
+
     const std::vector<bool>& getDistinctAggregates() const { return m_distinctAggregates; }
 
     /*
@@ -104,6 +106,7 @@ protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
     std::vector<ExpressionType> m_aggregates;
+    std::vector<int> m_aggregateIds;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
     OwningExpressionVector m_aggregateInputExpressions;

@@ -233,6 +233,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Call user-defined function
         NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
 
+        void callJavaUserDefinedAggregateStart(int32_t functionId);
+        // void callJavaUserDefinedAggregateAssemble(int32_t functionId, std::vector<NValue>& arguments);
+        // void callJavaUserDefinedAggregateWorkerEnd(int32_t functionId);
+        // NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId);
+
+
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
         void updateExecutorContextUndoQuantumForTest();

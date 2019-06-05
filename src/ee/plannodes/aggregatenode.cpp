@@ -99,6 +99,13 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             containsType = true;
             string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
             m_aggregates.push_back(stringToExpression(aggregateColumnTypeString));
+            if (aggregateColumnValue.hasNonNullKey("USER_AGGREGATE_ID")) {
+                int id = aggregateColumnValue.valueForKey("USER_AGGREGATE_ID").asInt();
+                m_aggregateIds.push_back(id);
+            }
+            else {
+                m_aggregateIds.push_back(-1);
+            }
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {
             containsDistinct = true;

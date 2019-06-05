@@ -488,48 +488,49 @@ public:
 };
 
 
-template<class D>
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(Pool* memoryPool)
-        : ifDistinct(memoryPool)
+    UserDefineAgg(int id)
+        : functionId(id)
     {
+        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
     }
 
     virtual void advance(const NValue& val)
     {
-        if (val.isNull() || ifDistinct.excludeValue(val)) {
+        if (val.isNull()) {
             return;
         }
+        //ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
     }
 
     virtual NValue finalize(ValueType type)
     {
-        ifDistinct.clear();
-        return ValueFactory::getBigIntValue(0).castAs(type);
+        return m_value;
     }
 
     virtual void resetAgg()
     {
-        m_haveAdvanced = false;
+        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
     }
 
 private:
-    D ifDistinct;
+    //Pool* m_memoryPool;
+    int functionId;
 };
 
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
         return new (memoryPool) CountStarAgg();
     case EXPRESSION_TYPE_AGGREGATE_MIN:
         return new (memoryPool) MinAgg(&memoryPool);
-    case EXPRESSION_TYPE_AGGREGATE_MAX  :
+    case EXPRESSION_TYPE_AGGREGATE_MAX:
         return new (memoryPool) MaxAgg(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_COUNT:
         if (isDistinct) {
@@ -553,10 +554,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
-        if (isDistinct) {
-            return new (memoryPool) UserDefineAgg<Distinct>(&memoryPool);
-        }
-        return new (memoryPool) UserDefineAgg<NotDistinct>(&memoryPool);
+        return new (memoryPool) UserDefineAgg(agg_id);
     default:
         {
             char message[128];
@@ -602,6 +600,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_partialSerialGroupByColumns = node->getPartialGroupByColumns();
 
     m_aggTypes = node->getAggregates();
+    m_aggregateIds = node->getAggregateIds();
     m_distinctAggs = node->getDistinctAggregates();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
@@ -726,7 +725,7 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii]);
     }
 }
 
