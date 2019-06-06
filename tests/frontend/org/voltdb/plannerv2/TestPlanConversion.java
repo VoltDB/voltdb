@@ -227,10 +227,6 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
         Map<String, String> ignores = new HashMap<>();
         // different column name for const : ENG-15300
         ignores.put("EXPR$0", "C1");
-        // "5.1" is NUMERIC in Calcite but float in Volt : ENG-15301
-        ignores.put("\"TYPE\":30,\"VALUE_TYPE\":22,\"ISNULL\":false,\"VALUE\":\"5.1\"",
-                "\"TYPE\":30,\"VALUE_TYPE\":8,\"ISNULL\":false,\"VALUE\":5.1");
-
         comparePlans(sql, ignores);
     }
 
