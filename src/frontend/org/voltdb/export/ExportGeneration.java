@@ -628,8 +628,7 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
-        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        source.setupMigrateRowsDeleter(migrateBatchSize,
+        source.setupMigrateRowsDeleter(
                 CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
 
         if (exportLog.isDebugEnabled()) {
@@ -695,8 +694,7 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
-                        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize, table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+                        exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);

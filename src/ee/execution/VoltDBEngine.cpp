@@ -2627,8 +2627,8 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
-        std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
+bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+        std::string tableName, int64_t deletableTxnId, int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
         setUndoToken(undoToken);
@@ -2642,9 +2642,9 @@ int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
                 (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            int32_t rowsToBeDeleted = 0;
+            bool rowsToBeDeleted;
             try {
-                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId);
             }
             catch (const SQLException &sqe) {
                 s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
@@ -2686,7 +2686,7 @@ int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 
-    return 0;
+    return false;
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, int64_t &genId, std::string streamName) {
