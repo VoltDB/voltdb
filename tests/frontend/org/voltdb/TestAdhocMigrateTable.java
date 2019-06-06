@@ -23,24 +23,19 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import org.junit.Test;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.utils.MiscUtils;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.junit.Assert.assertTrue;
 
 public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     private void setup(String ddl) throws Exception {
@@ -63,8 +58,8 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     @Test
     public void testSimple() throws Exception {
         testMigrate(
-                "CREATE TABLE with_ttl(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
-                        "CREATE TABLE without_ttl(i int NOT NULL, j FLOAT);\n" +
+                "CREATE TABLE with_ttl migrate to target foo (i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                        "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT);\n" +
                         "CREATE TABLE with_ttl_no_target(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
                         "CREATE TABLE without_ttl_no_target(i int NOT NULL, j FLOAT);",
                 Stream.of(

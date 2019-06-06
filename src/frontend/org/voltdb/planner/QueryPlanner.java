@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -208,6 +209,11 @@ public class QueryPlanner implements AutoCloseable {
         assert attributes.size() == 1;
         final Table targetTable = db.getTables().get(attributes.get("table"));
         assert targetTable != null;
+        if (StringUtil.isEmpty(targetTable.getMigrationtarget())) {
+            throw new PlanningErrorException(String.format(
+                    "%s: Cannot migrate from table %s because the table does not contain migration target",
+                    sql, targetTable.getTypeName()));
+        }
         // extract all the <leaf, parent> pairs in the where conditions.
         List<Pair<AbstractExpression, AbstractExpression>> leafAndParentList = ExpressionUtil.collectTerminalParentPairs(
                 ExpressionUtil.from(db,
