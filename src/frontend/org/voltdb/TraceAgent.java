@@ -71,25 +71,17 @@ public class TraceAgent extends OpsAgent {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
                    numOfParams + ")";
         }
-
-        if (numOfParams >= 1) {
-            Object first = paramsArray[0];
-            if (!(first instanceof String)) {
-                return "First argument to @Trace must be a valid STRING selector, instead was " +
-                       first;
-            }
-            subselector = (String)first;
-            // check the validity of selector following @Trace
-            if (!(subselector.equalsIgnoreCase("enable") ||
-                  subselector.equalsIgnoreCase("disable") ||
-                  subselector.equalsIgnoreCase("status") ||
-                  subselector.equalsIgnoreCase("dump"))) {
-                return "Invalid @Trace selector " + subselector;
-            }
-        }
         
-        // check number of arguments and then check the validity of arguments
-        if (subselector.equalsIgnoreCase("status") || subselector.equalsIgnoreCase("dump")) {
+        Object first = paramsArray[0];
+        if (!(first instanceof String)) {
+            return "First argument to @Trace must be a valid STRING selector, instead was " +
+                   first;
+        }
+
+        subselector = (String)first;
+        
+        // check the validity of arguments
+        if ("status".equalsIgnoreCase(subselector) || "dump".equalsIgnoreCase(subselector)) {
             if (numOfParams != 1) {
                 return "Incorrect number of arguments to @Trace " + 
                         subselector + " (expected: 1,  received: " + 
@@ -101,7 +93,7 @@ public class TraceAgent extends OpsAgent {
             return null;
         }
 
-        if (subselector.equalsIgnoreCase("enable") || subselector.equalsIgnoreCase("disable")) {
+        if ("enable".equalsIgnoreCase(subselector) || "disable".equalsIgnoreCase(subselector)) {
             if (numOfParams != 2) {
                 return "Incorrect number of arguments to @Trace " + 
                         subselector + " (expected: 2,  received: " + 
@@ -124,7 +116,7 @@ public class TraceAgent extends OpsAgent {
                     categoryItem;
         }
 
-       return "Invalid argument list to @Trace";
+       return "Invalid @Trace selector " + subselector;
     }
 
     @Override
