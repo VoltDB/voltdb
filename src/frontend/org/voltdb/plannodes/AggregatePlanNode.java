@@ -53,7 +53,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         AGGREGATE_EXPRESSION,
         GROUPBY_EXPRESSIONS,
         PARTIAL_GROUPBY_COLUMNS,
-        USER_AGGREGATE_ID
+        USER_AGGREGATE_ID,
+        WORKER_OR_COORDINATOR
         ;
     }
 
@@ -65,6 +66,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
     // a list of IDs for user define aggregate functions
     protected List<Integer> m_userAggregateId = new ArrayList<>();
+    // a list of strings that represent whether it is a worker or a coordinator
+    protected List<String> m_workerOrCoordinator = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
@@ -380,6 +383,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (aggInputExpr.getUserAggregateId() != null) {
             m_userAggregateId.add(Integer.parseInt(aggInputExpr.getUserAggregateId()));
         }
+        m_workerOrCoordinator.add("COORDINATOR");
     }
 
     public void updateAggregate(
@@ -398,6 +402,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         schemaExpr.setValueSize(aggExpr.getValueSize());
 
         m_aggregateTypes.set(index, aggType);
+    }
+
+    public void updateWorkerOrCoordinator(int index) {
+        m_workerOrCoordinator.set(index, "WORKER");
     }
 
     public void addGroupByExpression(AbstractExpression expr)
@@ -419,6 +427,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             if (m_userAggregateId.size() > ii) {
                 stringer.keySymbolValuePair(Members.USER_AGGREGATE_ID.name(), m_userAggregateId.get(ii));
             }
+            stringer.keySymbolValuePair(Members.WORKER_OR_COORDINATOR.name(), m_workerOrCoordinator.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));

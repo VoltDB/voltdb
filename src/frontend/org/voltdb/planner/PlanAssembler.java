@@ -2681,6 +2681,7 @@ public class PlanAssembler {
                             "", col.m_alias,
                             rootExpr, outputColumnIndex);
                     tve.setDifferentiator(col.m_differentiator);
+                    tve.setUserAggregateId(rootExpr.getUserAggregateId());
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     agg_input_expr.setUserAggregateId(rootExpr.getUserAggregateId());
@@ -2748,7 +2749,8 @@ public class PlanAssembler {
                          */
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
                                  agg_expression_type != ExpressionType.AGGREGATE_MAX &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT &&
+                                 agg_expression_type != ExpressionType.USER_DEFINE_AGGREGATE) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -3002,6 +3004,7 @@ public class PlanAssembler {
         boolean hasApproxCountDistinct = false;
         for (int i = 0; i < distAggTypes.size(); ++i) {
             ExpressionType et = distAggTypes.get(i);
+            distNode.updateWorkerOrCoordinator(i);
             if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                 hasApproxCountDistinct = true;
                 distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG);

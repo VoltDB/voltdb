@@ -490,8 +490,8 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id)
-        : functionId(id)
+    UserDefineAgg(int id, std::string worc_in)
+        : functionId(id), worc(worc_in)
     {
         ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
     }
@@ -506,6 +506,15 @@ class UserDefineAgg : public Agg {
 
     virtual NValue finalize(ValueType type)
     {
+        // // if this is a worker, it will serialize its output and send it to the coordinator.
+        // if (worc == "WORKER") {
+        //     ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId);
+        //     return m_value;
+        // }
+        // // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
+        // else {
+        //     return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
+        // }
         return m_value;
     }
 
@@ -517,13 +526,14 @@ class UserDefineAgg : public Agg {
 private:
     //Pool* m_memoryPool;
     int functionId;
+    std::string worc;
 };
 
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, std::string worc)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -554,7 +564,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
-        return new (memoryPool) UserDefineAgg(agg_id);
+        return new (memoryPool) UserDefineAgg(agg_id, worc);
     default:
         {
             char message[128];
@@ -602,6 +612,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_aggTypes = node->getAggregates();
     m_aggregateIds = node->getAggregateIds();
     m_distinctAggs = node->getDistinctAggregates();
+    m_workerOrCoordinator = node->getWorkerOrCoordinator();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
@@ -725,7 +736,7 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii]);
+        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_workerOrCoordinator[ii]);
     }
 }
 
