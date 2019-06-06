@@ -1075,8 +1075,12 @@ class Stats(object):
         cursor.execute(query_last_build)
         last_build_recorded = cursor.fetchone()[0]
         logging.info('Last build recorded (in qa database): %s' % last_build_recorded)
+        if not last_build_recorded:
+            last_build_recorded = sys.maxint  # initialized to a very large number
 
         try:
+            build_low  = -1
+            build_high = -2
             builds = build_range.split('-')
             if len(builds) > 1 and len(builds[1]) > 0:
                 build_high = int(builds[1])
@@ -1087,8 +1091,10 @@ class Stats(object):
                 build_low = last_build_recorded + 1
                 build_high = latest_build
         except Exception as e:
-            self.error("Couldn't extrapolate build range, from %s, with latest %s, so %s - %s." \
-                              & (build_range, latest_build, build_low, build_high), e )
+            self.error("Couldn't extrapolate build range, from '%s': with latest "
+                       "build %s and last build recorded %s, we got: %d - %d." \
+                       % (build_range, latest_build, last_build_recorded,
+                          build_low, build_high), e )
             print(self.cmdhelp)
             return
 
