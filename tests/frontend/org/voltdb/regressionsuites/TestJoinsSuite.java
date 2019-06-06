@@ -1722,6 +1722,10 @@ public class TestJoinsSuite extends RegressionSuite {
             {NULL_VALUE, 5}
         });
 
+        query = "SELECT A FROM R1 JOIN R2 USING (A) JOIN R3 USING(A) " +
+                "WHERE A > 0 ORDER BY A";
+        validateTableOfLongs(client, query, new long[][]{{1}, {1}});
+
         // ENG-15253
         // Fails to resolve ambiguous SELECT column for a multi-joins
         // Calcite's Exception "Column name 'A' in USING clause is not unique on one side of join"

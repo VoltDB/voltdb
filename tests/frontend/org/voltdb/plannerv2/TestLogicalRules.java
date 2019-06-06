@@ -496,8 +496,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 + "where t1.i = 3")
                 .transform("VoltLogicalCalc(expr#0..3=[{inputs}], V=[$t3], V0=[$t1])\n" +
                         "  VoltLogicalJoin(condition=[=($2, $0)], joinType=[inner])\n" +
-                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], " +
-                        "expr#8=[=($t6, $t7)], I=[$t0], V=[$t5], $condition=[$t8])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[30.3], " +
+                        "expr#7=[=($t4, $t6)], I=[$t0], V=[$t5], $condition=[$t7])\n" +
                         "      VoltLogicalTableScan(table=[[public, R2]])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], " +
                         "expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10])\n" +
@@ -706,9 +706,20 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
+    public void testFullUsingJoinWithAmbiguousSelectColumn11() {
+        m_tester.sql("select i from R1 full join R2 using(i) where i > 0")
+                .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], expr#4=[0], expr#5=[>($t1, $t4)], expr#6=[>($t0, $t4)], expr#7=[CASE($t2, $t5, $t6)], I=[$t3], $condition=[$t7])\n" +
+                        "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R2]])\n")
+                .pass();
+    }
+
     public void testInnerUsingJoinWithAmbiguousSelectColumn() {
         m_tester.sql("select i from R1 join R2 using(i)")
-        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3])\n" +
+        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t1])\n" +
                     "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -718,20 +729,9 @@ public class TestLogicalRules extends Plannerv2TestCase {
     }
 
     public void testInnerUsingJoinWithAmbiguousSelectColumn1() {
-        m_tester.sql("select i from R1 full join R2 using(i) where i > 0")
-        .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], expr#4=[0], expr#5=[>($t1, $t4)], expr#6=[>($t0, $t4)], expr#7=[CASE($t2, $t5, $t6)], I=[$t3], $condition=[$t7])\n" +
-                    "  VoltLogicalJoin(condition=[=($0, $1)], joinType=[full])\n" +
-                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
-                    "      VoltLogicalTableScan(table=[[public, R1]])\n" +
-                    "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
-                    "      VoltLogicalTableScan(table=[[public, R2]])\n")
-        .pass();
-    }
-
-    public void testInnerUsingJoinWithAmbiguousSelectColumn2() {
         m_tester.sql("select i from R1 join R2 using(i) order by i")
         .transform("VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                    "  VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[IS NOT NULL($t1)], expr#3=[CASE($t2, $t1, $t0)], I=[$t3])\n" +
+                    "  VoltLogicalCalc(expr#0..1=[{inputs}], I=[$t1])\n" +
                     "    VoltLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, R1]])\n" +
@@ -740,5 +740,16 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
-
+    // Non-integral numeric literals should be parsed as DOUBLEs to represent a larger range than DECIMAL
+    public void testNumericLiteralDataType() {
+        // 5.0 is parsed as a DOUBLE and 2 is parsed as an INT
+        // si(SMALLINT) requires a cast to double to be compared to 5.0.
+        // f(FLOAT) does not need a cast because the underlying type being used for FLOAT is actually DOUBLE
+        m_tester.sql("select * from R2 where si = 5.0 and i = 2 and f = 5.0")
+        .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):DOUBLE], expr#7=[5.0], expr#8=[=($t6, $t7)], " +
+                    "expr#9=[2], expr#10=[=($t0, $t9)], expr#11=[5.0], expr#12=[=($t4, $t11)], expr#13=[AND($t8, $t10, $t12)], "  +
+                    "proj#0..5=[{exprs}], $condition=[$t13])\n" +
+                    "  VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
 }
