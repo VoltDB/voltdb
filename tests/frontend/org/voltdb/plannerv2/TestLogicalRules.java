@@ -740,5 +740,9 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
-
+    public void testChatSet() {
+        m_tester.sql("select * from R1 where v like ''你好")
+        .transform("\n")
+        .pass();
+    }
 }
