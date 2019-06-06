@@ -975,6 +975,9 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.ALTER : {
                 read();
 
+                if (token.tokenType == Tokens.EXPORT ) {
+                    return readPersistentExport(t, true);
+                }
                 if (token.tokenType == Tokens.COLUMN) {
                     read();
                 }
@@ -988,9 +991,6 @@ public class ParserDDL extends ParserRoutine {
             }
             case Tokens.USING : {
                 return readTimeToLive(t, true);
-            }
-            case Tokens.EXPORT : {
-                return readPersistentExport(t, true);
             }
             default : {
                 throw unexpectedToken();
@@ -1384,11 +1384,7 @@ public class ParserDDL extends ParserRoutine {
                     read();
 
                     // A VoltDB extension to support TTL
-                    if(token.tokenType == Tokens.EXPORT) {
-                        readPersistentExport(table, false);
-                    } else {
-                        readTimeToLive(table, false);
-                    }
+                    readTimeToLive(table, false);
                     // End of VoltDB extension
                     end = true;
                     break;

@@ -2742,12 +2742,12 @@ public class Table extends TableBase implements SchemaObject {
         }
         assert(indexConstraintMap.isEmpty());
 
-        if (persistentExport != null) {
-            VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
-            pe.attributes.put("target", persistentExport.target);
-            pe.attributes.put("triggers", String.join(",", persistentExport.triggers));
-            table.children.add(pe);
-        }
+//        if (persistentExport != null) {
+//            VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
+//            pe.attributes.put("target", persistentExport.target);
+//            pe.attributes.put("triggers", String.join(",", persistentExport.triggers));
+//            table.children.add(pe);
+//        }
         return table;
     }
 

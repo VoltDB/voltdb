@@ -128,6 +128,12 @@ public abstract class CatalogSchemaTools {
                 if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
                     table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
                 }
+                if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
+                    table_sb.append(" EXPORT TO TARGET ");
+                    table_sb.append(streamTarget);
+                    table_sb.append(" ON " + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
+                    table_sb.append(" ");
+                }
             }
             table_sb.append(" (");
         }
@@ -336,12 +342,6 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
                 table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
-            }
-            else if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
-                table_sb.append(" EXPORT TO TARGET ");
-                table_sb.append(streamTarget);
-                table_sb.append(" ON (" + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
-                table_sb.append(")");
             }
             table_sb.append(";\n");
         }
