@@ -194,7 +194,7 @@ public class PlannerTool {
              * are at least somewhat expected.
              */
             String loggedMsg = "";
-            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
+            if (!(e instanceof PlanningErrorException)) {
                 logException(e, "Error compiling query");
                 loggedMsg = " (Stack trace has been written to the log.)";
             }
@@ -234,12 +234,9 @@ public class PlannerTool {
         // Apply Calcite logical rules
         // See comments in PlannerPrograms.directory.LOGICAL to find out
         // what each rule is used for.
-        RelNode transformed = planner.transform(
-                Phase.LOGICAL.ordinal(),
-                requiredLogicalOutputTraits, rel);
+        RelNode transformed = planner.transform(Phase.LOGICAL.ordinal(), requiredLogicalOutputTraits, rel);
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
-        System.err.println(RelOptUtil.toString(transformed));
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         //
@@ -251,7 +248,6 @@ public class PlannerTool {
 
         // Add RelDistributions.ANY trait to the rel tree.
         transformed = VoltRelUtil.addTraitRecursively(transformed, RelDistributions.ANY);
-
 
         // Apply MP query fallback rules
         // As of 9.0, only SP AdHoc queries are using this new planner.
@@ -270,12 +266,10 @@ public class PlannerTool {
                 .replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
-        transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),
-                requiredPhysicalOutputTraits, transformed);
+        transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(), requiredPhysicalOutputTraits, transformed);
 
         // apply inlining rules.
-        transformed = VoltPlanner.transformHep(Phase.INLINE,
-                HepMatchOrder.ARBITRARY, transformed, true);
+        transformed = VoltPlanner.transformHep(Phase.INLINE, HepMatchOrder.ARBITRARY, transformed, true);
 
         CompiledPlan compiledPlan = new CompiledPlan(false);
         try {
@@ -306,8 +300,8 @@ public class PlannerTool {
         plan.sql = task.getSQL();
         CorePlan core = new CorePlan(plan, m_catalogHash);
         // TODO: enable when we are ready
-        // throw new PlannerFallbackException("planSqlCalcite not ready");
-        return new AdHocPlannedStatement(plan, core);
+        throw new PlannerFallbackException("planSqlCalcite not ready");
+        // return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(
