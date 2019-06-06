@@ -100,26 +100,28 @@ public class KafkaStreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RoundRobinAssignor.class.getName());
 
+        // Query the topics and partitions outside the lock in order to properly
+        // respond to a shutdown query in case we're querying a non-existent broker
+        int kafkaPartitions = 0;
+        KafkaInternalConsumerRunner theConsumer = null;
+        try {
+            theConsumer = createConsumerRunner(props);
+            kafkaPartitions = theConsumer.getKafkaTopicPartitionCount();
+        } catch (KafkaException ke) {
+            LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
+        } catch (Throwable terminate) {
+            LOGGER.error("Failed creating Kafka consumer ", terminate);
+        }
+
+        //paused or shutting down
+        if (kafkaPartitions < 1) {
+            return;
+        }
+
         // While importers could be restarted upon catalog update, a cluster could be paused, triggering
         // stopping the importer @stop().
         // Thus sync the block to avoid any concurrent update.
         synchronized(m_lock) {
-            int kafkaPartitions = 0;
-            KafkaInternalConsumerRunner theConsumer = null;
-            try {
-                theConsumer = createConsumerRunner(props);
-                kafkaPartitions = theConsumer.getKafkaTopicPartitionCount();
-            } catch (KafkaException ke) {
-                LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
-            } catch (Throwable terminate) {
-                LOGGER.error("Failed creating Kafka consumer ", terminate);
-            }
-
-            //paused or shutting down
-            if (kafkaPartitions < 1) {
-                return;
-            }
-
             int totalConsumerCount = kafkaPartitions;
             if (m_config.getConsumerCount() > 0) {
                 totalConsumerCount = m_config.getConsumerCount();
