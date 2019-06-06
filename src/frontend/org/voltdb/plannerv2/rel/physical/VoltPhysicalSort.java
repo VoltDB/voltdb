@@ -124,15 +124,11 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
                 .flatMap(n -> n instanceof VoltLogicalTableScan ?
                         Stream.of(((VoltLogicalTableScan) n).getVoltTable().getCatalogTable()) : Stream.empty())
                 .collect(Collectors.toList());
-        switch (tables.size()) {
-            case 0:
-                return Collections.emptyList();
-            case 1:
-                return StreamSupport.stream((tables.get(0).getIndexes()).spliterator(), false)
-                        .collect(Collectors.toList());
-            default:
-                throw new CalcitePlanningException(String.format("Sort from multiple tables: %s",
-                        tables.stream().map(Table::getTypeName).collect(Collectors.joining(", "))));
+        if (tables.size() == 1) {
+            return StreamSupport.stream((tables.get(0).getIndexes()).spliterator(), false)
+                    .collect(Collectors.toList());
+        } else {    // either sort from multiple table joins, or from a calc
+            return Collections.emptyList();
         }
     }
 
