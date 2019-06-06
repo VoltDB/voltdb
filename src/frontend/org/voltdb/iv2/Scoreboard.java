@@ -86,8 +86,10 @@ public class Scoreboard {
             nextTaskCounter.txnId = next.getFirst().getMsgTxnId();
             nextTaskCounter.completionCount++;
             nextTaskCounter.timestamp = next.getFirst().getTimestamp();
+            nextTaskCounter.missingTxn |= next.getSecond() || next.getFirst().m_txnState.isDone();
         } else if (nextTaskCounter.txnId == next.getFirst().getMsgTxnId() &&
                 nextTaskCounter.timestamp == next.getFirst().getTimestamp()) {
+            nextTaskCounter.missingTxn |= next.getSecond();
             nextTaskCounter.completionCount++;
         }
         return pair;
