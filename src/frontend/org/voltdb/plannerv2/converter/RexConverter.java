@@ -17,7 +17,15 @@
 
 package org.voltdb.plannerv2.converter;
 
-import com.google_voltpatches.common.base.Preconditions;
+import static org.apache.calcite.rel.type.RelDataType.PRECISION_NOT_SPECIFIED;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.GregorianCalendar;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -51,15 +59,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
-import java.math.BigDecimal;
-import java.sql.Ref;
-import java.util.ArrayList;
-import java.util.GregorianCalendar;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-
-import static org.apache.calcite.rel.type.RelDataType.PRECISION_NOT_SPECIFIED;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * The utility class that covert Calcite row expression node to Volt AbstractExpression.
@@ -371,6 +371,46 @@ public class RexConverter {
         return localRefList.stream().map(program::expandLocalRef).collect(Collectors.toList());
     }
 
+    /**
+     * Resolve join condition.
+     *
+     */
+    private static class JoinRefExpressionConvertingVisitor extends ConvertingVisitor {
+
+        final private RexProgram m_outerProgram;
+        final private RexProgram m_innerProgram;
+        JoinRefExpressionConvertingVisitor(int numOuterFieldsForJoin, RexProgram outerProgram,
+                 RexProgram innerProgram) {
+            super(numOuterFieldsForJoin);
+            m_outerProgram = outerProgram;
+            m_innerProgram = innerProgram;
+        }
+
+        @Override
+        public AbstractExpression visitInputRef(RexInputRef inputRef) {
+            int exprInputIndx = inputRef.getIndex();
+            final int tableIdx;
+            RexProgram inputProgram = m_outerProgram;
+            if (exprInputIndx >= m_numOuterFieldsForJoin) {
+                // Adjust inner input and table indexes
+                exprInputIndx -= m_numOuterFieldsForJoin;
+                tableIdx = 1;
+                inputProgram = m_innerProgram;
+            } else {
+                tableIdx = 0;
+            }
+            if (inputProgram != null) {
+                final RexLocalRef outerLocalRef = inputProgram.getProjectList().get(exprInputIndx);
+                AbstractExpression ae = inputProgram.expandLocalRef(outerLocalRef).accept(this);
+                ae.findAllTupleValueSubexpressions().stream().forEach(
+                        tve -> tve.setTableIndex(tableIdx));
+                Preconditions.checkNotNull(ae);
+                return ae;
+            } else {
+                return super.visitInputRef(inputRef);
+            }
+        }
+    }
 
     /**
      * Resolve filter expression for a standalone table (numLhsFieldsForJoin = -1)
@@ -581,8 +621,17 @@ public class RexConverter {
     }
 
     public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond) {
+        return convertJoinPred(numOuterFields, cond, null, null);
+    }
+
+    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond, RexProgram innerProgram) {
+        return convertJoinPred(numOuterFields, cond, null, innerProgram);
+    }
+
+    public static AbstractExpression convertJoinPred(int numOuterFields, RexNode cond, RexProgram outerProgram, RexProgram innerProgram) {
         if (cond != null) {
-            final AbstractExpression expr = cond.accept(new ConvertingVisitor(numOuterFields));
+            final AbstractExpression expr = cond.accept(
+                    new JoinRefExpressionConvertingVisitor(numOuterFields, outerProgram, innerProgram));
             Preconditions.checkNotNull(expr, "RexNode converted to null expression");
             return expr;
         } else {
@@ -590,7 +639,7 @@ public class RexConverter {
         }
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType, int offset) {
+    public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType, int tableIdx) {
         final NodeSchema nodeSchema = new NodeSchema();
 
         final RelRecordType ty = (RelRecordType) rowType;
@@ -598,7 +647,8 @@ public class RexConverter {
         int i = 0;
         for (RelDataTypeField item : ty.getFieldList()) {
             TupleValueExpression tve = new TupleValueExpression("", "", "",
-                    names.get(i), i + offset, i + offset);
+                    names.get(i), i, i);
+            tve.setTableIndex(tableIdx);
             RexConverter.setType(tve, item.getType());
             nodeSchema.addColumn(new SchemaColumn("", "", "", names.get(i), tve, i));
             ++i;
@@ -606,11 +656,13 @@ public class RexConverter {
         return nodeSchema;
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
+    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program, int tableIdx) {
         final NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
         for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
             final AbstractExpression ae = program.expandLocalRef(item.left).accept(ConvertingVisitor.INSTANCE);
+            ae.findAllTupleValueSubexpressions().stream().forEach(
+                    tve -> tve.setTableIndex(tableIdx));
             Preconditions.checkNotNull(ae);
             newNodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
             ++i;

@@ -29,6 +29,7 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -112,8 +113,10 @@ public abstract class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
 
     protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
         Preconditions.checkNotNull(node, "Plan node is null");
-        final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getInput(0).getRowType(), 0)
-                .join(RexConverter.convertToVoltDBNodeSchema(getInput(1).getRowType(), 0));
+        RelDataType outerRowType = getInput(0).getRowType();
+        RelDataType innerRowType = getInput(1).getRowType();
+        final NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(outerRowType, 0)
+                .join(RexConverter.convertToVoltDBNodeSchema(innerRowType, 1));
         node.setOutputSchemaPreInlineAgg(schema);
         node.setOutputSchema(schema);
         node.setHaveSignificantOutputSchema(true);

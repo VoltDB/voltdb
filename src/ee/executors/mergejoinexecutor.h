@@ -51,8 +51,6 @@
 
 namespace voltdb {
 
-class IndexScanPlanNode;
-
 /**
  *
  */
@@ -64,7 +62,6 @@ class MergeJoinExecutor : public AbstractJoinExecutor {
         bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
         bool p_execute(const NValueArray &params);
 
-        IndexScanPlanNode* m_innerIndexNode;
 };
 
 }
