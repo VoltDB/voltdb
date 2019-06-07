@@ -755,8 +755,9 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testCharSet() {
         m_tester.sql("select * from R1 where v like '你好' or v like 'foo'")
-        .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['你好'], expr#7=[LIKE($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
-                    "VoltLogicalTableScan(table=[[public, R1]])\n")
+        .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['你好'], expr#7=[LIKE($t5, $t6)], expr#8=['foo'], " +
+                    "expr#9=[LIKE($t5, $t8)], expr#10=[OR($t7, $t9)], proj#0..5=[{exprs}], $condition=[$t10])\n" +
+                    "  VoltLogicalTableScan(table=[[public, R1]])\n")
         .pass();
     }
 }
