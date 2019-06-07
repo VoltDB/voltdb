@@ -2338,6 +2338,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_iv2Initiators.size() - (m_eligibleAsLeader ? 1 : 0);
     }
 
+    @Override
     public boolean isClusterComplete() {
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }

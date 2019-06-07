@@ -80,21 +80,7 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
             joinProducer = null;
         }
 
-        if (m_partitionId == MpInitiator.MP_INIT_PID) {
-            m_initiatorMailbox = new MpInitiatorMailbox(
-                    m_partitionId,
-                    m_scheduler,
-                    m_messenger,
-                    m_repairLog,
-                    joinProducer);
-        } else {
-            m_initiatorMailbox = new InitiatorMailbox(
-                    m_partitionId,
-                    m_scheduler,
-                    m_messenger,
-                    m_repairLog,
-                    joinProducer);
-        }
+        m_initiatorMailbox = createInitiatorMailbox(joinProducer);
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
@@ -239,4 +225,6 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
             return null;
         }
     }
+
+    protected abstract InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer);
 }
