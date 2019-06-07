@@ -402,7 +402,7 @@ public class TestInlineRules extends Plannerv2TestCase {
                         "    VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], " +
                         "expr#3=['foo'], expr#4=[<>($t1, $t3)], VC=[$t1], $condition=[$t4])\n" +
                         "    VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t1):VARCHAR(256) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5], split=[1])\n" +
+                        "\"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5], split=[1])\n" +
                         "      VoltPhysicalNestLoopJoin(condition=[=($4, $0)], joinType=[inner], split=[1])\n" +
                         "        VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], I=[$t0], V=[$t5])\n" +
                         "        VoltPhysicalTableSequentialScan(table=[[public, R1]], split=[1], expr#0..5=[{inputs}], " +
