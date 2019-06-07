@@ -753,6 +753,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
         .pass();
     }
 
+    // Unicode characters that are not part of the 'ISO-8859-1' character set should be correctly interpreted
     public void testCharSet() {
         m_tester.sql("select * from R1 where v like '你好' or v like 'foo'")
         .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['你好'], expr#7=[LIKE($t5, $t6)], expr#8=['foo'], " +
