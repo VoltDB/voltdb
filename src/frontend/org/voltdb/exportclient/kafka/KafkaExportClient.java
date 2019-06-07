@@ -318,6 +318,9 @@ public class KafkaExportClient extends ExportClientBase {
             catch (ConfigException e) {
                 LOG.error("Unable to instantiate a Kafka producer", e);
                 throw new RestartBlockException("Unable to instantiate a Kafka producer", e, true);
+            } catch (KafkaException e) {
+                LOG.error("Unable to instantiate a Kafka producer", e);
+                throw new RestartBlockException("Unable to instantiate a Kafka producer", e, true);
             }
             m_primed = true;
         }
@@ -405,15 +408,22 @@ public class KafkaExportClient extends ExportClientBase {
                     // In case we were misconfigured to a non-existent Kafka broker,
                     // a decoder thread may be stuck on 'send' and we need to force it out.
                     // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
-                    LOG.warn("Forcing executor shutdown on source: " + m_source);
-                    try {
-                        m_es.shutdownNow();
-                    } catch (Exception e) {
-                        LOG.error("Failed to force executor shutdown on source: " + m_source, e);
-                    }
+                    forceExecutorShutdown();
                 }
             } catch (InterruptedException e) {
-                throw new KafkaExportException("Interrupted while awaiting executor shutdown on source:" + m_source, e);
+                // We are in the UAC path and don't want to throw exception for this condition;
+                // just force the shutdown.
+                LOG.warn("Interrupted while awaiting executor shutdown on source:" + m_source);
+                forceExecutorShutdown();
+            }
+        }
+
+        private void forceExecutorShutdown() {
+            LOG.warn("Forcing executor shutdown on source: " + m_source);
+            try {
+                m_es.shutdownNow();
+            } catch (Exception e) {
+                LOG.error("Failed to force executor shutdown on source: " + m_source, e);
             }
         }
     }
