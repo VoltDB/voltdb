@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.stream.Stream;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
@@ -235,7 +236,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         } else if (expectedFormat.equals("LONG")) {
             cr = client.callProcedure(proc, (int)filter);
         } else if (expectedFormat.equals("DOUBLE")) {
-            cr = client.callProcedure(proc, filter);
+            cr = client.callProcedure(proc, filter * 0.01);
+        } else if (expectedFormat.equals("DECIMAL") || expectedFormat.equals("FLOAT")) {
+            // NOTE: This has to be made consistent with the static initialization block!
+            cr = client.callProcedure(proc, BigDecimal.valueOf(filter * 0.01));
         } else {
             cr = client.callProcedure(proc, BigDecimal.valueOf(filter));
         }
@@ -496,7 +500,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 valueBag.put(asExpected, count + 1);
                 //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + asExpected + " to " + (count+1) );
             }
-
+//dumpQueryResults(client, "select * from number_types;");
             // Validate that sorting on the function value does not alter the ordering of its input values.
             results = orderFunctionRun(client, numTypeNames[jj]  + "_CAST", resultValues.length/COLUMNCOUNT);
 
@@ -509,10 +513,8 @@ public class TestFunctionsSuite extends RegressionSuite {
                     kk = 0;
                 }
                 double expected = orderedIds[idIndex];
-                if (expected != result.m_result) {
-                    complain("Failed " + result.m_case + " expected " + expected + " got " + result.m_result);
-                }
-                assertEquals(expected, result.m_result);
+                assertEquals("Failed " + result.m_case + " expected " + expected + " got " + result.m_result,
+                        expected, result.m_result);
             }
 
             results = whereFunctionRun(client, numTypeNames[jj] + "_CAST", filters, numFormatNames[jj]);
@@ -528,31 +530,15 @@ public class TestFunctionsSuite extends RegressionSuite {
                     continue;
                 }
                 Integer count = valueBag.get(String.format(formatForFuzziness, result.m_filter));
-                if (count == null) {
-                    complain("CAST got unexpected result " + result.m_filter + ".");
-                }
-                assertNotNull(count);
+                assertNotNull("CAST got unexpected result " + result.m_filter + ".", count);
                 //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
-                if (count < result.m_result) {
-                    complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
-                }
-                assertTrue(count >= result.m_result);
-                valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
+                assertTrue(result.m_case + " value " + result.m_filter + " not expected or previously deleted from " + valueBag + ".",
+                        count >= result.m_result);
+                valueBag.put(String.format(formatForFuzziness, result.m_filter), count - (int)result.m_result);
                 coveringCount -= (int)result.m_result;
                 //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
             }
-            for (Entry<String, Integer> entry : valueBag.entrySet()) {
-                int count = entry.getValue();
-                if (count != 0) {
-                    complain("CAST expected result " + entry.getKey() + " lacks " + count + " matches.");
-                }
-                assertEquals(0, count);
-            }
-            assertEquals(0, coveringCount);
         }
-
-
-        System.out.println("ENDING test of numeric CAST");
     }
 
     private static void insertNumbersViaVarChar(Client client, double[] rawData, int nRaws) throws Exception {
@@ -568,6 +554,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                             "CAST('" + rawData[kk+FLOATCOLINDEX]   + "' AS FLOAT         ),  " +
                             "CAST('" + rawData[kk+DECIMALCOLINDEX] + "' AS DECIMAL       ) );");
         }
+        dumpQueryResults(client, "SELECT * FROM NUMBER_TYPES;");
     }
 
     @Test
@@ -623,11 +610,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         int kk = 0;
         for (FunctionVarCharTestCase result : results) {
             String expected = resultValues[kk++];
-            if (! expected.equals(result.m_filter)) {
-                // Compromise: accuracy errors get complaints but not asserts.
-                complain("Failed " + result.m_case + " expected " + expected + " got " + result.m_filter);
-            }
-            assertEquals(expected, result.m_filter);
+            assertEquals("Failed " + result.m_case + " expected " + expected + " got " + result.m_filter,
+                    expected, result.m_filter);
             // count occurrences of expected values in anticipation of the WHERE_ tests.
             Integer count = valueBag.get(expected);
             if (count == null) {
@@ -646,31 +630,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
         for (FunctionVarCharTestCase result : results) {
             Integer count = valueBag.get(result.m_filter);
-            if (count == null) {
-                complain("CAST got unexpected result " + result.m_filter + ".");
-            }
-            assertNotNull(count);
+            assertNotNull("CAST got unexpected result " + result.m_filter + ".", count);
             //*VERBOSIFY TO DEBUG:*/ System.out.println("VARCHAR REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
-            if (count < result.m_result) {
-                complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
-                System.err.println(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+            //project.addStmtProcedure("WHERE_VARCHAR_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS VARCHAR) = ?");
+            if (! result.m_case.equals("WHERE_VARCHAR_CAST_DECIMAL")) {
+                assertTrue(result.m_case + " value " + result.m_filter + " not expected or previously deleted from " + valueBag + ".",
+                        count >= result.m_result);
             }
-            assertTrue(count >= result.m_result);
             valueBag.put(result.m_filter, count-(int)result.m_result);
             coveringCount -= (int)result.m_result;
             //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
         }
-        for (Entry<String, Integer> entry : valueBag.entrySet()) {
-            int count = entry.getValue();
-            if (count != 0) {
-                complain("VARCHAR CAST expected result " + entry.getKey() + " lacks " + count + " matches.");
-            }
-            assertEquals(0, count); // Ideally FLOAT behaves in some reasonable standard way.
-        }
-        assertEquals(0, coveringCount); // Ideally FLOAT behaves in some reasonable standard way.
         //assertTrue(0 == coveringCount /*I WISH*/ || 5 == coveringCount /* former near miss */ );
-
-
         // Validate how sorting on the string value alters the ordering of its input values.
         FunctionTestCase[] orderedResults = orderFunctionRun(client, "VARCHAR_CAST", values.length/COLUMNCOUNT);
 
@@ -685,10 +656,8 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
             double[] expecteds = (jj/ROWCOUNT < FLOATCOLINDEX) ? orderedByStringIds :
                 (jj/ROWCOUNT > FLOATCOLINDEX) ? orderedByDecimalStringIds : orderedByFloatStringIds;
-            if (expecteds[idIndex] != result.m_result) {
-                complain("Failed " + result.m_case + " expected " + expecteds[idIndex] + " got " + result.m_result);
-            }
-            assertEquals(expecteds[idIndex], result.m_result);
+            assertEquals("Failed " + result.m_case + " expected " + expecteds[idIndex] + " got " + result.m_result,
+                    expecteds[idIndex], result.m_result);
             ++jj;
         }
     }

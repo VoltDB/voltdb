@@ -1267,7 +1267,7 @@ public class RegressionSuite extends TestCase {
         VoltTable vts[] = client.callProcedure("@AdHoc", StringUtils.join(queries, '\n')).getResults();
         int ii = 0;
         for (VoltTable vtn : vts) {
-            System.out.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
+            System.err.println("DEBUG: result for " + queries[ii] + "\n" + vtn + "\n");
             ++ii;
         }
     }
