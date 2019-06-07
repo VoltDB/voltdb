@@ -200,8 +200,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(
-                ((MpScheduler)m_scheduler).getHostId(), false);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_scheduler).getLeaderId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }
