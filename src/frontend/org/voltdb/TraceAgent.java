@@ -71,7 +71,7 @@ public class TraceAgent extends OpsAgent {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
                    numOfParams + ")";
         }
-        
+
         Object first = paramsArray[0];
         if (!(first instanceof String)) {
             return "First argument to @Trace must be a valid STRING selector, instead was " +
@@ -79,12 +79,12 @@ public class TraceAgent extends OpsAgent {
         }
 
         subselector = (String)first;
-        
+
         // check the validity of arguments
         if ("status".equalsIgnoreCase(subselector) || "dump".equalsIgnoreCase(subselector)) {
             if (numOfParams != 1) {
-                return "Incorrect number of arguments to @Trace " + 
-                        subselector + " (expected: 1,  received: " + 
+                return "Incorrect number of arguments to @Trace " +
+                        subselector + " (expected: 1,  received: " +
                         numOfParams + ")";
             }
 
@@ -95,8 +95,8 @@ public class TraceAgent extends OpsAgent {
 
         if ("enable".equalsIgnoreCase(subselector) || "disable".equalsIgnoreCase(subselector)) {
             if (numOfParams != 2) {
-                return "Incorrect number of arguments to @Trace " + 
-                        subselector + " (expected: 2,  received: " + 
+                return "Incorrect number of arguments to @Trace " +
+                        subselector + " (expected: 2,  received: " +
                         numOfParams + ")";
             }
 
@@ -107,12 +107,12 @@ public class TraceAgent extends OpsAgent {
                     obj.put("subselector", subselector);
                     obj.put("categories", params.toArray()[1]);
                     obj.put("interval", false);
-                    return null;               
+                    return null;
                 }
             }
 
-            return "Second argument to @Trace " + 
-                    subselector + " must be a valid STRING category, instead was " + 
+            return "Second argument to @Trace " +
+                    subselector + " must be a valid STRING category, instead was " +
                     categoryItem;
         }
 
