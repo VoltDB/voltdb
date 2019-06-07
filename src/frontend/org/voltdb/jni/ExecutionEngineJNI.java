@@ -741,15 +741,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
         long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
                 undoToken);
         if (rowCount < 0) {
-            SerializableException exc = getExceptionFromError((int) rowCount);
-            if (exc instanceof DRTableNotFoundException) {
-                ((DRTableNotFoundException) exc).setRemoteTxnUniqueId(remoteTxnUniqueId);
-            }
-            throw exc;
+            throw getExceptionFromError((int) rowCount);
         }
         return rowCount;
     }

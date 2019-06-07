@@ -87,6 +87,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
@@ -1793,8 +1794,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(1);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
-        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, -1, getNextUndoToken(m_currentTxnId));
+        return callApplyBinaryLogEE(paramBuffer, txnId, spHandle, uniqueId, remoteClusterId, -1);
     }
 
     @Override
@@ -1802,8 +1802,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
         paramBuffer.put(logs);
-        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                remoteClusterId, remoteTxnUniqueId, getNextUndoToken(m_currentTxnId));
+        return callApplyBinaryLogEE(paramBuffer, txnId, spHandle, uniqueId, remoteClusterId, remoteTxnUniqueId);
+    }
+
+    private long callApplyBinaryLogEE(ByteBuffer paramBuffer, long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteUniqueId)
+            throws EEException {
+        try {
+            return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
+                    remoteClusterId, getNextUndoToken(m_currentTxnId));
+        } catch(DRTableNotFoundException e) {
+            e.setRemoteTxnUniqueId(remoteUniqueId);
+            e.setCatalogVersion(getSystemProcedureExecutionContext().getCatalogVersion());
+            throw e;
+        }
     }
 
     @Override
