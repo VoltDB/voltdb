@@ -14,7 +14,7 @@ Things will not go well if this test is not starting with an empty class list.
 create procedure from class sqlcmdtest.Trivial;
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -70,7 +70,7 @@ Command succeeded.
 
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -110,7 +110,7 @@ create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -198,7 +198,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Trivial;
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -259,7 +259,7 @@ create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -328,7 +328,7 @@ drop procedure Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -398,7 +398,7 @@ create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -467,7 +467,7 @@ drop procedure Breakable0;
 Command succeeded.
 
 --- System Procedures ----------------------------------------
-@ElasticRemoveNT          	tinyint, varchar
+@ElasticRemoveNT          	tinyint, varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar

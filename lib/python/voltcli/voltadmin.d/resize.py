@@ -16,9 +16,8 @@
 import sys
 from voltcli.hostinfo import Hosts
 
-# TODO: change to specific version when feature branch merge into master
 RELEASE_MAJOR_VERSION = 9
-RELEASE_MINOR_VERSION = 0
+RELEASE_MINOR_VERSION = 1
 
 # elastic remove procedure call option
 # Need to be update once ElasticRemoveNT.java add/remove/change option coding
@@ -27,7 +26,7 @@ class Option:
     START = 1
     STATUS = 2
     RESTART = 3
-
+    UPDATE = 4
 
 def test(runner):
     procedureCaller(runner, Option.TEST)
@@ -35,11 +34,11 @@ def test(runner):
 def start(runner):
     procedureCaller(runner, Option.START)
 
-def status(runner):
-    procedureCaller(runner, Option.STATUS)
-
 def restart(runner):
     procedureCaller(runner, Option.RESTART)
+
+def status(runner):
+    procedureCaller(runner, Option.STATUS)
 
 def procedureCaller(runner, type):
     response = runner.call_proc('@SystemInformation',
@@ -54,7 +53,7 @@ def procedureCaller(runner, type):
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
 
-    # @ElasticRemoveNT is added in v8.5?, so must check the version of target cluster to make it work properly.
+    # check the version of target cluster to make it work properly.
     version = host.version
     versionStr = version.split('.')
     majorVersion = int(versionStr[0])
@@ -62,8 +61,8 @@ def procedureCaller(runner, type):
     if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
         runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
 
-    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [type, '']).table(0)
+    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
+                              [type, '', ','.join(runner.opts.skip_requirements)]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
     if status == 0:
@@ -75,11 +74,17 @@ def procedureCaller(runner, type):
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Elastic resizing cluster command.',
+    options = (
+            VOLT.StringListOption(None, '--ignore', 'skip_requirements',
+                                  '''requirements to skip when start resizing:
+                      disabled_export - Checking for disabled target has been disabled. ''',
+                                  default = ''),
+    ),
     modifiers = (
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
-            VOLT.Modifier('status', status, 'Check the resizing progress.'),
             VOLT.Modifier('restart', restart, 'Restart the previous failed resizing operation.'),
+            VOLT.Modifier('status', status, 'Check the resizing progress.'),
     )
 )
 
