@@ -27,8 +27,9 @@ DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string con
 
 void DRTableNotFoundException::p_serialize(ReferenceSerializeOutput *output) const {
     output->writeLong(m_hash);
-    // This is a placeholder for remote cluster's txn unique id that gets added in the java layer.
+    // placeholder for remote cluster's txn unique id and catalog version that gets added in the java layer.
     output->writeLong(-1);
+    output->writeInt(-1);
 }
 
 std::string DRTableNotFoundException::message() const {
