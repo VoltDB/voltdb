@@ -71,6 +71,8 @@ public class KafkaExportClient extends ExportClientBase {
     private final static Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
     private final static Splitter PERIOD_SPLITTER = Splitter.on(".").omitEmptyStrings().trimResults();
 
+    private final static int SHUTDOWN_TIMEOUT_MS = 10_000;
+
     private static final ExportClientLogger LOG = new ExportClientLogger();
 
     Properties m_producerConfig;
@@ -399,9 +401,19 @@ public class KafkaExportClient extends ExportClientBase {
             if (m_producer != null) try { m_producer.close(); } catch (Exception ignoreIt) {}
             m_es.shutdown();
             try {
-                m_es.awaitTermination(365, TimeUnit.DAYS);
+                if (!m_es.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    // In case we were misconfigured to a non-existent Kafka broker,
+                    // a decoder thread may be stuck on 'send' and we need to force it out.
+                    // Note that the 'send' does not seem to heed the 'max.block.ms' timeout.
+                    LOG.warn("Forcing executor shutdown on source: " + m_source);
+                    try {
+                        m_es.shutdownNow();
+                    } catch (Exception e) {
+                        LOG.error("Failed to force executor shutdown on source: " + m_source, e);
+                    }
+                }
             } catch (InterruptedException e) {
-                throw new KafkaExportException("Interrupted while awaiting executor shutdown", e);
+                throw new KafkaExportException("Interrupted while awaiting executor shutdown on source:" + m_source, e);
             }
         }
     }
