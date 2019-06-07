@@ -59,37 +59,64 @@ public class TraceAgent extends OpsAgent {
 
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
-    // return null.  Yes, ugly.  Bang it out, then refactor later.
+    // return null.
     private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
     {
         // Default with no args is OVERVIEW
         String subselector = "status";
-        if (params.toArray().length < 1) {
-            return "Incorrect number of arguments to @Trace (expects as least 1, received " +
-                   params.toArray().length + ")";
-        }
-        if (params.toArray().length >= 1) {
-            Object first = params.toArray()[0];
-            if (!(first instanceof String)) {
-                return "First argument to @Trace must be a valid STRING selector, instead was " +
-                       first;
-            }
-            subselector = (String)first;
-            if (!(subselector.equalsIgnoreCase("enable") ||
-                  subselector.equalsIgnoreCase("disable") ||
-                  subselector.equalsIgnoreCase("status") ||
-                  subselector.equalsIgnoreCase("dump"))) {
-                return "Invalid @Trace selector " + subselector;
-            }
-        }
-        // Would be nice to have subselector validation here, maybe.  Maybe later.
-        obj.put("subselector", subselector);
-        if (params.toArray().length >= 2) {
-            obj.put("categories", params.toArray()[1]);
-        }
-        obj.put("interval", false);
+        Object[] paramsArray = params.toArray();
+        int numOfParams = paramsArray.length;
 
-        return null;
+        if (numOfParams < 1) {
+            return "Incorrect number of arguments to @Trace (expects as least 1, received " +
+                   numOfParams + ")";
+        }
+        
+        Object first = paramsArray[0];
+        if (!(first instanceof String)) {
+            return "First argument to @Trace must be a valid STRING selector, instead was " +
+                   first;
+        }
+
+        subselector = (String)first;
+        
+        // check the validity of arguments
+        if ("status".equalsIgnoreCase(subselector) || "dump".equalsIgnoreCase(subselector)) {
+            if (numOfParams != 1) {
+                return "Incorrect number of arguments to @Trace " + 
+                        subselector + " (expected: 1,  received: " + 
+                        numOfParams + ")";
+            }
+
+            obj.put("subselector", subselector);
+            obj.put("interval", false);
+            return null;
+        }
+
+        if ("enable".equalsIgnoreCase(subselector) || "disable".equalsIgnoreCase(subselector)) {
+            if (numOfParams != 2) {
+                return "Incorrect number of arguments to @Trace " + 
+                        subselector + " (expected: 2,  received: " + 
+                        numOfParams + ")";
+            }
+
+            // check the validity of argument after enable/disable
+            String categoryItem = paramsArray[1].toString();
+            for (VoltTrace.Category cat : VoltTrace.Category.values()) {
+                if (cat.toString().equalsIgnoreCase(categoryItem)) {
+                    obj.put("subselector", subselector);
+                    obj.put("categories", params.toArray()[1]);
+                    obj.put("interval", false);
+                    return null;               
+                }
+            }
+
+            return "Second argument to @Trace " + 
+                    subselector + " must be a valid STRING category, instead was " + 
+                    categoryItem;
+        }
+
+       return "Invalid @Trace selector " + subselector;
     }
 
     @Override
