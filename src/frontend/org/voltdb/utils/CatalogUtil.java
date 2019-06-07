@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -655,6 +656,16 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    public static List<String> getDisabledConnectors() {
+        List<String> disabledConnectors = new LinkedList<>();
+        for (Connector conn : getConnectors(VoltDB.instance().getCatalogContext())) {
+            if (!conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                disabledConnectors.add(conn.getTypeName());
+            }
+        }
+        return disabledConnectors;
     }
 
     public static boolean hasExportedTables(CatalogMap<Connector> connectors) {

@@ -704,11 +704,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
         m_nextDeserializer.clear();
-        int txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
-                getStringBytes(tableName), deletableTxnId, maxRowCount, undoToken);
+        boolean txnFullyDeleted = nativeDeleteMigratedRows(pointer, txnid, spHandle, uniqueId,
+                getStringBytes(tableName), deletableTxnId, undoToken);
         return txnFullyDeleted;
     }
 

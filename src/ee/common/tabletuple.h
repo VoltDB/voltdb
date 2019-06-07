@@ -1161,13 +1161,6 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
                             hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
                             static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
     }
-
-    // Null the column
-    if (m_schema->isTableWithStream()) {
-         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(hiddenColumnCount);
-         NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
-         setNValue(hiddenColumnInfo->offset, value);
-    }
 }
 
 inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) const {

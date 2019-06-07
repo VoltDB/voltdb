@@ -1275,7 +1275,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     localAck(commitSeqNo, lastSeqNo);
                     forwardAckToOtherReplicas();
-                    if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
+                    if (m_migrateRowsDeleter != null && commitSpHandle > 0 && m_coordinator.isMaster()) {
                         m_migrateRowsDeleter.delete(commitSpHandle);
                     }
                 } catch (Exception e) {
@@ -1686,12 +1686,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void setupMigrateRowsDeleter(int batchSize, int partitionId) {
-        if (batchSize > 0) {
-            m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId, batchSize);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
-            }
+    public void setupMigrateRowsDeleter(int partitionId) {
+        m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
         }
     }
 

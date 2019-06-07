@@ -605,7 +605,7 @@ public:
     /**
      * Delete the rows that have completed the migration process
      */
-    int32_t deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount);
+    bool deleteMigratedRows(int64_t deletableTxnId);
 
 private:
     // Zero allocation size uses defaults.

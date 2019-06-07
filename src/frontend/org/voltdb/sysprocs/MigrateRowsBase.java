@@ -35,6 +35,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.VoltTable.ColumnInfo;
 
@@ -209,8 +210,9 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         long rowCount = result.asScalarLong();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Migrate on table " + tableName +
-                    (replicated ? "" : " on partition " + ctx.getPartitionId()) +
-                    " reported " + rowCount + " matching rows");
+                    " on partition " + ctx.getPartitionId() +
+                    " reported " + rowCount + " matching rows. txnid:" + TxnEgo.txnIdToString(m_runner.getTxnState().txnId) + " sphandle:" +
+                    m_runner.getTxnState().m_spHandle);
         }
 
         // If number of rows meet the criteria is more than chunk size, pick the column value
