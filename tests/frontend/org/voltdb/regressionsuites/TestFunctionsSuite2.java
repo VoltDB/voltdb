@@ -1788,7 +1788,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                 assertNotNull(count);
                 //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
                 if (count < result.m_result) {
-                    complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+                    complain(result.m_case + " value " + result.m_filter + " not expected or previously deleted from " + valueBag + ".");
                 }
                 assertTrue(count >= result.m_result);
                 valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
