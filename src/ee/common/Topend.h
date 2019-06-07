@@ -105,8 +105,8 @@ class Topend {
     virtual int32_t callJavaUserDefinedFunction() = 0;
     virtual int32_t callJavaUserDefinedAggregateStart() = 0;
     virtual int32_t callJavaUserDefinedAggregateAssemble() = 0;
-    // virtual int32_t callJavaUserDefinedAggregateWorkerEnd() = 0;
-    // virtual int32_t callJavaUserDefinedAggregateCoordinatorEnd() = 0;
+    virtual int32_t callJavaUserDefinedAggregateWorkerEnd() = 0;
+    virtual int32_t callJavaUserDefinedAggregateCoordinatorEnd() = 0;
 
     // Call into the Java top end to resize the ByteBuffer allocated for the UDF
     // when the current buffer size is not large enough to hold all the parameters.
@@ -165,6 +165,8 @@ public:
     int32_t callJavaUserDefinedFunction();
     int32_t callJavaUserDefinedAggregateStart();
     int32_t callJavaUserDefinedAggregateAssemble();
+    int32_t callJavaUserDefinedAggregateWorkerEnd();
+    int32_t callJavaUserDefinedAggregateCoordinatorEnd();
     void resizeUDFBuffer(int32_t size);
 
     std::queue<int32_t> partitionIds;

@@ -68,6 +68,7 @@ import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
 import org.voltdb.compiler.statements.DRTable;
+import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
@@ -214,6 +215,7 @@ public class DDLCompiler {
                                 .addNextProcessor(new CreateProcedureAsScript(this))
                                 .addNextProcessor(new CreateProcedureAsSQL(this))
                                 .addNextProcessor(new CreateFunctionFromMethod(this))
+                                .addNextProcessor(new DropAggregateFunction(this))
                                 .addNextProcessor(new DropFunction(this))
                                 .addNextProcessor(new DropProcedure(this))
                                 .addNextProcessor(new PartitionStatement(this))

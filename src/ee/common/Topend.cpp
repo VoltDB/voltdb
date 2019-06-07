@@ -183,6 +183,14 @@ namespace voltdb {
         return 0;
     }
 
+    int32_t DummyTopend::callJavaUserDefinedAggregateWorkerEnd() {
+        return 0;
+    }
+
+    int32_t DummyTopend::callJavaUserDefinedAggregateCoordinatorEnd() {
+        return 0;
+    }
+
     void DummyTopend::resizeUDFBuffer(int32_t size) {
         // We do nothing here.
     }

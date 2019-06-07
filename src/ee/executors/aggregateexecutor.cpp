@@ -506,16 +506,15 @@ class UserDefineAgg : public Agg {
 
     virtual NValue finalize(ValueType type)
     {
-        // // if this is a worker, it will serialize its output and send it to the coordinator.
-        // if (worc == "WORKER") {
-        //     ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId);
-        //     return m_value;
-        // }
-        // // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
-        // else {
-        //     return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
-        // }
-        return m_value;
+        // if this is a worker, it will serialize its output and send it to the coordinator.
+        if (worc == "WORKER") {
+            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId);
+            return m_value;
+        }
+        // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
+        else {
+            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
+        }
     }
 
     virtual void resetAgg()

@@ -771,92 +771,92 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, cons
     }
 }
 
-// void callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
-//     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-//     if (info == NULL) {
-//         // There must be serious inconsistency in the catalog if this could happen.
-//         throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
-//     }
+void VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
 
-//     // Estimate the size of the buffer we need. We will put:
-//     //   * size of the buffer (function ID + parameters)
-//     //   * function ID (int32_t)
-//     //   * parameters.
-//     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function ID + parameters)
+    //   * function ID (int32_t)
+    //   * parameters.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
 
-//     // Check buffer size here.
-//     // Adjust the buffer size when needed.
-//     // Note that bufferSizeNeeded does not include its own size.
-//     // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
-//     if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
-//         m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
-//     }
-//     resetUDFOutputBuffer();
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    // Note that bufferSizeNeeded does not include its own size.
+    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    }
+    resetUDFOutputBuffer();
 
-//     // Serialize buffer size, function ID.
-//     m_udfOutput.writeInt(bufferSizeNeeded);
-//     m_udfOutput.writeInt(functionId);
+    // Serialize buffer size, function ID.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
 
-//     // Make sure we did the correct size calculation.
-//     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-//     // callJavaUserDefinedFunction() will inform the Java end to execute the
-//     // Java user-defined function according to the function ID and the parameters
-//     // stored in the shared buffer. It will return 0 if the execution is successful.
-//     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
-//     if (returnCode != 0) {
-//         throw SQLException(SQLException::volt_user_defined_function_error,
-//             "callJavaUserDefinedAggregateWorkerEnd failed");
-//     }
-// }
+    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // Java user-defined function according to the function ID and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
+    if (returnCode != 0) {
+        throw SQLException(SQLException::volt_user_defined_function_error,
+            "callJavaUserDefinedAggregateWorkerEnd failed");
+    }
+}
 
-// NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId) {
-//     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
-//     if (info == NULL) {
-//         // There must be serious inconsistency in the catalog if this could happen.
-//         throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
-//     }
+NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
 
-//     // Estimate the size of the buffer we need. We will put:
-//     //   * size of the buffer (function ID + parameters)
-//     //   * function ID (int32_t)
-//     //   * parameters.
-//     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function ID + parameters)
+    //   * function ID (int32_t)
+    //   * parameters.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
 
-//     // Check buffer size here.
-//     // Adjust the buffer size when needed.
-//     // Note that bufferSizeNeeded does not include its own size.
-//     // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
-//     if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
-//         m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
-//     }
-//     resetUDFOutputBuffer();
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    // Note that bufferSizeNeeded does not include its own size.
+    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    }
+    resetUDFOutputBuffer();
 
-//     // Serialize buffer size, function ID.
-//     m_udfOutput.writeInt(bufferSizeNeeded);
-//     m_udfOutput.writeInt(functionId);
+    // Serialize buffer size, function ID.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
 
-//     // Make sure we did the correct size calculation.
-//     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-//     // callJavaUserDefinedFunction() will inform the Java end to execute the
-//     // Java user-defined function according to the function ID and the parameters
-//     // stored in the shared buffer. It will return 0 if the execution is successful.
-//     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
-//     // Note that the buffer may already be resized after the execution.
-//     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
-//     if (returnCode == 0) {
-//         // After the the invocation, read the return value from the buffer.
-//         NValue retval = ValueFactory::getNValueOfType(info->returnType);
-//         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
-//         return retval;
-//     }
-//     else {
-//         // Error handling
-//         std::string errorMsg = udfResultIn.readTextString();
-//         throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
-//     }
-// }
+    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // Java user-defined function according to the function ID and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
+    // Note that the buffer may already be resized after the execution.
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (returnCode == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval = ValueFactory::getNValueOfType(info->returnType);
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        std::string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    }
+}
 
 
 void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {

@@ -280,7 +280,21 @@ public class SQLParser extends SQLPatternFactory
             SPF.capture(SPF.classPath())
         ).compile("PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS");
     
-
+    /*
+     * DROP AGGREGATE FUNCTION <NAME> [IF EXISTS]
+     *
+     * Drop a user-defined aggregate function.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) If exists
+     */
+    private static final Pattern PAT_DROP_AGGREGATE_FUNCTION =
+        SPF.statement(
+            SPF.token("drop"), SPF.token("aggregate"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+        ).compile("PAT_DROP_AGGREGATE_FUNCTION");
+    
     /*
      * DROP FUNCTION <NAME> [IF EXISTS]
      *
@@ -908,6 +922,16 @@ public class SQLParser extends SQLPatternFactory
         return PAT_CREATE_AGGREGATE_FUNCTION_FROM_CLASS.matcher(statement);
     }
 
+    /**
+     * Match statement against the pattern for drop aggregate function
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropAggregateFunction(String statement)
+    {
+        return PAT_DROP_AGGREGATE_FUNCTION.matcher(statement);
+    }
+    
     /**
      * Match statement against the pattern for drop function
      * @param statement  statement to match against

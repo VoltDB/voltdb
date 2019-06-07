@@ -390,8 +390,8 @@ public class UserDefinedFunctionManager {
             m_assembleMethod.invoke(m_functionInstance, paramsIn);
         }
 
-        public void combine() throws Throwable {
-            // m_combineMethod.invoke(m_functionInstance, another instance);
+        public void combine(Object other) throws Throwable {
+            m_combineMethod.invoke(m_functionInstance, other);
         }
 
         public Object end() throws Throwable {
@@ -400,6 +400,10 @@ public class UserDefinedFunctionManager {
         
         public VoltType getReturnType() {
             return m_returnType;
+        }
+
+        public Object getFunctionInstance() {
+            return m_functionInstance;
         }
         
     }
