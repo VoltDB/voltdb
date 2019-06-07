@@ -963,7 +963,7 @@ public abstract class SubPlanAssembler {
         // This list remains null if the index is just on simple columns.
         List<AbstractExpression> indexedExprs = null;
         // This vector of indexed columns remains null if indexedExprs is in use.
-        List<ColumnRef> indexedColRefs = null;
+        List<ColumnRef> indexedColRefs;
         int[] indexedColIds = null;
         int keyComponentCount;
         if (exprsjson.isEmpty()) {

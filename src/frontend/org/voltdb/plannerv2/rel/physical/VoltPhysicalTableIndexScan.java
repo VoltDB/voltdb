@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -147,7 +148,8 @@ public class VoltPhysicalTableIndexScan extends VoltPhysicalTableScan {
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        double cpu = PlanCostUtil.computeIndexCost(m_index, m_accessPath, rowCount, mq);
+        double cpu = PlanCostUtil.computeIndexCost(m_index, m_accessPath,
+                getTraitSet().getTrait(RelCollationTraitDef.INSTANCE),  rowCount);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0.);
     }
 

@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
+public class VoltLogicalCalc extends Calc implements VoltLogicalRel {
 
     /**
      * Create a VoltLogicalCalc.
@@ -50,11 +50,7 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
      * @param input Input relation
      * @param program Calc program
      */
-    public VoltLogicalCalc(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexProgram program) {
+    public VoltLogicalCalc(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexProgram program) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
@@ -73,8 +69,10 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }

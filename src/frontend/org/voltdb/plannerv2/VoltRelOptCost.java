@@ -23,25 +23,37 @@ import java.util.Objects;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
 import org.apache.calcite.plan.RelOptUtil;
-import org.voltdb.VoltOverflowException;
 
 public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
 
-    static final RelOptCostFactory FACTORY = new Factory();
+    /** Implementation of {@link org.apache.calcite.plan.RelOptCostFactory}
+     * that creates {@link org.voltdb.plannerv2.VoltRelOptCost}s. */
+    static final RelOptCostFactory FACTORY = new RelOptCostFactory() {
+        @Override public RelOptCost makeCost(double dRows, double dCpu, double dIo) {
+            return new VoltRelOptCost(dRows, dCpu, dIo);
+        }
+        @Override public RelOptCost makeHugeCost() {
+            return VoltRelOptCost.HUGE;
+        }
+        @Override public RelOptCost makeInfiniteCost() {
+            return VoltRelOptCost.INFINITY;
+        }
+        @Override public RelOptCost makeTinyCost() {
+            return VoltRelOptCost.TINY;
+        }
+        @Override public RelOptCost makeZeroCost() {
+            return VoltRelOptCost.ZERO;
+        }
+    };
 
     private static final VoltRelOptCost INFINITY = new VoltRelOptCost(
-            Double.POSITIVE_INFINITY,
-            Double.POSITIVE_INFINITY,
-            Double.POSITIVE_INFINITY) {
+            Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY) {
         public String toString() {
             return "{inf}";
         }
     };
 
-    private static final VoltRelOptCost HUGE = new VoltRelOptCost(
-            Double.MAX_VALUE,
-            Double.MAX_VALUE,
-            Double.MAX_VALUE) {
+    private static final VoltRelOptCost HUGE = new VoltRelOptCost(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE) {
         public String toString() {
             return "{huge}";
         }
@@ -115,8 +127,7 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
         return compare(this, (VoltRelOptCost) other) == 0;
     }
 
-    @Override
-    public int hashCode() {
+    @Override public int hashCode() {
         return Objects.hash(rowCount, cpu, io);
     }
 
@@ -126,9 +137,8 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
             return true;
         } else {
             final VoltRelOptCost delta = (VoltRelOptCost) minus(other);
-            return Math.max(Math.abs(delta.getCpu()),
-                    Math.max(Math.abs(delta.getRows()),
-                            Math.abs(delta.getIo()))) < RelOptUtil.EPSILON;
+            return Math.max(Math.abs(delta.getCpu()), Math.max(Math.abs(delta.getRows()), Math.abs(delta.getIo()))) <
+                    RelOptUtil.EPSILON;
         }
     }
 
@@ -137,26 +147,16 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
             return this;
         } else {
             final VoltRelOptCost that = (VoltRelOptCost) other;
-            return new VoltRelOptCost(rowCount - that.rowCount,
-                    cpu - that.cpu, io - that.io);
+            return new VoltRelOptCost(rowCount - that.rowCount, cpu - that.cpu, io - that.io);
         }
     }
 
     @Override public RelOptCost multiplyBy(double factor) {
         if (this == INFINITY) {
             return this;
+        } else {
+            return new VoltRelOptCost(rowCount * factor, cpu * factor, io * factor);
         }
-        if (Double.isInfinite(rowCount * factor)) {
-            throw new VoltOverflowException("VoltRelOptCost rowCount is infinite");
-        }
-        if (Double.isInfinite(cpu * factor)) {
-            throw new VoltOverflowException("VoltRelOptCost cpu is infinite");
-        }
-        if (Double.isInfinite(io * factor)) {
-            throw new VoltOverflowException("VoltRelOptCost io is infinite");
-        }
-
-        return new VoltRelOptCost(rowCount * factor, cpu * factor, io * factor);
     }
 
     @Override public double divideBy(RelOptCost cost) {
@@ -170,63 +170,28 @@ public class VoltRelOptCost implements RelOptCost, Comparator<VoltRelOptCost> {
             d *= rowCount / that.rowCount;
             ++n;
         }
-        if (cpu != 0 && !Double.isInfinite(cpu) && that.cpu != 0
-                && !Double.isInfinite(that.cpu)) {
+        if (cpu != 0 && !Double.isInfinite(cpu) && that.cpu != 0 && !Double.isInfinite(that.cpu)) {
             d *= cpu / that.cpu;
             ++n;
         }
-        if (io != 0 && !Double.isInfinite(io) && that.io != 0
-                && !Double.isInfinite(that.io)) {
+        if (io != 0 && !Double.isInfinite(io) && that.io != 0 && !Double.isInfinite(that.io)) {
             d *= io / that.io;
             ++n;
         }
         if (n == 0) {
             return 1.0;
+        } else {
+            return Math.pow(d, 1 / n);
         }
-        return Math.pow(d, 1 / n);
     }
 
     @Override public RelOptCost plus(RelOptCost other) {
+        assert other instanceof VoltRelOptCost : "plus(): other is not an instance of VoltRelOptCost";
         final VoltRelOptCost that = (VoltRelOptCost) other;
-        if (this == INFINITY || that == INFINITY) {
-            return INFINITY;
-        } else if (Double.isInfinite(rowCount + that.rowCount)) {
-            throw new VoltOverflowException("VoltRelOptCost rowCount is infinite");
-        } else if (Double.isInfinite(cpu + that.cpu)) {
-            throw new VoltOverflowException("VoltRelOptCost cpu is infinite");
-        } else if (Double.isInfinite(io + that.io)) {
-            throw new VoltOverflowException("VoltRelOptCost io is infinite");
-        } else {
-            return new VoltRelOptCost(rowCount + that.rowCount,
-                    cpu + that.cpu, io + that.io);
-        }
+        return new VoltRelOptCost(rowCount + that.rowCount, cpu + that.cpu, io + that.io);
     }
 
     @Override public String toString() {
         return "{" + rowCount + " rows, " + cpu + " cpu, " + io + " io}";
-    }
-
-    /** Implementation of {@link org.apache.calcite.plan.RelOptCostFactory}
-     * that creates {@link org.voltdb.plannerv2.VoltRelOptCost}s. */
-    private static class Factory implements RelOptCostFactory {
-      public RelOptCost makeCost(double dRows, double dCpu, double dIo) {
-        return new VoltRelOptCost(dRows, dCpu, dIo);
-      }
-
-      public RelOptCost makeHugeCost() {
-        return VoltRelOptCost.HUGE;
-      }
-
-      public RelOptCost makeInfiniteCost() {
-        return VoltRelOptCost.INFINITY;
-      }
-
-      public RelOptCost makeTinyCost() {
-        return VoltRelOptCost.TINY;
-      }
-
-      public RelOptCost makeZeroCost() {
-        return VoltRelOptCost.ZERO;
-      }
     }
 }

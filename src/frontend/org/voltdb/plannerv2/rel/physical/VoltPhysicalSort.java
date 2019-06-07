@@ -17,16 +17,28 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -88,10 +100,34 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        double rowCount = estimateRowCount(mq);
-        //the worst-case time complexity is mandated to be O(nlogn)
-        double cpu = rowCount * Math.log(rowCount);
+        final double rowCount = estimateRowCount(mq);
+        final List<Integer> collations =
+                PlanCostUtil.collationIndices(getTraitSet().getTrait(RelCollationTraitDef.INSTANCE));
+        final double cpu;
+        if (getIndexes((VolcanoPlanner) planner).stream()
+                .filter(index -> index.getPredicatejson().isEmpty())   // partial index cannot be used
+                .map(PlanCostUtil::indexColumns)
+                .anyMatch(cols -> PlanCostUtil.commonPrefixLength(cols, collations) == collations.size())) {
+            // there is an index on the table with identical (or includes) the collation order
+            cpu = 1;
+        } else { // no matching index: the worst-case time complexity is mandated to be O(nlogn)
+            cpu = rowCount * Math.log(rowCount);
+        }
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
+    }
+
+
+    private static List<Index> getIndexes(VolcanoPlanner planner) {
+        final List<Table> tables = planner.getRelNodes().stream()
+                .flatMap(n -> n instanceof VoltLogicalTableScan ?
+                        Stream.of(((VoltLogicalTableScan) n).getVoltTable().getCatalogTable()) : Stream.empty())
+                .collect(Collectors.toList());
+        if (tables.size() == 1) {
+            return StreamSupport.stream((tables.get(0).getIndexes()).spliterator(), false)
+                    .collect(Collectors.toList());
+        } else {    // either sort from multiple table joins, or from a calc
+            return Collections.emptyList();
+        }
     }
 
     @Override

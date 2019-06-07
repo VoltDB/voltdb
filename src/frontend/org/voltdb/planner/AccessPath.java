@@ -45,6 +45,7 @@ public class AccessPath {
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
+    // For the purpose of these expressions, see SubPlanAssembler#getRelevantAccessPathForIndex().
     final List<AbstractExpression> initialExpr = new ArrayList<>();
     final List<AbstractExpression> indexExprs = new ArrayList<>();
     final List<AbstractExpression> endExprs = new ArrayList<>();

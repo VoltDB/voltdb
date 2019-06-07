@@ -46,19 +46,13 @@ public class VoltLogicalSort extends Sort implements VoltLogicalRel {
      * @param input     Input relational expression
      * @param collation Array of sort specifications
      */
-    public VoltLogicalSort(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RelCollation collation) {
+    public VoltLogicalSort(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation) {
         super(cluster, traitSet, input, collation, null, null);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override public VoltLogicalSort copy(RelTraitSet traitSet, RelNode input,
-                            RelCollation collation,
-                            RexNode offset,
-                            RexNode fetch) {
+    @Override public VoltLogicalSort copy(
+            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
         return new VoltLogicalSort(getCluster(), traitSet, input, collation);
     }
 
@@ -69,8 +63,10 @@ public class VoltLogicalSort extends Sort implements VoltLogicalRel {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }

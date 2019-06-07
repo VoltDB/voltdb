@@ -71,14 +71,15 @@ public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltL
     }
 
     @Override public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {
-        return new VoltLogicalTableScan(
-                getCluster(), traits, getTable(), getVoltTable());
+        return new VoltLogicalTableScan(getCluster(), traits, getTable(), getVoltTable());
     }
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-        RelOptCost cost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(cost.getRows(), cost.getRows(), cost.getIo());
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
     @Override

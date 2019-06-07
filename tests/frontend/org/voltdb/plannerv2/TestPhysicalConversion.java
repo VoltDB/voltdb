@@ -457,8 +457,8 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                 + "where t1.i = 3")
                 .transform("VoltPhysicalCalc(expr#0..3=[{inputs}], V=[$t3], V0=[$t1], split=[1])\n" +
                         "  VoltPhysicalNestLoopJoin(condition=[=($2, $0)], joinType=[inner], split=[1])\n" +
-                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], " +
-                        "I=[$t0], V=[$t5], $condition=[$t8], split=[1])\n" +
+                        "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=[30.3], expr#7=[=($t4, $t6)], " +
+                        "I=[$t0], V=[$t5], $condition=[$t7], split=[1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
                         "    VoltPhysicalCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], expr#8=[3], " +
                         "expr#9=[=($t0, $t8)], expr#10=[AND($t7, $t9)], I=[$t0], V=[$t5], $condition=[$t10], split=[1])\n" +

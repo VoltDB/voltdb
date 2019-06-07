@@ -18,10 +18,13 @@
 package org.voltdb.plannerv2.rel.util;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -30,6 +33,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.types.IndexLookupType;
@@ -75,26 +79,24 @@ public final class PlanCostUtil {
         if (joinCondition == null) {
             return rowCount;
         }
-        List<RexNode> predicates = RelOptUtil.conjunctions(joinCondition);
         // Counters to count the number of equality and all other expressions
         int eqCount = 0;
         int otherCount = 0;
-        double discountCountFactor = 1.0;
+        double discountCountFactor = 0;
         // Discount tuple count.
-        for (RexNode predicate: predicates) {
+        for (RexNode predicate: RelOptUtil.conjunctions(joinCondition)) {
             if (predicate.isA(SqlKind.EQUALS)) {
-                discountCountFactor -= Math.pow(MAX_EQ_FILTER_DISCOUNT, ++eqCount);
+                discountCountFactor += Math.pow(MAX_EQ_FILTER_DISCOUNT, ++eqCount);
             } else {
-                discountCountFactor -= Math.pow(MAX_OTHER_FILTER_DISCOUNT, ++otherCount);
+                discountCountFactor += Math.pow(MAX_OTHER_FILTER_DISCOUNT, ++otherCount);
             }
         }
-        return rowCount * discountCountFactor;
+        return rowCount * (1.0 - discountCountFactor);
     }
 
     public static double discountTableScanRowCount(double rowCount, RexProgram program) {
         if (program != null && program.getCondition() != null) {
-            int condSize = RelOptUtil.conjunctions(program.getCondition()).size();
-            return calculateFilterDiscount(rowCount, condSize);
+            return calculateFilterDiscount(rowCount, RelOptUtil.conjunctions(program.getCondition()).size());
         } else {
             return rowCount;
         }
@@ -102,8 +104,7 @@ public final class PlanCostUtil {
 
     public static double discountPartialIndexRowCount(double rowCount, AccessPath accessPath) {
         Preconditions.checkArgument(accessPath != null);
-        int condSize = accessPath.getPartialIndexExpression().size();
-        return calculateFilterDiscount(rowCount, condSize);
+        return calculateFilterDiscount(rowCount, accessPath.getPartialIndexExpression().size());
     }
 
     private static double calculateFilterDiscount(double rowCount, int filterCount) {
@@ -148,7 +149,8 @@ public final class PlanCostUtil {
      */
     public static double adjustRowCountOnRelDistribution(double rowCount, RelTraitSet traitSet) {
         if (traitSet.getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-                RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+                RelDistributions.ANY.getType().equals(
+                        traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
             return rowCount * 10000;
         } else {
             return rowCount;
@@ -180,29 +182,35 @@ public final class PlanCostUtil {
         return limit;
     }
 
-    public static double computeIndexCost(Index index, AccessPath accessPath, double rowCount, RelMetadataQuery mq) {
+    public static double computeIndexCost(Index index, AccessPath accessPath, RelCollation collation, double rowCount) {
 
         // HOW WE COST INDEXES
         // Since Volt only supports TREE based indexes, the CPU cost can be approximated as following
         // log(e - 1 + N * sparsity) / sparsity
-        // where N is number of rows in a table and Sparsity represents the reciprocal of number of identical rows -
+        // where N is the number of rows in a table and Sparsity represents the reciprocal of number of identical rows -
         // sparsity is 0.1 if on average, 10 rows have identical values on the column(s) of the index.
-        // For a UNIQUE index, sparsity is 1.
+        // For a UNIQUE index, sparsity is 1 (cannot be more sparse than this).
+        //
+        // We favor a large sparsity value, by penalizing various cases that index match is not perfect.
         //
         // The above formula favors sparser cases, UNIQUE index being an extreme in that direction. The extreme in
         // the opposite direction is sparsity == 1/N, where the cost becomes N, and index is not useful at all!
         //
         // To account for a multi-column indexes and partial coverage, Sparsity is adjusted to be
-        // Adjusted sparsity = sparsity / log(|Index Column Count - Key Width + e|)
-        // where the Index Column Count denotes number of columns / expressions in the index
-        // and Key Width denotes the number of Index columns / expressions covered by a given access path.
-        // The motivation is that we favor fuller coverage of an index, by dis-favoring more partial coverage that
-        // decreases sparsity. The favoring/disfavoring goes symmetric in both coverage directions, so for query:
-        // SELECT a, b FROM t ORDER BY a, b;
-        // and index1(a), index2(a, b), index3(a, b, c),
-        // the cost for index2 wins, and cost of index1 and index2 should equally be dis-favored.
+        // Adjusted sparsity *= log(Index Column Count + e) / log(|Index Column Count - Key Width| + e)
+        // where the Index Column Count denotes number of columns or expressions in the index,
+        // and Key Width denotes the number of Index columns or expressions covered by a given access path.
+        // When matching DQL with equi-filter that matches some indexes, we want to choose the index with best match,
+        // and maximum number of columns, so the query:
+        // SELECT c FROM t WHERE a = 0 AND b = 0;
+        // and index1(a), index2(a, b), index3(a, b, c), then the denominator of above calculation favors index1 and index2
+        // equally over index3; but the numerator factor favors index2 because it contains more columns.
         //
-        // This adjusted sparsity is then substituted into the first expression with log().
+        // Then, we further adjust the sparsity by penalizing collation mismatch, where the index with the larger number
+        // of columns is not necessarily the best, e.g.
+        // SELECT a, b FROM t ORDER BY a, b;
+        // the cost for index2 wins, and cost of index1 and index2 should equally be dis-favored.
+        // That is done with discounting factor calculated between the candidate index and query collation, if any.
         //
         // "Covering cell" indexes get a special adjustment to make them look more favorable.
         // Partial Indexes are discounted further
@@ -213,23 +221,17 @@ public final class PlanCostUtil {
         final double keyWidth = getSearchExpressionKeyWidth(accessPath, colCount);
         Preconditions.checkState(keyWidth <= colCount);
 
-//<<<<<<< HEAD
-        double sparsity = (index.getUnique() || index.getAssumeunique())? // && colCount == keyWidth?
-               1 : TABLE_COLUMN_SPARSITY;
-        sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
-        // Promote multi-columns indexes
-        sparsity *= Math.log(Math.abs(colCount + E_CONST));
+        double sparsity = (index.getUnique() || index.getAssumeunique()) ? 1 : TABLE_COLUMN_SPARSITY;
+        // penalize partial index match, and favor longest index match
+        sparsity *= Math.log(E_CONST + colCount) / Math.log(Math.abs(colCount - keyWidth) + E_CONST);
+        // penalize for collation mismatch
+        sparsity /= discountIndexCollation(index, collation);
         // Promote partial indexes that eliminates the most filters
         if (!accessPath.getEliminatedPostExpressions().isEmpty()) {
-            double partialFilterMultiplier =
-                    Math.abs(accessPath.getOtherExprs().size() - accessPath.getEliminatedPostExpressions().size()) + E_CONST;
-            sparsity *= Math.log(partialFilterMultiplier);
+            sparsity *= Math.log(E_CONST +
+                    Math.abs(accessPath.getOtherExprs().size() - accessPath.getEliminatedPostExpressions().size()));
         }
 
-//=======
-//        double sparsity = index.getUnique() || index.getAssumeunique() ? 1 : TABLE_COLUMN_SPARSITY;
-//        sparsity /= Math.log(Math.abs(colCount - keyWidth + E_CONST));
-//>>>>>>> Make cpu estimates to be equal row count for all logical rels to make new VoltRelOptCost.isLT behaive as old Calcite's implementation
         double tuplesToRead = Math.log(E_CONST - 1 + rowCount * sparsity) / sparsity;
 
         if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
@@ -253,7 +255,44 @@ public final class PlanCostUtil {
                     .sum();
         }
         Preconditions.checkState(discountFactor > 0);
-        return Math.max(1., tuplesToRead * discountFactor);
+        return tuplesToRead * discountFactor;
+    }
+
+    /**
+     * Translate sorting order to column indices. Ascending order are set to be positive, and descending order negative.
+     * @param collation collation
+     * @return a list of integers, whose absolute value are the column index of the collation; and sign mark whether the
+     * sort order is ascending (+) or not (-).
+     */
+    public static List<Integer> collationIndices(RelCollation collation) {
+        return collation.getFieldCollations().stream()
+                .map(col -> (col.getDirection().isDescending() ? -1 : 1) * col.getFieldIndex())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get the length of longest common prefix of two lists.
+     * @param lhs the first list
+     * @param rhs the second list
+     * @return the length of longest common prefix from two lists
+     */
+    public static<O> int commonPrefixLength(List<O> lhs, List<O> rhs) {
+        int index = 0;
+        final int len = Math.min(lhs.size(), rhs.size());
+        while (index < len && lhs.get(index).equals(rhs.get(index))) {
+            ++index;
+        }
+        return index;
+    }
+
+    public static List<Integer> indexColumns(Index index) {
+        return StreamSupport.stream((index.getColumns()).spliterator(), false)
+                .map(ColumnRef::getIndex).collect(Collectors.toList());
+    }
+
+    private static double discountIndexCollation(Index index, RelCollation collation) {
+        return Math.log(index.getColumns().size() -
+                commonPrefixLength(collationIndices(collation), indexColumns(index)) + E_CONST);
     }
 
     private static double getSearchExpressionKeyWidth(AccessPath accessPath, final double colCount) {
