@@ -24,7 +24,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.dtxn.TransactionState;
@@ -40,9 +39,6 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class MpInitiatorMailbox extends InitiatorMailbox
 {
-    VoltLogger hostLog = new VoltLogger("HOST");
-    VoltLogger tmLog = new VoltLogger("TM");
-
     private final LinkedBlockingQueue<Runnable> m_taskQueue = new LinkedBlockingQueue<Runnable>();
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
@@ -195,44 +191,43 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     public MpInitiatorMailbox(int partitionId,
-            Scheduler scheduler,
+            MpScheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
             JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_scheduler).getLeaderId(), false);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(scheduler.getLeaderId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }
 
-      @Override
-      public void shutdown() throws InterruptedException {
-          m_taskQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  try {
-                      shutdownInternal();
-                  } catch (InterruptedException e) {
-                      tmLog.info("Interrupted during shutdown", e);
-                  }
-              }
-          });
-          m_taskQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  throw new TerminateThreadException();
-              }
-          });
-          m_sendQueue.offer(new Runnable() {
-              @Override
-              public void run() {
-                  throw new TerminateThreadException();
-              }
-          });
-          m_taskThread.join();
-          m_sendThread.join();
-      }
-
+    @Override
+    public void shutdown() throws InterruptedException {
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    shutdownInternal();
+                } catch (InterruptedException e) {
+                    tmLog.info("Interrupted during shutdown", e);
+                }
+            }
+        });
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                throw new TerminateThreadException();
+            }
+        });
+        m_sendQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                throw new TerminateThreadException();
+            }
+        });
+        m_taskThread.join();
+        m_sendThread.join();
+    }
 
     @Override
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,

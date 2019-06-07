@@ -237,4 +237,9 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
     }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new MpInitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
+    }
 }
