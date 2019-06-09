@@ -514,12 +514,17 @@ public class DDLCompiler {
         loadSchema(reader, db, whichProcs);
     }
 
-    private void applyDiff(VoltXMLDiff stmtDiff)
+    private void applyDiff(VoltXMLDiff stmtDiff) throws VoltCompilerException
     {
         // record which tables changed
-        for (String tableName : stmtDiff.getChangedNodes().keySet()) {
+        for (Map.Entry<String, VoltXMLDiff> entry : stmtDiff.getChangedNodes().entrySet()) {
+            String tableName = entry.getKey();
             assert(tableName.startsWith("table"));
             tableName = tableName.substring("table".length());
+            if (!validatePersistentExport(entry.getValue())) {
+                throw m_compiler.new VoltCompilerException(String.format("The export target on table %s cann't be altered", tableName));
+            }
+
             m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
@@ -577,6 +582,23 @@ public class DDLCompiler {
         }
     }
 
+    private boolean validatePersistentExport(VoltXMLDiff stmtdiff) {
+        String persistentTarget = null;
+        for (VoltXMLElement persistentXML : stmtdiff.getAddedNodes()) {
+            if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
+                persistentTarget = persistentXML.attributes.get("target");
+                break;
+            }
+        }
+        if (persistentTarget != null) {
+            for (VoltXMLElement persistentXML : stmtdiff.getRemovedNodes()) {
+                if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
+                    return (persistentTarget.equalsIgnoreCase(persistentXML.attributes.get("target")));
+                }
+            }
+        }
+        return true;
+    }
     /**
      * Checks whether or not the start of the given identifier is java (and
      * thus DDL) compliant. An identifier may start with: _ [a-zA-Z] $
@@ -735,10 +757,21 @@ public class DDLCompiler {
                 if (triggers.isEmpty()) {
                     triggers = Arrays.asList("DELETE","INSERT","UPDATE");
                 }
+                targetName = targetName.toUpperCase();
+                tableName = tableName.toUpperCase();
                 VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
                 pe.attributes.put("target", targetName);
                 pe.attributes.put("triggers", String.join(",", triggers));
                 tableXML.children.add(pe);
+
+                // update export to target in the cached schema
+                VoltXMLElement lastSchema = m_hsql.getLastSchema(tableName.toLowerCase());
+                if (lastSchema != null) {
+                    VoltXMLElement lastXml = lastSchema.findChild("table", tableName);
+                    if (lastXml != null) {
+                        lastXml.children.add(pe.duplicate());
+                    }
+                }
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\", "

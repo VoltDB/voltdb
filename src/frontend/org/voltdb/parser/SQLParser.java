@@ -116,11 +116,12 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_TABLE");
 
     /**
-     * Pattern: CREATE EXPORT TABLE table_name [EXPORT TO target migrate_target_name].
+     * Pattern: CREATE TABLE table_name [EXPORT TO target migrate_target_name [ON...]].
      *
      * Capture groups:
      *  (1) table name
-     *  [(2) target name]
+     *  (2) target name
+     *  (3) [triggers, comma separated]
      */
     private static final Pattern PAT_CREATE_EXPORT_TABLE =
             SPF.statement(

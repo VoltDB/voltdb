@@ -95,27 +95,34 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
-//
-//        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
-//        pb = new VoltProjectBuilder();
-//        pb.addLiteralSchema(ddl);
-//        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
-//
-//        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
-//        pb = new VoltProjectBuilder();
-//        pb.addLiteralSchema(ddl);
-//        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
-//
-//        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
-//        pb = new VoltProjectBuilder();
-//        pb.addLiteralSchema(ddl);
-//        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
 
-//        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
-//        "alter table foo  alter EXPORT TO TARGET foo ON(UPDATE_NEW);\n";
-//        pb = new VoltProjectBuilder();
-//        pb.addLiteralSchema(ddl);
-//        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON INSERT,DELETE,UPDATE,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD,UPDATE_NEW (a integer NOT NULL, b integer, PRIMARY KEY(a));\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        // cann't alter target
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+        "alter table foo  alter EXPORT TO TARGET foox ON UPDATE_NEW;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
+
+        ddl = "create table foo EXPORT TO TARGET foo ON UPDATE_OLD (a integer NOT NULL, b integer, PRIMARY KEY(a));\n" +
+                "alter table foo  alter EXPORT TO TARGET foo ON UPDATE_NEW;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testExportTarget.jar")));
     }
 
     public void testDDLCompilerTTL() throws Exception {

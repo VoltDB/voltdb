@@ -129,16 +129,16 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
-//        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON (UPDATE_NEW,DELETE)");
-//        client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
-//        client.drain();
-//        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-//        checkTupleCount(client, "T3", 300, true);
-//
-//        client.callProcedure("@AdHoc", "delete from T3 where a < 10000;");
-//        client.drain();
-//        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
-//        checkTupleCount(client, "T3", 400, true);
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
+        client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 300, true);
+
+        client.callProcedure("@AdHoc", "delete from T3 where a < 10000;");
+        client.drain();
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
+        checkTupleCount(client, "T3", 400, true);
     }
 
     private static void checkTupleCount(Client client, String tableName, long expectedCount, boolean replicated){
@@ -176,45 +176,5 @@ public class TestPersistentExport extends ExportLocalClusterBase {
             }
         }
         assert(false);
-    }
-
-    @Test
-    public void testMigrateExportLicensing() throws Exception {
-        if (MiscUtils.isPro()) {
-            return;
-        }
-        tearDown();
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        String stream3= "CREATE table T1 MIGRATE to TARGET FOO1 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400;"
-                        + " CREATE table T2 MIGRATE to TARGET FOO2 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MAX_FREQUENCY 3;"
-                        + " CREATE table T3 MIGRATE to TARGET FOO3 (a INTEGER NOT NULL) using TTL 10 seconds on column a BATCH_SIZE 400 MAX_FREQUENCY 3;";
-
-        project.addLiteralSchema(stream3);
-        LocalCluster cluster = new LocalCluster("testMigrateExportLicensing.jar", 4, 3, KFACTOR,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
-        cluster.setHasLocalServer(false);
-
-        // does not allow more than 2 streams
-        assert(!(cluster.compile(project)));
-    }
-
-    @Test
-    public void testChangeDataCaptureLicensing() throws Exception {
-        if (MiscUtils.isPro()) {
-            return;
-        }
-        tearDown();
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        String stream3= "CREATE table T1 EXPORT TO to TARGET FOO1 (a INTEGER NOT NULL);"
-                        + " CREATE table T2 EXPORT TO to TARGET FOO2 (a INTEGER NOT NULL);"
-                        + " CREATE table T3 EXPORT TO to TARGET FOO3 (a INTEGER NOT NULL);";
-
-        project.addLiteralSchema(stream3);
-        LocalCluster cluster = new LocalCluster("testChangeDataCaptureLicensing.jar", 4, 3, KFACTOR,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, null);
-        cluster.setHasLocalServer(false);
-
-        // does not allow more than 2 streams
-        assert(!(cluster.compile(project)));
     }
 }
