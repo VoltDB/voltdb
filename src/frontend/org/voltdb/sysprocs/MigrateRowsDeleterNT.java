@@ -16,32 +16,27 @@
  */
 package org.voltdb.sysprocs;
 
-import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.TTLManager;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltNTSystemProcedure;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 
 public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     static final long TIMEOUT = TimeUnit.MINUTES.toMillis(Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2));
     static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
-
+    public static final String ROWS_TO_BE_DELETED = "RowsRemainingDeleted";
     static int getHashinatorPartitionKey(int partitionId) {
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
         while (partitionKeys.advanceRow()) {
@@ -52,100 +47,60 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         return Integer.MIN_VALUE;
     }
 
-    public VoltTable run(
-            int partitionId,             // Partition parameter
-            String tableName,            // Name of table that can have rows deleted
-            long deletableTxnId,         // All rows with TxnIds before this can be deleted
-            int maxRowCount)             // Maximum rows to be deleted that will fit in a DR buffer
+    /**
+     *
+     * @param partitionId Partition parameter
+     * @param tableName Name of table that can have rows deleted
+     * @param deletableTxnId All rows with this transaction or the first transaction before this can be deleted
+     * @return
+     */
+    public VoltTable run(int partitionId, String tableName, long deletableTxnId)
     {
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug(String.format("Deleting migrated rows, batch size %d on table %s.txn id: %d",
-                    maxRowCount, tableName, deletableTxnId));
+            exportLog.debug(String.format("Deleting migrated rows on table %s.txn id: %s",
+                    tableName, TxnEgo.txnIdToString(deletableTxnId)));
         }
 
-        VoltTable ret = new VoltTable(  new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
-                                        new ColumnInfo("STATUS", VoltType.BIGINT),
+        VoltTable result = new VoltTable(  new ColumnInfo("STATUS", VoltType.BIGINT),
                                         new ColumnInfo("MESSAGE", VoltType.STRING));
-        long rowsRemaining = Long.MIN_VALUE;
+        boolean rowsRemaining = true;
         try {
-            ClientResponse resp = deleteRows(partitionId, tableName, deletableTxnId, maxRowCount);
-            if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
-                resp = deleteRows(partitionId, tableName, deletableTxnId, maxRowCount);
-                if (resp.getStatus() != ClientResponse.SUCCESS) {
-                    exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
-                            "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
-                    ret.addRow((rowsRemaining != Long.MIN_VALUE) ? rowsRemaining : -1, ClientResponse.UNEXPECTED_FAILURE, resp.getAppStatusString());
-                    return ret;
-                }
-            } else if (resp.getStatus() != ClientResponse.SUCCESS) {
-                exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
-                        "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
-                ret.addRow((rowsRemaining != Long.MIN_VALUE) ? rowsRemaining : -1, ClientResponse.UNEXPECTED_FAILURE, resp.getAppStatusString());
-                return ret;
-            }
-            VoltTable vt = resp.getResults()[0];
-            if (vt.advanceRow()) {
-                rowsRemaining = vt.getLong("RowsRemainingDeleted");
-            }
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(String.format("Deleting migrated rows, batch size %d, remaining %d on table %s.txn id: %d",
-                        maxRowCount, rowsRemaining, tableName, deletableTxnId));
-            }
-            if (rowsRemaining > 0) {
-                int attemptsLeft = (int)Math.ceil((double)rowsRemaining/(double)maxRowCount);
-                ScheduledExecutorService es = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigrateDeleter"));
-                CountDownLatch latch = new CountDownLatch(attemptsLeft);
-                String[] errors = new String[attemptsLeft];
-                Arrays.fill(errors, "");
-                class Task implements Runnable {
-                    final int attempt;
-                    public Task(int attempt) {
-                        this.attempt = attempt;
-                    }
-                    @Override
-                    public void run() {
-                        try {
-                            ClientResponse resp = deleteRows(partitionId, tableName, deletableTxnId, maxRowCount);
-                            if (resp.getStatus() != ClientResponse.SUCCESS) {
-                                errors[attempt] = resp.getStatusString();
-                            }
-                        } catch (Exception e) {
-                            exportLog.warn("Migrate delete error:" + e.getMessage());
-                        } finally {
-                            latch.countDown();
-                        }
-                    }
-                }
-                int attempts = 0;
-                final long delay = 20;
-                while (attempts < attemptsLeft) {
-                    Task task = new Task(attempts);
-                    es.schedule(task, delay * attempts, TimeUnit.MILLISECONDS);
-                    attempts++;
-                }
-                try {
-                    latch.await(TIMEOUT, TimeUnit.MILLISECONDS);
-                } catch (InterruptedException e) {
-                    exportLog.warn("Migrate delete interrupted" + e.getMessage());
-                } finally {
-                    es.shutdownNow();
-                }
+            while (rowsRemaining) {
+                rowsRemaining = deleteRows(partitionId, tableName, deletableTxnId);
             }
         } catch (Exception ex) {
-            ret.addRow((rowsRemaining != Long.MAX_VALUE) ? rowsRemaining : -1, ClientResponse.UNEXPECTED_FAILURE, ex.getMessage());
-            return ret;
+            result.addRow(ClientResponse.UNEXPECTED_FAILURE, ex.getMessage());
+            return result;
         }
-        ret.addRow(rowsRemaining, ClientResponse.SUCCESS, "");
-        return ret;
+        result.addRow(ClientResponse.SUCCESS, "");
+        return result;
     }
 
-    private ClientResponse deleteRows(int partitionId, String tableName, long deletableTxnId, int maxRowCount) throws InterruptedException, ExecutionException, TimeoutException {
+    private boolean deleteRows(int partitionId, String tableName, long deletableTxnId) throws Exception {
         CompletableFuture<ClientResponse> cf = null;
         if (partitionId == MpInitiator.MP_INIT_PID) {
-            cf = callProcedure("@MigrateRowsAcked_MP", tableName, deletableTxnId, maxRowCount);
+            cf = callProcedure("@MigrateRowsAcked_MP", tableName, deletableTxnId);
         } else {
-            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, maxRowCount);
+            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId);
         }
-        return cf.get(5, TimeUnit.MINUTES);
+        ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
+        if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
+            if (resp.getStatus() != ClientResponse.SUCCESS) {
+                exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
+                        "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
+                return true;
+            }
+        } else if (resp.getStatus() != ClientResponse.SUCCESS) {
+            exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
+                    "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
+            throw new VoltProcedure.VoltAbortException(resp.getAppStatusString());
+        }
+        VoltTable vt = resp.getResults()[0];
+        while(vt.advanceRow()) {
+            if (vt.getLong(ROWS_TO_BE_DELETED) == 1) {
+                return true;
+            }
+        }
+        return false;
     }
 }

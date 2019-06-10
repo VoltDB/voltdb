@@ -107,7 +107,6 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
     int64_t migrated_tuples = 0;
-
     {
         assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
@@ -120,7 +119,6 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             BOOST_FOREACH(TableIndex *index, allIndexes) {
                 if (index->isMigratingIndex()) {
                     indexesToUpdate.push_back(index);
-                    VOLT_DEBUG("MigrateExecutor: updating migrating index.");
                 }
             }
 
