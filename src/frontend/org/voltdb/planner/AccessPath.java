@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.SortDirectionType;
 
@@ -44,6 +45,7 @@ public class AccessPath {
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
+    // For the purpose of these expressions, see SubPlanAssembler#getRelevantAccessPathForIndex().
     final List<AbstractExpression> initialExpr = new ArrayList<>();
     final List<AbstractExpression> indexExprs = new ArrayList<>();
     final List<AbstractExpression> endExprs = new ArrayList<>();
@@ -77,6 +79,9 @@ public class AccessPath {
     // if there is no index in this access path.
     //
     final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
+
+    // Partial Index predicates if any
+    final List<AbstractExpression> m_partialIndexPredicate = new ArrayList<>();
 
     /**
      * For Calcite
@@ -178,6 +183,14 @@ public class AccessPath {
 
     public List<AbstractExpression> getOtherExprs() {
         return otherExprs;
+    }
+
+    public void setPartialIndexExpression(AbstractExpression partialPredicate) {
+        m_partialIndexPredicate.addAll(ExpressionUtil.uncombineAny(partialPredicate));
+    }
+
+    public List<AbstractExpression> getPartialIndexExpression() {
+        return m_partialIndexPredicate;
     }
 
     public Index getIndex() {

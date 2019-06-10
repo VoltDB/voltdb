@@ -93,8 +93,7 @@ public class VoltPCalcScanToIndexRule extends RelOptRule {
                 // @TODO Adjust Calc program Condition based on the access path "other" filters
                 RelCollation indexCollation;
                 try {
-                    indexCollation = VoltRexUtil.createIndexCollation(
-                            index, catTable, rexBuilder, mergedProgram);
+                    indexCollation = VoltRexUtil.createIndexCollation(index, catTable, rexBuilder, mergedProgram);
                 } catch (JSONException e) {
                     indexCollation = null;
                 }

@@ -20,11 +20,14 @@ package org.voltdb.plannerv2.rel.physical;
 import java.util.Set;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -50,6 +53,15 @@ public class VoltPhysicalNestLoopJoin extends VoltPhysicalJoin {
             ImmutableList<RelDataTypeField> systemFieldList, RexNode offset, RexNode limit) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType,
                 semiJoinDone, systemFieldList, offset, limit);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        double outerRowCount = getInput(0).estimateRowCount(mq);
+        double innerRowCount = getInput(1).estimateRowCount(mq);
+        double cpu = outerRowCount * innerRowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override

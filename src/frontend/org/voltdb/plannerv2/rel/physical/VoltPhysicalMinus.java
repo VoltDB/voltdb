@@ -20,9 +20,13 @@ package org.voltdb.plannerv2.rel.physical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Minus;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -45,11 +49,7 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalMinus(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
@@ -57,6 +57,20 @@ public class VoltPhysicalMinus extends Minus implements VoltPhysicalRel {
 
     @Override public VoltPhysicalMinus copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         return new VoltPhysicalMinus(getCluster(), traitSet, inputs, all, m_splitCount);
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        Preconditions.checkState(getInputs().size() > 1);
+        double firstChildRowCount = getInput(0).estimateRowCount(mq);
+        return firstChildRowCount * Math.pow(1 - PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        double cpu = PlanCostUtil.computeSetOpCost(getInputs(), mq);
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override

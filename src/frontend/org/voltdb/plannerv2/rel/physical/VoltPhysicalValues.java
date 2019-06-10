@@ -17,17 +17,21 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Values;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLiteral;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Sub-class of {@link org.apache.calcite.rel.core.Values}
@@ -65,4 +69,17 @@ public class VoltPhysicalValues extends Values implements VoltPhysicalRel {
     public int getSplitCount() {
         return m_splitCount;
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner,
+            RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        return planner.getCostFactory().makeCost(rowCount, rowCount, 0.);
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return 1.;
+    }
+
 }

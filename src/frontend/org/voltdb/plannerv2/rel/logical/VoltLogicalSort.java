@@ -18,10 +18,13 @@
 package org.voltdb.plannerv2.rel.logical;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
 import com.google.common.base.Preconditions;
@@ -43,19 +46,27 @@ public class VoltLogicalSort extends Sort implements VoltLogicalRel {
      * @param input     Input relational expression
      * @param collation Array of sort specifications
      */
-    public VoltLogicalSort(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RelCollation collation) {
+    public VoltLogicalSort(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelCollation collation) {
         super(cluster, traitSet, input, collation, null, null);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override public VoltLogicalSort copy(RelTraitSet traitSet, RelNode input,
-                            RelCollation collation,
-                            RexNode offset,
-                            RexNode fetch) {
+    @Override public VoltLogicalSort copy(
+            RelTraitSet traitSet, RelNode input, RelCollation collation, RexNode offset, RexNode fetch) {
         return new VoltLogicalSort(getCluster(), traitSet, input, collation);
     }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return getInput(0).estimateRowCount(mq);
+     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
+    }
+
 }

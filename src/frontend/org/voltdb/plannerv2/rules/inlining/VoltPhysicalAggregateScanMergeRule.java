@@ -20,7 +20,7 @@ package org.voltdb.plannerv2.rules.inlining;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.physical.AbstractVoltPhysicalAggregate;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
 
 /**
@@ -33,13 +33,13 @@ public class VoltPhysicalAggregateScanMergeRule extends RelOptRule {
     public static final VoltPhysicalAggregateScanMergeRule INSTANCE = new VoltPhysicalAggregateScanMergeRule();
 
     private VoltPhysicalAggregateScanMergeRule() {
-        super(operand(AbstractVoltPhysicalAggregate.class,
+        super(operand(VoltPhysicalAggregate.class,
                 operand(VoltPhysicalTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        AbstractVoltPhysicalAggregate aggregate = call.rel(0);
+        VoltPhysicalAggregate aggregate = call.rel(0);
         VoltPhysicalTableScan scan = call.rel(1);
 
         RelNode newScan = scan.copyWithAggregate(scan.getTraitSet().merge(aggregate.getTraitSet()), aggregate);
