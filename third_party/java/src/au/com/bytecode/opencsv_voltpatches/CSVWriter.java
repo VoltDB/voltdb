@@ -165,9 +165,16 @@ public class CSVWriter implements Closeable {
         this.lineEnd = lineEnd;
     }
 
+    // TSV writer escaping carriage return and newline characters
     public static CSVWriter getStrictTSVWriter(Writer writer) {
         CSVWriter retval = new CSVWriter(writer, '\t', NO_QUOTE_CHARACTER, '\\', DEFAULT_LINE_END);
         retval.extraEscapeChars = new char[] { '\r', '\n' };
+        return retval;
+    }
+
+    // TSV writer escaping nothing
+    public static CSVWriter getTSVWriter(Writer writer) {
+        CSVWriter retval = new CSVWriter(writer, '\t', NO_QUOTE_CHARACTER, NO_ESCAPE_CHARACTER, DEFAULT_LINE_END);
         return retval;
     }
 
