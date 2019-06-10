@@ -20,10 +20,13 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import com.google.common.base.Preconditions;
@@ -59,4 +62,13 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
         return new VoltLogicalAggregate(getCluster(), traitSet, input, groupSet, groupSets, aggCalls);
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
+    }
+
 }

@@ -23,7 +23,7 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
-import org.voltdb.plannerv2.rel.physical.AbstractVoltPhysicalAggregate;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 
 /**
@@ -38,7 +38,7 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
 
     private VoltPhysicalCalcAggregateMergeRule() {
         super(operand(VoltPhysicalCalc.class,
-                operand(AbstractVoltPhysicalAggregate.class, any())));
+                operand(VoltPhysicalAggregate.class, any())));
     }
 
     @Override
@@ -51,13 +51,13 @@ public class VoltPhysicalCalcAggregateMergeRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltPhysicalCalc calc = call.rel(0);
-        AbstractVoltPhysicalAggregate aggregate = call.rel(1);
+        VoltPhysicalAggregate aggregate = call.rel(1);
 
         RexProgram program = calc.getProgram();
         RexLocalRef conditionRefExpr = program.getCondition();
         RexNode conditionExpr = program.expandLocalRef(conditionRefExpr);
 
-        AbstractVoltPhysicalAggregate newAggregate = aggregate.copy(
+        VoltPhysicalAggregate newAggregate = aggregate.copy(
                 aggregate.getCluster(),
                 aggregate.getTraitSet(),
                 aggregate.getInput(),

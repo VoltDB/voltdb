@@ -22,12 +22,15 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 
@@ -66,14 +69,8 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
      * @see #isSemiJoinDone()
      */
     public VoltLogicalJoin(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode left,
-            RelNode right,
-            RexNode condition,
-            Set<CorrelationId> variablesSet,
-            JoinRelType joinType,
-            boolean semiJoinDone,
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode left, RelNode right, RexNode condition,
+            Set<CorrelationId> variablesSet, JoinRelType joinType, boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
@@ -90,8 +87,7 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
     @Override public RelWriter explainTerms(RelWriter pw) {
         // Don't ever print semiJoinDone=false. This way, we
         // don't clutter things up in optimizers that don't use semi-joins.
-        return super.explainTerms(pw)
-                .itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
+        return super.explainTerms(pw).itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
     }
 
     @Override public boolean isSemiJoinDone() {
@@ -101,4 +97,13 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
     @Override public List<RelDataTypeField> getSystemFieldList() {
         return systemFieldList;
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
+    }
+
 }

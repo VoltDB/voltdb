@@ -32,7 +32,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 
 import java.util.List;
 
-public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
+public class VoltPhysicalSerialAggregate extends VoltPhysicalAggregate {
 
     // Inline Rels
     final private RexNode m_offset;
@@ -42,114 +42,50 @@ public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
      * Constructor
      */
     public VoltPhysicalSerialAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate,
-            int splitCount,
-            boolean isCoordinatorAggr,
-            RexNode offset,
-            RexNode limit
-    ) {
-        super(cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                splitCount,
-                isCoordinatorAggr);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate, int splitCount,
+            boolean isCoordinatorAggr, RexNode offset, RexNode limit) {
+        super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
+                splitCount, isCoordinatorAggr);
         m_offset = offset;
         m_limit = limit;
     }
 
     public VoltPhysicalSerialAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate,
-            int splitCount,
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode child, boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode postPredicate, int splitCount,
             boolean isCoordinatorAggr) {
-        super(cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                splitCount,
-                isCoordinatorAggr);
+        super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate,
+                splitCount, isCoordinatorAggr);
         m_offset = null;
         m_limit = null;
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double rowCount = getInput().estimateRowCount(mq);
-
-        rowCount = PlanCostUtil.discountRowCountSerialAggregate(rowCount, getGroupCount());
+    public RelOptCost computeSelfCost(
+            RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount =
+                PlanCostUtil.discountSerialAggregateRowCount(getInput().estimateRowCount(mq), getGroupCount());
         return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
     @Override
-    public VoltPhysicalSerialAggregate copy(RelTraitSet traitSet,
-                                            RelNode input,
-                                            boolean indicator,
-                                            ImmutableBitSet groupSet,
-                                            List<ImmutableBitSet> groupSets,
-                                            List<AggregateCall> aggCalls) {
+    public VoltPhysicalSerialAggregate copy(
+            RelTraitSet traitSet, RelNode input, boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
         return new VoltPhysicalSerialAggregate(
-                getCluster(),
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                getPostPredicate(),
-                getSplitCount(),
-                getIsCoordinatorAggr(),
-                m_offset,
-                m_limit);
+                getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls, getPostPredicate(),
+                getSplitCount(), getIsCoordinatorAggr(), m_offset, m_limit);
     }
 
     @Override
     public VoltPhysicalSerialAggregate copy(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode havingExpression,
-            int splitCount,
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls, RexNode havingExpression, int splitCount,
             boolean isCoordinatorAggr) {
         return new VoltPhysicalSerialAggregate(
-                cluster,
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                havingExpression,
-                splitCount,
-                isCoordinatorAggr,
-                m_offset,
-                m_limit);
+                cluster, traitSet, input, indicator, groupSet, groupSets, aggCalls, havingExpression, splitCount,
+                isCoordinatorAggr, m_offset, m_limit);
     }
 
     @Override
@@ -157,10 +93,6 @@ public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
         super.explainTerms(pw);
         pw.item("type", "serial");
         return pw;
-    }
-
-    private boolean hasLimitOffset() {
-        return (m_limit != null || m_offset != null);
     }
 
     public RexNode getOffset() {

@@ -69,10 +69,16 @@ create table RI4 (
     i integer,
     ii integer);
 
-CREATE UNIQUE INDEX RI4_IND1_HASH ON RI4 (i);
+CREATE UNIQUE INDEX RI4_IND1 ON RI4 (i);
 CREATE INDEX RI4_IND2 ON RI4 (i);
 CREATE INDEX RI4_IND3 ON RI4 (i + ii);
 
+create table RI5 (i integer, ii integer, iii integer);
+CREATE UNIQUE INDEX RI5_UNIQUE_IND_I ON RI5 (i);
+CREATE INDEX RI5_IND_I ON RI5 (i);
+CREATE INDEX RI5_IND_II_III ON RI5 (ii, iii);
+CREATE INDEX RI5_IND_II ON RI5 (ii);
+CREATE INDEX RI5_IND_II_PART ON RI5 (ii) WHERE ABS(I) > 8;
 
 create table RTYPES (
     bi bigint,

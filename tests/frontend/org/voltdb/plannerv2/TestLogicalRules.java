@@ -320,6 +320,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
 
     public void testCompareLikeExpr() {
         m_tester.sql("select 1 from RTYPES where vc LIKE 'ab%c'")
+                //.transform("")
                 .transform("VoltLogicalCalc(expr#0..8=[{inputs}], expr#9=[1], expr#10=['ab%c'], " +
                         "expr#11=[LIKE($t8, $t10)], EXPR$0=[$t9], $condition=[$t11])\n" +
                         "  VoltLogicalTableScan(table=[[public, RTYPES]])\n")

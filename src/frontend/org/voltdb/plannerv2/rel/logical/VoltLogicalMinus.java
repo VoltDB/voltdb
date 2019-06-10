@@ -20,9 +20,12 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Minus;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
 import com.google.common.base.Preconditions;
 
@@ -43,17 +46,21 @@ public class VoltLogicalMinus extends Minus implements VoltLogicalRel {
      * @param inputs           inputs
      * @param all              SetOps ALL qualifier
      */
-    public VoltLogicalMinus(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all) {
+    public VoltLogicalMinus(RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
     @Override public VoltLogicalMinus copy(RelTraitSet traitSet, List<RelNode> inputs, boolean all) {
         return new VoltLogicalMinus(getCluster(), traitSet, inputs, all);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
     }
 
 }

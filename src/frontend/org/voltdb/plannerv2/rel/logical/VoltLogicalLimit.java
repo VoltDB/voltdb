@@ -20,10 +20,13 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
 import com.google.common.base.Preconditions;
@@ -52,11 +55,7 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
      * @param limit     The Limit
      */
     public VoltLogicalLimit(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexNode offset,
-            RexNode limit) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit) {
             super(cluster, traitSet, input);
             Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
             m_offset = offset;
@@ -86,4 +85,13 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
                 .itemIf("limit", m_limit, m_limit != null)
                 .itemIf("offset", m_offset, m_offset != null);
     }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        final RelOptCost cost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(cost.getRows(),
+                cost.getRows(),     // NOTE: CPU cost comes into effect in physical planning stage.
+                cost.getIo());
+    }
+
 }

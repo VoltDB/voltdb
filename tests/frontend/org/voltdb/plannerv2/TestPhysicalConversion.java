@@ -437,7 +437,7 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
                         "    VoltPhysicalCalc(expr#0..2=[{inputs}], expr#3=['foo'], expr#4=[<>($t1, $t3)], VC=[$t1], $condition=[$t4], split=[1])\n" +
                         "      VoltPhysicalTableSequentialScan(table=[[public, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n" +
                         "    VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t1):VARCHAR(256) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5], split=[1])\n" +
+                        "\"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5], split=[1])\n" +
                         "      VoltPhysicalNestLoopJoin(condition=[=($4, $0)], joinType=[inner], split=[1])\n" +
                         "        VoltPhysicalCalc(expr#0..5=[{inputs}], I=[$t0], V=[$t5], split=[1])\n" +
                         "          VoltPhysicalTableSequentialScan(table=[[public, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
@@ -468,12 +468,12 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
 
     public void testENG15245() {
         m_tester.sql("select CAST(border as VARCHAR) from R5")
-                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR(2048) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR(2048) CHARACTER SET \"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
                         "  VoltPhysicalTableSequentialScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n")
                 .pass();
 
         m_tester.sql("select CAST(point as VARCHAR) from R5")
-                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(2048) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
+                .transform("VoltPhysicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(2048) CHARACTER SET \"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], EXPR$0=[$t5], split=[1])\n" +
                         "  VoltPhysicalTableSequentialScan(table=[[public, R5]], split=[1], expr#0..4=[{inputs}], proj#0..4=[{exprs}])\n")
                 .pass();
     }

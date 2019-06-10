@@ -20,14 +20,19 @@ package org.voltdb.plannerv2.rel.physical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Intersect;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 import com.google.common.base.Preconditions;
 
 /**
- * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical calling convention.
+ * Sub-class of {@link org.apache.calcite.rel.core.Intersect} targeted at the VoltDB physical INTERSECTION setop
+ * calling convention.
  *
  * @author Mike Alexeev
  * @since 9.0
@@ -45,11 +50,7 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
      * @param all              SetOps ALL qualifier
      */
     public VoltPhysicalIntersect(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            List<RelNode> inputs,
-            boolean all,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, List<RelNode> inputs, boolean all, int splitCount) {
         super(cluster, traitSet, inputs, all);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
@@ -62,6 +63,23 @@ public class VoltPhysicalIntersect extends Intersect implements VoltPhysicalRel 
     @Override
     public int getSplitCount() {
         return m_splitCount;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        Preconditions.checkState(getInputs().size() > 1);
+        final double allChildRowCount = getInputs().stream()
+                .mapToDouble(child -> child.estimateRowCount(mq))
+                .min()
+                .orElse(0);
+        return allChildRowCount * Math.pow(PlanCostUtil.SET_OP_OVERLAP, getInputs().size() - 1);
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        double cpu = PlanCostUtil.computeSetOpCost(getInputs(), mq);
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
 }

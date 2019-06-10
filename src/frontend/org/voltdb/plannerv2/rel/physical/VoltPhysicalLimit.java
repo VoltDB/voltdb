@@ -30,29 +30,23 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
 import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
-
-import com.google.common.base.Preconditions;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+
+import com.google.common.base.Preconditions;
 
 public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     // TODO: limit / offset as expressions or parameters
-    private RexNode m_offset;
-    private RexNode m_limit;
+    private final RexNode m_offset;
+    private final RexNode m_limit;
 
     private final int m_splitCount;
 
     public VoltPhysicalLimit(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexNode offset,
-            RexNode limit,
-            int splitCount) {
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
         super(cluster, traitSet, input);
         Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
@@ -60,20 +54,13 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
         m_splitCount = splitCount;
     }
 
-    public VoltPhysicalLimit copy(RelTraitSet traitSet, RelNode input,
-                                  RexNode offset, RexNode limit, int splitCount) {
-        return new VoltPhysicalLimit(
-                getCluster(),
-                traitSet,
-                input,
-                offset,
-                limit,
-                splitCount);
+    public VoltPhysicalLimit copy(
+            RelTraitSet traitSet, RelNode input, RexNode offset, RexNode limit, int splitCount) {
+        return new VoltPhysicalLimit(getCluster(), traitSet, input, offset, limit, splitCount);
     }
 
     @Override
-    public VoltPhysicalLimit copy(RelTraitSet traitSet,
-                                  List<RelNode> inputs) {
+    public VoltPhysicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
         return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
     }
 
@@ -103,33 +90,16 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        double limit = 0f;
-        // limit and offset can be question marks
-        if (m_limit != null && m_limit.getKind() != SqlKind.DYNAMIC_PARAM) {
-            limit = RexLiteral.intValue(m_limit);
-        }
-        if (m_offset != null && m_offset.getKind() != SqlKind.DYNAMIC_PARAM) {
-            limit += RexLiteral.intValue(m_offset);
-        }
-        double defaultLimit = super.estimateRowCount(mq);
-        if (limit == 0f || defaultLimit < limit) {
-            limit = defaultLimit;
-        }
-        return limit;
+        double childRowCount = getInput(0).estimateRowCount(mq);
+        return PlanCostUtil.discountLimitOffsetRowCount(childRowCount, m_offset, m_limit);
     }
 
     @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
+    public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+        // row count and cpu cost are the same
         double rowCount = estimateRowCount(mq);
-        // Hack. Discourage Calcite from picking a plan with a Limit that has a RelDistributions.ANY
-        // distribution trait. This would make a "correct"
-        // VoltPhysicalLimit (Single) / DistributedExchange / VoltPhysicalLimit (Hash) plan
-        // less expensive than an "incorrect" VoltPhysicalLimit (Any) / DistributedExchange one.
-        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
-
-        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
-        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
+        double cpu = rowCount;
+        return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
     @Override
@@ -139,8 +109,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     @Override
     public AbstractPlanNode toPlanNode() {
-
-        LimitPlanNode lpn = new LimitPlanNode();
+        final LimitPlanNode lpn = new LimitPlanNode();
         if (m_limit != null) {
             lpn.setLimit(RexLiteral.intValue(m_limit));
         }
@@ -158,7 +127,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     }
 
     public static LimitPlanNode toPlanNode(RexNode limit, RexNode offset) {
-        LimitPlanNode lpn = new LimitPlanNode();
+        final LimitPlanNode lpn = new LimitPlanNode();
         if (limit != null) {
             if (limit instanceof RexDynamicParam) {
                 lpn.setLimit(-1);
