@@ -171,10 +171,23 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                         "    VoltLogicalTableScan(table=[[public, R1]])\n")
                 .pass();
+
+        m_tester.sql("select i from R1 offset 1 limit 5")
+                .transform("VoltLogicalLimit(limit=[5], offset=[1])\n" +
+                        "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
+                        "    VoltLogicalTableScan(table=[[public, R1]])\n")
+                .pass();
     }
 
     public void testSeqScanWithLimitOffsetSort() {
         m_tester.sql("select i from R1 order by bi limit 5 offset 1")
+                .transform("VoltLogicalLimit(limit=[5], offset=[1])\n" +
+                        "  VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
+                        "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +
+                        "      VoltLogicalTableScan(table=[[public, R1]])\n")
+                .pass();
+
+        m_tester.sql("select i from R1 order by bi offset 1 limit 5")
                 .transform("VoltLogicalLimit(limit=[5], offset=[1])\n" +
                         "  VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
                         "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], BI=[$t3])\n" +

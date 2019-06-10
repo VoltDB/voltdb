@@ -101,10 +101,12 @@ public class TestPlanConversion extends CalcitePlannerTestCase {
 
     public void testSeqScanWithLimitOffset() {
         comparePlans("select i from R1 limit 5 offset 1");
+        comparePlans("select i from R1 offset 1 limit 5");
     }
 
     public void testSeqScanWithLimitOffsetSort() {
         comparePlans("select i from R1 order by bi limit 5 offset 1");
+        comparePlans("select i from R1 order by bi offset 1 limit 5");
     }
 
     public void testSeqScanWithOrderByAndFilter() {
