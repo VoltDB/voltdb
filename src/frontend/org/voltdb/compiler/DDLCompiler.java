@@ -180,7 +180,7 @@ public class DDLCompiler {
 
     private static final String INVALID_CREATE_EXPORT = "Invalid CREATE TABLE statement: %s "
             + "expected syntax: CREATE TABLE <table> [EXPORT TO TARGET <target> ON <OPERATIONS> (column datatype, ...);" +
-            " Only INSERT, DELETE, UPDATE (or one of UPDATE_NEW, UPDATE_OLD) are alloded for operations.";
+            " Only INSERT, DELETE, UPDATE (or one of UPDATE_NEW, UPDATE_OLD) are allowed for OPERATIONS.";
     static final String [][] DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS = {
         {DR_ROW_TYPE_COLUMN_NAME, "VARCHAR(3 BYTES) NOT NULL"},
         {DR_LOG_ACTION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
@@ -583,22 +583,23 @@ public class DDLCompiler {
     }
 
     private boolean validatePersistentExport(VoltXMLDiff stmtdiff) {
-        String persistentTarget = null;
+        String addedTarget = null;
         for (VoltXMLElement persistentXML : stmtdiff.getAddedNodes()) {
             if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
-                persistentTarget = persistentXML.attributes.get("target");
+                addedTarget = persistentXML.attributes.get("target");
                 break;
             }
         }
-        if (persistentTarget != null) {
+        if (addedTarget != null) {
             for (VoltXMLElement persistentXML : stmtdiff.getRemovedNodes()) {
                 if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
-                    return (persistentTarget.equalsIgnoreCase(persistentXML.attributes.get("target")));
+                    return (addedTarget.equalsIgnoreCase(persistentXML.attributes.get("target")));
                 }
             }
         }
         return true;
     }
+
     /**
      * Checks whether or not the start of the given identifier is java (and
      * thus DDL) compliant. An identifier may start with: _ [a-zA-Z] $
