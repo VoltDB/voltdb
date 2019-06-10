@@ -1460,10 +1460,6 @@ public class DDLCompiler {
                     break;
                 }
             }
-        } else if (migratingIndexName != null) {
-            throw new PlanningErrorException(
-                    String.format("Cannot create a migrating index \"%s\" on a non-TTL table \"%s\"",
-                            migratingIndexName, name));
         }
 
         // Warn user if DR table don't have any unique index.
