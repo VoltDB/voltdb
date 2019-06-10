@@ -435,12 +435,13 @@ public class TestStreamBlockQueue extends TestCase {
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
         m_sbq.sync();
+        long genId = m_sbq.getGenerationIdCreated();
 
         m_sbq.close();
         m_sbq = null;
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, m_sbq.getGenerationIdCreated());
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, genId);
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;

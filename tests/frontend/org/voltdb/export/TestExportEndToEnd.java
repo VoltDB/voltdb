@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -80,7 +81,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
-        builder.configureLogging(true, true, 2, 2, 64);
+//        builder.configureLogging(true, true, 2, 2, 64);
         // Each stream needs an exporter configuration
         builder.addExport(true /* enabled */,
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
@@ -200,6 +201,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     }
 
     @Test
+    @Ignore
     public void testExportRecoverWithEmptySnapshot() throws Exception
     {
         Client client = getClient(m_cluster);
