@@ -779,12 +779,12 @@ public class TestCatalogDiffs extends TestCase {
 
         // start with a table
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) EXPORT TO TARGET FOO ON(INSERT);");
+        builder.addLiteralSchema("\nCREATE TABLE A EXPORT TO TARGET FOO ON INSERT (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testPeristentExport1.jar"));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testPeristentExport1.jar");
 
-        builder.addLiteralSchema("\nALTER TABLE A EXPORT TO TARGET FOO ON(DELETE);");
+        builder.addLiteralSchema("\nALTER TABLE A ALTER EXPORT TO TARGET FOO ON DELETE ;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testPeristentExport2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testPeristentExport2.jar");
         verifyDiff(catOriginal, catUpdated, false, null, true, true, true);
