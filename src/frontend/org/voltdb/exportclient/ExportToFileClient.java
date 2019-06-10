@@ -417,7 +417,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 else {
                     // TSV
-                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 4096 * 4));
+                    writer = CSVWriter.getTSVWriter(new BufferedWriter(osw, 4096 * 4));
                 }
             }
             catch (Exception e) {
