@@ -104,26 +104,9 @@ public class StreamBlockQueue {
         m_nonce = nonce;
         m_streamName = streamName;
         m_partitionId = partitionId;
-        long initialGenId = genId;
+        m_initialGenerationId = genId;
 
-        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
-
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, initialGenId, genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
-
-        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
-                .compression(!DISABLE_COMPRESSION).build();
-
-        m_reader = m_persistentDeque.openForRead(m_nonce);
-        BinaryDequeReader.Entry<ExportRowSchema> entry = m_reader.pollHeader();
-        // Update the header schema with initial generation id from existing PBD file if possible
-        if (entry != null) {
-            initialGenId = entry.getExtraHeader().initialGenerationId;
-            schema = ExportRowSchema.create(streamTable, m_partitionId, initialGenId, genId);
-            m_persistentDeque.updateExtraHeader(schema);
-        }
-        m_initialGenerationId = initialGenId;
+        constructPBD(genId);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
                     (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())) +
@@ -322,7 +305,7 @@ public class StreamBlockQueue {
     public boolean truncateToSequenceNumber(final long truncationSeqNo, final long generationIdCreated) throws IOException {
         assert(m_memoryDeque.isEmpty());
 
-        boolean clearTracker = deletePBDFromOlderGeneration(generationIdCreated);
+        boolean clearTracker = deleteStalePBDSegments(generationIdCreated);
         if (!clearTracker) {
             m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
@@ -377,32 +360,40 @@ public class StreamBlockQueue {
             m_persistentDeque.close();
         }
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
-
-        ExportRowSchema schema =
-                ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, catalogContext.m_genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
-
-        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
-                .compression(!DISABLE_COMPRESSION).build();
-
-        m_reader = m_persistentDeque.openForRead(m_nonce);
+        constructPBD(catalogContext.m_genId);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
         return clearTracker;
     }
 
-    public boolean deletePBDFromOlderGeneration(long generationId) throws IOException {
-        // Different generation id from snapshot indicates current PBDs are from previous life of this stream,
-        // delete all segments.
-        if (generationId != m_initialGenerationId) {
-            m_persistentDeque.closeAndDelete();
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Delete all pbds from older generation " + m_initialGenerationId);
+    public boolean deleteStalePBDSegments(long generationId) throws IOException {
+        long initialGenId = 0;
+        BinaryDequeReader.Entry<ExportRowSchema> entry = m_reader.pollHeader();
+        // Update the header schema with initial generation id from existing PBD file if possible
+        if (entry != null) {
+            initialGenId = entry.getExtraHeader().initialGenerationId;
+            // Higher generation id passing indicates current PBDs are from previous life of this stream,
+            // delete all segments.
+            if (generationId > initialGenId) {
+                m_persistentDeque.closeAndDelete();
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Delete all pbds from older generation " + initialGenId);
+                }
+                m_initialGenerationId = generationId;
+                CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
+
+                ExportRowSchema schema =
+                        ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, catalogContext.m_genId);
+                ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
+
+                m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
+                        .initialExtraHeader(schema, serializer)
+                        .compression(!DISABLE_COMPRESSION).build();
+
+                m_reader = m_persistentDeque.openForRead(m_nonce);
+                return true;
             }
-            m_initialGenerationId = generationId;
-            return true;
         }
         return false;
     }
@@ -429,6 +420,19 @@ public class StreamBlockQueue {
 
     public long getGenerationIdCreated() {
         return m_initialGenerationId;
+    }
+
+    private void constructPBD(long genId) throws IOException {
+        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
+
+        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
+        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
+
+        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
+                .initialExtraHeader(schema, serializer)
+                .compression(!DISABLE_COMPRESSION).build();
+
+        m_reader = m_persistentDeque.openForRead(m_nonce);
     }
 
     @Override

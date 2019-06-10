@@ -362,9 +362,9 @@ public class ExportGeneration implements Generation {
                             final long seqNo = buf.getLong();
                             final long generationIdCreated = buf.getLong();
                             try {
-                                if (generationIdCreated != eds.getGenerationIdCreated()) {
+                                if (generationIdCreated < eds.getGenerationIdCreated()) {
                                     if (exportLog.isDebugEnabled()) {
-                                        exportLog.debug("Ignored staled RELEASE_BUFFER message for " + eds.toString() +
+                                        exportLog.debug("Ignored stale RELEASE_BUFFER message for " + eds.toString() +
                                                 " , sequence number: " + seqNo + ", generationIdCreated: " + generationIdCreated +
                                                 " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                                 " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
@@ -1044,6 +1044,16 @@ public class ExportGeneration implements Generation {
             for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : partitionDataSourceMap.values()) {
                     source.updateGenerationId(genId);
+                }
+            }
+        }
+    }
+
+    public void cleanupStaleBuffers() {
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    source.cleanupStaleBuffers();
                 }
             }
         }

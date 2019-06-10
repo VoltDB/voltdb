@@ -80,6 +80,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);
         builder.setDeadHostTimeout(30);
+        builder.configureLogging(true, true, 2, 2, 64);
         // Each stream needs an exporter configuration
         builder.addExport(true /* enabled */,
                          ServerExportEnum.CUSTOM, "org.voltdb.exportclient.SocketExporter",
@@ -196,5 +197,36 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
                 assertEquals("Stream (" + e.getKey() + ") has more than one master", 1, (int)e.getValue());
             }
         }
+    }
+
+    @Test
+    public void testExportRecoverWithEmptySnapshot() throws Exception
+    {
+        Client client = getClient(m_cluster);
+        ClientResponse response = client.callProcedure("@SnapshotSave",
+                                                        "/tmp/" + System.getProperty("user.name"),
+                                                        "testnonce",
+                                                        (byte) 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("@AdHoc", "DROP STREAM t_1");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("@AdHoc", T1_SCHEMA);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        // Generate PBD files
+        Object[] data = new Object[3];
+        Arrays.fill(data, 1);
+        int pkeyStart = 0;
+        insertToStream("t_1", pkeyStart, 100, client, data);
+        // Write some data to PBD then kill one node
+        client.drain();
+        client.callProcedure("@Quiesce");
+        m_cluster.shutDown();
+
+        // drop stream
+        m_cluster.startUp(false);
+        client = getClient(m_cluster);
+        client.drain();
+        client.callProcedure("@Quiesce");
+        TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
     }
 }

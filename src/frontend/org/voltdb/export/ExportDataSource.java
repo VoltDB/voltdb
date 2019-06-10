@@ -92,9 +92,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final RateLimitedLogger consoleLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), consoleLog, Level.WARN);
 
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
-    private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
-            8 + // generation id
-            4; // schema size
 
     private final String m_database;
     private final String m_tableName;
@@ -446,6 +443,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             });
         }
+    }
+
+    // In truncateExportToSeqNo() we try to cleanup stale PBD segments but if it is not invoked
+    // due to empty snapshot or missing stream in snapshot, this is our last chance to clean stale
+    // PBD segments.
+    public void cleanupStaleBuffers() {
+        m_es.execute(new Runnable() {
+            public void run() {
+                long generationIdCreated = m_committedBuffers.getGenerationIdCreated();
+                try {
+                    if (m_committedBuffers.deleteStalePBDSegments(generationIdCreated)) {
+                        m_gapTracker = new ExportSequenceNumberTracker();
+                    }
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Error while trying to delete stale PBD segments older than generation " +
+                            generationIdCreated, true, e);
+                }
+            }
+        });
     }
 
     public void markInCatalog(boolean inCatalog) {
@@ -885,7 +901,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     if (action == StreamStartAction.REJOIN) {
-                        if (m_committedBuffers.deletePBDFromOlderGeneration(generationIdCreated)) {
+                        if (m_committedBuffers.deleteStalePBDSegments(generationIdCreated)) {
                             m_gapTracker = new ExportSequenceNumberTracker();
                         }
                     }

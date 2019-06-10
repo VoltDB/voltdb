@@ -331,6 +331,7 @@ public class ExportManager
         Preconditions.checkState(processor != null, "guest processor is not set");
 
         processor.startPolling();
+        m_generation.get().cleanupStaleBuffers();
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
