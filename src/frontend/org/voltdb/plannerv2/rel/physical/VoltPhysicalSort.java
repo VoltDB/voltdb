@@ -29,10 +29,8 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
-import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.utils.VoltRexUtil;
@@ -106,6 +104,9 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
         final List<Integer> collations =
                 PlanCostUtil.collationIndices(getTraitSet().getTrait(RelCollationTraitDef.INSTANCE));
         final double cpu;
+        // NOTE: it is not necessary to discount based on index, since VoltPhysicalSort is only used on single table scan;
+        // and the VoltPhysicalTable{Sequential,Index}TableScan node beneath are sufficient to pick the best candidate.
+        /*
         if (getIndexes((VolcanoPlanner) planner).stream()
                 .filter(index -> index.getPredicatejson().isEmpty())   // partial index cannot be used
                 .map(PlanCostUtil::indexColumns)
@@ -114,7 +115,8 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
             cpu = 1;
         } else { // no matching index: the worst-case time complexity is mandated to be O(nlogn)
             cpu = rowCount * Math.log(rowCount);
-        }
+        }*/
+        cpu = rowCount * Math.log(rowCount);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
 
