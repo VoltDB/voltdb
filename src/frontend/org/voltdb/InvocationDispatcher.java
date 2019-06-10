@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -76,6 +77,7 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -122,11 +124,9 @@ public final class InvocationDispatcher {
     private final NTProcedureService m_NTProcedureService;
 
     // Next partition to service adhoc replicated table reads
-    private static int m_nextPartition = -1;
-    // Number of partitions, will NOT change when new node joins cluster
-    private static int m_partitionCount;
+    private static final AtomicInteger m_nextPartition = new AtomicInteger();
     // the partition id list, which does not assume starting from 0
-    private static ArrayList<Integer> m_partitionIds;
+    private static volatile List<Integer> m_partitionIds;
 
     public final static class Builder {
 
@@ -245,21 +245,8 @@ public final class InvocationDispatcher {
         return m_NTProcedureService.m_internalNTClientAdapter;
     }
 
-    static void updatePartitionInformation() {
-        m_partitionIds = new ArrayList<>();
-
-        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
-        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
-        partitionKeys.flattenToBuffer(buf);
-        buf.flip();
-        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
-        keyCopy.resetRowPosition();
-        while (keyCopy.advanceRow()) {
-            if (MpInitiator.MP_INIT_PID != keyCopy.getLong("PARTITION_ID")) {
-                m_partitionIds.add((int)(keyCopy.getLong("PARTITION_ID")));
-            }
-        }
-        m_partitionCount = m_partitionIds.size();
+    public static void updatePartitionInformation() {
+        m_partitionIds = ImmutableList.copyOf(TheHashinator.getCurrentHashinator().getPartitions());
     }
 
     /*
@@ -1350,8 +1337,12 @@ public final class InvocationDispatcher {
 
         if (initiatorHSId == null) {
             hostLog.rateLimitedLog(60, Level.INFO, null,
-                    "InvocationDispatcher.createTransaction request rejected. "
-                    + "This is likely due to parition leader being removed during elastic shrink.");
+                    String.format(
+                            "InvocationDispatcher.createTransaction request rejected for partition %d invocation %s."
+                                    + " isReadOnly=%s isSinglePartition=%s, isEveryPartition=%s isForReplay=%s."
+                                    + " This is likely due to partition leader being removed during elastic shrink.",
+                            (isSinglePartition && !isEveryPartition) ? partitions[0] : 16383, invocation, isReadOnly,
+                            isSinglePartition, isEveryPartition, isForReplay));
             return CreateTransactionResult.PARTITION_REMOVED;
         }
 
@@ -1401,8 +1392,9 @@ public final class InvocationDispatcher {
                 // partitions to spread the traffic.
                 assert (task.getProcName().equals("@AdHoc_RO_SP")): task.getProcName();
 
-                int partitionIdIndex = (Math.abs(++m_nextPartition)) % m_partitionCount;
-                int partitionId = m_partitionIds.get(partitionIdIndex);
+                List<Integer> partitionIds = m_partitionIds;
+                int partitionIdIndex = Math.abs(m_nextPartition.getAndIncrement()) % partitionIds.size();
+                int partitionId = partitionIds.get(partitionIdIndex);
                 return new int[] {partitionId};
             }
             return new int[] { TheHashinator.getPartitionForParameter(ppi.type, invocationParameter) };
