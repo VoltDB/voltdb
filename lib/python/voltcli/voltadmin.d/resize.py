@@ -79,8 +79,8 @@ def procedureCaller(runner, type):
     description = 'Elastic resizing cluster command.',
     options = (
             VOLT.StringListOption(None, '--ignore', 'skip_requirements',
-                                  '''requirements to skip when start resizing:
-                                  disabled_export - Bypass checking disabled export targets. ''',
+                                  '''Conditions that can be ignored when resizing the cluster:
+                                  disabled_export -- ignore pending export data for targets that are disabled''',
                                   default = ''),
     ),
     modifiers = (
