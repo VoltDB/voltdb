@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
@@ -30,9 +31,10 @@ public class AggregateExpression extends AbstractExpression {
         super(type);
     }
 
-    public AggregateExpression(ExpressionType type, String id) {
+    public AggregateExpression(ExpressionType type, String id, String n) {
         super(type);
         user_aggregate_id = id;
+        name = n;
     }
 
     public AggregateExpression() {
@@ -147,4 +149,11 @@ public class AggregateExpression extends AbstractExpression {
             m_left.explain(impliedTableName) + ")";
     }
 
+    public boolean isUserDefined() {
+        return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(user_aggregate_id));
+    }
+
+    public String getFunctionName() {
+        return name;
+    }
 }

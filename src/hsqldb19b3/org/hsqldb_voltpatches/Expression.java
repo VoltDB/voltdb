@@ -221,8 +221,9 @@ public class Expression {
     //
     boolean isColumnEqual;
 
-    // if it's a user-defined aggregate function, we will give it an id
+    // if it's a user-defined aggregate function, we will give it an id and a name
     int user_aggregate_id;
+    String name;
 
     Expression(int type) {
         opType = type;
@@ -1703,6 +1704,7 @@ public class Expression {
 
         if (opType == OpTypes.USER_DEFINE_AGGREGATE) {
             exp.attributes.put("user_aggregate_id", Integer.toString(user_aggregate_id));
+            exp.attributes.put("name", name);
         }
 
         if (realAlias != null) {

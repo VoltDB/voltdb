@@ -64,9 +64,10 @@ public class ExpressionAggregate extends Expression {
         isDistinctAggregate = e.isDistinctAggregate;
         nodes               = e.nodes;
         user_aggregate_id   = e.user_aggregate_id;
+        name				= e.name;
     }
 
-    ExpressionAggregate(int type, boolean distinct, Expression e, int id) {
+    ExpressionAggregate(int type, boolean distinct, Expression e, int id, String n) {
 
         super(type);
 
@@ -74,6 +75,7 @@ public class ExpressionAggregate extends Expression {
         isDistinctAggregate = distinct;
         nodes[LEFT]         = e;
         user_aggregate_id   = id;
+        name                = n;
     }
 
     @Override

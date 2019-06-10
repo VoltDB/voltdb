@@ -66,6 +66,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
     protected String user_aggregate_id;
+    protected String name;
 
     /**
      * We set this to non-null iff the expression has a non-deterministic

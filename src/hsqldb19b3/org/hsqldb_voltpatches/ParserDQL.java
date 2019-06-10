@@ -1711,7 +1711,7 @@ public class ParserDQL extends ParserBase {
 
             case OpTypes.USER_DEFINE_AGGREGATE :
                 int functionid = FunctionForVoltDB.newVoltDBFunctionID(udaf);
-                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid);
+                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid, udaf);
                 return aggregateExp;
 
             default :
