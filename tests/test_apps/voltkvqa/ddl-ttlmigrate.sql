@@ -7,7 +7,7 @@ CREATE TABLE store MIGRATE TO TARGET ABC
 , inserttime     timestamp DEFAULT NOW not null
 , PRIMARY KEY (key)
 ,
-) USING TTL 1 seconds ON COLUMN inserttime;
+) USING TTL 1 seconds ON COLUMN inserttime BATCH_SIZE 1000 MAX_FREQUENCY 1;
 PARTITION TABLE store ON COLUMN key;
 CREATE INDEX inserttimeidx ON store (inserttime) WHERE NOT MIGRATING;
 
