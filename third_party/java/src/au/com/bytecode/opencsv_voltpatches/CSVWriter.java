@@ -280,19 +280,22 @@ public class CSVWriter implements Closeable {
                 sb.append(escapechar).append(nextChar);
                 continue;
             }
-            if (extraEscapeChars != null) {
+            if (escapechar != NO_ESCAPE_CHARACTER && extraEscapeChars != null) {
+                boolean matched = false;
                 for (char eec : extraEscapeChars) {
                     if (nextChar == eec) {
                         sb.append(escapechar).append(nextChar);
+                        matched = true;
                         break;
                     }
                 }
-                continue;
+                if (matched) {
+                    continue;
+                }
             }
-            // else
+            // else not escaped
             sb.append(nextChar);
         }
-
         return sb;
     }
 
