@@ -487,41 +487,35 @@ public final class InvocationDispatcher {
         // up above.  -rtb.
 
         int[] partitions = null;
-        try {
-            partitions = getPartitionsForProcedure(catProc, task);
-        } catch (Exception e) {
-            // unable to hash to a site, return an error
-            return getMispartitionedErrorResponse(task, catProc, e);
-        }
-        CreateTransactionResult result = createTransaction(handler.connectionId(),
-                        task,
-                        catProc.getReadonly(),
-                        catProc.getSinglepartition(),
-                        catProc.getEverysite(),
-                        partitions,
-                        task.getSerializedSize(),
-                        nowNanos);
-        if (result == CreateTransactionResult.NO_CLIENT_HANDLER) {
-            // when VoltDB.crash... is called, we close off the client interface
-            // and it might not be possible to create new transactions.
-            // Return an error.
-            // Another case is when elastic shrink, the target partition may be
-            // removed in between the transaction is created
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
-                    "VoltDB failed to create the transaction internally.  It is possible this "
-                            + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
-                            + "it should be safe to resend the work, as the work was never started.",
-                    task.clientHandle);
-        } else if (result == CreateTransactionResult.PARTITION_REMOVED) {
-            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.TXN_MISPARTITIONED,
-                    new VoltTable[0], "VoltDB failed to create the transaction internally.  It is possible this "
-                            + "was caused by elastic shrink event that removed master partition.",
-                    task.clientHandle);
-            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
-            return response;
-        }
-
-        return null;
+        do {
+            try {
+                partitions = getPartitionsForProcedure(catProc, task);
+            } catch (Exception e) {
+                // unable to hash to a site, return an error
+                return getMispartitionedErrorResponse(task, catProc, e);
+            }
+            CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
+                    catProc.getSinglepartition(), catProc.getEverysite(), partitions, task.getSerializedSize(),
+                    nowNanos);
+            switch (result) {
+            case SUCCESS:
+                return null;
+            case NO_CLIENT_HANDLER:
+                /*
+                 * when VoltDB.crash... is called, we close off the client interface and it might not be possible to
+                 * create new transactions. Return an error. Another case is when elastic shrink, the target partition
+                 * may be removed in between the transaction is created
+                 */
+                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                        "VoltDB failed to create the transaction internally.  It is possible this "
+                                + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                                + "it should be safe to resend the work, as the work was never started.",
+                        task.clientHandle);
+            case PARTITION_REMOVED:
+                // Loop back around and try to figure out the partitions again
+                Thread.yield();
+            }
+        } while (true);
     }
 
     private final boolean shouldLoadSchemaFromSnapshot() {
