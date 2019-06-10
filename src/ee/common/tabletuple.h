@@ -429,8 +429,7 @@ public:
     }
 
     /** Print out a human readable description of this tuple */
-    std::string debug(const std::string& tableName,
-                      bool skipNonInline = false) const;
+    std::string debug(const std::string& tableName, bool skipNonInline = false) const;
 
     std::string debug() const {
         return debugNoHeader();

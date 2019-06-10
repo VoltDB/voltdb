@@ -205,7 +205,7 @@ public:
                 // Need to find the memory in the tuple block to update the hidden column (simulate migrate)
                 const UndoReleaseAction* undo = ExecutorContext::currentUndoQuantum()->getLastUndoActionForTest();
                 const PersistentTableUndoInsertAction* insertUndo = (const PersistentTableUndoInsertAction*) undo;
-                TableTuple targetTuple = TableTuple(static_cast<char*>(insertUndo->getTupleForTest()), tuple.getSchema());
+                TableTuple targetTuple = TableTuple(const_cast<char*>(insertUndo->getTupleForTest()), tuple.getSchema());
                 targetTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(txnId));
                 dynamic_cast<voltdb::PersistentTable *>(table)->migratingAdd(txnId, targetTuple);
             }

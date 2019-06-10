@@ -49,10 +49,10 @@ public:
     static const char* volt_decimal_serialization_error;
     static const char* volt_user_defined_function_error;
 
-    SQLException(std::string sqlState, std::string message);
-    SQLException(std::string sqlState, int error_no, std::string message);
-    SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
-    SQLException(std::string sqlState, std::string message, int internalFlags);
+    SQLException(std::string const& sqlState, std::string const& message);
+    SQLException(std::string const& sqlState, int error_no, std::string const& message);
+    SQLException(std::string const& sqlState, std::string const& message, VoltEEExceptionType type);
+    SQLException(std::string const& sqlState, std::string const& message, int internalFlags);
     virtual ~SQLException() throw() {}
 
     const std::string& getSqlState() const { return m_sqlState; }
@@ -66,7 +66,7 @@ public:
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
 private:
-    std::string m_sqlState;
+    std::string const m_sqlState;
 
     // internal and not sent to java
     const int m_internalFlags;

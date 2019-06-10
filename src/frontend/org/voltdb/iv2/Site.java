@@ -1203,8 +1203,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long beginUndoToken,
-            long spHandle, List<UndoAction> undoLog)
-    {
+            long spHandle, List<UndoAction> undoLog) {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
             setLastCommittedSpHandle(spHandle);
@@ -1215,18 +1214,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
         if (beginUndoToken == Site.kInvalidUndoToken) {
             return;
-        }
-        if (rollback) {
+        } else if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
-        }
-        else {
+        } else {
             assert(m_latestUndoToken != Site.kInvalidUndoToken);
             assert(m_latestUndoToken >= beginUndoToken);
             if (m_latestUndoToken > beginUndoToken) {
                 m_ee.releaseUndoToken(m_latestUndoToken, isEmptyDRTxn);
             }
         }
-
         // java level roll back
         handleUndoLog(undoLog, rollback);
     }
