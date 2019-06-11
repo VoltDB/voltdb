@@ -108,6 +108,9 @@ public interface BinaryDeque<M> {
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 
     public void scanEntries(BinaryDequeScanner scanner) throws IOException;
+
+    public boolean deletePBDSegment(BinaryDequeValidator<M> checker) throws IOException;
+
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
      * will result in an exception
@@ -159,5 +162,9 @@ public interface BinaryDeque<M> {
 
     public interface BinaryDequeScanner {
         public void scan(BBContainer bb);
+    }
+
+    public interface BinaryDequeValidator<M> {
+        public boolean isStale(M extraHeader);
     }
 }

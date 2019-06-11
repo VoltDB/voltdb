@@ -28,7 +28,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -92,9 +91,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final RateLimitedLogger consoleLogLimited =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(1), consoleLog, Level.WARN);
 
     private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
-    private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
-            8 + // generation id
-            4; // schema size
 
     private final String m_database;
     private final String m_tableName;
@@ -158,9 +154,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // *Generation ID* is actually a timestamp generated during catalog update(UpdateApplicationBase.java)
     // If a catalog update occurs, the generation ID will be updated and a new buffer needs to be
     // written to new PBD segment.
-    private long m_generationId;
-    // This is the generation ID when the stream was initially created
-    private long m_generationIdCreated;
+    private long m_currentGenerationId;
 
     private ExportSequenceNumberTracker m_gapTracker = new ExportSequenceNumberTracker();
 
@@ -180,6 +174,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         ACTIVE,
         DROPPED,
         BLOCKED
+    }
+
+    public static enum StreamStartAction {
+        INITIALIZATION,
+        REJOIN,
+        RECOVER,
+        SNAPSHOT_RESTORE
     }
 
     static class QueryResponse {
@@ -234,15 +235,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
     {
         m_generation = generation;
+        m_currentGenerationId = genId;
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
         m_signatureBytes = m_tableName.getBytes(StandardCharsets.UTF_8);
         String nonce = m_tableName + "_" + partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, partitionId);
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, partitionId, genId);
         m_gapTracker = m_committedBuffers.scanForGap();
-        // Pretend it's rejoin so we set first unpolled to a safe place
-        resetStateInRejoinOrRecover(0L, genId, true);
+        // Set first unpolled to a safe place
+        resetStateInRejoinOrRecover(0L, StreamStartAction.INITIALIZATION);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -332,6 +334,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final ExportDataProcessor processor,
             final long genId) throws IOException {
         m_generation = generation;
+        m_currentGenerationId = genId;
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -382,11 +385,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         final String nonce = m_tableName + "_" + m_partitionId;
-        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, m_partitionId);
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce, m_tableName, m_partitionId, genId);
         m_gapTracker = m_committedBuffers.scanForGap();
 
         // Pretend it's rejoin so we set first unpolled to a safe place
-        resetStateInRejoinOrRecover(0L, genId, true);
+        resetStateInRejoinOrRecover(0L, StreamStartAction.INITIALIZATION);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -441,6 +444,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    // In truncateExportToSeqNo() we try to cleanup stale PBD segments. If it isn't invoked
+    // due to empty snapshot or missing stream in snapshot, this is our last chance to clean
+    // stale PBD segments.
+    public void cleanupStaleBuffers() {
+        m_es.execute(new Runnable() {
+            public void run() {
+                // *Created* generation id is either from EDS constructor or from export buffer
+                // truncation (which comes from loading snapshot)
+                long generationIdCreated = m_committedBuffers.getGenerationIdCreated();
+                try {
+                    if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
+                        // Stale export buffers are deleted , re-create the tracker.
+                        m_gapTracker = m_committedBuffers.scanForGap();
+                    }
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Error while trying to delete stale PBD segments older than generation " +
+                            generationIdCreated, true, e);
+                }
+            }
+        });
+    }
+
     public void markInCatalog(boolean inCatalog) {
         m_isInCatalog = inCatalog;
     }
@@ -450,7 +475,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public long getGenerationIdCreated() {
-        return m_generationIdCreated;
+        return m_committedBuffers.getGenerationIdCreated();
     }
 
     // Package private as only used for tests
@@ -854,28 +879,41 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> truncateExportToSeqNo(boolean isRecover, boolean isRejoin, long sequenceNumber, long generationId) {
+    public ListenableFuture<?> truncateExportToSeqNo(StreamStartAction action, long sequenceNumber, long generationIdCreated) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    m_tupleCount = sequenceNumber;
-                    if (isRecover) {
+                    if (action == StreamStartAction.RECOVER) {
                         if (sequenceNumber < 0) {
                             exportLog.error("Snapshot does not include valid truncation point for partition " +
                                     m_partitionId);
                             return;
                         }
+                        if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
+                            // Stale export buffers are deleted , re-create the tracker.
+                            m_gapTracker = m_committedBuffers.scanForGap();
+                        }
                         m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
-                        // export data after truncation point will be regenerated by c/l replay
+                        // Export buffers are truncated to snapshot point
                         m_gapTracker.truncateAfter(sequenceNumber);
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Truncating tracker via snapshot truncation to " + sequenceNumber +
-                                    ", tracker map is " + m_gapTracker.toString());
+                        // export data after truncation point will be regenerated by c/l replay
+                    }
+                    if (action == StreamStartAction.REJOIN) {
+                        if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
+                            // Stale export buffers are deleted , re-create the tracker.
+                            m_gapTracker = m_committedBuffers.scanForGap();
                         }
                     }
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Truncating tracker via snapshot truncation to " + sequenceNumber +
+                                ", action is " + action +
+                                ", generationId is " + generationIdCreated +
+                                ", tracker map is " + m_gapTracker.toString());
+                    }
+                    m_tupleCount = sequenceNumber;
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(sequenceNumber, generationId, isRejoin);
+                    resetStateInRejoinOrRecover(sequenceNumber, action);
                     // Need to handle drained source if truncate emptied the buffers
                     // Note, this always happen before the first poll
                     handleDrainedSource(null);
@@ -1275,7 +1313,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     localAck(commitSeqNo, lastSeqNo);
                     forwardAckToOtherReplicas();
-                    if (m_migrateRowsDeleter != null && m_coordinator.isMaster()) {
+                    if (m_migrateRowsDeleter != null && commitSpHandle > 0 && m_coordinator.isMaster()) {
                         m_migrateRowsDeleter.delete(commitSpHandle);
                     }
                 } catch (Exception e) {
@@ -1297,7 +1335,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         buf.putInt(m_signatureBytes.length);
         buf.put(m_signatureBytes);
         buf.putLong(m_committedSeqNo);
-        buf.putLong(m_generationIdCreated);
+        buf.putLong(m_committedBuffers.getGenerationIdCreated());
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
         return bpm;
@@ -1325,47 +1363,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Send RELEASE_BUFFER to " + toString()
                         + " with sequence number " + m_committedSeqNo
-                        + ", generation ID " + m_generationIdCreated
+                        + ", generation ID " + m_committedBuffers.getGenerationIdCreated()
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
         }
-    }
-
-    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
-    // master stream resend the event when the export mailbox is aware of new streams.
-    public void forwardAckToNewJoinedReplicas(Set<Long> newReplicas) {
-        // In RunEveryWhere mode, every data source is master, no need to send out acks.
-        if (!m_coordinator.isMaster() || m_runEveryWhere) {
-            return;
-        }
-
-        m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-                if (p == null) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug(ExportDataSource.this.toString() + ": Skip forwarding ack to new replicas");
-                    }
-                    return;
-                }
-                Mailbox mbx = p.getFirst();
-                if (mbx != null && newReplicas.size() > 0) {
-                    BinaryPayloadMessage bpm = createReleaseBufferMessage();
-                    for( Long siteId: newReplicas) {
-                        mbx.send(siteId, bpm);
-                    }
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Send RELEASE_BUFFER to " + toString()
-                                + " with sequence number " + m_committedSeqNo
-                                + ", generation ID " + m_generationIdCreated
-                                + " from " + CoreUtils.hsIdToString(mbx.getHSId())
-                                + " to " + CoreUtils.hsIdCollectionToString(newReplicas));
-                    }
-                }
-            }
-        });
     }
 
     private int getAckMessageLength() {
@@ -1578,8 +1580,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // in snapshot to find where to poll next buffer. The right thing to do should be setting
     // the firstUnpolled to a safe point to avoid releasing a gap prematurely, waits for
     // current master to tell us where to poll next buffer.
-    private void resetStateInRejoinOrRecover(long initialSequenceNumber, long genId, boolean isRejoin) {
-        if (isRejoin) {
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber, StreamStartAction action) {
+        if (action == StreamStartAction.REJOIN) {
             if (!m_gapTracker.isEmpty()) {
                 m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo, m_gapTracker.getFirstSeqNo() - 1);
             }
@@ -1589,13 +1591,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Rejoin or recovery should be on a transaction boundary (except maybe in a gap situation)
         m_committedSeqNo = m_lastReleasedSeqNo;
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
-        m_generationId = genId;
-        m_generationIdCreated = genId;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Reset state in " + (isRejoin ? "REJOIN" : "RECOVER")
+            exportLog.debug(toString() + " reset state in " + action
                     + ", initial seqNo " + initialSequenceNumber + ", last released/committed " + m_lastReleasedSeqNo
-                    + ", first unpolled " + m_firstUnpolledSeqNo + ", generation ID " + genId);
+                    + ", first unpolled " + m_firstUnpolledSeqNo + ", initial generation ID " + m_committedBuffers.getGenerationIdCreated());
         }
     }
 
@@ -1686,31 +1686,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void setupMigrateRowsDeleter(int batchSize, int partitionId) {
-        if (batchSize > 0) {
-            m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId, batchSize);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
-            }
+    public void setupMigrateRowsDeleter(int partitionId) {
+        m_migrateRowsDeleter = new MigrateRowsDeleter(m_tableName, partitionId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("MigrateRowsDeleter has been initialized for table: " + m_tableName + ", partition:" + partitionId);
         }
     }
 
     public void updateCatalog(Table table, long genId) {
         // Skip unneeded catalog update
-        if (m_generationId >= genId || m_closed) {
+        if (m_currentGenerationId >= genId || m_closed) {
             return;
         }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                if (m_generationId < genId) {
+                if (m_currentGenerationId < genId) {
                     try {
-                        ExportRowSchema schema = ExportRowSchema.create(table, m_partitionId, genId);
+                        ExportRowSchema schema =
+                                ExportRowSchema.create(table, m_partitionId, m_committedBuffers.getGenerationIdCreated(), genId);
                         m_committedBuffers.updateSchema(schema);
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Unable to write PBD export header.", true, e);
                     }
-                    m_generationId = genId;
+                    m_currentGenerationId = genId;
                 }
             }
         });
@@ -1718,7 +1717,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     // This is called when schema update doesn't affect export
     public void updateGenerationId(long genId) {
-        m_generationId = genId;
+        m_currentGenerationId = genId;
     }
 
     // Called from {@code ExportCoordinator}, returns duplicate of tracker

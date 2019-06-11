@@ -365,4 +365,9 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         }
         m_scheduler.forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
     }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new InitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
+    }
 }

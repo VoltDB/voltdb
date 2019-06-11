@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import junit.framework.Assert;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
@@ -725,6 +726,112 @@ public class TestAdHocQueries extends AdHocQueryTester {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
+        }
+    }
+
+    @Test
+    public void testIndexFunction() {
+        // Test that tuple insert that violates index functions should not succeed: ENG-16013
+        final TestEnv env = new TestEnv("CREATE TABLE R3(i INTEGER NOT NULL, IPV6 VARCHAR(100));\n" +
+                "CREATE INDEX DIDR1 ON R3(INET6_ATON(IPV6));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    Pair.of("INSERT INTO R3 VALUES(0, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(1, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(2, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(3, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(4, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(5, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0:0:8a2e:370:7334');", true),
+                    Pair.of("INSERT INTO R3 VALUES(7, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true),
+                    Pair.of("UPDATE R3 SET IPV6 = '2001:db8:85a3:0000:0000:8a2e:370:7334' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true),
+                    Pair.of("UPDATE R3 SET IPV6 = 'foobar' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true))
+                    .forEachOrdered(queryAndStatus -> {
+                        final String query = queryAndStatus.getFirst();
+                        final boolean success = queryAndStatus.getSecond();
+                        try {
+                            assertEquals(String.format("Query \"%s\" should have %s", query,
+                                    success ? "passed" : "failed"),
+                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
+                        }
+                    });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{2});
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testIndexViolationOnView() {
+        // Test that tuple insert that violates index functions of a view should fail gracefully: ENG-15787
+        final TestEnv env = new TestEnv("CREATE TABLE R3(i INTEGER NOT NULL, IPV6 VARCHAR(100));\n" +
+                "CREATE VIEW VR3(IPV6) AS SELECT IPV6 FROM R3 GROUP BY IPV6;\n" +
+                "CREATE INDEX DIDR1 ON VR3(INET6_ATON(IPV6));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    Pair.of("INSERT INTO R3 VALUES(0, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(1, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(2, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(3, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(4, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(5, ':c::40:b47');", false),
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0:0:8a2e:370:7334');", true),
+                    Pair.of("INSERT INTO R3 VALUES(6, '2001:db8:85a3:0000:0000:8a2e:370:7334');", true),
+                    Pair.of("UPDATE R3 SET IPV6 = '2001:db8:85a3:0000:0000:8a2e:370:7334' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true),
+                    Pair.of("UPDATE R3 SET IPV6 = 'foobar' WHERE IPV6 = '2001:db8:85a3:0:0:8a2e:370:7334';", true))
+                    .forEachOrdered(queryAndStatus -> {
+                        final String query = queryAndStatus.getFirst();
+                        final boolean success = queryAndStatus.getSecond();
+                        try {
+                            assertEquals(String.format("Query \"%s\" should have %s", query,
+                                    success ? "passed" : "failed"),
+                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
+                        }
+                    });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{2});
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testIndexViolationOnView2() {
+        // Another sympton as ENG-15787 with the same root cause: ENG-15971
+        final TestEnv env = new TestEnv("CREATE TABLE R3(VCHAR VARCHAR(15), id INTEGER NOT NULL);\n" +
+                "CREATE VIEW VR3(VCHAR, ID) AS SELECT VCHAR, COUNT(*) FROM R3 GROUP BY VCHAR;\n" +
+                "CREATE INDEX DIDX1 ON VR3(STR(ID, 10));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            Stream.of(
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 0);", false),
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 1);", false),
+                    Pair.of("INSERT INTO R3 VALUES('abc2RD', 2);", false))
+                    .forEachOrdered(queryAndStatus -> {
+                        final String query = queryAndStatus.getFirst();
+                        final boolean success = queryAndStatus.getSecond();
+                        try {
+                            assertEquals(String.format("Query \"%s\" should have %s", query,
+                                    success ? "passed" : "failed"),
+                                    success ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                                    env.m_client.callProcedure("@AdHoc", query).getStatus());
+                        } catch (IOException | ProcCallException e) {
+                            Assert.assertFalse(String.format("Query \"%s\" should have failed", query), success);
+                        }
+                    });
+            verifyIncorrectParameterMessage(env, "SELECT COUNT(*) FROM R3;", new Integer[]{0});
+        } finally {
+            env.tearDown();
         }
     }
 

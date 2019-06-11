@@ -63,6 +63,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
@@ -363,7 +364,7 @@ public class ExportGeneration implements Generation {
                             try {
                                 if (generationIdCreated < eds.getGenerationIdCreated()) {
                                     if (exportLog.isDebugEnabled()) {
-                                        exportLog.debug("Ignored staled RELEASE_BUFFER message for " + eds.toString() +
+                                        exportLog.debug("Ignored stale RELEASE_BUFFER message for " + eds.toString() +
                                                 " , sequence number: " + seqNo + ", generationIdCreated: " + generationIdCreated +
                                                 " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                                 " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
@@ -410,11 +411,6 @@ public class ExportGeneration implements Generation {
             }
             for( ExportDataSource eds: partitionMap.values()) {
                 eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
-                if (newHSIds != null && !newHSIds.isEmpty()) {
-                    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
-                    // master stream resends the event when the export mailbox is aware of new streams.
-                    eds.forwardAckToNewJoinedReplicas(newHSIds);
-                }
             }
         }
     }
@@ -628,8 +624,7 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
-        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        source.setupMigrateRowsDeleter(migrateBatchSize,
+        source.setupMigrateRowsDeleter(
                 CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
 
         if (exportLog.isDebugEnabled()) {
@@ -695,8 +690,7 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
-                        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize, table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+                        exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
@@ -875,7 +869,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
-                                                boolean isRecover, boolean isRejoin,
+                                                StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
@@ -888,7 +882,7 @@ public class ExportGeneration implements Generation {
             if (source != null) {
                 ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(partitionId);
                 if (sequences != null) {
-                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                     tasks.add(task);
                 }
             }
@@ -902,7 +896,7 @@ public class ExportGeneration implements Generation {
                         if (!source.inCatalog()) {
                             ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(source.getPartitionId());
                             if (sequences != null) {
-                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                                 tasks.add(task);
                             }
                         }
@@ -1043,6 +1037,16 @@ public class ExportGeneration implements Generation {
             for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : partitionDataSourceMap.values()) {
                     source.updateGenerationId(genId);
+                }
+            }
+        }
+    }
+
+    public void cleanupStaleBuffers() {
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    source.cleanupStaleBuffers();
                 }
             }
         }

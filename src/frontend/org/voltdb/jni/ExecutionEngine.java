@@ -664,8 +664,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long lastCommittedSpHandle,
             long uniqueId,
             long undoQuantumToken,
-            boolean traceOn) throws EEException
-    {
+            boolean traceOn) throws EEException {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_fragmentContext = (undoQuantumToken == Long.MAX_VALUE) ? FragmentContext.RO_BATCH : FragmentContext.RW_BATCH;
@@ -801,9 +800,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Delete of migrated rows in the execution engine.
      */
-    public abstract int deleteMigratedRows(
+    public abstract boolean deleteMigratedRows(
             long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken);
+            String tableName, long deletableTxnId, long undoToken);
 
     /**
      * Get the seqNo and offset for an export table.
@@ -1184,13 +1183,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param uniqueId The uniqueId of the currently executing stored procedure
      * @param mTableName The name of the table that the deletes should be applied to.
      * @param deletableTxnId The transactionId of the last row that can be deleted
-     * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
      * @param undoToken The token marking the rollback point for this transaction
-     * @return number of rows to be deleted
+     * @return true if more rows to be deleted
      */
-    protected native int nativeDeleteMigratedRows(long pointer,
+    protected native boolean nativeDeleteMigratedRows(long pointer,
             long txnid, long spHandle, long uniqueId,
-            byte mTableName[], long deletableTxnId, int maxRowCount, long undoToken);
+            byte mTableName[], long deletableTxnId, long undoToken);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 

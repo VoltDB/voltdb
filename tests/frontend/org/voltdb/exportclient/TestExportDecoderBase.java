@@ -191,6 +191,8 @@ public class TestExportDecoderBase
     @Flaky(description="TestExportDecoderBase.testExportWriter")
     public void testExportWriter() throws IOException {
         long l = System.currentTimeMillis();
+        //clear the table
+        vtable.clearRowData();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);

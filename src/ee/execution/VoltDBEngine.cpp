@@ -386,7 +386,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
 // ------------------------------------------------------------------
 /**
  * Execute the given fragments serially and in order.
- * Return 0 if there are no failures and 1 if there are
+ * Return 0 if there are no failures and n>0 if there are
  * any failures.  Note that this is the meat of the JNI
  * call org.voltdb.jni.ExecutionEngine.nativeExecutePlanFragments.
  *
@@ -414,17 +414,9 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
  *                              the JNI call
  * @param traceOn               True to turn per-transaction tracing on.
  */
-int VoltDBEngine::executePlanFragments(int32_t numFragments,
-                                       int64_t planfragmentIds[],
-                                       int64_t inputDependencyIds[],
-                                       ReferenceSerializeInputBE &serialInput,
-                                       int64_t txnId,
-                                       int64_t spHandle,
-                                       int64_t lastCommittedSpHandle,
-                                       int64_t uniqueId,
-                                       int64_t undoToken,
-                                       bool traceOn)
-{
+int VoltDBEngine::executePlanFragments(
+      int32_t numFragments, int64_t planfragmentIds[], int64_t inputDependencyIds[], ReferenceSerializeInputBE &serialInput,
+      int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, int64_t undoToken, bool traceOn) {
     // count failures
     int failures = 0;
 
@@ -537,7 +529,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     if (m_udfBufferCapacity > MAX_UDF_BUFFER_SIZE) {
         m_topend->resizeUDFBuffer(MAX_UDF_BUFFER_SIZE);
     }
-
     return failures;
 }
 
@@ -2627,8 +2618,8 @@ int64_t VoltDBEngine::exportAction(bool syncAction,
     return 0;
 }
 
-int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
-        std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken) {
+bool VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+        std::string tableName, int64_t deletableTxnId, int64_t undoToken) {
     PersistentTable* table = dynamic_cast<PersistentTable*>(getTableByName(tableName));
     if (table) {
         setUndoToken(undoToken);
@@ -2642,9 +2633,9 @@ int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
                 (table->isReplicatedTable(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            int32_t rowsToBeDeleted = 0;
+            bool rowsToBeDeleted;
             try {
-                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId, maxRowCount);
+                rowsToBeDeleted = table->deleteMigratedRows(deletableTxnId);
             }
             catch (const SQLException &sqe) {
                 s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
@@ -2686,7 +2677,7 @@ int32_t VoltDBEngine::deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
     }
 
-    return 0;
+    return false;
 }
 
 void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, int64_t &genId, std::string streamName) {

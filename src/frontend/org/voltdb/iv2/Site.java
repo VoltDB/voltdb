@@ -88,6 +88,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
@@ -1203,8 +1204,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long beginUndoToken,
-            long spHandle, List<UndoAction> undoLog)
-    {
+            long spHandle, List<UndoAction> undoLog) {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
             setLastCommittedSpHandle(spHandle);
@@ -1215,18 +1215,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
         if (beginUndoToken == Site.kInvalidUndoToken) {
             return;
-        }
-        if (rollback) {
+        } else if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
-        }
-        else {
+        } else {
             assert(m_latestUndoToken != Site.kInvalidUndoToken);
             assert(m_latestUndoToken >= beginUndoToken);
             if (m_latestUndoToken > beginUndoToken) {
                 m_ee.releaseUndoToken(m_latestUndoToken, isEmptyDRTxn);
             }
         }
-
         // java level roll back
         handleUndoLog(undoLog, rollback);
     }
@@ -1433,15 +1430,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public int deleteMigratedRows(long txnid,
+    public boolean deleteMigratedRows(long txnid,
                                       long spHandle,
                                       long uniqueId,
                                       String tableName,
-                                      long deletableTxnId,
-                                      int maxRowCount)
+                                      long deletableTxnId)
     {
         return m_ee.deleteMigratedRows(txnid, spHandle, uniqueId,
-                tableName, deletableTxnId, maxRowCount, getNextUndoToken(m_currentTxnId));
+                tableName, deletableTxnId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1513,7 +1509,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     catalogTable.getTypeName());
             // assign the stats to the other partition's value
             ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getTypeName(),
-                    false, true, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
+                    StreamStartAction.REJOIN, tableEntry.getValue(), m_sysprocContext.isLowestSiteId());
         }
 
         if (drSequenceNumbers != null) {

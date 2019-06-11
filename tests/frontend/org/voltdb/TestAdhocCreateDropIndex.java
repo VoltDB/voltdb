@@ -411,8 +411,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                         "VCHAR_JSON        VARCHAR(100) DEFAULT 'foo' NOT NULL," +
                         "BIG     BIGINT   DEFAULT 0,\n" +
                         ");\n" +
-                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));" +
-                        "CREATE TABLE T_ENG_12024 (a INT, b INT, c VARCHAR(10));";
+                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));";
         try {
             createSchema(config, ddl, 2, 1, 0);
             startSystem(config);

@@ -49,20 +49,19 @@
 
 namespace voltdb {
 
-std::string TableTuple::debug(const std::string& tableName,
-                              bool skipNonInline) const {
+std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) const {
     assert(m_schema);
     assert(m_data);
 
     std::ostringstream buffer;
     if (tableName.empty()) {
-        buffer << "TableTuple(no table) ->";
+       buffer << "TableTuple(no table) ->";
     } else {
-        buffer << "TableTuple(" << tableName << ") ->";
+       buffer << "TableTuple(" << tableName << ") ->";
     }
 
     if (isActive() == false) {
-        buffer << " <DELETED> ";
+       buffer << " <DELETED> ";
     }
     for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
         buffer << "(";
@@ -70,8 +69,7 @@ std::string TableTuple::debug(const std::string& tableName,
         if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
             StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
             buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-        }
-        else {
+        } else {
             buffer << getNValue(ctr).debug();
         }
         buffer << ")";
@@ -86,8 +84,7 @@ std::string TableTuple::debug(const std::string& tableName,
             if (isVariableLengthType(colInfo->getVoltType()) && !colInfo->inlined && skipNonInline) {
                 StringRef* sr = *reinterpret_cast<StringRef**>(getWritableDataPtr(colInfo));
                 buffer << "<non-inlined value @" << static_cast<void*>(sr) << ">";
-            }
-            else {
+            } else {
                 buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";

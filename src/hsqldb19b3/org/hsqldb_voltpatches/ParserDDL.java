@@ -42,7 +42,6 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
-import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.rights.GranteeManager;
 import org.hsqldb_voltpatches.rights.Right;
@@ -975,6 +974,9 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.ALTER : {
                 read();
 
+                if (token.tokenType == Tokens.EXPORT ) {
+                    return readPersistentExport(t, true);
+                }
                 if (token.tokenType == Tokens.COLUMN) {
                     read();
                 }
@@ -988,9 +990,6 @@ public class ParserDDL extends ParserRoutine {
             }
             case Tokens.USING : {
                 return readTimeToLive(t, true);
-            }
-            case Tokens.EXPORT : {
-                return readPersistentExport(t, true);
             }
             default : {
                 throw unexpectedToken();
@@ -1017,33 +1016,22 @@ public class ParserDDL extends ParserRoutine {
 
     private Statement readPersistentExport(Table table, boolean alter) {
 
-        // EXPORT TO TARGET FOO ON(INSERT, DELETE, UPDATE);
+        // EXPORT TO TARGET FOO ON INSERT, DELETE, UPDATE;
         if (token.tokenType != Tokens.EXPORT) {
             return null;
         }
         String target = readMigrateTarget();
-        if (alter && (table.getPersistentExport() == null ||
-                !target.equalsIgnoreCase(table.getPersistentExport().target))) {
-            throw unexpectedToken("Export target cann't be altered.");
-        }
         // read triggers
         List<String> triggers = new ArrayList<>();
         read();
         if (token.tokenType == Tokens.ON) {
             read();
-            if (Tokens.OPENBRACKET != token.tokenType) {
-                throw unexpectedToken();
-            }
-            read();
-            int tokenCount = 7;
-            boolean hasUpdate = false;
-            while (token.tokenType != Tokens.CLOSEBRACKET) {
+            while (token.tokenType != Tokens.SEMICOLON) {
                 if (token.tokenType == Tokens.DELETE) {
                     triggers.add(Tokens.T_DELETE);
                 } else if (token.tokenType == Tokens.INSERT) {
                     triggers.add(Tokens.T_INSERT);
                 } else if (token.tokenType == Tokens.UPDATE) {
-                    hasUpdate = true;
                     triggers.add(Tokens.T_UPDATE);
                 } else if (token.tokenType == Tokens.UPDATEOLD) {
                     triggers.add(Tokens.T_UPDATEOLD);
@@ -1053,12 +1041,8 @@ public class ParserDDL extends ParserRoutine {
                     throw unexpectedToken();
                 }
                 read();
-                tokenCount--;
-                if (tokenCount < 0) {
-                    break;
-                }
             }
-            if (hasUpdate && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
+            if (triggers.contains(Tokens.T_UPDATE) && (triggers.contains(Tokens.T_UPDATEOLD) || triggers.contains(Tokens.T_UPDATENEW))){
                 throw unexpectedToken("Cann't combine " + Tokens.T_UPDATE + " with " + Tokens.T_UPDATEOLD +
                         " or " + Tokens.T_UPDATENEW);
             }
@@ -1066,19 +1050,14 @@ public class ParserDDL extends ParserRoutine {
                 throw unexpectedToken("Use " + Tokens.T_UPDATE + " instead of both " + Tokens.T_UPDATEOLD +
                         " and " + Tokens.T_UPDATENEW);
             }
-            if (token.tokenType != Tokens.CLOSEBRACKET) {
-                throw unexpectedToken();
-            }
-            read();
         }
         if (triggers.isEmpty()) {
             triggers= Arrays.asList("DELETE","INSERT","UPDATE");
         }
 
-        table.addPersistentExport(target, triggers);
         Object[] args = new Object[] {
                 table.getName(),
-                target,
+                target.toUpperCase(),
                 triggers,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
@@ -1384,11 +1363,7 @@ public class ParserDDL extends ParserRoutine {
                     read();
 
                     // A VoltDB extension to support TTL
-                    if(token.tokenType == Tokens.EXPORT) {
-                        readPersistentExport(table, false);
-                    } else {
-                        readTimeToLive(table, false);
-                    }
+                    readTimeToLive(table, false);
                     // End of VoltDB extension
                     end = true;
                     break;

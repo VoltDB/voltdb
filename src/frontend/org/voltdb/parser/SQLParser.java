@@ -116,6 +116,28 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_TABLE");
 
     /**
+     * Pattern: CREATE TABLE table_name [EXPORT TO target migrate_target_name [ON...]].
+     *
+     * Capture groups:
+     *  (1) table name
+     *  (2) target name
+     *  (3) [triggers, comma separated]
+     */
+    private static final Pattern PAT_CREATE_EXPORT_TABLE =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture("tableName", SPF.databaseObjectName()),
+                    SPF.token("export"), SPF.token("to"), SPF.token("target"),
+                    SPF.capture("migrateTargetName", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(
+                            SPF.token("on"),
+                            SPF.group(true, SPF.commaList(SPF.userName())))),
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_EXPORT_TABLE");
+
+    /**
      * Pattern: CREATE TABLE table_name [MIGRATE TO target migrate_target_name].
      *
      * Capture groups:
@@ -748,6 +770,15 @@ public class SQLParser extends SQLPatternFactory
      */
     public static Matcher matchCreateTableMigrateTo(String statement) {
         return PAT_CREATE_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against create table ... export to target ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableExportTo(String statement) {
+        return PAT_CREATE_EXPORT_TABLE.matcher(statement);
     }
 
     public static Matcher matchAlterTTL(String statement)

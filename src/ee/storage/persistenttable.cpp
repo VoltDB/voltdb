@@ -246,11 +246,9 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
             //Check if the block goes into the pending snapshot set of buckets
-            }
-            else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
-            }
-            else {
+            } else {
                 //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
                 //do nothing, once the block is finished by the iterator, the iterator will return it
             }
@@ -284,12 +282,10 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
             //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
         //Now check if it goes in with the others
-        }
-        else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+        } else if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block to snapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
-        }
-        else {
+        } else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
@@ -764,15 +760,17 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple& source, bool fallibl
 
     try {
         m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (ConstraintFailureException const& e) {
+        m_deltaTable->deleteTupleStorage(targetForDelta);
+        throw;
+    } catch (TupleStreamException const& e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     }
-    catch (TupleStreamException& e) {
-        m_deltaTable->deleteTupleStorage(targetForDelta);
-        throw;
-    }
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 /*
@@ -805,24 +803,26 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
-    }
-    catch (ConstraintFailureException& e) {
+    } catch (TupleStreamException const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
-    } catch (TupleStreamException& e) {
+    } catch (ConstraintFailureException const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
+      bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
-
     }
 
     // Write to DR stream before everything else to ensure nothing gets left in
@@ -859,8 +859,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     TableTuple conflict(m_schema);
     try {
-        tryInsertOnAllIndexes(&target, &conflict);
-    } catch (SQLException& e) {
+        tryInsertOnAllIndexes(&target, &conflict);    // Also evaluates if the index update might throw
+    } catch (std::exception const& e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
@@ -901,7 +901,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
+            UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(
+                  *uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
             if (isTableWithExportInserts(m_tableType)) {
                 assert(m_shadowStream != nullptr);
@@ -916,17 +917,16 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     // Insert the tuple into the delta table first.
     //
-    // (Note: we may hit a NOT NULL constraint violation,
-    // in which case, we want to clean up by calling
-    // deleteTupleStorage, below)
+    // (Note: we may hit a NOT NULL constraint violation, or any
+    // types of constraint violation. In which case, we want to
+    // clean up by calling deleteTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
 }
 
 void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
-                                        bool fallible, bool shouldDRStream, bool delayTupleDelete) {
+      bool fallible, bool shouldDRStream, bool delayTupleDelete) {
     // If the target table is a replicated table, only one thread can reach here.
     doInsertTupleCommon(source, target, fallible, shouldDRStream, delayTupleDelete);
-
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -979,12 +979,9 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUpdate,
-                                                     TableTuple& sourceTupleWithNewValues,
-                                                     std::vector<TableIndex*> const& indexesToUpdate,
-                                                     bool fallible,
-                                                     bool updateDRTimestamp,
-                                                     bool fromMigrate) {
+void PersistentTable::updateTupleWithSpecificIndexes(
+      TableTuple& targetTupleToUpdate, TableTuple& sourceTupleWithNewValues,
+      std::vector<TableIndex*> const& indexesToUpdate, bool fallible, bool updateDRTimestamp, bool fromMigrate) {
     UndoQuantum* uq = NULL;
     char* oldTupleData = NULL;
     int tupleLength = targetTupleToUpdate.tupleLength();
@@ -994,24 +991,17 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
      * Check for index constraint violations.
      */
     if (fallible) {
-        if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
-                                          sourceTupleWithNewValues,
-                                          indexesToUpdate)) {
-            throw ConstraintFailureException(this,
-                                             sourceTupleWithNewValues,
-                                             targetTupleToUpdate,
-                                             CONSTRAINT_TYPE_UNIQUE);
+        if (! checkUpdateOnUniqueIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate)) {
+            throw ConstraintFailureException(
+                  this, sourceTupleWithNewValues, targetTupleToUpdate, CONSTRAINT_TYPE_UNIQUE);
         }
-
-        checkUpdateOnExpressions(targetTupleToUpdate, sourceTupleWithNewValues, indexesToUpdate);
+        checkUpdateOnExpressions(sourceTupleWithNewValues, indexesToUpdate);
         /**
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
         FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-            throw ConstraintFailureException(this,
-                                             sourceTupleWithNewValues,
-                                             targetTupleToUpdate,
-                                             CONSTRAINT_TYPE_NOT_NULL);
+            throw ConstraintFailureException(
+                  this, sourceTupleWithNewValues, targetTupleToUpdate, CONSTRAINT_TYPE_NOT_NULL);
         }
 
         uq = ExecutorContext::currentUndoQuantum();
@@ -1076,7 +1066,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
      */
     const bool someIndexGotUpdated = !indexesToUpdate.empty();
     bool indexRequiresUpdate[indexesToUpdate.size()];
-    if (indexesToUpdate.size()) {
+    if (someIndexGotUpdated) {
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex* index = indexesToUpdate[i];
             if (!index->keyUsesNonInlinedMemory() || index->isPartialIndex()) {
@@ -1129,8 +1119,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     //Copy the dirty status that was set by markTupleDirty.
     if (targetTupleToUpdate.isDirty()) {
         sourceTupleWithNewValues.setDirtyTrue();
-    }
-    else {
+    } else {
         sourceTupleWithNewValues.setDirtyFalse();
     }
 
@@ -1160,8 +1149,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
               *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated, fromMigrate);
         SynchronizedThreadLock::addUndoAction(isReplicatedTable(), uq, undoAction);
-    }
-    else {
+    } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
         // to keep the UndoAction stupid simple?
@@ -1177,10 +1165,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
         TableIndex* index = indexesToUpdate[i];
         if (!indexRequiresUpdate[i]) {
             continue;
-        }
-
-        // For migrate, the hidden index should not be added back
-        if (fromMigrate && index->isMigratingIndex()) {
+        } else if (fromMigrate && index->isMigratingIndex()) {
+           // For migrate, the hidden index should not be added back
             continue;
         }
         index->addEntry(&targetTupleToUpdate, &conflict);
@@ -1444,9 +1430,8 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
         target = lookupTupleForUndo(matchable);
     }
     if (target.isNullTuple()) {
-        throwFatalException("Failed to delete tuple from table %s:"
-                            " tuple does not exist\n%s\n", m_name.c_str(),
-                            matchable.debugNoHeader().c_str());
+        throwFatalException("Failed to delete tuple from table %s: tuple does not exist\n%s\n", m_name.c_str(),
+              matchable.debugNoHeader().c_str());
     }
     //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
     //* enable for debug */           << " { " << target.debugNoHeader() << " } "
@@ -1484,16 +1469,14 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
                 return tableTuple;
             }
         }
-    }
-    else {
+    } else {
         size_t tuple_length;
         if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
             // Looking up a tuple by values should not include any internal
             // hidden column values, which are appended to the end of the
             // tuple.
             tuple_length = m_schema->offsetOfHiddenColumns();
-        }
-        else {
+        } else {
             tuple_length = m_schema->tupleLength();
         }
         // Do an inline tuple byte comparison
@@ -1533,55 +1516,53 @@ void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
     }
 }
 
-void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict) {
-    for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
-       try {
-          m_indexes[i]->addEntry(tuple, conflict);
-       } catch (SQLException const& e) {    // ENG-15047, when inserting a value that causes Inf, the exception is SQLException. Clean up the mess.
-          for (int j = 0; j < i; ++j) {
-             m_indexes[j]->deleteEntry(tuple);
-          }
-          throw;
-       }
-        FAIL_IF(!conflict->isNullTuple()) {
-            VOLT_DEBUG("Failed to insert into index %s,%s",
-                       m_indexes[i]->getTypeName().c_str(),
-                       m_indexes[i]->getName().c_str());
-            for (int j = 0; j < i; ++j) {
-                m_indexes[j]->deleteEntry(tuple);
-            }
-            return;
-        }
-    }
+void PersistentTable::rollbackIndexChanges(TableTuple* tuple, int upto) {
+   for(int i = 0; i < upto; ++i) {
+      m_indexes[i]->deleteEntry(tuple);
+   }
 }
 
-void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
-      TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
+void PersistentTable::tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict) {
+   int i = 0;
    try {
-      BOOST_FOREACH (auto index, indexesToUpdate) {
-         BOOST_FOREACH (auto expr, index->getIndexedExpressions()) {
-            expr->eval(&sourceTupleWithNewValues, NULL);
+      for (; i < indexCount(); ++i) {
+         m_indexes[i]->addEntry(tuple, conflict);
+         FAIL_IF(!conflict->isNullTuple()) {
+            VOLT_DEBUG("Failed to insert into index %s,%s", m_indexes[i]->getTypeName().c_str(),
+                  m_indexes[i]->getName().c_str());
+            rollbackIndexChanges(tuple, i);
+            return;
          }
       }
-   } catch (SQLException const& e) {
-      throw ConstraintFailureException(this,
-            sourceTupleWithNewValues,
-            e.what());
+   } catch (std::exception const& e) {
+      rollbackIndexChanges(tuple, i);
+      throw;
+   }
+}
+
+void PersistentTable::checkUpdateOnExpressions(TableTuple const& sourceTupleWithNewValues,
+      std::vector<TableIndex*> const& indexesToUpdate) {
+   try {
+      for (auto& index: indexesToUpdate) {
+         for (auto& expr: index->getIndexedExpressions()) {
+            expr->eval(&sourceTupleWithNewValues, nullptr);
+         }
+      }
+   } catch (SQLException const& e) {   // TODO: is this necessary?
+      throw ConstraintFailureException(this, sourceTupleWithNewValues, e.what());
    }
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
-                                                 TableTuple const& sourceTupleWithNewValues,
-                                                 std::vector<TableIndex*> const& indexesToUpdate) {
-    BOOST_FOREACH (auto index, indexesToUpdate) {
+      TableTuple const& sourceTupleWithNewValues, std::vector<TableIndex*> const& indexesToUpdate) {
+    for(auto const* index: indexesToUpdate) {
         if (index->isUniqueIndex()) {
             if (index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues) == false)
                 continue; // no update is needed for this index
 
             // if there is a change, the new_key has to be checked
             FAIL_IF (index->exists(&sourceTupleWithNewValues)) {
-                VOLT_WARN("Unique Index '%s' complained to the update",
-                          index->debug().c_str());
+                VOLT_WARN("Unique Index '%s' complained to the update", index->debug().c_str());
                 return false; // cannot insert the new value
             }
         }
@@ -1624,8 +1605,7 @@ std::string PersistentTable::tableType() const { return "PersistentTable"; }
 bool PersistentTable::equals(PersistentTable* other) {
     if ( ! Table::equals(other)) {
         return false;
-    }
-    if (!(indexCount() == other->indexCount())) {
+    } else if (!(indexCount() == other->indexCount())) {
         return false;
     }
 
@@ -1676,12 +1656,8 @@ std::string PersistentTable::debug(const std::string& spacer) const {
  * Loads tuple data from the serialized table.
  * Used for snapshot restore and bulkLoad
  */
-void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
-                                             Pool *stringPool,
-                                             ReferenceSerializeOutput *uniqueViolationOutput,
-                                             bool shouldDRStreamRows,
-                                             bool ignoreTupleLimit,
-                                             bool elastic) {
+void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool *stringPool,
+      ReferenceSerializeOutput *uniqueViolationOutput, bool shouldDRStreamRows, bool ignoreTupleLimit, bool elastic) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();
@@ -1749,6 +1725,10 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput,
             deleteTupleStorage(target);
             throw;
         }
+        // TODO: we do not catch other types of exceptions, such as
+        // SQLException, etc. The assumption we held that no other
+        // exceptions should be thrown in the try-block is pretty
+        // daring and likely not correct.
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
                            shouldDRStreamRows, ignoreTupleLimit || elastic);
     }
@@ -1788,8 +1768,7 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
     } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {
             throw;
-        }
-        if (serializedTupleCount == 0) {
+        } else if (serializedTupleCount == 0) {
             serializeColumnHeaderTo(*uniqueViolationOutput);
             tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
         }
@@ -1800,7 +1779,10 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
         deleteTupleStorage(tuple);
         throw;
     }
-
+    // TODO: we do not catch other types of exceptions, such as
+    // SQLException, etc. The assumption we held that no other
+    // exceptions should be thrown in the try-block is pretty
+    // daring and likely not correct.
 }
 
 /** Prepare table for streaming from serialized data. */
@@ -1853,9 +1835,7 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
     m_tableStreamer = tableStreamer;
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
-        success = m_tableStreamer->activateStream(m_surgeon,
-                                                  streamType,
-                                                  predicateStrings);
+        success = m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
     }
     return success;
 }
@@ -1930,15 +1910,14 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_tableStreamer->notifyBlockWasCompactedAway(block);
-        return;
+    } else { // check that block is in pending snapshot container
+       assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     }
-    // else check that block is in pending snapshot container
-    assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
 }
 
 // Call-back from TupleBlock::merge() for each tuple moved.
 void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                          TableTuple& sourceTuple, TableTuple& targetTuple) {
+      TableTuple& sourceTuple, TableTuple& targetTuple) {
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
     }
@@ -2052,8 +2031,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector* bucketVector) 
             m_blocksNotPendingSnapshot.erase(lightest);
             m_blocksPendingSnapshot.erase(lightest);
             lightest->swapToBucket(TBBucketPtr());
-        }
-        else {
+        } else {
             int lightestBucketChange = bucketChanges.second;
             if (lightestBucketChange != NO_NEW_BUCKET_INDEX) {
                 lightest->swapToBucket((*bucketVector)[lightestBucketChange]);
@@ -2524,42 +2502,31 @@ uint16_t PersistentTable::getMigrateColumnIndex() {
     return (m_schema->hiddenColumnCount() -1);
 }
 
-int32_t PersistentTable::deleteMigratedRows(int64_t deletableTxnId, int32_t maxRowCount) {
-    if (isTableWithMigrate(m_tableType)) {
-        assert(m_shadowStream != nullptr);
-        MigratingRows::iterator it = m_migratingRows.lower_bound(deletableTxnId);
-        int32_t deletedRows = 0;
-        if (it != m_migratingRows.end()) {
-            TableTuple targetTuple(m_schema);
-            MigratingRows::iterator currIt = m_migratingRows.begin();
-            do {
-                MigratingBatch& batch = currIt->second;
-                deletedRows += batch.size();
-                BOOST_FOREACH (auto toDelete, batch) {
-                    targetTuple.move(toDelete);
-                    assert(ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())) == currIt->first);
-                    deleteTuple(targetTuple, true, false);
-                }
-                currIt = m_migratingRows.erase(currIt);
-                if (currIt == m_migratingRows.end()) {
-                    return 0;
-                }
-            } while (deletedRows <= maxRowCount && currIt->first <= it->first);
-
-            int32_t remainingRows = 0;
-            while (currIt->first <= it->first) {
-                MigratingBatch& batch = currIt->second;
-                remainingRows += batch.size();
-                currIt++;
-                if (currIt == m_migratingRows.end()) {
-                    break;
-                }
-            }
-            VOLT_TRACE("Migrated rows to be deleted: %d, deleted: %d", remainingRows, deletedRows);
-            return remainingRows;
-        }
-    }
-    return 0;
+bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
+   if (!isTableWithMigrate(m_tableType) || m_migratingRows.size() == 0) {
+       return false;
+   }
+   assert(m_shadowStream != nullptr);
+   MigratingRows::iterator currIt = m_migratingRows.begin();
+   if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
+       return false;
+   }
+   TableTuple targetTuple(m_schema);
+   MigratingBatch& batch = currIt->second;
+   // Delete the first batch which has a sphandle <= deletableTxnId. Other batches with sphandle <= deletableTxnId
+   // will be deleted next round, one batch at a time
+   BOOST_FOREACH (auto toDelete, batch) {
+      targetTuple.move(toDelete);
+      assert(ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())) == currIt->first);
+      deleteTuple(targetTuple, true, false);
+   }
+   currIt = m_migratingRows.erase(currIt);
+   if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
+       return false;
+   }
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
+        name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
+   return true;
 }
 
 } // namespace voltdb

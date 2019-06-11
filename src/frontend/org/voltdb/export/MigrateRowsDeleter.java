@@ -17,11 +17,7 @@
 
 package org.voltdb.export;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -30,34 +26,25 @@ public class MigrateRowsDeleter {
 
     private static final VoltLogger logger = new VoltLogger("EXPORT");
     final String m_tableName;
-    final int m_batchSize;
     final int m_partitionId;
 
-    public MigrateRowsDeleter(String table, int partitionId, int batchSize) {
+    public MigrateRowsDeleter(String table, int partitionId) {
         m_tableName = table;
         m_partitionId = partitionId;
-        m_batchSize = batchSize;
     }
 
     public void delete(long deletableTxnId) {
         try {
-            CountDownLatch latch = new CountDownLatch(1);
             final ProcedureCallback cb = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse resp) throws Exception {
                     if (resp.getStatus() != ClientResponse.SUCCESS) {
-                        logger.warn(String.format("Fail to execute migrating delete on table: %s,status: %s",
+                        logger.warn(String.format("Fail to execute migrate delete on table: %s,status: %s",
                                 m_tableName, resp.getStatusString()));
                     }
-                    latch.countDown();
                 }
             };
-            ExportManager.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, m_batchSize, deletableTxnId, cb);
-            try {
-                latch.await(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                logger.warn("Migrating delete was interrupted" + e.getMessage());
-            }
+            ExportManager.instance().invokeMigrateRowsDelete(m_partitionId, m_tableName, deletableTxnId, cb);
         } catch (Exception e) {
             logger.error("Error deleting migrated rows", e);
         } catch (Error e) {

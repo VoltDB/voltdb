@@ -429,8 +429,7 @@ public:
     }
 
     /** Print out a human readable description of this tuple */
-    std::string debug(const std::string& tableName,
-                      bool skipNonInline = false) const;
+    std::string debug(const std::string& tableName, bool skipNonInline = false) const;
 
     std::string debug() const {
         return debugNoHeader();
@@ -1160,13 +1159,6 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
                             tupleIn, dataPool, dataPtr,
                             hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
                             static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
-    }
-
-    // Null the column
-    if (m_schema->isTableWithStream()) {
-         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(hiddenColumnCount);
-         NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
-         setNValue(hiddenColumnInfo->offset, value);
     }
 }
 

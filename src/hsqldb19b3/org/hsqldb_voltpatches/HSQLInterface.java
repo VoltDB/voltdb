@@ -281,6 +281,10 @@ public class HSQLInterface {
         return diff;
     }
 
+    public VoltXMLElement getLastSchema(String expectedTableAffected) {
+        return lastSchema.get(expectedTableAffected);
+    }
+
     /**
      * Modify the current schema with a SQL DDL command.
      *

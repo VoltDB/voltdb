@@ -103,7 +103,7 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
     m_engine->releaseUndoToken(2, false);
     checkExportTupleStream(&wrapper, 2);
     // Delete migrate rows
-    m_engine->deleteMigratedRows(3000, 2000, 2000, "A", 2000, 10, 3);
+    m_engine->deleteMigratedRows(3000, 2000, 2000, "A", 2000, 3);
     m_engine->releaseUndoToken(3, false);
     checkExportTupleStream(&wrapper, 2);
 
