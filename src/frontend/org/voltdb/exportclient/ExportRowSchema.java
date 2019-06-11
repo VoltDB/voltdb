@@ -41,9 +41,11 @@ import com.google_voltpatches.common.collect.ImmutableList;
  */
 public class ExportRowSchema extends ExportRow implements DeferredSerialization {
 
+    public long initialGenerationId;
     // Serialized schema data is preceded by fixed header
     public static final int EXPORT_BUFFER_VERSION = 1;
     private static final int EXPORT_SCHEMA_HEADER_BYTES = 1 + // export buffer version
+            8 + // initial generation id
             8 + // generation id
             4 + // partition id
             4; // schema size
@@ -82,8 +84,10 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
 
     // private constructor
     private ExportRowSchema(String tableName, List<String> columnNames, List<VoltType> t, List<Integer> l,
-            int partitionId, long generation) {
+            int partitionId, long initialGeneration, long generation) {
         super(tableName, columnNames, t, l, new Object[] {}, null, -1, partitionId, generation);
+        initialGenerationId = initialGeneration;
+
     }
 
     /**
@@ -94,7 +98,7 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
      * @param generationId the generation id
      * @return
      */
-    public static ExportRowSchema create(Table table, int partitionId, long generationId) {
+    public static ExportRowSchema create(Table table, int partitionId, long initialGenerationId, long generationId) {
 
         List<String> colNames = new LinkedList<>();
         List<VoltType> colTypes = new LinkedList<>();
@@ -113,7 +117,7 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
         }
 
         return new ExportRowSchema(table.getTypeName(), colNames, colTypes, colSizes,
-                partitionId, generationId);
+                partitionId, initialGenerationId, generationId);
     }
 
     /**
@@ -130,6 +134,7 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
                 throw new IllegalArgumentException("Illegal version, expected: " + EXPORT_BUFFER_VERSION
                         + ", got: " + version);
             }
+            long initialGenId = buf.getLong();
             long genId = buf.getLong();
             int partitionId = buf.getInt();
             int size = buf.getInt();
@@ -144,7 +149,7 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
                 colTypes.add(VoltType.get(buf.get()));
                 colLengths.add(buf.getInt());
             }
-            return new ExportRowSchema(tableName, colNames, colTypes, colLengths, partitionId, genId);
+            return new ExportRowSchema(tableName, colNames, colTypes, colLengths, partitionId, initialGenId, genId);
         }
         catch(Exception ex) {
             throw new IOException("Failed to deserialize schema " + ex, ex);
@@ -160,6 +165,7 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
                         + ", available: " + buf.remaining());
             }
             buf.put((byte)EXPORT_BUFFER_VERSION);
+            buf.putLong(this.initialGenerationId);
             buf.putLong(this.generation);
             buf.putInt(this.partitionId);
             buf.putInt(required - EXPORT_SCHEMA_HEADER_BYTES); // size of schema
@@ -207,6 +213,8 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
         StringBuilder sb = new StringBuilder(this.tableName)
                 .append(":")
                 .append(this.partitionId)
+                .append(":")
+                .append(this.initialGenerationId)
                 .append(":")
                 .append(this.generation)
                 .append(" - [");

@@ -52,6 +52,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
@@ -329,7 +330,18 @@ public class ExportManager
         ExportDataProcessor processor = m_processor.get();
         Preconditions.checkState(processor != null, "guest processor is not set");
 
+        // Notify export datasources to check the *generation* of export buffers,
+        // delete buffers older than current generation number or generation number
+        // from snapshot.
+        cleanupStaleBuffers();
+
         processor.startPolling();
+    }
+
+    private void cleanupStaleBuffers() {
+        if (m_generation.get() != null) {
+            m_generation.get().cleanupStaleBuffers();
+        }
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
@@ -648,7 +660,7 @@ public class ExportManager
     }
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, boolean isRejoin,
+                                                StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         //If the generation was completely drained, wait for the task to finish running
@@ -656,7 +668,7 @@ public class ExportManager
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
             generation.updateInitialExportStateToSeqNo(partitionId, signature,
-                                                       isRecover, isRejoin,
+                                                       action,
                                                        sequenceNumberPerPartition, isLowestSite);
         }
     }
