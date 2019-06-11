@@ -29,6 +29,9 @@ from voltcli.checkstats import StatisticsProcedureException
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
 
+RESIZE_MAJOR_VERSION = 9
+RESIZE_MINOR_VERSION = 0
+
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Show status of current cluster and remote cluster(s) it connects to",
@@ -171,6 +174,26 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
         if isAdmin != 1:
             liveclients += 1
     cluster.update_live_clients(liveclients)
+
+    # check cluster elastic resizing info
+    if "license" in host and\
+            (majorVersion > RESIZE_MAJOR_VERSION or
+             (majorVersion == RESIZE_MAJOR_VERSION and minorVersion >= RESIZE_MINOR_VERSION)):
+        result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
+                                  [2, '', '']).table(0)
+        resizeStatus = result.tuple(0).column_integer(0)
+        resizeMessage = result.tuple(0).column_string(1)
+        if resizeStatus != 0:
+            runner.error(resizeMessage)
+        else:
+            try:
+                response = checkstats.get_stats(runner, "REBALANCE")
+            except StatisticsProcedureException as e:
+                runner.info(e.message)
+                sys.exit(e.exitCode)
+
+            percentage_moved = response.table(0).tuple(0).column(1)
+
 
     if runner.opts.dr:
         # Do we have any ongoing DR conversation?

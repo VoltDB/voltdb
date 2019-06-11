@@ -61,8 +61,12 @@ def procedureCaller(runner, type):
     versionStr = version.split('.')
     majorVersion = int(versionStr[0])
     minorVersion = int(versionStr[1])
+    if "license" not in host:
+        runner.abort('Elastic resize only available for enterprise edition.')
+
     if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
         runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
+
 
     result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
                               [type, '', ','.join(runner.opts.skip_requirements)]).table(0)
