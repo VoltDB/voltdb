@@ -32,7 +32,6 @@ import java.util.Map.Entry;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -146,7 +145,6 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     }
 
     @Test
-    @Ignore
     public void testExportRejoinOldGenerationStream_ENG_16239() throws Exception
     {
         Client client = getClient(m_cluster);

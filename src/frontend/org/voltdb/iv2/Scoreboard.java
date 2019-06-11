@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
@@ -86,8 +87,10 @@ public class Scoreboard {
             nextTaskCounter.txnId = next.getFirst().getMsgTxnId();
             nextTaskCounter.completionCount++;
             nextTaskCounter.timestamp = next.getFirst().getTimestamp();
+            nextTaskCounter.missingTxn |= next.getSecond() || next.getFirst().m_txnState.isDone();
         } else if (nextTaskCounter.txnId == next.getFirst().getMsgTxnId() &&
                 nextTaskCounter.timestamp == next.getFirst().getTimestamp()) {
+            nextTaskCounter.missingTxn |= next.getSecond();
             nextTaskCounter.completionCount++;
         }
         return pair;
@@ -142,16 +145,11 @@ public class Scoreboard {
 
     // Only match CompleteTransactionTask at head of the queue
     public boolean matchCompleteTransactionTask(long txnId, long timestamp) {
-        if (!m_compTasks.isEmpty()) {
-            long lowestTxnId = m_compTasks.firstKey();
-            if (txnId == lowestTxnId) {
-                Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(lowestTxnId);
-                return timestamp == pair.getFirst().getTimestamp();
-            }
-        }
-        return false;
+        Map.Entry<Long, Pair<CompleteTransactionTask, Boolean>> entry = m_compTasks.firstEntry();
+        return entry != null && entry.getKey() == txnId && entry.getValue().getFirst().getTimestamp() == timestamp;
     }
 
+    @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
         if (!m_compTasks.isEmpty()){

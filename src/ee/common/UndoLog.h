@@ -86,7 +86,6 @@ namespace voltdb
             // us the largest token value that definitely doesn't
             // exist; this will just result in all undo quanta being undone.
             assert(undoToken >= m_lastReleaseToken);
-
             if (undoToken > m_lastUndoToken) {
                 // a procedure may abort before it sends work to the EE
                 // (informing the EE of its undo token. For example, it

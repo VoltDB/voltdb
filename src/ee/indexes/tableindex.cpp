@@ -183,17 +183,18 @@ void TableIndex::printReport()
     std::cout << m_updates << std::endl;
 }
 
-bool TableIndex::equals(const TableIndex *other) const
-{
+bool TableIndex::equals(const TableIndex *other) const {
     //TODO Do something useful here!
     return true;
 }
 
-void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
-{
+void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple) {
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Do not add it.
         return;
+    }
+    for(auto const* expr : getIndexedExpressions()) {
+       expr->eval(tuple, nullptr);
     }
     addEntryDo(tuple, conflictTuple);
 }
@@ -235,10 +236,8 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
     }
 }
 
-bool TableIndex::exists(const TableTuple *persistentTuple) const
-{
-    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue())
-    {
+bool TableIndex::exists(const TableTuple *persistentTuple) const {
+    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue()) {
         // Tuple fails the predicate.
         return false;
     }
@@ -263,3 +262,4 @@ bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rh
     }
     return checkForIndexChangeDo(lhs, rhs);
 }
+

@@ -35,7 +35,7 @@ public class TestMpRestartSequenceGenerator extends TestCase {
         MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(0, forRestart);
         long seq = seqGen.getNextSeqNum();
         assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(0, MpRestartSequenceGenerator.getNodeId(seq));
+        assertEquals(0, MpRestartSequenceGenerator.getLeaderId(seq));
         assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
     }
 
@@ -45,7 +45,7 @@ public class TestMpRestartSequenceGenerator extends TestCase {
         MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(12, forRestart);
         long seq = seqGen.getNextSeqNum();
         assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(12, MpRestartSequenceGenerator.getNodeId(seq));
+        assertEquals(12, MpRestartSequenceGenerator.getLeaderId(seq));
         assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
     }
 }

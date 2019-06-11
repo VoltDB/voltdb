@@ -169,6 +169,9 @@ public abstract class PBDSegment<M> {
      */
     abstract int scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException;
 
+
+    abstract int validate(BinaryDeque.BinaryDequeValidator<M> validator) throws IOException;
+
     /**
      * Returns whether the file is final
      *

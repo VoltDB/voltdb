@@ -32,6 +32,7 @@ import org.voltdb.exportclient.ExportRowSchemaSerializer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.BinaryDequeValidator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
@@ -94,28 +95,23 @@ public class StreamBlockQueue {
     private final String m_path;
     private final int m_partitionId;
     private final String m_streamName;
+    // The initial generation id of the stream that SBQ currently represents.
+    private long m_initialGenerationId;
     private BinaryDequeReader<ExportRowSchema> m_reader;
 
-    public StreamBlockQueue(String path, String nonce, String streamName, int partitionId)
+    public StreamBlockQueue(String path, String nonce, String streamName, int partitionId, long genId)
             throws java.io.IOException {
         m_path = path;
         m_nonce = nonce;
         m_streamName = streamName;
         m_partitionId = partitionId;
+        m_initialGenerationId = genId;
 
-        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
-
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
-
-        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
-                .compression(!DISABLE_COMPRESSION).build();
-
-        m_reader = m_persistentDeque.openForRead(m_nonce);
+        constructPBD(genId);
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " +
+                    (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())) +
+                    " initial generation ID is " + m_initialGenerationId);
         }
     }
 
@@ -358,26 +354,15 @@ public class StreamBlockQueue {
                 }
             }
         });
-
         // close reopen reader
         m_persistentDeque.close();
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
-
-        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, catalogContext.m_genId);
-        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
-
-        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                .initialExtraHeader(schema, serializer)
-                .compression(!DISABLE_COMPRESSION).build();
-
-        m_reader = m_persistentDeque.openForRead(m_nonce);
+        constructPBD(catalogContext.m_genId);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
 
     public ExportSequenceNumberTracker scanForGap() throws IOException {
-        assert(m_memoryDeque.isEmpty());
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
         m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
@@ -394,6 +379,53 @@ public class StreamBlockQueue {
 
         });
         return tracker;
+    }
+
+    public boolean deleteStaleBlocks(long generationId) throws IOException {
+        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
+
+            public boolean isStale(ExportRowSchema extraHeader) {
+                assert (extraHeader != null);
+                boolean fromOlderGeneration = extraHeader.initialGenerationId < generationId;
+                if (exportLog.isDebugEnabled() && fromOlderGeneration) {
+                    exportLog.debug("Delete PBD segments of " +
+                            (extraHeader.tableName + "_" + extraHeader.partitionId) +
+                            " from older generation " + extraHeader.initialGenerationId);
+                }
+                return fromOlderGeneration;
+            }
+
+        });
+        if (generationId != m_initialGenerationId) {
+            m_initialGenerationId = generationId;
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Update created generation id of " + m_nonce + " to " + generationId);
+            }
+        }
+        if (didCleanup) {
+            // Clear cache in case of any memory copy of stale data is stored in memory deque
+            m_memoryDeque.clear();
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            constructPBD(catalogContext.m_genId);
+        }
+        return didCleanup;
+    }
+
+    public long getGenerationIdCreated() {
+        return m_initialGenerationId;
+    }
+
+    private void constructPBD(long genId) throws IOException {
+        Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
+
+        ExportRowSchema schema = ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, genId);
+        ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
+
+        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
+                .initialExtraHeader(schema, serializer)
+                .compression(!DISABLE_COMPRESSION).build();
+
+        m_reader = m_persistentDeque.openForRead(m_nonce);
     }
 
     @Override

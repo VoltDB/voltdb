@@ -150,7 +150,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     }
 
     int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
+    const char* textData = getObject_withoutNull(textLength);
     std::string wkt(textData, textLength);
 
     // Discard whitespace, but return commas or parentheses as tokens
@@ -376,7 +376,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
 
     int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
+    const char* textData = getObject_withoutNull(textLength);
     const std::string wkt(textData, textLength);
 
     return polygonFromText(wkt, false);
@@ -389,7 +389,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
     }
 
     int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
+    const char* textData = getObject_withoutNull(textLength);
     const std::string wkt(textData, textLength);
 
     return polygonFromText(wkt, true);

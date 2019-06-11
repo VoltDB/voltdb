@@ -27,8 +27,8 @@ volatile int tupleBlocksAllocated = 0;
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_storage(NULL),
         m_references(0),
-        m_tupleLength(table->m_tupleLength),
-        m_tuplesPerBlock(table->m_tuplesPerBlock),
+        m_tupleLength(table->getTupleLength()),
+        m_tuplesPerBlock(table->getTuplesPerBlock()),
         m_activeTuples(0),
         m_nextFreeTuple(0),
         m_lastCompactionOffset(0),
@@ -43,7 +43,7 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         throwFatalException("Failed mmap");
     }
 #else
-    m_storage = new char[table->m_tableAllocationSize];
+    m_storage = new char[table->getTableAllocationSize()];
 #endif
     tupleBlocksAllocated++;
 }

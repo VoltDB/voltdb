@@ -40,6 +40,9 @@ def restart(runner):
 def status(runner):
     procedureCaller(runner, Option.STATUS)
 
+def update(runner):
+    procedureCaller(runner, Option.UPDATE)
+
 def procedureCaller(runner, type):
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
@@ -76,8 +79,8 @@ def procedureCaller(runner, type):
     description = 'Elastic resizing cluster command.',
     options = (
             VOLT.StringListOption(None, '--ignore', 'skip_requirements',
-                                  '''requirements to skip when start resizing:
-                      disabled_export - Checking for disabled target has been disabled. ''',
+                                  '''Conditions that can be ignored when resizing the cluster:
+                                  disabled_export -- ignore pending export data for targets that are disabled''',
                                   default = ''),
     ),
     modifiers = (
@@ -85,6 +88,7 @@ def procedureCaller(runner, type):
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('restart', restart, 'Restart the previous failed resizing operation.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
+            VOLT.Modifier('update', update, 'Update the options for the current resizing operation.'),
     )
 )
 
