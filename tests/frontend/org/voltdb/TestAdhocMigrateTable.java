@@ -73,8 +73,10 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
                         Pair.of("MIGRATE FROM with_ttl_no_target where not migrating;", false),
                         Pair.of("MIGRATE FROM without_ttl_no_target where not migrating();", false),
                         // we do prevent user from doing this
-                        Pair.of("MIGRATE FROM with_ttl WHERE not not migrating();", false),
-                        Pair.of("MIGRATE FROM with_ttl WHERE migrating() and j > 0;", false)
+                        Pair.of("MIGRATE FROM with_ttl WHERE not not migrating;", false),
+                        Pair.of("MIGRATE FROM with_ttl WHERE migrating() and j > 0;", false),
+                        // we don't prevent user from doing this
+                        Pair.of("MIGRATE FROM with_ttl WHERE not (not migrating);", true)
                 ).collect(Collectors.toList()));
     }
 
