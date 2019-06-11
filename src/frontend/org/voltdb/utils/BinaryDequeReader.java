@@ -49,15 +49,6 @@ public interface BinaryDequeReader<M> {
     public Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException;
 
     /**
-     * Read and return the extra header of the segment that this reader currently points at.
-     * This call <b>will not</b> move current read position of this reader.
-     * @return {@link Entry} containing only extra header associated with it or {@code null} if there is
-     *         no entry
-     * @throws IOException
-     */
-    public Entry<M> pollHeader() throws IOException;
-
-    /**
      * Number of bytes left to read for this reader.
      * @return number of bytes left to read for this reader.
      * @throws IOException

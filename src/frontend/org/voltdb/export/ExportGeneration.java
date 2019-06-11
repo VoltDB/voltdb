@@ -411,11 +411,6 @@ public class ExportGeneration implements Generation {
             }
             for( ExportDataSource eds: partitionMap.values()) {
                 eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
-                if (newHSIds != null && !newHSIds.isEmpty()) {
-                    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
-                    // master stream resends the event when the export mailbox is aware of new streams.
-                    eds.forwardAckToNewJoinedReplicas(newHSIds);
-                }
             }
         }
     }

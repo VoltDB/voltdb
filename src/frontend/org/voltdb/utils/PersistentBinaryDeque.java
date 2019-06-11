@@ -55,7 +55,6 @@ import com.google_voltpatches.common.base.Throwables;
  * @param M Type of extra header metadata stored in the PBD
  */
 public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
-
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
         private static final VoltLogger LOG = new VoltLogger("HOST");
 
@@ -164,39 +163,6 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     public void release() {
                         retcont.discard();
                     }
-                };
-            }
-        }
-
-        @Override
-        public Entry<M> pollHeader()
-                throws IOException {
-            synchronized (PersistentBinaryDeque.this) {
-                if (m_cursorClosed) {
-                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
-                }
-                assertions();
-
-                moveToValidSegment();
-                PBDSegmentReader<M> segmentReader = m_segment.getReader(m_cursorId);
-                if (segmentReader == null) {
-                    segmentReader = m_segment.openForRead(m_cursorId);
-                }
-                M extraHeader = m_segment.getExtraHeader();
-
-                return new BinaryDequeReader.Entry<M>() {
-                    @Override
-                    public M getExtraHeader() {
-                        return extraHeader;
-                    }
-
-                    @Override
-                    public ByteBuffer getData() {
-                        return null;
-                    }
-
-                    @Override
-                    public void release() {}
                 };
             }
         }
@@ -1227,7 +1193,8 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         numObjects += segment.getNumEntries() - reader.readIndex();
                     }
                 }
-                assert numObjects == cursor.getNumObjects() : numObjects + " != " + cursor.getNumObjects();
+                assert numObjects == cursor.getNumObjects() :
+                    cursor.m_cursorId + " expects " + cursor.getNumObjects() + " entries but only found " + numObjects;
             } catch (Exception e) {
                 Throwables.throwIfUnchecked(e);
                 throw new RuntimeException(e);
@@ -1287,6 +1254,44 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
         }
 
         return;
+    }
+
+    @Override
+    public boolean deletePBDSegment(BinaryDequeValidator<M> validator) throws IOException
+    {
+        boolean segmentDeleted = false;
+        if (m_closed) {
+            throw new IOException("Cannot scanForGap(): PBD has been closed");
+        }
+
+        assertions();
+        if (m_segments.isEmpty()) {
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            }
+            return segmentDeleted;
+        }
+
+        /*
+         * Iterator all the objects in all the segments and pass them to the scanner
+         */
+        Iterator<PBDSegment<M>> iter = m_segments.values().iterator();
+        while (iter.hasNext()) {
+            PBDSegment<M> segment = iter.next();
+            try {
+                int entriesToDelete = segment.validate(validator);
+                if (entriesToDelete != 0) {
+                    m_numObjects -= entriesToDelete;
+                    iter.remove();
+                    closeAndDeleteSegment(segment);
+                    segmentDeleted = true;
+                }
+            } catch (IOException e) {
+                m_usageSpecificLog.warn("Error validating segment: " + segment.file() + ". Quarantining segment.");
+                quarantineSegment(segment);
+            }
+        }
+        return segmentDeleted;
     }
 
     /**

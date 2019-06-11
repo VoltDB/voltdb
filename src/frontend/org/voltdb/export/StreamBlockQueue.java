@@ -32,6 +32,7 @@ import org.voltdb.exportclient.ExportRowSchemaSerializer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.BinaryDequeValidator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
@@ -302,104 +303,66 @@ public class StreamBlockQueue {
     }
 
     // See PDB segment layout at beginning of this file.
-    public boolean truncateToSequenceNumber(final long truncationSeqNo, final long generationIdCreated) throws IOException {
+    public void truncateToSequenceNumber(final long truncationSeqNo) throws IOException {
         assert(m_memoryDeque.isEmpty());
+        m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
-        boolean clearTracker = deleteStalePBDSegments(generationIdCreated);
-        if (!clearTracker) {
-            m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
-
-                @Override
-                public TruncatorResponse parse(BBContainer bbc) {
-                    ByteBuffer b = bbc.b();
-                    ByteOrder endianness = b.order();
-                    b.order(ByteOrder.LITTLE_ENDIAN);
-                    try {
-                        final long startSequenceNumber = b.getLong();
-                        // If after the truncation point is the first row in the block, the entire block is to be discarded
-                        if (startSequenceNumber > truncationSeqNo) {
-                            return PersistentBinaryDeque.fullTruncateResponse();
-                        }
-                        final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
-                        final int tupleCountPos = b.position();
-                        final int tupleCount = b.getInt();
-                        // There is nothing to do with this buffer
-                        final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
-                        if (lastSequenceNumber <= truncationSeqNo) {
-                            return null;
-                        }
-                        b.getLong(); // uniqueId
-
-                        // Partial truncation
-                        int offset = 0;
-                        while (b.hasRemaining()) {
-                            if (startSequenceNumber + offset > truncationSeqNo) {
-                                // The sequence number of this row is the greater than the truncation sequence number.
-                                // Don't want this row, but want to preserve all rows before it.
-                                // Move back before the row length prefix, txnId and header
-                                // Return everything in the block before the truncation point.
-                                // Indicate this is the end of the interesting data.
-                                b.limit(b.position());
-                                // update tuple count in the header
-                                b.putInt(tupleCountPos, offset - 1);
-                                b.position(0);
-                                return new ByteBufferTruncatorResponse(b);
-                            }
-                            offset++;
-                            // Not the row we are looking to truncate at. Skip past it (row length + row length field).
-                            final int rowLength = b.getInt();
-                            b.position(b.position() + rowLength);
-                        }
-                        return null;
-                    } finally {
-                        b.order(endianness);
+            @Override
+            public TruncatorResponse parse(BBContainer bbc) {
+                ByteBuffer b = bbc.b();
+                ByteOrder endianness = b.order();
+                b.order(ByteOrder.LITTLE_ENDIAN);
+                try {
+                    final long startSequenceNumber = b.getLong();
+                    // If after the truncation point is the first row in the block, the entire block is to be discarded
+                    if (startSequenceNumber > truncationSeqNo) {
+                        return PersistentBinaryDeque.fullTruncateResponse();
                     }
+                    final long committedSequenceNumber = b.getLong(); // committedSequenceNumber
+                    final int tupleCountPos = b.position();
+                    final int tupleCount = b.getInt();
+                    // There is nothing to do with this buffer
+                    final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
+                    if (lastSequenceNumber <= truncationSeqNo) {
+                        return null;
+                    }
+                    b.getLong(); // uniqueId
+
+                    // Partial truncation
+                    int offset = 0;
+                    while (b.hasRemaining()) {
+                        if (startSequenceNumber + offset > truncationSeqNo) {
+                            // The sequence number of this row is the greater than the truncation sequence number.
+                            // Don't want this row, but want to preserve all rows before it.
+                            // Move back before the row length prefix, txnId and header
+                            // Return everything in the block before the truncation point.
+                            // Indicate this is the end of the interesting data.
+                            b.limit(b.position());
+                            // update tuple count in the header
+                            b.putInt(tupleCountPos, offset - 1);
+                            b.position(0);
+                            return new ByteBufferTruncatorResponse(b);
+                        }
+                        offset++;
+                        // Not the row we are looking to truncate at. Skip past it (row length + row length field).
+                        final int rowLength = b.getInt();
+                        b.position(b.position() + rowLength);
+                    }
+                    return null;
+                } finally {
+                    b.order(endianness);
                 }
-            });
-            // close reopen reader
-            m_persistentDeque.close();
-        }
+            }
+        });
+        // close reopen reader
+        m_persistentDeque.close();
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         constructPBD(catalogContext.m_genId);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
-        return clearTracker;
-    }
-
-    public boolean deleteStalePBDSegments(long generationId) throws IOException {
-        long initialGenId = 0;
-        BinaryDequeReader.Entry<ExportRowSchema> entry = m_reader.pollHeader();
-        // Update the header schema with initial generation id from existing PBD file if possible
-        if (entry != null) {
-            initialGenId = entry.getExtraHeader().initialGenerationId;
-            // Higher generation id passing indicates current PBDs are from previous life of this stream,
-            // delete all segments.
-            if (generationId > initialGenId) {
-                m_persistentDeque.closeAndDelete();
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Delete all pbds from older generation " + initialGenId);
-                }
-                m_initialGenerationId = generationId;
-                CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                Table streamTable = VoltDB.instance().getCatalogContext().database.getTables().get(m_streamName);
-
-                ExportRowSchema schema =
-                        ExportRowSchema.create(streamTable, m_partitionId, m_initialGenerationId, catalogContext.m_genId);
-                ExportRowSchemaSerializer serializer = new ExportRowSchemaSerializer();
-
-                m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
-                        .initialExtraHeader(schema, serializer)
-                        .compression(!DISABLE_COMPRESSION).build();
-
-                m_reader = m_persistentDeque.openForRead(m_nonce);
-                return true;
-            }
-        }
-        return false;
     }
 
     public ExportSequenceNumberTracker scanForGap() throws IOException {
-        assert(m_memoryDeque.isEmpty());
         ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
         m_persistentDeque.scanEntries(new BinaryDequeScanner() {
             @Override
@@ -416,6 +379,36 @@ public class StreamBlockQueue {
 
         });
         return tracker;
+    }
+
+    public boolean deleteStalePBDSegments(long generationId) throws IOException {
+        boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
+
+            public boolean isStale(ExportRowSchema extraHeader) {
+                assert (extraHeader != null);
+                boolean fromOlderGeneration = extraHeader.initialGenerationId < generationId;
+                if (exportLog.isDebugEnabled() && fromOlderGeneration) {
+                    exportLog.debug("Delete PBD segments of " +
+                            (extraHeader.tableName + "_" + extraHeader.partitionId) +
+                            " from older generation " + extraHeader.initialGenerationId);
+                }
+                return fromOlderGeneration;
+            }
+
+        });
+        if (generationId != m_initialGenerationId) {
+            m_initialGenerationId = generationId;
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Update created generation id of " + m_nonce + " to " + generationId);
+            }
+        }
+        if (didCleanup) {
+            // Clear cache in case of any memory copy of stale data is stored in memory deque
+            m_memoryDeque.clear();
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            constructPBD(catalogContext.m_genId);
+        }
+        return didCleanup;
     }
 
     public long getGenerationIdCreated() {
