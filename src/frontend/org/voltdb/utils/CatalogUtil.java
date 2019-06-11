@@ -3261,16 +3261,7 @@ public abstract class CatalogUtil {
         }
         return false;
     }
-    public static int getPersistentMigrateBatchSize(String tableName) {
-        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
-        if (table != null && table.getTimetolive() != null ) {
-            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl != null && !StringUtil.isEmpty(table.getMigrationtarget())) {
-                return ttl.getBatchsize();
-            }
-        }
-        return -1;
-    }
+
     public static boolean getIsreplicated(String tableName) {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null) {
