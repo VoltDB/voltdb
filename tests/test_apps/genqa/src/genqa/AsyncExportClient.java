@@ -504,7 +504,7 @@ public class AsyncExportClient
                 .get(config.procedure);
 
         if (stats == null) return;
-        
+ 
         // switch from app's runtime to VoltLogger clock time so results line up
         // with apprunner if running in that framework
 
