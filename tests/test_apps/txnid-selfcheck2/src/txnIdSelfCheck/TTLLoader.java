@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class NibbleDeleteLoader extends BenchmarkThread {
+public class TTLLoader extends BenchmarkThread {
 
     final Client client;
     final long targetCount;
@@ -50,6 +50,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
     final int rowSize;
     final int batchSize;
     final int partitionCount;
+    final String type;  // "EXPORT" -- migrate to export stream, or "TTL" -- nibble delete
     final Random r = new Random(0);
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final Semaphore m_permits;
@@ -59,12 +60,13 @@ public class NibbleDeleteLoader extends BenchmarkThread {
     /* this is the ttl configured on each of the tables in the ddl */
     long TTL = 30;
 
-    NibbleDeleteLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
-        setName("NibbleDeleteLoader-"+tableName);
+    TTLLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount, String type) {
+        setName("TTLLoader-"+tableName);
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
         this.rowSize = rowSize;
+        this.type = type;
         this.batchSize = batchSize;
         m_permits = permits;
         this.partitionCount = partitionCount;
@@ -75,7 +77,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
 
     void shutdown() {
         m_shouldContinue.set(false);
-        log.info("NibbleDeleteLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: " + rowsLoaded.get() +
+        log.info("TTLLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: " + rowsLoaded.get() +
                 " deletes remaining: " + deletesRemaining);
     }
 
@@ -95,11 +97,11 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                Benchmark.hardStop("NibbleDeleteLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
+                Benchmark.hardStop("TTLLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("NibbleDeleteLoader ungracefully failed to insert into table " + tableName);
+                log.warn("TTLLoader ungracefully failed to insert into table " + tableName);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
@@ -110,18 +112,18 @@ public class NibbleDeleteLoader extends BenchmarkThread {
         }
     }
 
-    class NibbleDeleteMonitor extends Thread {
+    class TTLMonitor extends Thread {
         final String tableName;
         final String tsColumnName;
-        NibbleDeleteMonitor(String tableName,String tsColumnName) {
+        TTLMonitor(String tableName,String tsColumnName) {
             this.tableName = tableName;
             this.tsColumnName = tsColumnName;
-            setName("NibbleDeleteMonitor-"+tableName);
+            setName("TTLMonitor-"+tableName);
         }
 
         @Override
         public void run() {
-            log.info("NibbleDeleteMonitor is running");
+            log.info("TTLMonitor is running");
             long totalDeleted = 0;
             int retries = 4;
             while (m_shouldContinue.get()) {
@@ -130,11 +132,12 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     long ttl = new Double(Math.ceil(TTL*1.5)).longValue();
                     ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select count(*) from "+tableName+" where "+tsColumnName+" < DATEADD(SECOND,-"+ttl+",NOW) ");
                     long remainingRows = TxnId2Utils.doProcCall(client, "@AdHoc", "select count(*) from "+tableName).getResults()[0].asScalarLong();
-                    Map<String,Object> stats = getTTLStats(tableName);
+                    Map<String,Object> stats = getStats(tableName, type);
                     if (response.getStatus() == ClientResponse.SUCCESS ) {
                         long unDeletedRows  = response.getResults()[0].asScalarLong();
-                        log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted:" + unDeletedRows);
-                        log.info("Stats Rows behind from being deleted:" + stats.get("ROWS_LEFT"));
+                        Object rows_left = (type == "TTL") ? stats.get("ROWS_LEFT") : stats.get("TUPLE_PENDING");
+                        log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted/migrated:" + unDeletedRows);
+                        log.info("Stats Rows behind from being deleted/migrated:" + rows_left);
                         long currentRemainingRows = rowsLoaded.get() - remainingRows;
                         if (currentRemainingRows == totalDeleted && totalDeleted > 0){
                             //nothing deleted in last round
@@ -160,11 +163,12 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             }
         }
 
-        public Map<String,Object> getTTLStats(String tableName ) {
+        public Map<String,Object> getStats(String tableName, String type ) {
             Map<String,Object> stats = new HashMap<String,Object>();
             ClientResponse cr = null;
+            log.info("stats request, type: " + type);
             try {
-                cr = client.callProcedure("@Statistics", "TTL");
+                cr = client.callProcedure("@Statistics", type);
             } catch(IOException e) {
                 log.error(e.getMessage());
                 return stats;
@@ -172,7 +176,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                 log.error(pe.getMessage());
             }
             if (cr.getStatus() != ClientResponse.SUCCESS) {
-                log.error("Failed to call Statistics TTL proc.");
+                log.error("Failed to call Statistics " + type + " proc.");
                 log.error(((ClientResponseImpl) cr).toJSONString());
                 return stats;
             }
@@ -181,32 +185,53 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             System.out.println(t.toFormattedString());
             t.resetRowPosition();
             stats.put("TABLE", tableName);
-            long deleted = 0;
-            long left = 0;
-            while ( t.advanceRow() ) {
-                if ( tableName.equalsIgnoreCase(t.getString("TABLE_NAME")) ) {
-                   deleted += t.getLong("ROWS_DELETED");
-                   left += t.getLong("ROWS_REMAINING");
+            switch (type) {
+
+            case "TTL" :
+                long deleted = 0;
+                long left = 0;
+                while ( t.advanceRow() ) {
+                    if ( tableName.equalsIgnoreCase(t.getString("TABLE_NAME")) ) {
+                        deleted += t.getLong("ROWS_DELETED");
+                        left += t.getLong("ROWS_REMAINING");
+                    }
                 }
+                stats.put("ROWS_DELETED", deleted);
+                stats.put("ROWS_LEFT",left);
+                return stats;
+            case "EXPORT":
+                long tuple_count = 0;
+                long tuple_pending = 0;
+                while ( t.advanceRow() ) {
+                    if ( tableName.equalsIgnoreCase(t.getString("SOURCE")) ) {
+                        tuple_count += t.getLong("TUPLE_COUNT");
+                        tuple_pending += t.getLong("TUPLE_PENDING");
+                    }
+                }
+                stats.put("TUPLE_COUNT", tuple_count);
+                stats.put("TUPLE_PENDING",tuple_pending);
+                return stats;
+            default:
+                log.info("Invalid type, " + type + " in getStats");
+                break;
             }
-            stats.put("ROWS_DELETED", deleted);
-            stats.put("ROWS_LEFT",left);
             return stats;
         }
 
-        public long getRemainingRowCount(String tableName) {
-            Map<String,Object> stats = getTTLStats(tableName);
+        public long getRemainingRowCount(String tableName, String type) {
+            Map<String,Object> stats = getStats(tableName, "TTL");
             if (stats.isEmpty()) {
                 return -1;
             }
-            return ((Long)stats.get("ROWS_LEFT")).longValue();
+            long row_count = (type == "TTL") ? ((Long)stats.get("ROWS_LEFT")).longValue() : ((Long)stats.get("TUPLE_PENDING")).longValue();
+            return row_count;
         }
     }
     @Override
     public void run() {
-        NibbleDeleteMonitor monitor = new NibbleDeleteMonitor(this.tableName,"ts");
+        TTLMonitor monitor = new TTLMonitor(this.tableName,"ts");
         monitor.start();
-        log.info("NibbleDeleteMonitor started.");
+        log.info("TTLMonitor started.");
         byte[] data = new byte[rowSize];
         long currentRowCount;
         boolean diedEarly = false;
@@ -228,7 +253,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                             isDone = true;
                             break;
                         }
-                        log.error("NibbleDeleteLoader thread interrupted while waiting for permit. " + e.getMessage());
+                        log.error("TTLLoader thread interrupted while waiting for permit. " + e.getMessage());
                     }
                     insertsTried++;
                     client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
@@ -242,7 +267,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     if (!m_shouldContinue.get()) {
                         break;
                     }
-                    log.error("NibbleDeleteLoader thread interrupted while waiting." + e.getMessage());
+                    log.error("TTLLoader thread interrupted while waiting." + e.getMessage());
                 }
                 long nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                 // if no progress, throttle a bit
@@ -250,32 +275,32 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     try { Thread.sleep(1000); } catch (Exception e2) {}
                 }
                 currentRowCount = nextRowCount;
-                log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " total inserted rows:" + rowsLoaded.get() );
-                log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully");
+                log.info("TTLLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " total inserted rows:" + rowsLoaded.get() );
+                log.info("TTLLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully");
             } catch (Exception e) {
                 if ( e instanceof InterruptedIOException && ! m_shouldContinue.get()) {
                     continue;
                 }
                 diedEarly = true;
                 // on exception, log and end the thread, but don't kill the process
-                log.error("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
+                log.error("TTLLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
                 break;
             }
         }
 
-        log.info("NibbleDeleteLoader completed for table " + tableName + " rows inserted: " + rowsLoaded.get());
-        long rowRemaining = monitor.getRemainingRowCount(tableName);
+        log.info("TTLLoader completed for table " + tableName + " rows inserted: " + rowsLoaded.get());
+        long rowRemaining = monitor.getRemainingRowCount(tableName, type);
         if (!diedEarly){
             int retries = 12;
             while (rowRemaining != 0) {
                 try { Thread.sleep(3000); } catch (Exception ex) {}
-                rowRemaining = monitor.getRemainingRowCount(tableName);
+                rowRemaining = monitor.getRemainingRowCount(tableName, type);
                 retries--;
                 if (retries == 0 && rowRemaining != 0) {
-                    Benchmark.hardStop("Nibble Delete hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
+                    Benchmark.hardStop("Nibble Delete/Migrate hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
                 }
             }
         }
-        log.info("NibbleDeleteLoader completed for table " + tableName + " rows remaining to be deleted:" + rowRemaining);
+        log.info("TTLLoader completed for table " + tableName + " rows remaining to be deleted:" + rowRemaining);
     }
 }
