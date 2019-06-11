@@ -186,6 +186,7 @@ public class TLSEncryptionAdapter {
                 if (m_inflightMessages == null) {
                     break;
                 }
+                delta += m_inflightMessages.m_delta;
             }
 
             bytesWritten += m_inflightMessages.write(channel);
@@ -193,7 +194,6 @@ public class TLSEncryptionAdapter {
                 break;
             }
 
-            delta += m_inflightMessages.m_delta;
             messagesWritten += m_inflightMessages.m_count;
             m_inflightMessages.m_messages.release();
             m_inflightMessages = null;
