@@ -63,7 +63,11 @@ public class TestQueryParameterization {
                 new ParameterizationTestCase(
                         "select id, rank() over(PARTITION BY cnt+1 ORDER BY name) LIMIT 2 OFFSET 3",
                         "select id, rank() over(PARTITION BY cnt+? ORDER BY name) LIMIT ? OFFSET ?",
-                        num("1"), num("2"), num("3"))
+                        num("1"), num("2"), num("3")),
+                new ParameterizationTestCase(
+                        "select id, rank() over(PARTITION BY cnt+1 ORDER BY name) OFFSET 2 LIMIT 3",
+                        "select id, rank() over(PARTITION BY cnt+? ORDER BY name) OFFSET ? LIMIT ?",
+                         num("1"), num("2"), num("3"))
         };
         for (ParameterizationTestCase testCase : testCases) {
             testCase.run();
