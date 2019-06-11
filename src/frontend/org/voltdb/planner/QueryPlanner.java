@@ -20,6 +20,8 @@ package org.voltdb.planner;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -198,6 +200,14 @@ public class QueryPlanner implements AutoCloseable {
         m_planSelector.outputCompiledStatement(m_xmlSQL);
     }
 
+    private static Predicate<Pair<AbstractExpression, AbstractExpression>> isNotMigrating() {
+        // the migrating function expression somehow takes function_id = 1,
+        // so compare the function name is safer than function id.
+        return p -> p.getFirst() instanceof FunctionExpression &&
+                ((FunctionExpression) p.getFirst()).getFunctionName().equals("migrating") &&
+                p.getSecond().getExpressionType() == ExpressionType.OPERATOR_NOT;
+    }
+
     /**
      * Check that "MIGRATE FROM tbl WHERE..." statement is valid.
      * @param sql SQL statement
@@ -211,7 +221,7 @@ public class QueryPlanner implements AutoCloseable {
         assert targetTable != null;
         if (StringUtil.isEmpty(targetTable.getMigrationtarget())) {
             throw new PlanningErrorException(String.format(
-                    "%s: Cannot migrate from table %s because the table does not contain migration target",
+                    "%s: Cannot migrate from table %s because the table definition does not specify a migration target",
                     sql, targetTable.getTypeName()));
         }
         // extract all the <leaf, parent> pairs in the where conditions.
@@ -221,16 +231,9 @@ public class QueryPlanner implements AutoCloseable {
                                 VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
                                 "operation")));
         // check if "not migrating" exists in the where condition
-        for (Pair<AbstractExpression, AbstractExpression> leafAndParent : leafAndParentList) {
-            if (leafAndParent.getFirst() instanceof FunctionExpression) {
-                // the migrating function expression somehow takes function_id = 1,
-                // so compare the function name is safer than function id.
-                if (((FunctionExpression) leafAndParent.getFirst()).getFunctionName().equals("migrating") &&
-                        leafAndParent.getSecond().getExpressionType() == ExpressionType.OPERATOR_NOT) {
-                    // hit "NOT MIGRATING", valid statement
-                    return;
-                }
-            }
+        if (leafAndParentList.stream().anyMatch(isNotMigrating())) {
+            // hit "NOT MIGRATING", valid statement
+            return;
         }
         // not hit "NOT MIGRATING", invalid statement
         throw new PlanningErrorException(String.format(

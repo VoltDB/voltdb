@@ -291,7 +291,8 @@ public final class ExpressionUtil {
         }
     }
 
-    private static void collectTerminalParentPairs(AbstractExpression expr, AbstractExpression parent, List<Pair<AbstractExpression, AbstractExpression>> accum) {
+    private static void collectTerminalParentPairs(AbstractExpression expr, AbstractExpression parent,
+                                                   List<Pair<AbstractExpression, AbstractExpression>> accum) {
         if (expr != null) {
             collectTerminalParentPairs(expr.getLeft(), expr, accum);
             collectTerminalParentPairs(expr.getRight(), expr, accum);
@@ -315,9 +316,9 @@ public final class ExpressionUtil {
     }
 
     /**
-     * Collect/dedup all terminal/leaf nodes and their parents of an expression tree
+     * Collect all terminal/leaf nodes and their parents of an expression tree
      * @param expr source expression tree
-     * @return dedup-ed (terminal, terminal's parent) expression pairs
+     * @return (terminal, terminal ' s parent) expression pairs
      */
     public static List<Pair<AbstractExpression, AbstractExpression>> collectTerminalParentPairs(AbstractExpression expr) {
         final List<Pair<AbstractExpression, AbstractExpression>> result = new ArrayList<>();
