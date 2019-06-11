@@ -1261,13 +1261,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
     {
         boolean segmentDeleted = false;
         if (m_closed) {
-            throw new IOException("Cannot scanForGap(): PBD has been closed");
+            throw new IOException("Cannot deletePBDSegment(): PBD has been closed");
         }
 
         assertions();
         if (m_segments.isEmpty()) {
             if (m_usageSpecificLog.isDebugEnabled()) {
-                m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+                m_usageSpecificLog.debug("PBD " + m_nonce + " has no segments to delete.");
             }
             return segmentDeleted;
         }

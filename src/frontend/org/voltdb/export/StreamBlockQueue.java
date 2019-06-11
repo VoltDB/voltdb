@@ -381,7 +381,7 @@ public class StreamBlockQueue {
         return tracker;
     }
 
-    public boolean deleteStalePBDSegments(long generationId) throws IOException {
+    public boolean deleteStaleBlocks(long generationId) throws IOException {
         boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
 
             public boolean isStale(ExportRowSchema extraHeader) {
