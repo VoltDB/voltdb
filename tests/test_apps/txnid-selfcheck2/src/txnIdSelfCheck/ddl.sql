@@ -423,26 +423,26 @@ CREATE TABLE importbr
 );
 
 -- TTL with migrate to stream -- partitioned
-CREATE TABLE ttlmigratep
+CREATE TABLE ttlmigratep MIGRATE TO TARGET abc1
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
-) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc1;
+) USING TTL 30 SECONDS ON COLUMN ts;
 PARTITION TABLE ttlmigratep ON COLUMN p;
 CREATE INDEX ttlmigrateidxp ON ttlmigratep(ts) WHERE NOT MIGRATING;
 
 -- TTL with migrate to stream -- replicated
-CREATE TABLE ttlmigrater
+CREATE TABLE ttlmigrater MIGRATE TO TARGET abc2
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
-) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc2 ;
+) USING TTL 30 SECONDS ON COLUMN ts;
 CREATE INDEX ttlmigrateidxr ON ttlmigrater(ts) WHERE NOT MIGRATING;
 
 -- base procedures you shouldn't call
