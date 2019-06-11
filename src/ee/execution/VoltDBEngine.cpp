@@ -718,7 +718,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     // Make sure we did the correct size calculation.
     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function according to the function ID and the parameters
     // stored in the shared buffer. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart();
@@ -761,7 +761,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, cons
     // Make sure we did the correct size calculation.
     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function according to the function ID and the parameters
     // stored in the shared buffer. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
@@ -771,7 +771,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, cons
     }
 }
 
-void VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
+NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
         // There must be serious inconsistency in the catalog if this could happen.
@@ -800,13 +800,21 @@ void VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
     // Make sure we did the correct size calculation.
     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function according to the function ID and the parameters
     // stored in the shared buffer. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();
-    if (returnCode != 0) {
-        throw SQLException(SQLException::volt_user_defined_function_error,
-            "callJavaUserDefinedAggregateWorkerEnd failed");
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (returnCode == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval = ValueFactory::getNValueOfType(VALUE_TYPE_VARBINARY);
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        std::string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
     }
 }
 

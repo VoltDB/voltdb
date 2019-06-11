@@ -21,6 +21,13 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectOutput;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectInput;
+
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -924,57 +931,100 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     public int callJavaUserDefinedAggregateWorkerEnd() {
-        // m_udfBuffer.clear();
-        // m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
-        // int functionId = m_udfBuffer.getInt();
-        // UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
-        // Throwable throwable = null;
-        // try {
-        //     assert(udafRunner != null);
-        //     // Call the user-defined function.
-        //     udafRunner.assemble(m_udfBuffer);
-
-        //     // Write the result to the shared buffer.
-        //     m_udfBuffer.clear();
-        //     return 0;
-        // }
-        // catch (InvocationTargetException ex1) {
-        //     // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
-        //     // We need to get its cause and throw that to the user.
-        //     throwable = ex1.getCause();
-        // }
-        // catch (Throwable ex2) {
-        //     throwable = ex2;
-        // }
-        // // Getting here means the execution was not successful.
-        // try {
-        //     assert(throwable != null);
-        //     byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-        //     // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-        //     // But you never know.
-        //     if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
-        //         resizeUDFBuffer(errorMsg.length + 4);
-        //     }
-        //     m_udfBuffer.clear();
-        //     SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
-        // }
-        // catch (IOException e) {
-        //     throw new RuntimeException(e);
-        // }
-        // return -1;
-        return 0;
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        Throwable throwable = null;
+        Object returnValue = null;
+        try {
+            assert(udafRunner != null);
+            // get the instance
+            Object worker_instance = udafRunner.getFunctionInstance();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutput out = null;
+            try {
+               out = new ObjectOutputStream(bos);
+               out.writeObject(worker_instance);
+               out.flush();
+               returnValue = bos.toByteArray();
+            } finally {
+              try {
+                  bos.close();
+              } catch (IOException ex) {
+                // ignore close exception
+              }
+            }
+            VoltType returnType = VoltType.VARBINARY;
+            // If the function we are running returns variable-length return value,
+            // it may be possible that the buffer is not large enough to hold it.
+            // Check the required buffer size and enlarge the existing buffer when necessary.
+            // The default buffer size is 256K, which is more than enough for any
+            // fixed-length data and NULL variable-length data (the buffer size will not go less than 256K).
+            if (returnType.isVariableLength() && ! VoltType.isVoltNullValue(returnValue)) {
+                // The minimum required size is 5 bytes:
+                // 1 byte for the type indicator, 4 bytes for the prefixed length.
+                int sizeRequired = 1 + 4;
+                switch(returnType) {
+                case VARBINARY:
+                    if (returnValue instanceof byte[]) {
+                        sizeRequired += ((byte[])returnValue).length;
+                    }
+                    else if (returnValue instanceof Byte[]) {
+                        sizeRequired += ((Byte[])returnValue).length;
+                    }
+                    break;
+                case STRING:
+                    sizeRequired += ((String)returnValue).getBytes(Constants.UTF8ENCODING).length;
+                    break;
+                case GEOGRAPHY:
+                    sizeRequired += ((GeographyValue)returnValue).getLengthInBytes();
+                    break;
+                default:
+                }
+                if (sizeRequired > m_udfBuffer.capacity()) {
+                    resizeUDFBuffer(sizeRequired);
+                }
+            }
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
+            UserDefinedAggregateFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
+        }
+        catch (Throwable ex2) {
+            throwable = ex2;
+        }
+        // Getting here means the execution was not successful.
+        try {
+            assert(throwable != null);
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+            // But you never know.
+            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
+                resizeUDFBuffer(errorMsg.length + 4);
+            }
+            m_udfBuffer.clear();
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return -1;
     }
 
     public int callJavaUserDefinedAggregateCoordinatorEnd() {
-        // m_udfBuffer.clear();
-        // m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
-        // int functionId = m_udfBuffer.getInt();
-        // UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
-        // Object returnValue = null;
-        // Throwable throwable = null;
-        // try {
-        //     assert(udfRunner != null);
-        //     // Call the user-defined function.
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
+        UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        Object returnValue = null;
+        Throwable throwable = null;
+        try {
+            assert(udafRunner != null);
+            return 0;
+        }
+            // Call the user-defined function.
         //     returnValue = udfRunner.call(m_udfBuffer);
 
         //     VoltType returnType = udfRunner.getReturnType();
@@ -1019,9 +1069,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //     // We need to get its cause and throw that to the user.
         //     throwable = ex1.getCause();
         // }
-        // catch (Throwable ex2) {
-        //     throwable = ex2;
-        // }
+        catch (Throwable ex2) {
+            throwable = ex2;
+        }
         // // Getting here means the execution was not successful.
         // try {
         //     assert(throwable != null);
@@ -1037,8 +1087,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // catch (IOException e) {
         //     throw new RuntimeException(e);
         // }
-        // return -1;
-        return 0;
+        return -1;
     }
 
 

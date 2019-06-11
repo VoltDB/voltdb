@@ -150,7 +150,11 @@ public class AggregateExpression extends AbstractExpression {
     }
 
     public boolean isUserDefined() {
-        return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(user_aggregate_id));
+        if (user_aggregate_id != null) {
+            return FunctionForVoltDB.isUserDefinedFunctionId(Integer.parseInt(user_aggregate_id));
+        } else {
+            return false;
+        }
     }
 
     public String getFunctionName() {
