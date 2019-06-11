@@ -291,17 +291,34 @@ public final class ExpressionUtil {
         }
     }
 
-    private static void collectTerminalParentPairs(AbstractExpression expr, AbstractExpression parent,
-                                                   List<Pair<AbstractExpression, AbstractExpression>> accum) {
+    private static boolean containsTerminalParentPairs(AbstractExpression expr, AbstractExpression parent,
+                                                       Predicate<Pair<AbstractExpression, AbstractExpression>> predicate) {
         if (expr != null) {
-            collectTerminalParentPairs(expr.getLeft(), expr, accum);
-            collectTerminalParentPairs(expr.getRight(), expr, accum);
+            // if contains in left/right node
+            if (containsTerminalParentPairs(expr.getLeft(), expr, predicate) ||
+                    containsTerminalParentPairs(expr.getRight(), expr, predicate)) {
+                return true;
+            }
+            // if contains in arguments
             if (expr.getArgs() != null && expr.getArgs().size() > 0) {
-                expr.getArgs().forEach(e -> collectTerminalParentPairs(e, expr, accum));
-            } else if (expr.getLeft() == null && expr.getRight() == null) {
-                accum.add(Pair.of(expr, parent));
+                return expr.getArgs().stream().anyMatch(e -> containsTerminalParentPairs(e, expr, predicate));
+            } else if (expr.getLeft() == null && expr.getRight() == null) { // check leaf node matches
+                return predicate.test(Pair.of(expr, parent));
             }
         }
+        return false;
+    }
+
+    /**
+     * Recursively check if any (terminal, terminal's parent) expression pair in the given expression tree
+     * satisfies given predicate.
+     * @param expr      source expression tree
+     * @param predicate predicate to check against (terminal, terminal's parent) expression pairs.
+     * @return true if there exists a (terminal, terminal's parent)  expression pair that satisfies the predicate
+     */
+    public static boolean containsTerminalParentPairs(AbstractExpression expr,
+                                                      Predicate<Pair<AbstractExpression, AbstractExpression>> predicate) {
+        return containsTerminalParentPairs(expr, null, predicate);
     }
 
     /**
@@ -312,17 +329,6 @@ public final class ExpressionUtil {
     public static Set<AbstractExpression> collectTerminals(AbstractExpression expr) {
         final Set<AbstractExpression> result = new HashSet<>();
         collectTerminals(expr, result);
-        return result;
-    }
-
-    /**
-     * Collect all terminal/leaf nodes and their parents of an expression tree
-     * @param expr source expression tree
-     * @return (terminal, terminal ' s parent) expression pairs
-     */
-    public static List<Pair<AbstractExpression, AbstractExpression>> collectTerminalParentPairs(AbstractExpression expr) {
-        final List<Pair<AbstractExpression, AbstractExpression>> result = new ArrayList<>();
-        collectTerminalParentPairs(expr, null, result);
         return result;
     }
 

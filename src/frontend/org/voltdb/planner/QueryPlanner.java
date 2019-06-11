@@ -224,14 +224,11 @@ public class QueryPlanner implements AutoCloseable {
                     "%s: Cannot migrate from table %s because the table definition does not specify a migration target",
                     sql, targetTable.getTypeName()));
         }
-        // extract all the <leaf, parent> pairs in the where conditions.
-        List<Pair<AbstractExpression, AbstractExpression>> leafAndParentList = ExpressionUtil.collectTerminalParentPairs(
-                ExpressionUtil.from(db,
-                        VoltXMLElementHelper.getFirstChild(
-                                VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
-                                "operation")));
         // check if "not migrating" exists in the where condition
-        if (leafAndParentList.stream().anyMatch(isNotMigrating())) {
+        if (ExpressionUtil.containsTerminalParentPairs(ExpressionUtil.from(db,
+                VoltXMLElementHelper.getFirstChild(
+                        VoltXMLElementHelper.getFirstChild(xmlSQL, "condition"),
+                        "operation")), isNotMigrating())) {
             // hit "NOT MIGRATING", valid statement
             return;
         }
