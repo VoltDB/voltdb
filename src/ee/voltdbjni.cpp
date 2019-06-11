@@ -621,25 +621,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         // all fragments' parameters are in this buffer
         ReferenceSerializeInputBE serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
 
-        int failures = engine->executePlanFragments(num_fragments,
-                                                    fragmentIdsBuffer,
-                                                    input_dep_ids ? depIdsBuffer : NULL,
-                                                    serialize_in,
-                                                    txnId,
-                                                    spHandle,
-                                                    lastCommittedSpHandle,
-                                                    uniqueId,
-                                                    undoToken,
-                                                    traceOn == JNI_TRUE);
-
+        int failures = engine->executePlanFragments(num_fragments, fragmentIdsBuffer, input_dep_ids ? depIdsBuffer : NULL,
+              serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken, traceOn == JNI_TRUE);
         if (failures > 0) {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
-        else {
+        } else {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
         }
-    }
-    catch (const FatalException &e) {
+    } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -903,8 +892,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken, jboolean isEmptyDRTxn)
-{
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken, jboolean isEmptyDRTxn) {
     VOLT_DEBUG("nativeReleaseUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -925,15 +913,14 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeR
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUndoUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
-{
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken) {
     VOLT_DEBUG("nativeUndoUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         if (engine) {
-            engine->undoUndoToken(undoToken);
+              engine->undoUndoToken(undoToken);
             return JNI_TRUE;
         }
         return JNI_FALSE;

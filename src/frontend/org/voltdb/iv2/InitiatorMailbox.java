@@ -84,8 +84,8 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    VoltLogger hostLog = new VoltLogger("HOST");
-    VoltLogger tmLog = new VoltLogger("TM");
+    final VoltLogger hostLog = new VoltLogger("HOST");
+    final VoltLogger tmLog = new VoltLogger("TM");
 
     protected final int m_partitionId;
     protected final Scheduler m_scheduler;

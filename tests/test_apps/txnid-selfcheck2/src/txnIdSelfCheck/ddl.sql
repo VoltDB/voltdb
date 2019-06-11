@@ -163,7 +163,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target ABC3
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -422,6 +422,29 @@ CREATE TABLE importbr
 , UNIQUE ( cid, seq )
 );
 
+-- TTL with migrate to stream -- partitioned
+CREATE TABLE ttlmigratep
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mp PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc1;
+PARTITION TABLE ttlmigratep ON COLUMN p;
+CREATE INDEX ttlmigrateidxp ON ttlmigratep(ts) WHERE NOT MIGRATING;
+
+-- TTL with migrate to stream -- replicated
+CREATE TABLE ttlmigrater
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_mr PRIMARY KEY (p,id)
+) USING TTL 30 SECONDS ON COLUMN ts MIGRATE TO TARGET abc2 ;
+CREATE INDEX ttlmigrateidxr ON ttlmigrater(ts) WHERE NOT MIGRATING;
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
@@ -449,6 +472,9 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATEPTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TTLMIGRATERTableInsert;
+PARTITION PROCEDURE TTLMIGRATEPTableInsert ON TABLE ttlmigratep COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;

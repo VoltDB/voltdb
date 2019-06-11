@@ -20,7 +20,7 @@
 
 using namespace voltdb;
 
-DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string message) :
+DRTableNotFoundException::DRTableNotFoundException(int64_t hash, std::string const& message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_DR_TABLE_NOT_FOUND, message),
     m_hash(hash)
 { }
@@ -31,12 +31,11 @@ void DRTableNotFoundException::p_serialize(ReferenceSerializeOutput *output) con
     output->writeLong(-1);
 }
 
-const std::string
-DRTableNotFoundException::message() const
-{
+std::string DRTableNotFoundException::message() const {
     std::string msg = SerializableEEException::message();
     msg.append(" [");
     msg.append((char *) m_hash);
     msg.append("]");
     return msg;
 }
+

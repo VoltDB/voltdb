@@ -52,9 +52,9 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message, PersistentTableSurgeon *surgeon =  NULL);
+    ConstraintFailureException(Table *table, TableTuple tuple, std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
 
-    virtual const std::string message() const;
+    virtual std::string message() const;
     virtual ~ConstraintFailureException() throw();
 
     const TableTuple* getConflictTuple() const { return &m_tuple; }

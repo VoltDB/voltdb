@@ -94,13 +94,13 @@ public:
             }
         }
 
-        return value.getObject_withoutNull(lengthOut);
+        return value.getObject_withoutNull(*lengthOut);
     }
 
     static const char* peekObject_withoutNull(const NValue& value, int32_t* lengthOut) {
         assert(isVariableLengthType(value.getValueType()));
         // NEEDS WORK
-        return value.getObject_withoutNull(lengthOut);
+        return value.getObject_withoutNull(*lengthOut);
     }
 
     static ValueType peekValueType(const NValue& value) {

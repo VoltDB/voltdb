@@ -21,31 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.iv2;
+package txnIdSelfCheck.procedures;
 
-import org.junit.Test;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-import junit.framework.TestCase;
+public class TTLMIGRATEPTableInsert extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into ttlmigratep (p, id, value) values (?,?,?);");
 
-public class TestMpRestartSequenceGenerator extends TestCase {
-
-    @Test
-    public void testFirstSequenceNumber() {
-        boolean forRestart = false;
-        MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(0, forRestart);
-        long seq = seqGen.getNextSeqNum();
-        assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(0, MpRestartSequenceGenerator.getLeaderId(seq));
-        assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
-    }
-
-    @Test
-    public void testRestartSequenceNumber() {
-        boolean forRestart = true;
-        MpRestartSequenceGenerator seqGen = new MpRestartSequenceGenerator(12, forRestart);
-        long seq = seqGen.getNextSeqNum();
-        assertEquals(forRestart, MpRestartSequenceGenerator.isForRestart(seq));
-        assertEquals(12, MpRestartSequenceGenerator.getLeaderId(seq));
-        assertEquals(1, MpRestartSequenceGenerator.getSequence(seq));
+    public VoltTable[] run(long p, byte[] data) {
+        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
+        return voltExecuteSQL(true);
     }
 }

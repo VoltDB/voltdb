@@ -51,7 +51,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderId)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -60,7 +60,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                     MP_INIT_PID,
                     buddyHSIds,
                     new SiteTaskerQueue(MP_INIT_PID),
-                    messenger.getHostId()),
+                    leaderId),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);
@@ -169,8 +169,9 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
                         m_initiatorMailbox.repairReplicasWith(null, firstMsg);
                     }
                     tmLog.info(m_whoami
-                             + "finished leader promotion. Took "
-                             + (System.currentTimeMillis() - startTime) + " ms.");
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms. Leader ID: "
+                            + m_scheduler.getLeaderId());
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -235,5 +236,10 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new MpInitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
     }
 }
