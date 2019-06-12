@@ -131,7 +131,7 @@ for s in "$@"; do
   fi
 done
 
-JAVA_MAJOR_VERSION=$("$JAVA" -version 2>&1 | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
+JAVA_MAJOR_VERSION=$("$JAVA" -version 2>&1 | sed -E -n 's/.* version "([0-9]+).*/\1/p')
 #echo $JAVA_MAJOR_VERSION
 if [[ "$JAVA_MAJOR_VERSION" -ge 11 ]]; then
     jvmOPTS+=("--add-opens" "java.base/java.lang=ALL-UNNAMED")
