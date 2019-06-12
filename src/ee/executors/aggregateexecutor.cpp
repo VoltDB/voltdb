@@ -501,7 +501,14 @@ class UserDefineAgg : public Agg {
         if (val.isNull()) {
             return;
         }
-        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
+        // if this is a worker, it will accumulate the data of its columns
+        if (worc == "WORKER") {
+            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
+        }
+        // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
+//        else {
+//            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCombine(functionId, val);
+//        }
     }
 
     virtual NValue finalize(ValueType type)
@@ -512,8 +519,7 @@ class UserDefineAgg : public Agg {
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
-            //return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
-            return m_value;
+            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
         }
     }
 

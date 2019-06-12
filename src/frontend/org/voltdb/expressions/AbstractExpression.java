@@ -631,6 +631,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         else {
             if (user_aggregate_id != null && receive_or_seqscan) {
                 stringer.keySymbolValuePair(Members.VALUE_TYPE, "25");
+                stringer.keySymbolValuePair(Members.VALUE_SIZE, "1048576");
             } else {
                 stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
             }
