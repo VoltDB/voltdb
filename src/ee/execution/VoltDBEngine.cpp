@@ -1641,6 +1641,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
     // Set DR flag based on current catalog state
     auto catalogCluster = m_catalog->clusters().get("cluster");
     m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
+    assert(catalogCluster->drFlushInterval() > 0);
     m_executorContext->drStream()->setFlushInterval(catalogCluster->drFlushInterval());
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
