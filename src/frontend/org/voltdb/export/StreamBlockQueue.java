@@ -384,6 +384,7 @@ public class StreamBlockQueue {
     public boolean deleteStaleBlocks(long generationId) throws IOException {
         boolean didCleanup = m_persistentDeque.deletePBDSegment(new BinaryDequeValidator<ExportRowSchema>() {
 
+            @Override
             public boolean isStale(ExportRowSchema extraHeader) {
                 assert (extraHeader != null);
                 boolean fromOlderGeneration = extraHeader.initialGenerationId < generationId;
@@ -403,8 +404,8 @@ public class StreamBlockQueue {
             }
         }
         if (didCleanup) {
-            // Clear cache in case of any memory copy of stale data is stored in memory deque
-            m_memoryDeque.clear();
+            // Close and reopen
+            close();
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
             constructPBD(catalogContext.m_genId);
         }

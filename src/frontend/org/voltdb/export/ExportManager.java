@@ -332,7 +332,7 @@ public class ExportManager
 
         // Notify export datasources to check the *generation* of export buffers,
         // delete buffers older than current generation number or generation number
-        // from snapshot.
+        // from snapshot. This must be done before the processor starts polling.
         cleanupStaleBuffers();
 
         processor.startPolling();
