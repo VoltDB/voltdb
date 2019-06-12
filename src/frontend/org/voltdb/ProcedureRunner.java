@@ -1224,7 +1224,7 @@ public class ProcedureRunner {
         // ensure the message is returned if we're not going to hit the verbose
         // condition below
         if (expected_failure) {
-            msg.append("  ").append(e.getMessage());
+            msg.append(" ").append(e.getMessage());
             if (e instanceof org.voltdb.exceptions.InterruptException && readOnly) {
                 int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
                 if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
@@ -1259,7 +1259,7 @@ public class ProcedureRunner {
             Writer result = new StringWriter();
             PrintWriter pw = new PrintWriter(result);
             e.printStackTrace(pw);
-            msg.append("  ").append(result.toString());
+            msg.append(" ").append(result.toString());
         }
 
         return getErrorResponse(status, appStatus, appStatusString, msg.toString(),
