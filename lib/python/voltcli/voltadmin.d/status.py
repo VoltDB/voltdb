@@ -30,7 +30,7 @@ RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
 
 RESIZE_MAJOR_VERSION = 9
-RESIZE_MINOR_VERSION = 0
+RESIZE_MINOR_VERSION = 1
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -117,7 +117,7 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
                                     ['OVERVIEW'],
                                     True, None, True)
     if response.response.status != 1:
-        return None;
+        return None
 
     if clearHostCache:
         available_hosts[:] = []
@@ -181,18 +181,21 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
              (majorVersion == RESIZE_MAJOR_VERSION and minorVersion >= RESIZE_MINOR_VERSION)):
         result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
                                   [2, '', '']).table(0)
-        resizeStatus = result.tuple(0).column_integer(0)
-        resizeMessage = result.tuple(0).column_string(1)
-        if resizeStatus != 0:
-            runner.error(resizeMessage)
-        else:
+        query_status = result.tuple(0).column_integer(0)
+        elastic_status = result.tuple(0).column_string(1)
+
+        if query_status == 0 and elastic_status != "NONE":
+            percentage_moved = 0.0
             try:
                 response = checkstats.get_stats(runner, "REBALANCE")
             except StatisticsProcedureException as e:
                 runner.info(e.message)
                 sys.exit(e.exitCode)
 
-            percentage_moved = response.table(0).tuple(0).column(1)
+            if response.table(0).tuple_count() == 1:
+                percentage_moved = float(response.table(0).tuple(0).column(1))
+
+            cluster.set_elastic_status(elastic_status, percentage_moved)
 
 
     if runner.opts.dr:
@@ -255,6 +258,10 @@ def printPlainSummary(cluster):
                 missing, 's' if missing > 2 else '',
                 cluster.liveclients, 's' if cluster.liveclients > 2 else '',
                 cluster.uptime)
+
+    # additional elastic info
+    if cluster.elastic_status:
+        header2 += "\n Cluster {} , progress: {:.2f}% completed".format(cluster.elastic_status, cluster.percentage_moved)
 
     delimiter = '-' * header1.__len__()
 
@@ -325,5 +332,10 @@ def printJSONSummary(cluster):
         "remoteClusters": remoteClusterInfos,
         "members": members
     }
+    # additional elastic info
+    if cluster.elastic_status:
+        body["elastic_status"] = cluster.elastic_status
+        body["elastic_progress"] = cluster.percentage_moved
+
     jsonStr = json.dumps(body)
     print jsonStr
