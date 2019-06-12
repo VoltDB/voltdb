@@ -370,8 +370,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         if(!isHSQL()) {
 
-            String errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+            String errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                     + "Incompatible parameter type: can not convert type 'byte\\[\\]\\[\\]' to 'INLIST_OF_BIGINT' "
                     + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE VARBIN IN \\?;. "
                     + "Try explicitly using a long\\[\\] parameter";
@@ -392,8 +391,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
             assertEquals(1, results[0].getRowCount());
 
-            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+            errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                     + "Incompatible parameter type: can not convert type 'double\\[\\]' to 'INLIST_OF_BIGINT' "
                     + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE NUM IN \\?;. "
                     + "Try explicitly using a long\\[\\] parameter";
@@ -406,8 +404,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
             assertEquals(1, results[0].getRowCount());
 
-            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+            errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                     + "Incompatible parameter type: can not convert type 'BigDecimal\\[\\]' to 'INLIST_OF_BIGINT' "
                     + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE DEC IN \\?;. "
                     + "Try explicitly using a long\\[\\] parameter";
@@ -476,15 +473,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 null, null, null, null);
 
         // Long cannot be converted to long in arrays
-        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 4: "
-                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+        errMsg = "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
                     + "Unable to match parameter array:java.lang.Long to provided long";
         verifyProcFails(client, errMsg, "BoxedByteArrays",
                 "LNGARR", null, null, null, new Long[]{1L, 2L, 3L}, null, null);
 
         // Integer cannot be converted to int in arrays
-        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 5: "
-                + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+        errMsg = "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
                 + "Unable to match parameter array:java.lang.Integer to provided int";
         verifyProcFails(client, errMsg, "BoxedByteArrays",
                 "INTARR", null, null, null, null, new Integer[]{1, 2, 3}, null);
@@ -495,8 +490,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
                         null, null, null).getResults();
         } catch (Exception e) {
-            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                    + "  org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
+            errMsg = "org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
                     + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
                     + "for arg 0 for SQL stmt: SELECT * FROM ENG_539 WHERE VARBIN IN ?;. "
                     + "Try explicitly using a long[] parameter";
