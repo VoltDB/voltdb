@@ -2448,7 +2448,13 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         remaining = table->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
             m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+            if (table->isReplicatedTable()) {
+                ScopedReplicatedResourceLock scopedLock;
+                ExecuteWithMpMemory usingMpMemory;
+                table->decrementRefcount();
+            } else {
+                table->decrementRefcount();
+            }
         }
     }
     else if (tableStreamTypeIsStreamIndexing(streamType)) {
