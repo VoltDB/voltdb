@@ -349,16 +349,18 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             startSystem(config);
             try {
                 // test create table is working
-                m_client.callProcedure("@AdHoc","create table T migrate to target MigrateTableTarget (id int);");
+                m_client.callProcedure("@AdHoc", "create table T migrate to target MigrateTableTarget (id int not null);");
+                m_client.callProcedure("@AdHoc", "create index migratingIndex on t(id) where not migrating;");
                 assertTrue(findTableInSystemCatalogResults("T"));
                 m_client.callProcedure("@AdHoc", "insert into t values(1);");
                 m_client.callProcedure("@AdHoc", "insert into t values(2);");
                 m_client.callProcedure("@AdHoc", "insert into t values(3);");
                 // test migrating index is working
-                VoltTable tb = m_client.callProcedure("@AdHoc","select * from t where not migrating();").getResults()[0];
+                VoltTable tb = m_client.callProcedure("@AdHoc","select * from t where not migrating;").getResults()[0];
                 // if no ttl column is set then it will behave like a regular table
                 assertEquals(tb.getRowCount(), 3);
             } catch (ProcCallException pce) {
+                fail("migrate table goes wrong.");
             }
         } finally {
             teardownSystem();
