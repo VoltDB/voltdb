@@ -444,16 +444,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    // In truncateExportToSeqNo() we try to cleanup stale PBD segments. If it isn't invoked
-    // due to empty snapshot or missing stream in snapshot, this is our last chance to clean
-    // stale PBD segments.
-    public void cleanupStaleBuffers() {
-        m_es.execute(new Runnable() {
+    // In truncateExportToSeqNo() we try to cleanup stale PBD segments. If truncation isn't invoked
+    // due to an empty snapshot or stream not present in snapshot, this is our last chance to clean
+    // stale PBD segments. This MUST be called before the {@code GuestProcessor} starts polling.
+    public ListenableFuture<?> cleanupStaleBuffers() {
+        return m_es.submit(new Runnable() {
+            @Override
             public void run() {
                 // *Created* generation id is either from EDS constructor or from export buffer
                 // truncation (which comes from loading snapshot)
                 long generationIdCreated = m_committedBuffers.getGenerationIdCreated();
                 try {
+                    assert(!m_readyForPolling);
+
                     if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
                         // Stale export buffers are deleted , re-create the tracker.
                         m_gapTracker = m_committedBuffers.scanForGap();
