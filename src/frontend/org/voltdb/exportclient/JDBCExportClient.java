@@ -55,7 +55,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import static org.voltdb.exportclient.ExportClientBase.rateLimitedLogError;
 
 public class JDBCExportClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
@@ -157,6 +156,7 @@ public class JDBCExportClient extends ExportClientBase {
         DatabaseType m_dbType = null;
         private String m_preparedStmtStr = null;
         private String m_createTableStr = null;
+        private ExportRowSchema m_curSchema = null;
         private boolean m_supportsUpsert = false;
         private boolean m_warnedOfUnsupportedOperation = false;
         private boolean m_supportsBatchUpdates;
@@ -530,6 +530,52 @@ public class JDBCExportClient extends ExportClientBase {
             }
         }
 
+        /**
+         * Detect whether the schema changed, and if yes, reset state for new statements.
+         * @throws RestartBlockException
+         */
+        private void checkSchemas() throws RestartBlockException {
+            try {
+                boolean newSchema = false;
+                ExportRowSchema curSchema = getExportRowSchema();
+                if (m_curSchema == null || !m_curSchema.sameSchema(curSchema)) {
+                    if (m_logger.isDebugEnabled()) {
+                        StringBuilder sb = new StringBuilder("Detected new schema:\n");
+                        sb.append("old: ");
+                        if (m_curSchema == null) {
+                            sb.append("(none)\n");
+                        } else {
+                            sb.append(m_curSchema).append("\n");
+                        }
+                        sb.append("new: ");
+                        if (curSchema == null) {
+                            sb.append("(none)\n");
+                        } else {
+                            sb.append(curSchema).append("\n");
+                        }
+                        m_logger.debug(sb.toString());
+                    }
+                    m_curSchema = curSchema;
+                    newSchema = true;
+                }
+                if (newSchema) {
+                    if (pstmt != null) {
+                        try {
+                            pstmt.close();
+                        } catch (Exception e) {}
+                        finally {
+                            pstmt = null;
+                        }
+                    }
+                    m_preparedStmtStr = null;
+                    m_createTableStr = null;
+                }
+            } catch (Exception e) {
+                m_logger.warn("JDBC export unable to check schemas", e);
+                throw new RestartBlockException(true);
+            }
+        }
+
         @Override
         public void onBlockStart(ExportRow row) throws RestartBlockException {
             m_dataRows.clear();
@@ -550,6 +596,7 @@ public class JDBCExportClient extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
+            checkSchemas();
         }
 
         @Override

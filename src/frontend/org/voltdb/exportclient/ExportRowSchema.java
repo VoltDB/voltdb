@@ -121,6 +121,53 @@ public class ExportRowSchema extends ExportRow implements DeferredSerialization 
     }
 
     /**
+     * Returns true of other is the same schema (excluding generation and tableName).
+     *
+     * NOTE: ignores the generation, as catalog updates on export updates the generation
+     * even if no changes occur on the table.
+     *
+     * NOTE: ignores the tableName to allow comparing different tables.
+     *
+     * @param other the other schema to compare
+     * @return true if same schema regardless of generations and tableName
+     */
+    public boolean sameSchema(ExportRowSchema other) {
+
+        if (other == this) {
+            return true;
+        }
+        if (!(other instanceof ExportRowSchema)) {
+            return false;
+        }
+        if (this.names.size() != other.names.size()) {
+            return false;
+        }
+
+        // Note: valid instances assume those different members have same size
+        // Note: schemas are not identical if columns have different order
+        Iterator<String> itNames = this.names.iterator();
+        Iterator<VoltType> itTypes = this.types.iterator();
+        Iterator<Integer> itSizes = this.lengths.iterator();
+
+        Iterator<String> itONames = other.names.iterator();
+        Iterator<VoltType> itOTypes = other.types.iterator();
+        Iterator<Integer> itOSizes = other.lengths.iterator();
+
+        while(itNames.hasNext()) {
+            if (!itNames.next().equals(itONames.next())) {
+                return false;
+            }
+            if (!itTypes.next().equals(itOTypes.next())) {
+                return false;
+            }
+            if (!itSizes.next().equals(itOSizes.next())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Deserialize {@code ExportRowSchema} from {@code ByteBuffer}
      *
      * @param buf the input buffer, with position and byte order preset
