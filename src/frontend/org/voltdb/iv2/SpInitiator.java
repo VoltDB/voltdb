@@ -60,7 +60,6 @@ import com.google_voltpatches.common.collect.Sets;
 public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private final TickProducer m_tickProducer;
     private boolean m_promoted = false;
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
@@ -129,7 +128,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
         m_scheduler.m_repairLog = m_repairLog;
     }
 
@@ -156,8 +154,6 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, agent, memStats, cl,
                 coreBindIds, isLowestSiteId);
-
-        m_tickProducer.start();
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition

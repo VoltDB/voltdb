@@ -145,8 +145,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
-                        int32_t compactionThreshold = 95,
-                        int32_t exportFlushTimeout = 4*1000);
+                        int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
         // ------------------------------------------------------------------
