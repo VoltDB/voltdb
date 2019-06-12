@@ -914,7 +914,8 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
-            Integer drFlushInterval = deployment.getDr().getFlushInterval();
+            DrType drType = deployment.getDr();
+            Integer drFlushInterval = drType == null ? null : drType.getFlushInterval();
             if (drFlushInterval == null) {
                 drFlushInterval = deployment.getSystemsettings().getFlushInterval().getDr().getInterval();
             }
@@ -1217,10 +1218,10 @@ public abstract class CatalogUtil {
         FlushIntervalType fi = ss.getFlushInterval();
         if (fi == null) {
             fi = new FlushIntervalType();
-            fi.setExport(new FlushIntervalType.Export());
-            fi.setDr(new FlushIntervalType.Dr());
             ss.setFlushInterval(fi);
         }
+        fi.setExport(new FlushIntervalType.Export());
+        fi.setDr(new FlushIntervalType.Dr());
     }
 
     /**
