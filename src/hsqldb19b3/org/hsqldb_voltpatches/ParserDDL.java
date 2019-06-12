@@ -910,6 +910,9 @@ public class ParserDDL extends ParserRoutine {
                         if (t.getTTL() != null) {
                             throw Error.error(ErrorCode.X_42504);
                         }
+                        if (t.hasMigrationTarget()) {
+                            throw Error.error(ErrorCode.X_42581, "May not add migration target");
+                        }
                         return readTimeToLive(t, true);
                     default :
                         if (cname != null) {
