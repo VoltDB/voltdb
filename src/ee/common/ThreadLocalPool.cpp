@@ -202,7 +202,7 @@ void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
 
 namespace {
 int32_t getAllocationSizeForObject(int length) {
-    static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
+    static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = sizeof(voltdb::ThreadLocalPool::Sized);
     static const int32_t MAX_ALLOCATION = ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
                                           NVALUE_LONG_OBJECT_LENGTHLENGTH +
                                           CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
@@ -302,8 +302,10 @@ ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, in
         // Compute num_elements to be the largest multiple of alloc_size
         // to fit in a 2MB buffer.
         int32_t num_elements = ((2 * 1024 * 1024 - 1) / alloc_size) + 1;
-        boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size, num_elements));
-        poolMap.insert(std::pair<int32_t, boost::shared_ptr<CompactingPool> >(alloc_size, pool));
+        // Compacting pool adds in its overhead so remove it since getAllocationSizeForObject also adds it
+        boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size - CompactingPool::FIXED_OVERHEAD_PER_ENTRY(),
+                num_elements));
+        poolMap[alloc_size] = pool;
         allocation = pool->malloc(referrer);
     }
     else {
