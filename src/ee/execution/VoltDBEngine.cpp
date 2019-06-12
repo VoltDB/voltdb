@@ -158,7 +158,8 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy) : m_logManager(lo
 }
 
 void
-VoltDBEngine::initialize(int32_t clusterIndex,
+VoltDBEngine::initialize(
+        int32_t clusterIndex,
         int64_t siteId,
         int32_t partitionId,
         int32_t sitesPerHost,
@@ -168,16 +169,13 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         int32_t defaultDrBufferSize,
         int64_t tempTableMemoryLimit,
         bool isLowestSiteId,
-        int32_t compactionThreshold,
-        int32_t exportFlushTimeout) {
+        int32_t compactionThreshold) {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_isLowestSite = isLowestSiteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
-    vassert(exportFlushTimeout > 0);
-    s_exportFlushTimeout = exportFlushTimeout;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -1648,6 +1646,8 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
+    assert(catalogCluster->exportFlushInterval() > 0);
+    s_exportFlushTimeout = catalogCluster->exportFlushInterval();
 
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");

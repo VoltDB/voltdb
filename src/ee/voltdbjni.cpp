@@ -280,8 +280,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jint compactionThreshold,
-    jint exportFlushTimeout)
+    jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -309,8 +308,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold),
-                           exportFlushTimeout);
+                           static_cast<int32_t>(compactionThreshold));
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }

@@ -16,7 +16,9 @@ begin Cluster                      "A set of connected hosts running one or more
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
   string drConsumerSslPropertyFile "Path to DR consumer property file containing path to trust store and the trust store password"
-  int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
+  int globalFlushInterval          "Time interval in milliseconds between flushing either DR or Export buffers"
+  int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers (depends on globalFlushInterval)"
+  int exportFlushInterval          "Time interval in milliseconds between flushing partially filled Export buffers (depends on globalFlushInterval)"
   int preferredSource              "The cluster id from which this joining cluster should request snapshot"
 end
 

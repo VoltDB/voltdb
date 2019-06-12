@@ -178,7 +178,8 @@ public class TestExecutionEngine extends TestCase {
         assert(catalog != null);
         sourceEngine.loadCatalog(0, catalog.serialize());
 
-        int TEST_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("TEST").getRelativeIndex();
+        int TEST_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").
+                getTables().get("TEST").getRelativeIndex();
         VoltTable testTable = new VoltTable(new VoltTable.ColumnInfo("MSG", VoltType.STRING));
         // Assemble a very long string.
         testTable.addRow(String.join("", Collections.nCopies(15, "我能吞下玻璃而不伤身体。")));
@@ -228,7 +229,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         }).get();
 
@@ -265,7 +266,8 @@ public class TestExecutionEngine extends TestCase {
         try {
             srcRslt = sourceEngine.loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
                     Long.MAX_VALUE,
-                    returnUniqueViolations ? LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS : LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
+                    returnUniqueViolations ? LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS :
+                        LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         }
         catch (ConstraintFailureException e) {
             // srcRslt already null
@@ -304,23 +306,28 @@ public class TestExecutionEngine extends TestCase {
     }
 
     private int warehouseTableId(Catalog catalog) {
-        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().
+                get("WAREHOUSE").getRelativeIndex();
     }
 
     private int stockTableId(Catalog catalog) {
-        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().
+                get("STOCK").getRelativeIndex();
     }
 
     private int itemTableId(Catalog catalog) {
-        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("ITEM").getRelativeIndex();
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().
+                get("ITEM").getRelativeIndex();
     }
 
     public void testGetStats() throws Exception {
         initializeSourceEngine(1);
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
-        final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").
+                getTables().get("WAREHOUSE").getRelativeIndex();
+        final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").
+                getTables().get("STOCK").getRelativeIndex();
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
         final VoltTable results[] = sourceEngine.getStats(StatsSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
@@ -354,7 +361,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
+                                new HashinatorConfig(configBytes, 0, 0), false));
             }
         }).get();
 
@@ -395,7 +402,8 @@ public class TestExecutionEngine extends TestCase {
         try {
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
-            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output).getSecond()[0]);
+            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX,
+                    output).getSecond()[0]);
         } finally {
             container.discard();
         }
@@ -432,7 +440,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true, 4*1000);
+                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true);
     }
 
     private void terminateSourceEngine() throws Exception {
