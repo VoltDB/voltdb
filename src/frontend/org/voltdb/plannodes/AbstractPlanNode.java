@@ -1090,8 +1090,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.keySymbolValuePair(Members.ID.name(), m_id);
-        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), getPlanNodeType().toString());
-
+        String planNodeType = getPlanNodeType().toString();
+        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), planNodeType);
+        if (planNodeType == "RECEIVE" || planNodeType == "SEQSCAN") {
+            m_outputSchema.getColumn(0).getExpression().setReceiveOrSeqscan(true);
+        } else {
+            m_outputSchema.getColumn(0).getExpression().setReceiveOrSeqscan(false);
+        }
         if (m_inlineNodes.size() > 0) {
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
             int i = 0;

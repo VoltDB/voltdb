@@ -67,6 +67,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected boolean m_inBytes = false;
     protected String user_aggregate_id;
     protected String name;
+    protected boolean receive_or_seqscan;
 
     /**
      * We set this to non-null iff the expression has a non-deterministic
@@ -148,6 +149,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         this(type);
         m_left = left;
         m_right = right;
+    }
+
+    public void setReceiveOrSeqscan(boolean b) {
+        receive_or_seqscan = b;
     }
 
     public void validate() throws Exception {
@@ -624,7 +629,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
         }
         else {
-            stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
+            if (user_aggregate_id != null && receive_or_seqscan) {
+                stringer.keySymbolValuePair(Members.VALUE_TYPE, "25");
+            } else {
+                stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
+            }
             if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
                 stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
             }

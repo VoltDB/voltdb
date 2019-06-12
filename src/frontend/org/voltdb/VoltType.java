@@ -767,7 +767,7 @@ public enum VoltType {
      * Variable-length types should throw a RuntimeException.
      * @return An integer value representing a number of bytes. */
     public int getLengthInBytesForFixedTypes() {
-        if (m_lengthAsBytesRange != null) {
+        if (m_lengthAsBytesRange != null && m_value != 25) {
             throw new RuntimeException(
                     "Asking for fixed size for non-fixed or unknown type:" + m_sqlString);
         }
