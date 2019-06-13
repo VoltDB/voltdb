@@ -911,7 +911,7 @@ public class ParserDDL extends ParserRoutine {
                             throw Error.error(ErrorCode.X_42504);
                         }
                         if (t.hasMigrationTarget()) {
-                            throw Error.error(ErrorCode.X_42581, "May not add migration target");
+                            throw Error.error(ErrorCode.X_42581, "May not add TTL column");
                         }
                         return readTimeToLive(t, true);
                     default :
@@ -1006,7 +1006,7 @@ public class ParserDDL extends ParserRoutine {
             throw Error.error(ErrorCode.X_42501);
         }
         if (t.hasMigrationTarget()) {
-            throw unexpectedToken("May not drop migration target");
+            throw unexpectedToken("May not drop TTL column");
         }
         Object[] args = new Object[] {
             t.getName(),
