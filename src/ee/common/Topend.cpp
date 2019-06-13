@@ -183,6 +183,10 @@ namespace voltdb {
         return 0;
     }
 
+    int32_t DummyTopend::callJavaUserDefinedAggregateCombine() {
+        return 0;
+    }
+
     int32_t DummyTopend::callJavaUserDefinedAggregateWorkerEnd() {
         return 0;
     }

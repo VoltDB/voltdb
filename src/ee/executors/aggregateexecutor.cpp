@@ -506,9 +506,9 @@ class UserDefineAgg : public Agg {
             ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
         }
         // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
-//        else {
-//            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCombine(functionId, val);
-//        }
+        else {
+            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCombine(functionId, val);
+        }
     }
 
     virtual NValue finalize(ValueType type)

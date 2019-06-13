@@ -240,7 +240,7 @@ public class UserDefinedFunctionManager {
         
      // We should refactor those functions into SerializationHelper
 
-        private static byte[] readVarbinary(ByteBuffer buffer) {
+        public static byte[] readVarbinary(ByteBuffer buffer) {
             // Sanity check the size against the remaining buffer size.
             if (VAR_LEN_SIZE > buffer.remaining()) {
                 throw new RuntimeException(String.format(

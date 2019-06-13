@@ -112,6 +112,15 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_callJavaUserDefinedAggregateCombineMID = m_jniEnv->GetMethodID(
+            jniClass, "callJavaUserDefinedAggregateCombine", "()I");
+    if (m_callJavaUserDefinedAggregateCombineMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_callJavaUserDefinedAggregateCombineMID != 0);
+        throw std::exception();
+    }
+
+
     m_callJavaUserDefinedAggregateWorkerEndMID = m_jniEnv->GetMethodID(
             jniClass, "callJavaUserDefinedAggregateWorkerEnd", "()I");
     if (m_callJavaUserDefinedAggregateWorkerEndMID == NULL) {
@@ -519,6 +528,11 @@ int32_t JNITopend::callJavaUserDefinedAggregateStart() {
 int32_t JNITopend::callJavaUserDefinedAggregateAssemble() {
     return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
                                             m_callJavaUserDefinedAggregateAssembleMID);
+}
+
+int32_t JNITopend::callJavaUserDefinedAggregateCombine() {
+    return (int32_t)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                            m_callJavaUserDefinedAggregateCombineMID);
 }
 
 int32_t JNITopend::callJavaUserDefinedAggregateWorkerEnd() {

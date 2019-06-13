@@ -771,6 +771,49 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, cons
     }
 }
 
+void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument) {
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
+
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function ID + parameter)
+    //   * function ID (int32_t)
+    //   * parameter.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    auto cast_argument = argument.castAs(VALUE_TYPE_VARBINARY);
+    bufferSizeNeeded += cast_argument.serializedSize();
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+    // Note that bufferSizeNeeded does not include its own size.
+    // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+    }
+    resetUDFOutputBuffer();
+
+    // Serialize buffer size, function ID.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+
+    // Serialize UDAF parameter to the buffer.
+    cast_argument.serializeTo(m_udfOutput);
+    // Make sure we did the correct size calculation.
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+
+    // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
+    // Java user-defined function according to the function ID and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
+    if (returnCode != 0) {
+        throw SQLException(SQLException::volt_user_defined_function_error,
+            "callJavaUserDefinedAggregateCombine failed");
+    }
+}
+
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
