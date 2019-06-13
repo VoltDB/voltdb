@@ -1126,36 +1126,46 @@ tr:hover{
 
             # Try to update the Jira ticket without email notification; but if
             # that fails (as seems to happen fairly often, but unpredictably),
-            # update it with email notification
+            # update it with email notification (which is the default)
             exception = None
             exception_count = 0
             for notification in [False, True]:
                 try:
-                    ticket_to_modify.update(fields={'summary'    : summary,
-                                                    'description': description,
-                                                    'labels'     : labels,
-                                                    'priority'   : {'name': priority}
-                                                    }, notify=notification )
+                    if notification:
+                        ticket_to_modify.update(fields={'summary'    : summary,
+                                                        'description': description,
+                                                        'labels'     : labels,
+                                                        'priority'   : {'name': priority}
+                                                        }
+                                                )
+                    else:
+                        ticket_to_modify.update(notify=False,
+                                                fields={'summary'    : summary,
+                                                        'description': description,
+                                                        'labels'     : labels,
+                                                        'priority'   : {'name': priority}
+                                                        },
+                                                )
                     break
                 except Exception as e:
                     exception = e
                     exception_count += 1
-                    logging.exception("Jira ticket update (notify=%s) failed with Exception:"
-                                      "\n    %s"
-                                      "\n    for Jira ticket %s, using:"
-                                      "\n        version '%s', priority '%s', labels %s;"
-                                      "\n    old and new summaries:"
-                                      "\n        '%s'"
-                                      "\n        '%s'"
-                                      "\n    old description:"
-                                      "\n        %s"
-                                      "\n    new (updated) description:"
-                                      "\n        %s\n"
-                                      % (str(notification), str(e),
-                                         str(ticket_to_modify.key),
-                                         version, priority, str(labels),
-                                         previous_summary, summary,
-                                         old_description, description) )
+                    logging.warn("Jira ticket update (notify=%s) failed with Exception:"
+                                 "\n    %s"
+                                 "\n    for Jira ticket %s, using:"
+                                 "\n        version '%s', priority '%s', labels %s;"
+                                 "\n    old and new summaries:"
+                                 "\n        '%s'"
+                                 "\n        '%s'"
+                                 "\n    old description:"
+                                 "\n        %s"
+                                 "\n    new (updated) description:"
+                                 "\n        %s\n"
+                                 % (str(notification), str(e),
+                                    str(ticket_to_modify.key),
+                                    version, priority, str(labels),
+                                    previous_summary, summary,
+                                    old_description, description) )
             # If an exception was thrown for both values of 'notification',
             # throw the latter exception
             if exception_count > 1:
