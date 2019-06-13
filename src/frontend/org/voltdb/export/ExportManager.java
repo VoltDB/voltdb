@@ -318,7 +318,7 @@ public class ExportManager
 
     }
 
-    public synchronized void startPolling(CatalogContext catalogContext) {
+    public synchronized void startPolling(CatalogContext catalogContext, StreamStartAction action) {
         m_startPolling = true;
 
         CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
@@ -333,14 +333,14 @@ public class ExportManager
         // Notify export datasources to check the *generation* of export buffers,
         // delete buffers older than current generation number or generation number
         // from snapshot. This must be done before the processor starts polling.
-        cleanupStaleBuffers();
+        cleanupStaleBuffers(action);
 
         processor.startPolling();
     }
 
-    private void cleanupStaleBuffers() {
+    private void cleanupStaleBuffers(StreamStartAction action) {
         if (m_generation.get() != null) {
-            m_generation.get().cleanupStaleBuffers();
+            m_generation.get().cleanupStaleBuffers(action);
         }
     }
 

@@ -447,7 +447,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // In truncateExportToSeqNo() we try to cleanup stale PBD segments. If truncation isn't invoked
     // due to an empty snapshot or stream not present in snapshot, this is our last chance to clean
     // stale PBD segments. This MUST be called before the {@code GuestProcessor} starts polling.
-    public ListenableFuture<?> cleanupStaleBuffers() {
+    public ListenableFuture<?> cleanupStaleBuffers(StreamStartAction action) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -460,6 +460,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (m_committedBuffers.deleteStaleBlocks(generationIdCreated)) {
                         // Stale export buffers are deleted , re-create the tracker.
                         m_gapTracker = m_committedBuffers.scanForGap();
+                        // If we reach here it means the stream hasn't got sequence number
+                        // from snapshot because either it's empty or stream isn't exist in snapshot.
+                        // In both case we can safely assume here the start sequence number is O.
+                        resetStateInRejoinOrRecover(0L, action);
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Error while trying to delete stale PBD segments older than generation " +

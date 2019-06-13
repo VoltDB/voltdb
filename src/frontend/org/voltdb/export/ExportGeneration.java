@@ -1045,12 +1045,12 @@ public class ExportGeneration implements Generation {
     /**
      * Iterate over sources to clean up stale buffers; this is done in a blocking fashion.
      */
-    public void cleanupStaleBuffers() {
+    public void cleanupStaleBuffers(StreamStartAction action) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         synchronized(m_dataSourcesByPartition) {
             for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
                 for (ExportDataSource source : partitionDataSourceMap.values()) {
-                    tasks.add(source.cleanupStaleBuffers());
+                    tasks.add(source.cleanupStaleBuffers(action));
                 }
             }
         }
