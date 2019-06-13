@@ -1156,10 +1156,10 @@ tr:hover{
                                          version, priority, str(labels),
                                          previous_summary, summary,
                                          old_description, description) )
-                # If an exception was thrown for both values of 'notification',
-                # throw the latter exception
-                if exception_count > 1 and type(exception) is Exception:
-                    raise exception
+            # If an exception was thrown for both values of 'notification',
+            # throw the latter exception
+            if exception_count > 1:
+                raise exception
 
             # Add attachments to the Jira ticket
             with_attachments = ''
