@@ -977,9 +977,14 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.ALTER : {
                 read();
 
-                if (token.tokenType == Tokens.EXPORT ) {
+                if (token.tokenType == Tokens.EXPORT) {
                     return readPersistentExport(t, true);
                 }
+
+                if (token.tokenType == Tokens.USING) {
+                    return readTimeToLive(t, true);
+                }
+
                 if (token.tokenType == Tokens.COLUMN) {
                     read();
                 }
@@ -990,9 +995,6 @@ public class ParserDDL extends ParserRoutine {
                 read();
 
                 return compileAlterColumn(t, column, columnIndex);
-            }
-            case Tokens.USING : {
-                return readTimeToLive(t, true);
             }
             default : {
                 throw unexpectedToken();
