@@ -930,6 +930,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
+    s_exportFlushTimeout = catalogCluster->exportFlushInterval();
+    assert(s_exportFlushTimeout > 0);
 
     VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
@@ -1647,8 +1649,8 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
         m_executorContext->drReplicatedStream()->m_enabled = catalogCluster->drProducerEnabled();
         m_executorContext->drReplicatedStream()->setFlushInterval(catalogCluster->drFlushInterval());
     }
-    assert(catalogCluster->exportFlushInterval() > 0);
     s_exportFlushTimeout = catalogCluster->exportFlushInterval();
+    assert(s_exportFlushTimeout > 0);
 
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");

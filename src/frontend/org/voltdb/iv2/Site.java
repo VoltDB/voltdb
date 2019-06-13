@@ -752,8 +752,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
-        int configuredTimeout = Integer.getInteger("MAX_EXPORT_BUFFER_FLUSH_INTERVAL", 4*1000);
-        final int exportFlushTimeout = configuredTimeout > 0 ? configuredTimeout : 4*1000;
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting

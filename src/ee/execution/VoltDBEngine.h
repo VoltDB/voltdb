@@ -120,6 +120,7 @@ struct UserDefinedFunctionInfo {
 using UniqueTempTableResult = std::unique_ptr<AbstractTempTable, TempTableTupleDeleter>;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+
 extern int32_t s_exportFlushTimeout;
 
 
