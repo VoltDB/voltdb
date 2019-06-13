@@ -63,7 +63,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
       VoltDBEngine* engine, const std::string& jsonPlan, int64_t fragId) {
     PlanNodeFragment *pnf = NULL;
     try {
-        pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
+        pnf = PlanNodeFragment::createFromCatalog(jsonPlan.c_str());
     } catch (SerializableEEException &seee) {
         throw;
     } catch (std::exception const& e) {

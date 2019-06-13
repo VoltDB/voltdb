@@ -78,7 +78,7 @@ class PlanNodeFragment {
     virtual ~PlanNodeFragment();
 
     // construct a new fragment from the catalog's serialization
-    static PlanNodeFragment * createFromCatalog(const std::string);
+    static PlanNodeFragment* createFromCatalog(const char*);
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
@@ -123,8 +123,6 @@ class PlanNodeFragment {
     // read node list for a given sub statement
     void nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId);
 
-    // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
-    std::string m_serializedType;
     // translate id from catalog to pointer to plannode
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
     // Pointers to nodes in execution order grouped by substatement
