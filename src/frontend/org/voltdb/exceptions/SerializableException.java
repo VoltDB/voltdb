@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltProcedure;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Base class for runtime exceptions that can be serialized to ByteBuffers without involving Java's
@@ -240,6 +241,11 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
         final int ordinal = b.get();
         assert (ordinal != SerializableExceptions.None.ordinal());
         return SerializableExceptions.values()[ordinal].deserializeException(b);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.UNEXPECTED_FAILURE;
     }
 
     @Override
