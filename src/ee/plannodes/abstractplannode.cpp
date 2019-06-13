@@ -213,8 +213,8 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColum
         // Someone should put that class out of our misery.
         SchemaColumn* col = outputSchema[i];
         AbstractExpression * expr = col->getExpression();
-        columnTypes.push_back(expr->getValueType());
-        columnSizes.push_back(expr->getValueSize());
+        columnTypes.emplace_back(expr->getValueType());
+        columnSizes.emplace_back(expr->getValueSize());
         columnInBytes.push_back(expr->getInBytes());
     }
 
@@ -267,7 +267,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
             SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
-            node->m_outputSchema.push_back(outputColumn);
+            node->m_outputSchema.emplace_back(outputColumn);
         }
         node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());
     } else if (node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION)) {
@@ -325,7 +325,7 @@ void AbstractPlanNode::loadBooleanArrayFromJSONObject(
         PlannerDomValue stringArray = obj.valueForKey(label);
         int len = stringArray.arrayLen();
         for (int i = 0; i < len; ++i) {
-            result.emplace_back(stringArray.valueAtIndex(i).asBool());
+            result.push_back(stringArray.valueAtIndex(i).asBool());
         }
     }
 }
@@ -445,12 +445,12 @@ void AbstractPlanNode::loadSortListFromJSONObject(
         if (sortDirs && sortColumn.hasNonNullKey("SORT_DIRECTION")) {
             hasDirection = true;
             std::string sortDirectionStr = sortColumn.valueForKey("SORT_DIRECTION").asStr();
-            sortDirs->push_back(stringToSortDirection(sortDirectionStr));
+            sortDirs->emplace_back(stringToSortDirection(sortDirectionStr));
         }
         if (sortExprs && sortColumn.hasNonNullKey("SORT_EXPRESSION")) {
             hasExpression = true;
             PlannerDomValue exprDom = sortColumn.valueForKey("SORT_EXPRESSION");
-            sortExprs->push_back(AbstractExpression::buildExpressionTree(exprDom));
+            sortExprs->emplace_back(AbstractExpression::buildExpressionTree(exprDom));
         }
 
         if (!(hasExpression && hasDirection)) {

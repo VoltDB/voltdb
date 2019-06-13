@@ -21,13 +21,10 @@
 #include "storage/tablefactory.h"
 
 namespace voltdb {
-    static Table* copyTable(const std::string &name, Table* template_table, char *signature)
-    {
-        Table* t = TableFactory::getPersistentTable(0,
-                                                    name,
-                                                    TupleSchema::createTupleSchema(template_table->schema()),
-                                                    template_table->getColumnNames(),
-                                                    signature);
+    static Table* copyTable(const std::string &name, Table* template_table, char *signature) {
+        Table* t = TableFactory::getPersistentTable(0, name.c_str(),
+                TupleSchema::createTupleSchema(template_table->schema()),
+                template_table->getColumnNames(), signature);
         TableTuple tuple(template_table->schema());
         TableIterator iterator = template_table->iterator();
         while (iterator.next(tuple)) {

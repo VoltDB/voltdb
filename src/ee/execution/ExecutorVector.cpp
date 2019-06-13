@@ -52,8 +52,8 @@
 
 namespace voltdb {
 
-boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(VoltDBEngine* engine,
-                                                                       catalog::Statement *stmt) {
+boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(
+        VoltDBEngine* engine, catalog::Statement *stmt) {
     const string& b64plan = stmt->fragments().begin()->second->plannodetree();
     const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
     return fromJsonPlan(engine, jsonPlan, -1);
@@ -96,39 +96,33 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
 
     // Note: the executor vector takes ownership of the plan node
     // fragment here.
-    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
-                                                            tempTableLogLimit,
-                                                            tempTableMemoryLimit,
-                                                            pnf));
+    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(
+                fragId, tempTableLogLimit, tempTableMemoryLimit, pnf));
     ev->init(engine);
     return ev;
 }
 
 void ExecutorVector::init(VoltDBEngine* engine) {
     // Initialize each node!
-    for (PlanNodeFragment::PlanNodeMapIterator it = m_fragment->executeListBegin();
-         it != m_fragment->executeListEnd(); ++it) {
-        assert(it->second != NULL);
-        const std::vector<AbstractPlanNode*>& planNodeList = *it->second;
-        std::auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
-        BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
+    for (auto it = m_fragment->executeListBegin(); it != m_fragment->executeListEnd(); ++it) {
+        auto const& planNodeList = it->second;
+        std::vector<AbstractExecutor*> executorList;
+        for(AbstractPlanNode* planNode : planNodeList) {
             initPlanNode(engine, planNode);
-            executorList->push_back(planNode->getExecutor());
+            executorList.emplace_back(planNode->getExecutor());
         }
-        m_subplanExecListMap.insert(make_pair(it->first, executorList.get()));
-        executorList.release();
+        m_subplanExecListMap.emplace(it->first, executorList);
     }
 }
 
 std::string ExecutorVector::debug() const {
     std::ostringstream oss;
-    std::map<int, std::vector<AbstractExecutor*>* >::const_iterator it;
     oss << "Fragment ID: " << m_fragId << ", ";
     oss << "Temp table memory in bytes: " << m_limits.getAllocated() << std::endl;
-    for (it = m_subplanExecListMap.begin(); it != m_subplanExecListMap.end(); ++it) {
-        std::vector<AbstractExecutor*>& executorList = *it->second;
-       oss << "Statement id:" << it->first << ", list size: " << executorList.size() << ", ";
-        BOOST_FOREACH (AbstractExecutor* ae, executorList) {
+    for (auto const& it : m_subplanExecListMap) {
+       auto const& executorList = it.second;
+       oss << "Statement id:" << it.first << ", list size: " << executorList.size() << ", ";
+        for(AbstractExecutor* ae : executorList) {
             oss << ae->getPlanNode()->debug(" ") << "\n";
         }
     }
@@ -144,8 +138,8 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     AbstractExecutor* executor = getNewExecutor(engine, node, isLargeQuery());
     if (executor == NULL) {
         char message[256];
-        snprintf(message, sizeof(message), "Unexpected error. "
-                 "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
+        snprintf(message, sizeof(message),
+                "Unexpected error. Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
                  (intmax_t)m_fragId, (int)node->getPlanNodeType());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
@@ -182,28 +176,18 @@ void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 
 const std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
     assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
-    return *(m_subplanExecListMap.find(planId)->second);
+    return m_subplanExecListMap.find(planId)->second;
 }
 
 void ExecutorVector::getRidOfSendExecutor(int planId) {
-    std::map<int, std::vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.find(planId);
-    assert(it != m_subplanExecListMap.end());
-    std::vector<AbstractExecutor*> executorList = *(it->second);
-    std::auto_ptr<std::vector<AbstractExecutor*> > executorListWithoutSend(new std::vector<AbstractExecutor*>());
-    BOOST_FOREACH (AbstractExecutor* executor, executorList) {
+    auto iter = m_subplanExecListMap.find(planId);
+    assert(iter != m_subplanExecListMap.end());
+    std::vector<AbstractExecutor*> const executorList = iter->second;
+    iter->second.clear();
+    for(AbstractExecutor* executor : executorList) {
         if (executor->getPlanNode()->getPlanNodeType() != PLAN_NODE_TYPE_SEND) {
-            executorListWithoutSend->push_back(executor);
+            iter->second.emplace_back(executor);
         }
-    }
-    delete it->second;
-    it->second = executorListWithoutSend.get();
-    executorListWithoutSend.release();
-}
-
-ExecutorVector::~ExecutorVector() {
-    typedef  std::map<int, std::vector<AbstractExecutor*>*>::value_type MapEntry;
-    BOOST_FOREACH(MapEntry &entry, m_subplanExecListMap) {
-        delete entry.second;
     }
 }
 

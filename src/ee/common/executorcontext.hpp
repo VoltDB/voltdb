@@ -158,11 +158,10 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
-    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
+    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>>* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         assert(m_subqueryContextMap.empty());
-
         assert(m_commonTableMap.empty());
     }
 
@@ -247,32 +246,25 @@ class ExecutorContext {
     }
 
     /** Executor List for a given sub statement id */
-    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
-    {
+    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const {
         assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
-        return *m_executorsMap->find(subqueryId)->second;
+        return m_executorsMap->find(subqueryId)->second;
     }
 
     /** Return pointer to a subquery context or NULL */
-    SubqueryContext* getSubqueryContext(int subqueryId)
-    {
-        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(subqueryId);
-        if (it != m_subqueryContextMap.end()) {
-            return &(it->second);
+    SubqueryContext* getSubqueryContext(int subqueryId) {
+        auto const it = m_subqueryContextMap.find(subqueryId);
+        if (it != m_subqueryContextMap.cend()) {
+            return &it->second;
         } else {
-            return NULL;
+            return nullptr;
         }
     }
 
     /** Set a new subquery context for the statement id. */
-    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
-    {
+    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams) {
         SubqueryContext fromCopy(lastParams);
-#ifndef NDEBUG
-        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
-#endif
-            m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
-        assert(result.second);
+        assert(m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy)).second);
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 
@@ -290,8 +282,8 @@ class ExecutorContext {
      * performance, this method takes care of all cleanup
      * aotomatically.
      */
-    UniqueTempTableResult executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                           int subqueryId = 0);
+    UniqueTempTableResult executeExecutors(
+            const std::vector<AbstractExecutor*>& executorList, int subqueryId = 0);
 
     /**
      * Similar to above method.  Execute the executors associated with
@@ -476,7 +468,7 @@ class ExecutorContext {
 
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
-    std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, std::vector<AbstractExecutor*>>* m_executorsMap;
     std::map<std::string, AbstractTempTable*> m_commonTableMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 

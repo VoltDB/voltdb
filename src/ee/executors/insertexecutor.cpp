@@ -55,9 +55,7 @@ namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;
 std::string InsertExecutor::s_errorMessage;
 
-bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
-                            const ExecutorVector& executorVector)
-{
+bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector& executorVector) {
     VOLT_TRACE("init Insert Executor");
 
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
@@ -127,11 +125,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // These default values are used for an INSERT including the INSERT sub-case of an UPSERT.
     // The defaults are purposely ignored in favor of existing column values
     // for the UPDATE subcase of an UPSERT.
-    m_node->initTupleWithDefaultValues(m_engine,
-                                       &m_memoryPool,
-                                       fieldsExplicitlySet,
-                                       tuple,
-                                       m_nowFields);
+    m_node->initTupleWithDefaultValues(m_engine, &m_memoryPool, fieldsExplicitlySet, tuple, m_nowFields);
     m_hasPurgeFragment = persistentTarget ? persistentTarget->hasPurgeFragment() : false;
 
     return true;
@@ -162,8 +156,7 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 }
 
 bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
-                                             AbstractTempTable *newOutputTable,
-                                             TableTuple &temp_tuple) {
+        AbstractTempTable *newOutputTable, TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
@@ -200,11 +193,8 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     // Other partitions can just return a 0 modified tuple count.
     // OTOH, if the data is coming from a (sub)query with
     // partitioned tables, perform the insert on every partition.
-    if (m_partitionColumn == -1 &&
-            m_isStreamed &&
-            m_multiPartition &&
-            !m_sourceIsPartitioned &&
-            m_engine->getPartitionId() != 0) {
+    if (m_partitionColumn == -1 && m_isStreamed && m_multiPartition &&
+            !m_sourceIsPartitioned && m_engine->getPartitionId() != 0) {
         m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
         // put the tuple into the output table
         m_tmpOutputTable->insertTuple(m_count_tuple);
@@ -237,8 +227,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
 }
 
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    AbstractTempTable *newOutputTable,
-                                    TableTuple &temp_tuple) {
+        AbstractTempTable *newOutputTable, TableTuple &temp_tuple) {
     bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
     if (m_replicatedTableOperation) {
         if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
@@ -276,9 +265,8 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
         // in the existing tuple and its other columns keep their existing
         // values -- the DEFAULT values that are stored in templateTuple
         // DO NOT get copied to an existing tuple.
-        m_templateTuple.setNValueAllocateForObjectCopies(fieldMap[i],
-                                                         tuple.getNValue(i),
-                                                         m_tempPool);
+        m_templateTuple.setNValueAllocateForObjectCopies(
+                fieldMap[i], tuple.getNValue(i), m_tempPool);
     }
 
     VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
