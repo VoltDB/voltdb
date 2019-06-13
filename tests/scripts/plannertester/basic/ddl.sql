@@ -26,6 +26,3 @@ partition table l on column a;
 create index idx_c on l (lname, a, b, id);
 create index idx_b on l (lname, b, id);
 create index idx_a on l (lname, a, id);
-
-create table migratable migrate to target tar (id int not null);
-create index migratingIndex on migratable(id) where not migrating;
