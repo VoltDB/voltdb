@@ -536,7 +536,6 @@ public class JDBCExportClient extends ExportClientBase {
          */
         private void checkSchemas() throws RestartBlockException {
             try {
-                boolean newSchema = false;
                 ExportRowSchema curSchema = getExportRowSchema();
                 if (m_curSchema == null || !m_curSchema.sameSchema(curSchema)) {
                     if (m_logger.isDebugEnabled()) {
@@ -556,9 +555,6 @@ public class JDBCExportClient extends ExportClientBase {
                         m_logger.debug(sb.toString());
                     }
                     m_curSchema = curSchema;
-                    newSchema = true;
-                }
-                if (newSchema) {
                     if (pstmt != null) {
                         try {
                             pstmt.close();
@@ -596,7 +592,9 @@ public class JDBCExportClient extends ExportClientBase {
                     throw new RestartBlockException(true);
                 }
             }
-            checkSchemas();
+            if (!ignoreGenerations) {
+                checkSchemas();
+            }
         }
 
         @Override
