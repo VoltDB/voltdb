@@ -491,6 +491,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
+        project.setFlushIntervals(100, 200, 200);
         wireupExportTableToSocketExport("ex");
         int numOfStreams = 2;
         if (MiscUtils.isPro()) {

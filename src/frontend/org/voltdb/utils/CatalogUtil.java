@@ -1220,8 +1220,12 @@ public abstract class CatalogUtil {
             fi = new FlushIntervalType();
             ss.setFlushInterval(fi);
         }
-        fi.setExport(new FlushIntervalType.Export());
-        fi.setDr(new FlushIntervalType.Dr());
+        if (fi.getExport() == null) {
+            fi.setExport(new FlushIntervalType.Export());
+        }
+        if (fi.getDr() == null) {
+            fi.setDr(new FlushIntervalType.Dr());
+        }
     }
 
     /**
