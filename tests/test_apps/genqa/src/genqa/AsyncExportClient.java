@@ -99,7 +99,7 @@ public class AsyncExportClient
             File logPath = new File(m_txnLogPath);
             if (!logPath.exists()) {
                 if (!logPath.mkdir()) {
-                    log.error("Problem creating log directory " + logPath);
+                    log.warn("Problem creating log directory " + logPath);
                 }
             }
         }
@@ -109,7 +109,7 @@ public class AsyncExportClient
             if (dh == null) {
                 dh = new File(m_txnLogPath, Integer.toString(partId));
                 if (!dh.mkdir()) {
-                    log.error("Problem createing log directory " + dh);
+                    log.warn("Problem creating log directory " + dh);
                 }
                 m_baseDirs.put(partId, dh);
             }
