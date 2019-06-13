@@ -1002,11 +1002,11 @@ public class ParserDDL extends ParserRoutine {
 
     //VoltDB extension, drop TTL
     private Statement compileAlterTableDropTTL(Table t) {
+        if (t.hasMigrationTarget()) {
+            throw Error.error(ErrorCode.X_42581, "May not drop TTL column");
+        }
         if (t.getTTL() == null) {
             throw Error.error(ErrorCode.X_42501);
-        }
-        if (t.hasMigrationTarget()) {
-            throw unexpectedToken("May not drop TTL column");
         }
         Object[] args = new Object[] {
             t.getName(),
