@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.TTLManager;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltNTSystemProcedure;
@@ -28,6 +29,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 
@@ -85,11 +87,15 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         }
         ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
-            if (resp.getStatus() != ClientResponse.SUCCESS) {
-                exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
-                        "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
-                return true;
+            exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
+                    "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
+            // Update the hashinator and re-run the delete
+            Pair<Long, byte[]> hashinator = ((ClientResponseImpl)resp).getMispartitionedResult();
+            if (hashinator != null) {
+                TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
+                        hashinator.getFirst(), hashinator.getSecond(), false);
             }
+            return true;
         } else if (resp.getStatus() != ClientResponse.SUCCESS) {
             exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
                     "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
