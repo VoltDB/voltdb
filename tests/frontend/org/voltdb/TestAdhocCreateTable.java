@@ -347,45 +347,41 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
         try {
             startSystem(config);
-            try {
-                // test create table is working
-                m_client.callProcedure("@AdHoc", "create table T migrate to target MigrateTableTarget (id int not null);");
-                m_client.callProcedure("@AdHoc", "create index migratingIndex on t(id) where not migrating;");
-                assertTrue(findTableInSystemCatalogResults("T"));
-                m_client.callProcedure("@AdHoc", "insert into t values(1);");
-                m_client.callProcedure("@AdHoc", "insert into t values(2);");
-                m_client.callProcedure("@AdHoc", "insert into t values(3);");
-                // test migrating index is working
-                VoltTable tb = m_client.callProcedure("@AdHoc", "select * from t where not migrating;").getResults()[0];
-                // if no ttl column is set then it will behave like a regular table
-                assertEquals(tb.getRowCount(), 3);
+            // test create table is working
+            m_client.callProcedure("@AdHoc", "create table T migrate to target MigrateTableTarget (id int not null);");
+            m_client.callProcedure("@AdHoc", "create index migratingIndex on t(id) where not migrating;");
+            assertTrue(findTableInSystemCatalogResults("T"));
+            m_client.callProcedure("@AdHoc", "insert into t values(1);");
+            m_client.callProcedure("@AdHoc", "insert into t values(2);");
+            m_client.callProcedure("@AdHoc", "insert into t values(3);");
+            // test migrating index is working
+            VoltTable tb = m_client.callProcedure("@AdHoc", "select * from t where not migrating;").getResults()[0];
+            // if no ttl column is set then it will behave like a regular table
+            assertEquals(tb.getRowCount(), 3);
 
+            m_client.callProcedure("@AdHoc",
+                    "create table T2 migrate to target MigrateTableTarget (ts1 timestamp not null, ts2 timestamp not null);");
+            assertTrue(findTableInSystemCatalogResults("T2"));
+            // test ALTER table ADD / DROP / ALTER TTL column
+            boolean threw;
+            try {
+                threw = false;
                 m_client.callProcedure("@AdHoc",
-                        "create table T2 migrate to target MigrateTableTarget (ts1 timestamp not null, ts2 timestamp not null);");
-                assertTrue(findTableInSystemCatalogResults("T2"));
-                // test ALTER table ADD / DROP / ALTER TTL column
-                boolean threw;
-                try {
-                    threw = false;
-                    m_client.callProcedure("@AdHoc",
-                            "alter table T2 add using ttl 10 on column ts1;");
-                } catch (ProcCallException pce) {
-                    assertTrue(pce.getMessage().contains("May not add TTL column"));
-                    threw = true;
-                }
-                assertTrue("Shouldn't have been able to alter add ttl column in migrate table.", threw);
-                try {
-                    threw = false;
-                    m_client.callProcedure("@AdHoc",
-                            "alter table T2 drop ttl;");
-                } catch (ProcCallException pce) {
-                    assertTrue(pce.getMessage().contains("May not drop TTL column"));
-                    threw = true;
-                }
-                assertTrue("Shouldn't have been able to alter drop ttl column in migrate table.", threw);
+                        "alter table T2 add using ttl 10 on column ts1;");
             } catch (ProcCallException pce) {
-                fail("migrate table goes wrong.");
+                assertTrue(pce.getMessage().contains("May not add TTL column"));
+                threw = true;
             }
+            assertTrue("Shouldn't have been able to alter add ttl column in migrate table.", threw);
+            try {
+                threw = false;
+                m_client.callProcedure("@AdHoc",
+                        "alter table T2 drop ttl;");
+            } catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("May not drop TTL column"));
+                threw = true;
+            }
+            assertTrue("Shouldn't have been able to alter drop ttl column in migrate table.", threw);
         } finally {
             teardownSystem();
         }

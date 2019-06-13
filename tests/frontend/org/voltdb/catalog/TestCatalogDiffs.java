@@ -67,8 +67,6 @@ public class TestCatalogDiffs extends TestCase {
         return  compileWithGroups(false, null, null, null, name, procList);
     }
 
-
-
     protected String compileWithGroups(
             boolean securityEnabled, String securityProvider,
             RoleInfo[] gi, UserInfo[] ui,
