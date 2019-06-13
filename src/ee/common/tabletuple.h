@@ -1102,6 +1102,7 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
             std::ostringstream message;
             message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
                     << "(index=" << j << ")"
+                    << "hidden column count=" << m_schema->hiddenColumnCount()
                     << std::endl;
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
         }
