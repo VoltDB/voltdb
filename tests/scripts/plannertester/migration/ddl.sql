@@ -24,7 +24,6 @@ CREATE TABLE without_ttl_replicated migrate to target foo (
 );
 CREATE INDEX idex4 ON without_ttl_replicated(j) WHERE NOT MIGRATING;
 
-
 CREATE TABLE with_ttl_no_index migrate to target foo (
   i int NOT NULL,
   j int NOT NULL

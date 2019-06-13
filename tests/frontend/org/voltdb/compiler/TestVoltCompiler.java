@@ -23,7 +23,7 @@
 
 package org.voltdb.compiler;
 
-import static org.mockito.Matchers.contains;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
@@ -4013,6 +4013,20 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table ttl MIGRATE TO TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
                 "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a));\n" +
+                "partition table ttl on column a;\n";
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+
+        // shouldn't have batch size here since it is a parameter for ttl
+        ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
+                "BATCH_SIZE 10;\n" +
                 "partition table ttl on column a;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
