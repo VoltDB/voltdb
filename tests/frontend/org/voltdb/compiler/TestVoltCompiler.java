@@ -4024,6 +4024,7 @@ public class TestVoltCompiler extends TestCase {
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
 
+        // shouldn't have batch size here since it is a parameter for ttl
         ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
                 "BATCH_SIZE 10;\n" +
                 "partition table ttl on column a;\n";
