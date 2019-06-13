@@ -1727,6 +1727,11 @@ if __name__ == '__main__':
                          post_to_slack, file_jira_ticket=not DRY_RUN)
 
     if ERROR_COUNT:
+        # Check for any /tmp/*.tmp files, which a JIRAError sometimes creates
+        for file in os.listdir('/tmp'):
+            if file.endswith('.tmp'):
+                contents = open('/tmp/'+file, 'r')
+                logging.info('Contents of %s:\n%s' % (str(file), contents.read()) )
         logging.info("Processing of Jenkins builds failed with %d ERROR(s) "
                      "(and %d WARNING(s))" % (ERROR_COUNT, WARNING_COUNT) )
         sys.exit(11)

@@ -980,7 +980,7 @@ tr:hover{
                 logging.exception("Jira ticket creation failed with Exception:"
                                   "\n    %s\n    using:\n    %s"
                                   % (str(e), str(issue_dict)) )
-                return new_issue
+                raise e
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -1123,26 +1123,43 @@ tr:hover{
             # then do not downgrade it
             if previous_priority == 'Blocker':
                 priority = previous_priority
-            try:
-                ticket_to_modify.update(fields={'summary'    : summary,
-                                                'description': description,
-#                                                 'fixVersions': [{"set":[{"name" : version}]}],
-                                                'labels'     : labels,
-                                                'priority'   : {'name': priority}
-                                                },
-                                        notify=False)
-            except Exception as e:
-                logging.exception("Jira ticket update failed with Exception:\n    %s"
-                                  "\n    for Jira ticket %s, using:"
-                                  "\n    version '%s', priority '%s', labels %s;"
-                                  "\n    old and new summaries:\n    '%s'\n    '%s'"
-                                  "\n    old description:\n    %s"
-                                  "\n    new (updated) description:\n    %s\n"
-                                  % (str(e), str(ticket_to_modify.key),
-                                     version, priority, str(labels),
-                                     previous_summary, summary,
-                                     old_description, description) )
-                return ticket_to_modify
+
+            # Try to update the Jira ticket without email notification; but if
+            # that fails (as seems to happen fairly often, but unpredictably),
+            # update it with email notification
+            exception = None
+            exception_count = 0
+            for notification in [False, True]:
+                try:
+                    ticket_to_modify.update(fields={'summary'    : summary,
+                                                    'description': description,
+                                                    'labels'     : labels,
+                                                    'priority'   : {'name': priority}
+                                                    }, notify=notification )
+                    break
+                except Exception as e:
+                    exception = e
+                    exception_count += 1
+                    logging.exception("Jira ticket update (notify=%s) failed with Exception:"
+                                      "\n    %s"
+                                      "\n    for Jira ticket %s, using:"
+                                      "\n        version '%s', priority '%s', labels %s;"
+                                      "\n    old and new summaries:"
+                                      "\n        '%s'"
+                                      "\n        '%s'"
+                                      "\n    old description:"
+                                      "\n        %s"
+                                      "\n    new (updated) description:"
+                                      "\n        %s\n"
+                                      % (str(notification), str(e),
+                                         str(ticket_to_modify.key),
+                                         version, priority, str(labels),
+                                         previous_summary, summary,
+                                         old_description, description) )
+                # If an exception was thrown for both values of 'notification',
+                # throw the latter exception
+                if exception_count > 1 and type(exception) is Exception:
+                    raise exception
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -1305,7 +1322,7 @@ tr:hover{
             except Exception as e:
                 logging.exception("Closing Jira ticket %s failed with Exception:\n    %s"
                                   % (str(ticket_to_close.key), str(e)) )
-                return ticket_to_close
+                raise e
 
             logging_message = ("Closed ticket %s (https://issues.voltdb.com/browse/%s), "
                                "with summary:\n    '%s'"
