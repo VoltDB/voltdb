@@ -1400,6 +1400,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
 
+        StreamStartAction action = isRecover ? StreamStartAction.RECOVER : StreamStartAction.SNAPSHOT_RESTORE;
+
         //Iterate the export tables
         for (Table t : db.getTables()) {
             if (!CatalogUtil.isTableExportOnly(db, t)) {
@@ -1407,6 +1409,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
 
             String name = t.getTypeName();
+
 
             //Sequence numbers for this table for every partition
             Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
@@ -1419,27 +1422,29 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 continue;
             }
 
-            ExportSnapshotTuple sequences =
-                    sequenceNumberPerPartition.get(myPartitionId);
-            if (sequences == null) {
-                SNAP_LOG.warn("Could not find an export sequence number for table " + name +
-                        " partition " + myPartitionId +
-                        ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
-                        " which would not contain these sequence numbers (added in 1.3)." +
-                        " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
-                        " are reset to 0");
-                continue;
-            }
+            if (action == StreamStartAction.RECOVER) {
+                ExportSnapshotTuple sequences =
+                        sequenceNumberPerPartition.get(myPartitionId);
+                if (sequences == null) {
+                    SNAP_LOG.warn("Could not find an export sequence number for table " + name +
+                            " partition " + myPartitionId +
+                            ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
+                            " which would not contain these sequence numbers (added in 1.3)." +
+                            " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
+                            " are reset to 0");
+                    continue;
+                }
 
-            //Forward the sequence number to the EE
-            context.getSiteProcedureConnection().exportAction(
-                    true,
-                    sequences,
-                    myPartitionId,
-                    name);
+                //Forward the sequence number to the EE
+                context.getSiteProcedureConnection().exportAction(
+                        true,
+                        sequences,
+                        myPartitionId,
+                        name);
+            }
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
             ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, name,
-                    isRecover ? StreamStartAction.RECOVER : StreamStartAction.SNAPSHOT_RESTORE,
+                    action,
                     sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }

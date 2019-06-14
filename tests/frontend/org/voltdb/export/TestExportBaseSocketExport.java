@@ -145,6 +145,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return m_queue.size();
         }
 
+        public void ignoreRow(long rowId) {
+            m_seenIds.remove(rowId);
+            m_data.remove(rowId);
+            m_queue.remove(rowId);
+        }
+
         private class ClientConnectionHandler extends Thread {
             private final Socket m_clientSocket;
             private boolean m_closed = false;
@@ -199,6 +205,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
 
     }
+
 
     /** Shove a table name and pkey in front of row data */
     protected Object[] convertValsToParams(String tableName, final int i, final Object[] rowdata) {
