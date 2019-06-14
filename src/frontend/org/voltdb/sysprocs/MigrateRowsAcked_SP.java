@@ -66,7 +66,7 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
     {
         VoltTable result = new VoltTable(new ColumnInfo(MigrateRowsDeleterNT.ROWS_TO_BE_DELETED, VoltType.BIGINT));
         // mis-partitioned, possibly in cluster grow and shrink.
-        if (m_runner.getCorrespondingPartitionId() != partitionId) {
+        if (m_site.getCorrespondingPartitionId() != partitionId) {
             throw new MispartitionedException();
         }
         final TransactionState txnState = m_runner.getTxnState();
