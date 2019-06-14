@@ -156,11 +156,12 @@ public class JDBCExportClient extends ExportClientBase {
         DatabaseType m_dbType = null;
         private String m_preparedStmtStr = null;
         private String m_createTableStr = null;
-        private ExportRowSchema m_curSchema = null;
         private boolean m_supportsUpsert = false;
         private boolean m_warnedOfUnsupportedOperation = false;
         private boolean m_supportsBatchUpdates;
         private boolean m_disableAutoCommits = true;
+        private long m_curGenId;
+        private ExportRowSchema m_curSchema;
 
         private final RefCountedDS m_ds;
 
@@ -180,6 +181,7 @@ public class JDBCExportClient extends ExportClientBase {
         public JDBCDecoder(AdvertisedDataSource source, RefCountedDS ds) {
             super(source);
 
+            m_curGenId = source.m_generation;
             m_ds = ds;
             m_es =
                     CoreUtils.getListeningSingleThreadExecutor(
@@ -532,28 +534,27 @@ public class JDBCExportClient extends ExportClientBase {
 
         /**
          * Detect whether the schema changed, and if yes, reset state for new statements.
+         * Optimize the changes by checking if schemas actually differ, because there are
+         * scenarios where the catalog changes (e.g. an export target is enabled) but the
+         * schemas are unchanged.
+         *
          * @throws RestartBlockException
          */
         private void checkSchemas() throws RestartBlockException {
             try {
                 ExportRowSchema curSchema = getExportRowSchema();
-                if (m_curSchema == null || !m_curSchema.sameSchema(curSchema)) {
+                assert(curSchema != null);
+                if (m_curGenId != curSchema.generation &&
+                        !(m_curSchema != null && m_curSchema.sameSchema(curSchema))) {
                     if (m_logger.isDebugEnabled()) {
-                        StringBuilder sb = new StringBuilder("Detected new schema:\n");
-                        sb.append("old: ");
-                        if (m_curSchema == null) {
-                            sb.append("(none)\n");
-                        } else {
-                            sb.append(m_curSchema).append("\n");
-                        }
-                        sb.append("new: ");
-                        if (curSchema == null) {
-                            sb.append("(none)\n");
-                        } else {
-                            sb.append(curSchema).append("\n");
-                        }
-                        m_logger.debug(sb.toString());
+                        StringBuilder sb = new StringBuilder("Detected new schema: ")
+                                .append("old = ")
+                                .append(m_curGenId)
+                                .append(", new = ")
+                                .append(curSchema.generation);
+                        m_logger.debug(sb);
                     }
+                    m_curGenId = curSchema.generation;
                     m_curSchema = curSchema;
                     if (pstmt != null) {
                         try {
