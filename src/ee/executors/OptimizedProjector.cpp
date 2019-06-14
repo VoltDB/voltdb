@@ -210,7 +210,7 @@ void ProjectStep::exec(TableTuple& dstTuple, const TableTuple& srcTuple) const {
         break;
     }
     default:
-        assert(false);
+        vassert(false);
     }
 }
 
@@ -229,7 +229,7 @@ int ProjectStep::srcFieldIndex() const {
     case MEMCPY:
         return m_params.m_memcpyParams.m_srcFieldIndex;
     default:
-        assert(false);
+        vassert(false);
     }
 
     return -1;
@@ -251,7 +251,7 @@ std::string ProjectStep::debug() const {
             << ", " << expr()->debug();
         break;
     default:
-        assert(false);
+        vassert(false);
     }
 
     return oss.str();

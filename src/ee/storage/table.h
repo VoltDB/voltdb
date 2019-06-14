@@ -59,7 +59,7 @@
 
 #include <vector>
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 class TableIterator;
@@ -229,7 +229,7 @@ class Table {
      */
     virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated) {
         // this should be overidden by any table involved in an export
-        assert(false);
+        vassert(false);
     }
 
     /**
@@ -238,7 +238,7 @@ class Table {
      */
     virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed, int64_t &genId) {
         // this should be overidden by any table involved in an export
-        assert(false);
+        vassert(false);
     }
 
     /**

@@ -263,7 +263,7 @@ bool CoveringCellIndex::deleteEntryDo(const TableTuple *tuple) {
             break;
 
         CellMapIterator cellIter = m_cellEntries.find(setKeyFromCellId(cell, tuple));
-        assert(! cellIter.isEnd());
+        vassert(! cellIter.isEnd());
         m_cellEntries.erase(cellIter);
     }
 
@@ -293,7 +293,7 @@ bool CoveringCellIndex::replaceEntryNoKeyChangeDo(const TableTuple &destinationT
             break;
         }
         CellMapIterator cellMapIt = m_cellEntries.find(setKeyFromCellId(cells[i], &originalTuple));
-        assert(! cellMapIt.isEnd());
+        vassert(! cellMapIt.isEnd());
         m_cellEntries.erase(cellMapIt);
         m_cellEntries.insert(setKeyFromCellId(cells[i], &destinationTuple), destinationTuple.address());
     }

@@ -31,7 +31,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <algorithm>    // std::find
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstdio>
 #include <sstream>
 
@@ -76,12 +76,12 @@ void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* 
 }
 
 void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView) {
-    assert( ! m_views.empty());
+    vassert( ! m_views.empty());
     MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
         std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
-        assert(toView != m_views.end());
+        vassert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
     }
@@ -144,7 +144,7 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
 void StreamedTable::streamTuple(TableTuple &source, ExportTupleStream::STREAM_ROW_TYPE type, AbstractDRTupleStream *drStream) {
     if (m_executorContext->externalStreamsEnabled()) {
         int64_t currSequenceNo = ++m_sequenceNo;
-        assert(m_columnNames.size() == source.columnCount());
+        vassert(m_columnNames.size() == source.columnCount());
         size_t mark = m_wrapper->appendTuple(m_executorContext->getContextEngine(),
                                       m_executorContext->currentSpHandle(),
                                       currSequenceNo,
@@ -213,7 +213,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis) {
 
 void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
-        assert(seqNo == m_sequenceNo);
+        vassert(seqNo == m_sequenceNo);
         m_wrapper->rollbackExportTo(mark, seqNo);
         if (getLastSeenUndoToken() == m_migrateTxnSizeGuard.undoToken) {
             m_migrateTxnSizeGuard.estimatedDRLogSize -=
@@ -258,7 +258,7 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  */
 void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated) {
     // assume this only gets called from a fresh rejoined node or after the reset of a wrapper
-    assert(m_sequenceNo == 0 || seqNo == 0);
+    vassert(m_sequenceNo == 0 || seqNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
         m_wrapper->setBytesUsed(seqNo, streamBytesUsed);

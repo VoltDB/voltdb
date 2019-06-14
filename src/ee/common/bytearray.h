@@ -46,7 +46,7 @@
 #ifndef HSTOREBYTEARRAY_H
 #define HSTOREBYTEARRAY_H
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <boost/shared_array.hpp>
 
@@ -117,15 +117,15 @@ public:
     };
     // corresponds to "bar = new byte[len];" in Java
     void resetAndExpand(int newLength) {
-        assert(newLength >= 0);
+        vassert(newLength >= 0);
         data_ = boost::shared_array<T>(new T[newLength]);
         ::memset(data_.get(), 0, newLength * sizeof(T));
         length_ = newLength;
     };
     // corresponds to "tmp = new byte[newlen]; System.arraycopy(bar to tmp); bar = tmp;" in Java
     void copyAndExpand(int newLength) {
-        assert(newLength >= 0);
-        assert(newLength > length_);
+        vassert(newLength >= 0);
+        vassert(newLength > length_);
         boost::shared_array<T> newData(new T[newLength]);
         ::memset(newData.get(), 0, newLength * sizeof(T)); // makes valgrind happy.
         ::memcpy(newData.get(), data_.get(), length_ * sizeof(T));
@@ -140,27 +140,27 @@ public:
 
     // helper functions for convenience.
     void assign(const T* assignedData, int offset, int assignedLength) {
-        assert(!isNull());
-        assert(length_ >= offset + assignedLength);
-        assert(offset >= 0);
+        vassert(!isNull());
+        vassert(length_ >= offset + assignedLength);
+        vassert(offset >= 0);
         ::memcpy(data_.get() + offset, assignedData, assignedLength * sizeof(T));
     };
     GenericArray<T> operator+(const GenericArray<T> &tail) const {
-        assert(!isNull());
-        assert(!tail.isNull());
+        vassert(!isNull());
+        vassert(!tail.isNull());
         GenericArray<T> concated(this->length_ + tail.length_);
         concated.assign(this->data_.get(), 0, this->length_);
         concated.assign(tail.data_.get(), this->length_, tail.length_);
         return concated;
     };
     const T& operator[](int index) const {
-        assert(!isNull());
-        assert(length_ > index);
+        vassert(!isNull());
+        vassert(length_ > index);
         return data_.get()[index];
     };
     T& operator[](int index) {
-        assert(!isNull());
-        assert(length_ > index);
+        vassert(!isNull());
+        vassert(length_ > index);
         return data_.get()[index];
     };
 private:

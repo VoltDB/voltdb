@@ -61,9 +61,9 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     VOLT_TRACE("init Insert Executor");
 
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTableCount() == (m_node->isInline() ? 0 : 1));
+    vassert(m_node);
+    vassert(m_node->getTargetTable());
+    vassert(m_node->getInputTableCount() == (m_node->isInline() ? 0 : 1));
 
     Table* targetTable = m_node->getTargetTable();
     m_isUpsert = m_node->isUpsert();
@@ -79,7 +79,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     if ( ! m_node->isInline()) {
         setDMLCountOutputTable(executorVector.limits());
         m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
-        assert(m_inputTable);
+        vassert(m_inputTable);
     } else {
         m_inputTable = NULL;
     }
@@ -97,7 +97,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     }
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
-        assert( ! m_node->isInline() );
+        vassert( ! m_node->isInline() );
         if (m_isStreamed) {
             VOLT_ERROR("UPSERT is not supported for Stream table %s", targetTable->name().c_str());
         }
@@ -164,23 +164,23 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
                                              AbstractTempTable *newOutputTable,
                                              TableTuple &temp_tuple) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert(inputSchema);
-    assert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
-    assert(m_node->isInline() || m_inputTable);
+    vassert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    vassert(m_node);
+    vassert(inputSchema);
+    vassert(m_node->isInline() || (m_inputTable == dynamic_cast<AbstractTempTable*>(m_node->getInputTable())));
+    vassert(m_node->isInline() || m_inputTable);
 
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     // Update target table reference from table delegate
     m_targetTable = m_node->getTargetTable();
-    assert(m_targetTable);
-    assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
+    vassert(m_targetTable);
+    vassert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
             (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
 
     m_persistentTable = m_isStreamed ?
             NULL : static_cast<PersistentTable*>(m_targetTable);
-    assert((!m_persistentTable && !m_replicatedTableOperation) ||
+    vassert((!m_persistentTable && !m_replicatedTableOperation) ||
             m_replicatedTableOperation == m_persistentTable->isReplicatedTable());
 
     m_upsertTuple = TableTuple(m_targetTable->schema());
@@ -191,7 +191,7 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
     m_modifiedTuples = 0;
 
     m_tmpOutputTable = newOutputTable;
-    assert(m_tmpOutputTable);
+    vassert(m_tmpOutputTable);
     m_count_tuple = m_tmpOutputTable->tempTuple();
 
     // For export tables with no partition column,
@@ -314,7 +314,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
 
     if (m_isUpsert) {
         // upsert execution logic
-        assert(m_persistentTable->primaryKeyIndex() != NULL);
+        vassert(m_persistentTable->primaryKeyIndex() != NULL);
         TableTuple existsTuple = m_persistentTable->lookupTupleByValues(m_templateTuple);
 
         if (!existsTuple.isNullTuple()) {
@@ -381,7 +381,7 @@ void InsertExecutor::p_execute_finish() {
     if (m_replicatedTableOperation) {
         // Use the static value assigned above to propagate the result to the other engines
         // that skipped the replicated table work
-        assert(s_modifiedTuples != -1);
+        vassert(s_modifiedTuples != -1);
         m_modifiedTuples = s_modifiedTuples;
     }
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));

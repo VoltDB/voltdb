@@ -53,7 +53,7 @@
 #include "expressions/abstractexpression.h"
 
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -97,7 +97,7 @@ class OperatorIsNullExpression : public AbstractExpression {
     };
 
    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-       assert(m_left);
+       vassert(m_left);
        NValue tmp = m_left->eval(tuple1, tuple2);
        if (tmp.isNull()) {
            return NValue::getTrue();
@@ -120,7 +120,7 @@ class OperatorUnaryMinusExpression : public AbstractExpression {
     };
 
    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-       assert(m_left);
+       vassert(m_left);
        NValue tmp = m_left->eval(tuple1, tuple2);
        return tmp.op_unary_minus();
    }
@@ -241,8 +241,8 @@ class OperatorExpression : public AbstractExpression {
     NValue
     eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
-        assert(m_left);
-        assert(m_right);
+        vassert(m_left);
+        vassert(m_right);
         return oper.op(m_left->eval(tuple1, tuple2),
                        m_right->eval(tuple1, tuple2));
     }

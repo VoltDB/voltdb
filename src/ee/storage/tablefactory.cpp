@@ -102,7 +102,7 @@ Table* TableFactory::getPersistentTable(
         // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
         // is to avoid allocation cost at time of tuple insertion
         TBPtr block = persistentTable->allocateFirstBlock();
-        assert(block->hasFreeTuples());
+        vassert(block->hasFreeTuples());
         persistentTable->m_blocksWithSpace.insert(block);
     }
 
@@ -218,9 +218,9 @@ void TableFactory::initCommon(
             const bool ownsTupleSchema,
             const int32_t compactionThreshold) {
 
-    assert(table != NULL);
-    assert(schema != NULL);
-    assert(columnNames.size() != 0);
+    vassert(table != NULL);
+    vassert(schema != NULL);
+    vassert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;

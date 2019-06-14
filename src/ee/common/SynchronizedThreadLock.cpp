@@ -76,7 +76,7 @@ void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
 }
 
 void SynchronizedThreadLock::create() {
-    assert(s_SITES_PER_HOST == -1);
+    vassert(s_SITES_PER_HOST == -1);
     s_SITES_PER_HOST = 0;
     pthread_cond_init(&s_sharedEngineCondition, 0);
     pthread_cond_init(&s_wakeLowestEngineCondition, 0);
@@ -99,7 +99,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
             // We need the Replicated table memory before the MP Site is initialized so
             // Just track it in s_mpEngine.
             VOLT_DEBUG("Initializing memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
-            assert(s_mpEngine.context == NULL);
+            vassert(s_mpEngine.context == NULL);
             s_mpEngine.context = newEngineLocals.context;
 
             delete s_mpEngine.enginePartitionId;
@@ -128,7 +128,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
         // thread before the MP Site was initialized.
         if (s_mpEngine.context != NULL) {
             VOLT_DEBUG("Reset memory pool for Replicated Tables on thread %d", ThreadLocalPool::getThreadPartitionId());
-            assert(s_mpEngine.poolData->first == 1);
+            vassert(s_mpEngine.poolData->first == 1);
             delete s_mpEngine.poolData->second;
             delete s_mpEngine.poolData;
             s_mpEngine.poolData = NULL;
@@ -187,9 +187,9 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
 
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
     VOLT_DEBUG("Entering countdown latch...");
-    assert(s_globalTxnStartCountdownLatch > 0);
-    assert(ThreadLocalPool::getEnginePartitionId() != 16383);
-    assert(!isInSingleThreadMode());
+    vassert(s_globalTxnStartCountdownLatch > 0);
+    vassert(ThreadLocalPool::getEnginePartitionId() != 16383);
+    vassert(!isInSingleThreadMode());
     if (lowestSite) {
         pthread_mutex_lock(&s_sharedEngineMutex);
         if (--s_globalTxnStartCountdownLatch != 0) {
@@ -209,7 +209,7 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
         pthread_cond_wait(&s_sharedEngineCondition, &s_sharedEngineMutex);
         pthread_mutex_unlock(&s_sharedEngineMutex);
         VOLT_DEBUG("Other SP partition thread released on thread %d", ThreadLocalPool::getThreadPartitionId());
-        assert(!isInSingleThreadMode());
+        vassert(!isInSingleThreadMode());
         return false;
     }
 }
@@ -226,7 +226,7 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
         PersistentTable *table) {
     if (synchronized) {
-        assert(isInSingleThreadMode());
+        vassert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder. Note that since we only touch quantum memory
@@ -235,13 +235,13 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
         UndoQuantumReleaseInterest* realReleaseInterest;
         UndoQuantumReleaseInterest* dummyReleaseInterest;
         if (table && table->isNewReleaseInterest(uq->getUndoToken())) {
-            assert(table->isReplicatedTable());
+            vassert(table->isReplicatedTable());
             dummyReleaseInterest = table->getDummyReplicatedInterest();
             realReleaseInterest = table->getReplicatedInterest();
         }
         else {
             if (table) {
-                assert(table->isReplicatedTable());
+                vassert(table->isReplicatedTable());
             }
             dummyReleaseInterest = NULL;
             realReleaseInterest = NULL;
@@ -256,7 +256,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
             }
         }
     } else {
-        assert(!table || !table->isReplicatedTable());
+        vassert(!table || !table->isReplicatedTable());
         uq->registerUndoAction(action, table);
     }
 }
@@ -265,7 +265,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
 void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
         PersistentTable *deletedTable) {
     if (synchronized) {
-        assert(isInSingleThreadMode());
+        vassert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
         // will create the actual undo action, other sites register a dummy
         // undo action as placeholder. Note that since we only touch quantum memory
@@ -283,7 +283,7 @@ void SynchronizedThreadLock::addTruncateUndoAction(bool synchronized, UndoQuantu
                 removeReleaseInterest = deletedTable->getDummyReplicatedInterest();
             }
             currUQ->registerUndoAction(undoAction);
-            assert(removeReleaseInterest);
+            vassert(removeReleaseInterest);
             currUQ->unregisterReleaseInterest(removeReleaseInterest);
         }
     } else {
@@ -306,11 +306,11 @@ void SynchronizedThreadLock::lockReplicatedResource() {
     // calling the countdown latch instead.
     // This method is for locking write-access to replicated resources in
     // multi-threaded execution.
-    assert(!isInSingleThreadMode());
+    vassert(!isInSingleThreadMode());
     VOLT_DEBUG("Attempting to acquire replicated resource lock on engine %d...", ThreadLocalPool::getThreadPartitionId());
     pthread_mutex_lock(&s_sharedEngineMutex);
 #ifndef  NDEBUG
-    assert(! s_holdingReplicatedTableLock);
+    vassert(! s_holdingReplicatedTableLock);
     s_holdingReplicatedTableLock = true;
 #endif
     VOLT_DEBUG("Acquired replicated resource lock on engine %d.", ThreadLocalPool::getThreadPartitionId());
@@ -330,7 +330,7 @@ bool SynchronizedThreadLock::usingMpMemory() {
 }
 
 void SynchronizedThreadLock::setUsingMpMemory(bool isUsingMpMemory) {
-    assert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
+    vassert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
     s_usingMpMemory = isUsingMpMemory;
 }
 #endif
@@ -357,13 +357,13 @@ void SynchronizedThreadLock::assumeMpMemoryContext() {
 #ifndef  NDEBUG
     if (usingMpMemory()) {
         VOLT_ERROR_STACK();
-        assert(!usingMpMemory());
+        vassert(!usingMpMemory());
     }
 #endif
     // We should either be running on the lowest site thread (in the lowest site context) or
     // or be holding the replicated resource lock (Note: This could be a false positive if
     // a different thread happens to have the Replicated Resource Lock)
-    assert(isInSingleThreadMode() || s_holdingReplicatedTableLock);
+    vassert(isInSingleThreadMode() || s_holdingReplicatedTableLock);
     ExecutorContext::assignThreadLocals(s_mpEngine);
 #ifndef  NDEBUG
     setUsingMpMemory(true);
@@ -379,14 +379,14 @@ void SynchronizedThreadLock::assumeLowestSiteContext() {
 
 void SynchronizedThreadLock::assumeLocalSiteContext() {
 #ifndef  NDEBUG
-    assert(usingMpMemory());
+    vassert(usingMpMemory());
     setUsingMpMemory(false);
 #endif
     ExecutorContext::assignThreadLocals(s_enginesByPartitionId.find(ThreadLocalPool::getThreadPartitionId())->second);
 }
 
 void SynchronizedThreadLock::assumeSpecificSiteContext(EngineLocals& eng) {
-    assert(*eng.enginePartitionId != s_mpMemoryPartitionId);
+    vassert(*eng.enginePartitionId != s_mpMemoryPartitionId);
 #ifndef  NDEBUG
     setUsingMpMemory(false);
 #endif

@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 
 #include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
@@ -50,8 +50,8 @@ namespace voltdb
             // Since ExecutionSite is using monotonically increasing
             // token values, every new quanta we're asked to generate should be
             // larger than any token value we've seen before
-            assert(nextUndoToken > m_lastUndoToken);
-            assert(nextUndoToken > m_lastReleaseToken);
+            vassert(nextUndoToken > m_lastUndoToken);
+            vassert(nextUndoToken > m_lastReleaseToken);
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
             if (m_undoDataPools.empty()) {
@@ -60,7 +60,7 @@ namespace voltdb
                 pool = m_undoDataPools.back();
                 m_undoDataPools.pop_back();
             }
-            assert(pool);
+            vassert(pool);
             m_undoQuantums.emplace_back(createInstanceFromPool<UndoQuantum>(*pool,
                      nextUndoToken, pool));
             return m_undoQuantums.back();
@@ -79,13 +79,13 @@ namespace voltdb
             // commenting out this assertion because it isn't valid (hugg 3/29/13)
             // if you roll back a proc that hasn't done any work, you can run
             // into this situation. Needs a better fix than this.
-            // assert(m_lastReleaseToken < m_lastUndoToken);
+            // vassert(m_lastReleaseToken < m_lastUndoToken);
 
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand
             // us the largest token value that definitely doesn't
             // exist; this will just result in all undo quanta being undone.
-            assert(undoToken >= m_lastReleaseToken);
+            vassert(undoToken >= m_lastReleaseToken);
             if (undoToken > m_lastUndoToken) {
                 // a procedure may abort before it sends work to the EE
                 // (informing the EE of its undo token. For example, it
@@ -128,7 +128,7 @@ namespace voltdb
             //std::cout << "Releasing token " << undoToken
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
-            assert(m_lastReleaseToken < undoToken);
+            vassert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
             while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();

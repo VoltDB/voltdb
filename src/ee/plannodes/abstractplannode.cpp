@@ -115,12 +115,12 @@ void AbstractPlanNode::setInputTables(const vector<Table*>& val)
         PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(val[ii]);
         if (persistentTable) {
             VoltDBEngine* engine = ExecutorContext::getEngine();
-            assert(engine);
+            vassert(engine);
             TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
             m_inputTables[ii].setTable(tcd);
         } else {
             AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(val[ii]);
-            assert(abstractTempTable);
+            vassert(abstractTempTable);
             m_inputTables[ii].setTable(abstractTempTable);
         }
     }
@@ -135,7 +135,7 @@ void AbstractPlanNode::setOutputTable(Table* table)
         m_outputTable.setTable(tcd);
     } else {
         AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(table);
-        assert(abstractTempTable);
+        vassert(abstractTempTable);
         m_outputTable.setTable(abstractTempTable);
     }
 }
@@ -271,7 +271,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
 
             // todo: if this throws, new Node can be leaked.
             // As long as newNode is not NULL, this will not throw.
-            assert(newNode);
+            vassert(newNode);
             node->addInlinePlanNode(newNode);
         }
     }
@@ -308,7 +308,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
 
     AbstractPlanNode* retval = node.get();
     node.release();
-    assert(retval);
+    vassert(retval);
     return retval;
 }
 

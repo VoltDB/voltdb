@@ -161,7 +161,7 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
             return subqueryComparisonFactory<TupleExtractor, NValueExtractor>(c, l, r, quantifier);
       }
    } else {
-      assert(r_subquery != NULL);
+      vassert(r_subquery != NULL);
       switch (c) {
          case EXPRESSION_TYPE_COMPARE_LIKE:
             return new VectorComparisonExpression<CmpLike, NValueExtractor, TupleExtractor>(
@@ -247,7 +247,7 @@ static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
  * comparison helper templates. */
 AbstractExpression* ExpressionUtil::comparisonFactory(
       PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
-    assert(lc);
+    vassert(lc);
 
     // more specialization available?
     ConstantValueExpression *l_const = dynamic_cast<ConstantValueExpression*>(lc);
@@ -633,7 +633,7 @@ void ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr,
    if (expr != nullptr) {
       if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
          auto const* tve = dynamic_cast<const TupleValueExpression*>(expr);
-         assert(tve != NULL);
+         vassert(tve != NULL);
          columnIds.emplace_back(tve->getColumnId());
       } else {
          ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);

@@ -20,7 +20,7 @@
 #include <vector>
 #include <stdint.h>
 #include <string.h>
-#include <cassert>
+#include <common/debuglog.h>
 
 #include "boost/scoped_array.hpp"
 #include "boost/shared_ptr.hpp"
@@ -108,7 +108,7 @@ public:
         uses boost::pool under the hood. */
     void* operator new(std::size_t sz)
     {
-        assert(sz == sizeof(TupleBlock));
+        vassert(sz == sizeof(TupleBlock));
         return ThreadLocalPool::allocateExactSizedObject(sizeof(TupleBlock));
     }
 
@@ -160,7 +160,7 @@ public:
         }
 
         int index = TUPLE_BLOCK_NUM_BUCKETS * m_activeTuples / m_tuplesPerBlock;
-        assert(index < TUPLE_BLOCK_NUM_BUCKETS);
+        vassert(index < TUPLE_BLOCK_NUM_BUCKETS);
         return index;
     }
 

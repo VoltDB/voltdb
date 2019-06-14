@@ -346,7 +346,7 @@ int32_t hexCharToInt(char c) {
         retval = c - 'A' + 10;
     else
         retval = c - '0';
-    assert(retval >=0 && retval < 16);
+    vassert(retval >=0 && retval < 16);
     return retval;
 }
 

@@ -26,14 +26,14 @@ namespace voltdb {
 voltdb::NValue ScalarValueExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
 {
     // Execute the subquery and get its subquery id
-    assert(m_left != NULL);
+    vassert(m_left != NULL);
     NValue lnv = m_left->eval(tuple1, tuple2);
     int subqueryId = ValuePeeker::peekInteger(lnv);
 
     // Get the subquery context
     ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
     Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-    assert(table != NULL);
+    vassert(table != NULL);
     if (table->activeTupleCount() > 1) {
         // throw runtime exception
         char message[256];

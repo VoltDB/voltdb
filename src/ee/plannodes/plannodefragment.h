@@ -86,7 +86,7 @@ class PlanNodeFragment {
 
     // first node from the statement plan
     AbstractPlanNode * getRootNode(int stmtId = 0) {
-        assert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
+        vassert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
         return m_stmtExecutionListMap[stmtId]->front();
     }
 

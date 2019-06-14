@@ -16,9 +16,7 @@
  */
 
 #include "ContiguousAllocator.h"
-
 #include "common/ThreadLocalPool.h"
-
 
 using namespace voltdb;
 

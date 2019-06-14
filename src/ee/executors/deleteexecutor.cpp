@@ -59,23 +59,23 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     VOLT_TRACE("init Delete Executor");
 
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
-    assert(m_node);
+    vassert(m_node);
 
     setDMLCountOutputTable(executorVector.limits());
 
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
     m_replicatedTableOperation = targetTable->isReplicatedTable();
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(m_node->getInputTableCount() == 0);
+        vassert(m_node->getInputTableCount() == 0);
         return true;
     }
 
-    assert(m_node->getInputTableCount() == 1);
+    vassert(m_node->getInputTableCount() == 1);
     m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable()); //input table should be temptable
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
     return true;
@@ -86,13 +86,13 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     // update target table reference from table delegate
     // Note that the target table pointer in the node's tcd can change between p_init and p_execute
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
     TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 
     {
-        assert(targetTable->isReplicatedTable() ==
+        vassert(targetTable->isReplicatedTable() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
@@ -112,9 +112,9 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 targetTable->truncateTable(m_engine, m_replicatedTableOperation);
             }
             else {
-                assert(m_inputTable);
-                assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-                assert(targetTuple.columnCount() == targetTable->columnCount());
+                vassert(m_inputTable);
+                vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+                vassert(targetTuple.columnCount() == targetTable->columnCount());
                 TableIterator inputIterator = m_inputTable->iterator();
                 while (inputIterator.next(m_inputTuple)) {
                     //

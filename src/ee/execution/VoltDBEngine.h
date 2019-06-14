@@ -63,7 +63,7 @@
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <map>
 #include <unordered_map>
 #include <string>
@@ -439,7 +439,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
 
-                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
+                vassert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }

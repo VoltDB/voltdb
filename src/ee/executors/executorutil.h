@@ -51,7 +51,7 @@
 #include "storage/AbstractTempTable.hpp"
 
 #include <cstddef> // for NULL !
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -106,7 +106,7 @@ bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* i
         }
         // Evaluate LIMIT now
         if (m_limit >= 0) {
-            assert(m_table != NULL);
+            vassert(m_table != NULL);
             if (m_table->activeTupleCount() == m_limit) {
                 m_under_limit = false;
                 // Notify a parent that the limit is reached

@@ -20,7 +20,7 @@
 #include "LogDefs.h"
 #include "LogProxy.h"
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -54,7 +54,7 @@ public:
      * @param statement Statement to log
      */
     inline void log(const voltdb::LogLevel level, const std::string *statement) const {
-        assert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         if (level >= m_level && m_logProxy != NULL) {
             m_logProxy->log( m_id, level, statement->c_str());
         }

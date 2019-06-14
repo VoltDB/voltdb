@@ -20,7 +20,7 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <stdint.h>
 #include <limits>

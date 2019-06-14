@@ -21,7 +21,7 @@
 //#include "boost/scoped_ptr.hpp"
 //#include "boost/unordered_map.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <map>
 #include <stack>
 #include <string>

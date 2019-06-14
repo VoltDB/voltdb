@@ -68,7 +68,7 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(LargeTempTableBlockId 
         ensureSpaceForNewBlock();
 
         bool rc = m_topend->loadLargeTempTableBlock(listIt->get());
-        assert(rc);
+        vassert(rc);
         assert (! (*listIt)->isPinned());
         m_totalAllocatedBytes += LargeTempTableBlock::BLOCK_SIZE_IN_BYTES;
     }
@@ -163,7 +163,7 @@ void LargeTempTableBlockCache::releaseAllBlocks() {
 
             if (block->isStored()) {
                 bool rc = m_topend->releaseLargeTempTableBlock(block->id());
-                assert(rc);
+                vassert(rc);
             }
 
             if (block->isResident()) {

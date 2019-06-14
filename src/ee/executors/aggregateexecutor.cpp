@@ -86,7 +86,7 @@ struct Distinct : public AggregateNValueSetType {
                 // for the value stored in the unordered set to remain
                 // valid.
                 NValue newval = val;
-                assert(m_memoryPool != NULL);
+                vassert(m_memoryPool != NULL);
                 newval.allocateObjectFromPool(m_memoryPool);
                 insert(newval);
             }
@@ -388,13 +388,13 @@ public:
         // bit patterns representing the same value (positive/negative
         // zero, and [de-]normalized numbers).  This is also enforced
         // in the front end.
-        assert((! isVariableLengthType(ValuePeeker::peekValueType(val)))
+        vassert((! isVariableLengthType(ValuePeeker::peekValueType(val)))
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_POINT
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
 
         int32_t valLength = 0;
         const char* data = ValuePeeker::peekPointerToDataBytes(val, &valLength);
-        assert(valLength != 0);
+        vassert(valLength != 0);
 
         m_hyperLogLog.add(data, static_cast<uint32_t>(valLength));
     }
@@ -533,7 +533,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& executorVector)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
 
     m_inputExpressions = node->getAggregateInputExpressions();
     for (int i = 0; i < m_inputExpressions.size(); i++) {
@@ -624,8 +624,8 @@ inline TupleSchema* AggregateExecutorBase::constructGroupBySchema(bool partial) 
 inline void AggregateExecutorBase::initCountingPredicate(const NValueArray& params, CountingPostfilter* parentPostfilter)
 {
     VOLT_DEBUG("started AGGREGATE");
-    assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
-    assert(m_tmpOutputTable);
+    vassert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
+    vassert(m_tmpOutputTable);
     //
     // OPTIMIZATION: NESTED LIMIT for serial aggregation
     //
@@ -775,11 +775,11 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable();
-    assert(input_table);
+    vassert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
     const TupleSchema * inputSchema = input_table->schema();
-    assert(inputSchema);
+    vassert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
@@ -787,7 +787,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
-        assert(m_postfilter.isUnderLimit()); // hash aggregation can not early return for limit
+        vassert(m_postfilter.isUnderLimit()); // hash aggregation can not early return for limit
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
     AggregateHashExecutor::p_execute_finish();
@@ -877,7 +877,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable();
-    assert(input_table);
+    vassert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
@@ -993,7 +993,7 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
     Table* input_table = m_abstractNode->getInputTable(0);
-    assert(input_table);
+    vassert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());

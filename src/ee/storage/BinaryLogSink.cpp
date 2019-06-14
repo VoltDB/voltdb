@@ -231,7 +231,7 @@ void findConflictTuple(PersistentTable *table, const TableTuple *existingTuple, 
 void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable,
         Pool *pool, const TableTuple *tupleToBeWrote, DRConflictOnPK conflictOnPKType, DRRecordType actionType,
         DRConflictType conflictType, DRConflictRowType rowType, int64_t remoteUniqueId, int32_t remoteClusterId) {
-    assert(ExecutorContext::getExecutorContext() != NULL);
+    vassert(ExecutorContext::getExecutorContext() != NULL);
 
     int32_t localClusterId = ExecutorContext::getExecutorContext()->drClusterId();
     int64_t localTsCounter = UniqueId::timestampSinceUnixEpoch(ExecutorContext::getExecutorContext()->currentUniqueId());
@@ -273,14 +273,14 @@ void exportDRConflict(StreamedTable *exportTable,
                       TempTable *deletedMetaTableForDelete,
                       TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
                       TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert) {
-    assert(exportTable != NULL);
-    assert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
+    vassert(exportTable != NULL);
+    vassert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
            (existingMetaTableForDelete != NULL && existingTupleTableForDelete != NULL));
-    assert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||
+    vassert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||
            (expectedMetaTableForDelete != NULL && expectedTupleTableForDelete != NULL));
-    assert((existingMetaTableForInsert == NULL && existingTupleTableForInsert == NULL) ||
+    vassert((existingMetaTableForInsert == NULL && existingTupleTableForInsert == NULL) ||
            (existingMetaTableForInsert != NULL && existingTupleTableForInsert != NULL));
-    assert((newMetaTableForInsert == NULL && newTupleTableForInsert == NULL) ||
+    vassert((newMetaTableForInsert == NULL && newTupleTableForInsert == NULL) ||
            (newMetaTableForInsert != NULL && newTupleTableForInsert != NULL));
 
     if (existingMetaTableForDelete) {
@@ -391,7 +391,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (newTuple) {
-        assert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
+        vassert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
                == UniqueId::timestampSinceUnixEpoch(uniqueId));
 
         newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable));
@@ -419,7 +419,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
-    assert(resolved || !applyRemoteChange);
+    vassert(resolved || !applyRemoteChange);
 
     if (existingMetaTableForDelete) {
         setConflictOutcome(existingMetaTableForDelete, applyRemoteChange, resolved);
@@ -543,7 +543,7 @@ public:
         m_taskInfo.getRawPointer(
                 (m_txnStart + m_txnLen) - (m_taskInfo.getRawPointer() + DRTupleStream::END_RECORD_SIZE));
         DRRecordType __attribute__ ((unused)) type = readRecordType();
-        assert(type = DR_RECORD_END_TXN);
+        vassert(type = DR_RECORD_END_TXN);
         validateEndTxn();
     }
 
@@ -559,7 +559,7 @@ public:
                     (intmax_t )m_sequenceNumber, (intmax_t )tempSequenceNumber);
         }
         uint32_t checksum = m_taskInfo.readInt();
-        assert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
+        vassert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
         validateChecksum(checksum, m_txnStart, m_taskInfo.getRawPointer());
     }
 
@@ -581,7 +581,7 @@ public:
         }
 
         DRRecordType __attribute__ ((unused)) type = readRecordType();
-        assert(type == DR_RECORD_BEGIN_TXN);
+        vassert(type == DR_RECORD_BEGIN_TXN);
 
         m_uniqueId = m_taskInfo.readLong();
         m_sequenceNumber = m_taskInfo.readLong();
@@ -589,7 +589,7 @@ public:
         m_hashFlag = static_cast<DRTxnPartitionHashFlag>(m_taskInfo.readByte());
 
         m_txnLen = m_taskInfo.readInt();
-        assert(m_txnStart + m_txnLen <= m_logEnd);
+        vassert(m_txnStart + m_txnLen <= m_logEnd);
         m_partitionHash = m_taskInfo.readInt();
 
         return true;
@@ -622,11 +622,11 @@ private:
     }
 
     void initialize(int32_t logLength) {
-        assert(m_taskInfo.hasRemaining());
+        vassert(m_taskInfo.hasRemaining());
         m_logEnd = m_taskInfo.getRawPointer() + logLength;
 
         bool __attribute__ ((unused)) success = readNextTransaction();
-        assert(success);
+        vassert(success);
     }
 
     static int32_t readRawInt(const char *log) {
@@ -727,7 +727,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         return rowCount;
     }
 
-    assert(UniqueId::isMpUniqueId(localUniqueId));
+    vassert(UniqueId::isMpUniqueId(localUniqueId));
 
     VOLT_DEBUG("Applying MP binary log: log count: %d, unique ID: %jd, sequence number: %jd", logCount,
             (intmax_t) logs[0]->m_uniqueId, (intmax_t) logs[0]->m_sequenceNumber);
@@ -744,7 +744,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         std::string truncateTableName = std::string();
 
         for (int i = 0; i < logCount; ++i) {
-            assert(!logs[i]->isReplicatedTableLog());
+            vassert(!logs[i]->isReplicatedTableLog());
 
             if (!logs[i]->m_taskInfo.hasRemaining() ||
                     // Skip processing log if a truncate has been encountered but this log does not have one
@@ -758,7 +758,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
                 if (type == DR_RECORD_TRUNCATE_TABLE) {
                     ++truncateCount;
                     if (i == 0) {
-                        assert(truncateTableName.size() == 0);
+                        vassert(truncateTableName.size() == 0);
                         truncateTableHandle = logs[i]->m_taskInfo.readLong();
                         truncateTableName = logs[i]->m_taskInfo.readTextString();
                     } else {
@@ -779,7 +779,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
             }
 
             if (type == DR_RECORD_END_TXN) {
-                assert(truncateCount == 0);
+                vassert(truncateCount == 0);
 
                 logs[i]->validateEndTxn();
                 ++completedLogs;
@@ -787,7 +787,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         }
 
         if (truncateTableName.size() > 0) {
-            assert(truncateCount == specialLogCount);
+            vassert(truncateCount == specialLogCount);
             truncateCount = 0;
 
             VOLT_DEBUG("Applying MP binary log truncate to %s", truncateTableName.c_str());
@@ -798,7 +798,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
 
 #ifndef NDEBUG
     for (int i = 0; i < logCount; ++i) {
-        assert(!logs[i]->m_taskInfo.hasRemaining());
+        vassert(!logs[i]->m_taskInfo.hasRemaining());
     }
 #endif
 
@@ -834,7 +834,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
     START_TIMER(timer);
 
     while ((type = log->readRecordType()) != DR_RECORD_END_TXN) {
-        assert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
+        vassert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
         bool skipRow = false;
         if (checkForSkip && !engine->isLocalSite(log->m_partitionHash)) {
             if (canSkip) {
@@ -874,7 +874,7 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, boost::unordered_map<i
         log->skipRecordsAndValidateTxn();
     }
 
-    assert(!log->m_taskInfo.hasRemaining());
+    vassert(!log->m_taskInfo.hasRemaining());
 
     return rowCount;
 }

@@ -20,7 +20,7 @@
 #include "common/ThreadLocalPool.h"
 #include "boost/foreach.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb
 {
@@ -42,7 +42,7 @@ CompactingPool::~CompactingPool() {
         VOLT_ERROR("Missing deallocation for %p at:", entry);
     }
 #endif
-        assert(false);
+        vassert(false);
     }
     m_allocations.clear();
 }

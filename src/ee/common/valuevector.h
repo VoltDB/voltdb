@@ -51,7 +51,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
-#include <cassert>
+#include <common/debuglog.h>
 #include "boost/unordered_map.hpp"
 #include "boost/array.hpp"
 #include "common/types.h"

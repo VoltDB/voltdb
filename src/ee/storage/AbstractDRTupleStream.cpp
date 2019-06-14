@@ -17,7 +17,7 @@
 
 #include "AbstractDRTupleStream.h"
 #include "stdarg.h"
-#include <cassert>
+#include <common/debuglog.h>
 
 using namespace std;
 using namespace voltdb;
@@ -95,7 +95,7 @@ bool AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
 
 void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber)
 {
-    assert(m_committedSequenceNumber <= m_openSequenceNumber);
+    vassert(m_committedSequenceNumber <= m_openSequenceNumber);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
 }

@@ -24,6 +24,7 @@
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
 #include "plannodes/insertnode.h"
+#include "debuglog.h"
 
 #ifdef LINUX
 #include <malloc.h>
@@ -197,7 +198,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
     int ctr = 0;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert(executor);
+            vassert(executor);
 
             if (isTraceOn()) {
                 char name[32];
@@ -271,7 +272,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
-    assert(!executorList.empty());
+    vassert(!executorList.empty());
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
@@ -310,7 +311,7 @@ void ExecutorContext::cleanupAllExecutors()
 
 void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-        assert(executor);
+        vassert(executor);
         executor->cleanupTempOutputTable();
     }
 }

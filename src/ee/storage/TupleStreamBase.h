@@ -39,7 +39,7 @@
 #include <utility>
 #include <math.h>
 #include <deque>
-#include <cassert>
+#include <common/debuglog.h>
 namespace voltdb {
 
 class Topend;

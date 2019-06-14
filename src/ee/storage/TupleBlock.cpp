@@ -61,7 +61,7 @@ TupleBlock::~TupleBlock() {
 }
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {
-    assert(source != this);
+    vassert(source != this);
     /*
       std::cout << "Attempting to merge " << static_cast<void*> (this)
                 << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())
@@ -92,7 +92,7 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
            //The block isn't empty, but there are no more active tuples.
            //Some of the tuples that make it register as not empty must have been
            //pending delete and those aren't mergable
-            assert(sourceTuplesPendingDeleteOnUndoRelease);
+            vassert(sourceTuplesPendingDeleteOnUndoRelease);
             break;
         }
 

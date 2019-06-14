@@ -210,7 +210,7 @@ bool TableIndex::deleteEntry(const TableTuple *tuple)
 
 bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
 {
-    assert(originalTuple.address() != destinationTuple.address());
+    vassert(originalTuple.address() != destinationTuple.address());
 
     if (isPartialIndex()) {
         const AbstractExpression* predicate = getPredicate();
@@ -228,7 +228,7 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
             return deleteEntryDo(&originalTuple);
         } else {
             // both tuples pass the predicate.
-            assert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
+            vassert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
             return replaceEntryNoKeyChangeDo(destinationTuple, originalTuple);
         }
     } else {
@@ -256,7 +256,7 @@ bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rh
             // either existing tuple needs to be deleted or the new one added from/to the index
             return true;
         } else {
-            assert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
+            vassert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
             return checkForIndexChangeDo(lhs, rhs);
         }
     }

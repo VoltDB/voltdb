@@ -57,7 +57,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("init Projection Executor");
 
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstractNode);
-    assert(node);
+    vassert(node);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);
@@ -112,7 +112,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     assert (m_columnCount == (int)node->getOutputColumnNames().size());
     if (m_allTupleArray == NULL && m_allParamArray == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            assert(expression_array[ctr]);
+            vassert(expression_array[ctr]);
             VOLT_TRACE("predicate[%d]: %s", ctr,
                        expression_array[ctr]->debug(true).c_str());
         }

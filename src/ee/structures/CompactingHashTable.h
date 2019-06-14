@@ -22,7 +22,7 @@
 
 #include <cstdlib>
 #include <utility>
-#include <cassert>
+#include <common/debuglog.h>
 #include <climits>
 #include <iostream>
 #include <cstring>
@@ -257,7 +257,7 @@ namespace voltdb {
     {
         // allocate the hash table and bzero it (bzero is crucial)
         void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-        assert(memory);
+        vassert(memory);
         m_buckets = reinterpret_cast<HashNode**>(memory);
         memset(m_buckets, 0, sizeof(HashNode*) * TABLE_SIZES[m_sizeIndex]);
     }
@@ -311,7 +311,7 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET>::erase(const Key &key) {
-        assert(m_unique);
+        vassert(m_unique);
         HashNode *prevBucketNode = NULL;
         uint64_t hash = m_hasher(key);
         uint64_t bucketOffset = hash % TABLE_SIZES[m_sizeIndex];
@@ -399,7 +399,7 @@ namespace voltdb {
 
         // create a new node
         void *memory = m_allocator.alloc();
-        assert(memory);
+        vassert(memory);
         HashNode *newNode;
         // placement new
         if (m_unique) {
@@ -433,7 +433,7 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET>::remove(HashNode **bucket, HashNode *prevBucketNode, HashNode *keyHeadNode, HashNode *prevKeyNode, HashNode *node) {
-        assert(!m_unique);
+        vassert(!m_unique);
 
         // if not in the main list from the bucket
         // but rather linked off of an original key
@@ -471,7 +471,7 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     bool CompactingHashTable<K, T, H, EK, ET>::removeUnique(HashNode **bucket, HashNode *prevBucketNode, HashNode *node) {
-        assert(m_unique);
+        vassert(m_unique);
 
         if (*bucket == node)
             *bucket = node->nextInBucket;
@@ -486,7 +486,7 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     void CompactingHashTable<K, T, H, EK, ET>::deleteAndFixup(HashNode *node) {
-        assert(node);
+        vassert(node);
 
         // hash is empty now (after the recent delete)
         if (!m_count) {
@@ -495,7 +495,7 @@ namespace voltdb {
             (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
 
             m_allocator.trim();
-            assert(m_allocator.count() == m_count);
+            vassert(m_allocator.count() == m_count);
             return;
         }
 
@@ -509,7 +509,7 @@ namespace voltdb {
             (reinterpret_cast<HashNodeSmall*>(node))->~HashNodeSmall();
 
             m_allocator.trim();
-            assert(m_allocator.count() == m_count);
+            vassert(m_allocator.count() == m_count);
             return;
         }
 
@@ -544,7 +544,7 @@ namespace voltdb {
                 // destructor and memory release
                 (reinterpret_cast<HashNodeSmall*>(last))->~HashNodeSmall();
                 m_allocator.trim();
-                assert(m_allocator.count() == m_count);
+                vassert(m_allocator.count() == m_count);
 
                 // done
                 return;
@@ -580,7 +580,7 @@ namespace voltdb {
                     // destructor and memory release
                     last->~HashNode();
                     m_allocator.trim();
-                    assert(m_allocator.count() == m_count);
+                    vassert(m_allocator.count() == m_count);
 
                     // done
                     return;
@@ -590,7 +590,7 @@ namespace voltdb {
         }
 
         // not found
-        assert(false);
+        vassert(false);
     }
 
     template<class K, class T, class H, class EK, class ET>
@@ -618,7 +618,7 @@ namespace voltdb {
 
         // create new double size buffer
         void *memory = mmap(NULL, sizeof(HashNode*) * TABLE_SIZES[newSizeIndex], PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-        assert(memory);
+        vassert(memory);
         HashNode **newBuckets = reinterpret_cast<HashNode**>(memory);
         memset(newBuckets, 0, TABLE_SIZES[newSizeIndex] * sizeof(HashNode*));
 

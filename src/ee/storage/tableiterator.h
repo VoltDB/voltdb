@@ -46,7 +46,7 @@
 #ifndef HSTORETABLEITERATOR_H
 #define HSTORETABLEITERATOR_H
 
-#include <cassert>
+#include <common/debuglog.h>
 
 #include "common/LargeTempTableBlockCache.h"
 #include "common/LargeTempTableBlockId.hpp"
@@ -388,7 +388,7 @@ inline TableIterator& TableIterator::operator=(const TableIterator& that) {
 }
 
 inline void TableIterator::reset(TBMapI start) {
-    assert(m_iteratorType == PERSISTENT);
+    vassert(m_iteratorType == PERSISTENT);
 
     m_tupleLength = m_table->getTupleLength();
     m_activeTuples = (int) m_table->activeTupleCount();
@@ -399,7 +399,7 @@ inline void TableIterator::reset(TBMapI start) {
 }
 
 inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
-    assert(m_iteratorType == TEMP);
+    vassert(m_iteratorType == TEMP);
 
     m_tupleLength = m_table->getTupleLength();
     m_activeTuples = (int) m_table->activeTupleCount();
@@ -411,7 +411,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
 }
 
  inline void TableIterator::reset(std::vector<LargeTempTableBlockId>::iterator start) {
-    assert(m_iteratorType == LARGE_TEMP);
+    vassert(m_iteratorType == LARGE_TEMP);
 
     // Unpin the block of the previous scan before resetting.
     finishLargeTempTableScan();
@@ -439,7 +439,7 @@ inline bool TableIterator::next(TableTuple &out) {
         return persistentNext(out);
     case LARGE_TEMP:
     default:
-        assert(m_iteratorType == LARGE_TEMP);
+        vassert(m_iteratorType == LARGE_TEMP);
         return largeTempNext(out);
     }
 }
