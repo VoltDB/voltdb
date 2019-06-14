@@ -127,14 +127,14 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTTL() throws Exception {
         String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
-                     "alter table ttl USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 10;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1;\n" +
+                     "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a MAX_FREQUENCY 3;\n" +
+                     "alter table ttl alter USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n" +
                      "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
@@ -150,7 +150,7 @@ public class TestVoltCompiler extends TestCase {
 
         // max_fequency must be positive integer
         ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-              "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
+              "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 0;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertFalse(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
@@ -3964,7 +3964,7 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table ttl MIGRATE TO TARGET TEST (a integer not null, b integer, PRIMARY KEY(a)) " +
                 "USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
-                "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20;\n";
+                "alter table ttl alter USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 200 MAX_FREQUENCY 20;\n";
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         // does not alter target but other params
