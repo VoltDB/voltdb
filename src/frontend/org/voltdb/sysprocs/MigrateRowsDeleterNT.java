@@ -83,7 +83,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         if (partitionId == MpInitiator.MP_INIT_PID) {
             cf = callProcedure("@MigrateRowsAcked_MP", tableName, deletableTxnId);
         } else {
-            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId);
+            cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, partitionId);
         }
         ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
@@ -103,7 +103,15 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         }
         VoltTable vt = resp.getResults()[0];
         while(vt.advanceRow()) {
-            if (vt.getLong(ROWS_TO_BE_DELETED) == 1) {
+            long rows = vt.getLong(ROWS_TO_BE_DELETED);
+            if (rows == MigrateRowsAcked_SP.TXN_MISPARTITIONED) {
+                Pair<Long, byte[]> hashinator = TheHashinator.getCurrentVersionedConfig();
+                if (hashinator != null) {
+                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
+                            hashinator.getFirst(), hashinator.getSecond(), false);
+                }
+            }
+            if (rows == 1) {
                 return true;
             }
         }

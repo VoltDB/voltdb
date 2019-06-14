@@ -1621,4 +1621,8 @@ public class ProcedureRunner {
         }
         return results;
     }
+
+    public int getCorrespondingPartitionId() {
+        return m_site.getCorrespondingPartitionId();
+    }
 }
