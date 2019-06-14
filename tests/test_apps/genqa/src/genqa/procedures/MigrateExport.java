@@ -22,22 +22,27 @@
  */
 package genqa.procedures;
 
+import java.util.Random;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltType;
+import org.voltdb.types.TimestampType;
 
-public class JiggleExportGroupDoneTable extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
-    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
 
-    public long run(long txid)
+public class MigrateExport extends VoltProcedure {
+    public final SQLStmt migrate = 
+            new SQLStmt("MIGRATE FROM export_partitioned_table WHERE type_not_null_timestamp < DATEADD(SECOND, -?, NOW)");
+
+    public void run(int seconds)
     {
-        voltQueueSQL(export, txid);
-        voltQueueSQL(exportFoo, txid);
+        // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
+        voltQueueSQL(migrate, -seconds);
 
         // Execute last statement batch
         voltExecuteSQL(true);
 
         // Return to caller
-        return txid;
+        return;
     }
 }
