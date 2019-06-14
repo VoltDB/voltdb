@@ -29,7 +29,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 
@@ -90,7 +89,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
             exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
                     "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
             // Update the hashinator and re-run the delete
-            Pair<Long, byte[]> hashinator = ((ClientResponseImpl)resp).getMispartitionedResult();
+            Pair<Long, byte[]> hashinator = TheHashinator.getCurrentVersionedConfig();
             if (hashinator != null) {
                 TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
                         hashinator.getFirst(), hashinator.getSecond(), false);
@@ -103,15 +102,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         }
         VoltTable vt = resp.getResults()[0];
         while(vt.advanceRow()) {
-            long rows = vt.getLong(ROWS_TO_BE_DELETED);
-            if (rows == MigrateRowsAcked_SP.TXN_MISPARTITIONED) {
-                Pair<Long, byte[]> hashinator = TheHashinator.getCurrentVersionedConfig();
-                if (hashinator != null) {
-                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
-                            hashinator.getFirst(), hashinator.getSecond(), false);
-                }
-            }
-            if (rows == 1) {
+            if (vt.getLong(ROWS_TO_BE_DELETED) == 1) {
                 return true;
             }
         }

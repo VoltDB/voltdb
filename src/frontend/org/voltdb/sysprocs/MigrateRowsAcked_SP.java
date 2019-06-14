@@ -28,6 +28,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.VoltType;
 
 /**
@@ -38,7 +39,6 @@ import org.voltdb.VoltType;
 public class MigrateRowsAcked_SP extends VoltSystemProcedure {
 
     VoltLogger exportLog = new VoltLogger("EXPORT");
-    public static final int TXN_MISPARTITIONED = -10;
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -65,24 +65,19 @@ public class MigrateRowsAcked_SP extends VoltSystemProcedure {
     public VoltTable run(SystemProcedureExecutionContext context, int partitionParam, String tableName, long deletableTxnId, int partitionId)
     {
         VoltTable result = new VoltTable(new ColumnInfo(MigrateRowsDeleterNT.ROWS_TO_BE_DELETED, VoltType.BIGINT));
-        try {
-            // mis-partitioned, possibly in cluster grow and shrink.
-            if (m_runner.getCorrespondingPartitionId() != partitionId) {
-                result.addRow(TXN_MISPARTITIONED);
-                return result;
-            }
-            final TransactionState txnState = m_runner.getTxnState();
-            boolean txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
-                    txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
-                    tableName, deletableTxnId);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(String.format("MigrateRowsAcked_SP: remaining %s on table %s, txnId: %d",
-                        Boolean.toString(txnRemainingDeleted), tableName, deletableTxnId));
-            }
-            result.addRow(txnRemainingDeleted ? 1: 0);
-        } catch (Exception ex) {
-            exportLog.warn(String.format("Migrating delete error on table %s, error: %s", tableName, ex.getMessage()));
+        // mis-partitioned, possibly in cluster grow and shrink.
+        if (m_runner.getCorrespondingPartitionId() != partitionId) {
+            throw new MispartitionedException();
         }
+        final TransactionState txnState = m_runner.getTxnState();
+        boolean txnRemainingDeleted = context.getSiteProcedureConnection().deleteMigratedRows(
+                txnState.txnId, txnState.m_spHandle, txnState.uniqueId,
+                tableName, deletableTxnId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(String.format("MigrateRowsAcked_SP: remaining %s on table %s, txnId: %d",
+                    Boolean.toString(txnRemainingDeleted), tableName, deletableTxnId));
+        }
+        result.addRow(txnRemainingDeleted ? 1: 0);
         return result;
     }
 }
