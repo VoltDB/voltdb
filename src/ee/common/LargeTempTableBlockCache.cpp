@@ -21,7 +21,6 @@
 
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
-#include "FixUnusedAssertHack.h"
 
 namespace voltdb {
 

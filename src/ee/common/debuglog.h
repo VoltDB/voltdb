@@ -216,14 +216,13 @@ struct _TimerLevels {
 
 #define PRINT_STACK_TRACE() VOLT_LOG_STACK("UNKWN")
 
-// A custom assert macro that avoids "unused variable" warnings when compiled
-// away, and adds stacktrace on message
+// A custom assert macro that adds stacktrace on message
 #ifdef NDEBUG
-#define vassert(x) ((void)(x))
+#define vassert(expr)
 #else
-#define vassert(expr)            \
+#define vassert(expr)             \
    if(! (expr)) {                 \
-       char msg[1024];          \
+       char msg[1024];            \
        snprintf(msg, 1024, "%s\n(STACK TRACE:\n\t%s)\n", #expr,           \
                voltdb::StackTrace::stringStackTrace("    ").c_str());     \
        __assert_fail(msg, __FILE__, __LINE__, __ASSERT_FUNCTION);         \

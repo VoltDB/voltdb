@@ -19,7 +19,6 @@
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/FixUnusedAssertHack.h"
 #include "expressions/hashrangeexpression.h"
 #include "logging/LogManager.h"
 #include <common/debuglog.h>
