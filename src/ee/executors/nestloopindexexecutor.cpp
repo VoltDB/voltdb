@@ -429,9 +429,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         bool isEnd = index->moveToGreaterThanKey(&index_values, indexCursor);
                         if (isEnd) {
                             index->moveToEnd(false, indexCursor);
-                        }
-                        else {
+                        } else {
                             if (!(inner_tuple = index->nextValue(indexCursor)).isNullTuple()) {
+                                pmp.countdownProgress();
+                                // move to the valid upperbound as the starting point
                                 index->moveToBeforePriorEntry(indexCursor);
                             }
                             if (inner_tuple.isNullTuple()) {
