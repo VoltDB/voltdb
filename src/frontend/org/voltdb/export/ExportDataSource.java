@@ -599,7 +599,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public long getGeneration() {
-        return 0L;
+        return m_currentGenerationId;
     }
 
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
@@ -1510,9 +1510,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 if (m_coordinator.isPartitionLeader()) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Already the leader of stream " + m_tableName + ", partition " + getPartitionId());
-                    }
                     return;
                 }
                 try {
