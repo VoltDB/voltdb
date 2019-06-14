@@ -283,7 +283,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         if (isActiveActiveDRed && table.getIsdred()) {
             VoltTable tbl;
-            if (TableType.isPersistentMigrate(table.getTabletype())) {
+            if (TableType.needsShadowStream(table.getTabletype())) {
                 tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
             } else {
                 tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
