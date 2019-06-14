@@ -87,14 +87,7 @@ namespace voltdb {
         else {
             sourceTable->addViewHandler(this);
         }
-#ifndef NDEBUG
-        std::pair<std::map<PersistentTable*, int32_t>::iterator,bool> ret =
-#endif
-        #if __cplusplus >= 201103L
-        m_sourceTables.emplace(sourceTable, relativeTableIndex);
-        #else
-        m_sourceTables.insert(std::make_pair(sourceTable, relativeTableIndex));
-        #endif
+        auto const& ret = m_sourceTables.emplace(sourceTable, relativeTableIndex);
         vassert(ret.second);
 
         m_dirty = true;

@@ -218,13 +218,13 @@ struct _TimerLevels {
 
 // A custom assert macro that adds stacktrace on message
 #ifdef NDEBUG
-#define vassert(expr)
+#define vassert(expr) (void)(expr)
 #else
 #define vassert(expr)             \
    if(! (expr)) {                 \
        char msg[1024];            \
        snprintf(msg, 1024, "%s\n(STACK TRACE:\n\t%s)\n", #expr,           \
-               voltdb::StackTrace::stringStackTrace("    ").c_str());     \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());       \
        __assert_fail(msg, __FILE__, __LINE__, __ASSERT_FUNCTION);         \
    }
 #endif

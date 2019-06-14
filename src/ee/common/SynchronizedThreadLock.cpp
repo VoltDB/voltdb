@@ -52,9 +52,9 @@ int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
 
 bool SynchronizedThreadLock::s_inSingleThreadMode = false;
 const int32_t SynchronizedThreadLock::s_mpMemoryPartitionId = 65535;
+bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 #ifndef  NDEBUG
 bool SynchronizedThreadLock::s_usingMpMemory = false;
-bool SynchronizedThreadLock::s_holdingReplicatedTableLock = false;
 #endif
 
 SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
@@ -324,7 +324,11 @@ void SynchronizedThreadLock::unlockReplicatedResource() {
     pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
-#ifndef  NDEBUG
+#ifdef NDEBUG
+bool SynchronizedThreadLock::usingMpMemory() { return false; }
+void SynchronizedThreadLock::setUsingMpMemory(bool) {}
+bool SynchronizedThreadLock::isHoldingResourceLock() { return false; }
+#else
 bool SynchronizedThreadLock::usingMpMemory() {
     return s_usingMpMemory;
 }
@@ -332,6 +336,10 @@ bool SynchronizedThreadLock::usingMpMemory() {
 void SynchronizedThreadLock::setUsingMpMemory(bool isUsingMpMemory) {
     vassert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
     s_usingMpMemory = isUsingMpMemory;
+}
+
+bool SynchronizedThreadLock::isHoldingResourceLock() {
+    return s_holdingReplicatedTableLock;
 }
 #endif
 
@@ -346,12 +354,6 @@ bool SynchronizedThreadLock::isInSingleThreadMode() {
 void SynchronizedThreadLock::setIsInSingleThreadMode(bool value) {
     s_inSingleThreadMode = value;
 }
-
-#ifndef  NDEBUG
-bool SynchronizedThreadLock::isHoldingResourceLock() {
-    return s_holdingReplicatedTableLock;
-}
-#endif
 
 void SynchronizedThreadLock::assumeMpMemoryContext() {
 #ifndef  NDEBUG

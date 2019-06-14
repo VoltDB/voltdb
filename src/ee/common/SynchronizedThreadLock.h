@@ -99,11 +99,9 @@ public:
     static bool isInSingleThreadMode();
     static void setIsInSingleThreadMode(bool value);
     static bool isInLocalEngineContext();
-#ifndef  NDEBUG
     static bool usingMpMemory();
     static void setUsingMpMemory(bool isUsingMpMemory);
     static bool isHoldingResourceLock();
-#endif
     static void debugSimulateSingleThreadMode(bool inSingleThreadMode) {
         s_inSingleThreadMode = inSingleThreadMode;
     }
@@ -133,8 +131,8 @@ private:
     static bool s_inSingleThreadMode;
 #ifndef  NDEBUG
     static bool s_usingMpMemory;
-    static bool s_holdingReplicatedTableLock;
 #endif
+    static bool s_holdingReplicatedTableLock;
     static pthread_mutex_t s_sharedEngineMutex;
     static pthread_cond_t s_sharedEngineCondition;
     static pthread_cond_t s_wakeLowestEngineCondition;

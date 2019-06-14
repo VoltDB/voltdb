@@ -603,9 +603,12 @@ struct CompiledSwap {
     }
 };
 
-#ifndef NDEBUG
-static bool hasNameIntegrity(std::string const& tableName,
-        std::vector<std::string> const& indexNames) {
+#ifdef NDEBUG
+static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
+    return false;
+}
+#else
+static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
     // Validate that future queries will be able to resolve the table
     // name and its associated index names.
     VoltDBEngine* engine = ExecutorContext::getEngine();
@@ -635,8 +638,7 @@ static bool hasNameIntegrity(std::string const& tableName,
 void PersistentTable::swapTable(PersistentTable* otherTable,
         std::vector<std::string> const& theIndexNames,
         std::vector<std::string> const& otherIndexNames,
-        bool fallible,
-        bool isUndo) {
+        bool fallible, bool isUndo) {
     vassert(hasNameIntegrity(name(), theIndexNames));
     vassert(hasNameIntegrity(otherTable->name(), otherIndexNames));
     CompiledSwap compiled(*this, *otherTable,
@@ -1960,10 +1962,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
             vassert(it != m_migratingRows.end());
             MigratingBatch& batch = it->second;
             void* addr = originalTuple.address();
-#ifndef NDEBUG
-            size_t found =
-#endif
-                    batch.erase(addr);
+            size_t found = batch.erase(addr);
             vassert(found == 1);
             batch.emplace(destinationTuple.address());
         }
@@ -2296,7 +2295,11 @@ std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
     return blockAddresses;
 }
 
-#ifndef NDEBUG
+#ifdef NDEBUG
+static bool isExistingTableIndex(std::vector<TableIndex*>&, TableIndex*) {
+    return false;
+}
+#else
 static bool isExistingTableIndex(std::vector<TableIndex*>& indexes, TableIndex* index) {
     BOOST_FOREACH (auto existingIndex, indexes) {
         if (existingIndex == index) {
@@ -2474,10 +2477,7 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
         it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
     }
     void* addr = tuple.address();
-#ifndef NDEBUG
-    std::pair<MigratingBatch::iterator,bool> success =
-#endif
-    it->second.insert(addr);
+    auto const success = it->second.insert(addr);
     vassert(success.second);
 };
 

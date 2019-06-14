@@ -2271,11 +2271,8 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     for (auto const &streamTable : m_exportingTables) {
         if (streamTable.second->getWrapper()) {
-#ifndef NDEBUG
             // A quiesce should be transactional so periodicFlush should always succeed
-            bool streamFlushed =
-#endif
-            streamTable.second->getWrapper()->periodicFlush(-1, lastCommittedSpHandle);
+            bool streamFlushed = streamTable.second->getWrapper()->periodicFlush(-1, lastCommittedSpHandle);
             vassert(streamFlushed);
         }
     }
