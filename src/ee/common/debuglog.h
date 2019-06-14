@@ -215,3 +215,16 @@ struct _TimerLevels {
 #endif
 
 #define PRINT_STACK_TRACE() VOLT_LOG_STACK("UNKWN")
+
+// vassert is alike assert; it also include stack trace for assertion failures
+#ifdef NDEBUG
+#define vassert(expr)
+#else
+#define vassert(expr)           \
+   if(! expr) {                 \
+       char msg[1024];          \
+       snprintf(msg, 1024, "%s\n(STACK TRACE:\n\t%s)\n", #expr,                 \
+               voltdb::StackTrace::stringStackTrace("    ").c_str());     \
+       __assert_fail(msg, __FILE__, __LINE__, __ASSERT_FUNCTION);         \
+   }
+#endif
