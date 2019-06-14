@@ -36,8 +36,6 @@ public class CatalogOperator {
 
     final Catalog m_catalog;
 
-    private CatalogType m_prevUsedPath = null;
-
     public CatalogOperator(Catalog catalog) {
         m_catalog = catalog;
     }
