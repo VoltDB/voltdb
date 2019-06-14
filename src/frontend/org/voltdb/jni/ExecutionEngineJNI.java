@@ -18,11 +18,13 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
 import java.io.ObjectOutput;
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
@@ -55,6 +57,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
+
+import sun.misc.ObjectInputFilter;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -930,6 +934,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return -1;
     }
 
+    class udfObjectInputStream extends ObjectInputStream {
+
+        public udfObjectInputStream(InputStream in) throws IOException {
+			super(in);
+			// TODO Auto-generated constructor stub
+		}
+
+		@Override
+        protected Class<?> resolveClass(ObjectStreamClass desc)
+            throws IOException, ClassNotFoundException
+            {
+                String name = desc.getName();
+                try {
+                  return Class.forName(name, true, VoltDB.instance().getCatalogContext().m_catalogInfo.m_jarfile.getLoader());
+                } catch (ClassNotFoundException ex) {
+                  throw ex;
+                }
+            }
+    }
+
     public int callJavaUserDefinedAggregateCombine() {
         m_udfBuffer.clear();
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
@@ -945,7 +969,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             ByteArrayInputStream bis = new ByteArrayInputStream(worker_byte_array);
             ObjectInput in = null;
             try {
-                in = new ObjectInputStream(bis);
+                in = new udfObjectInputStream(bis);
                 worker_object = in.readObject();
             } finally {
                 try {
@@ -968,6 +992,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         catch (Throwable ex2) {
             throwable = ex2;
+            ex2.printStackTrace();
         }
         // Getting here means the execution was not successful.
         try {
