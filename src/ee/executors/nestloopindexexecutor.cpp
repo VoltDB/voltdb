@@ -431,13 +431,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             index->moveToEnd(false, indexCursor);
                         }
                         else {
-                            while (!(inner_tuple = index->nextValue(indexCursor)).isNullTuple()) {
-                                pmp.countdownProgress();
-                                if (initial_expression != NULL && !initial_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
-                                    // just passed the first failed entry, so move 2 backward
-                                    index->moveToBeforePriorEntry(indexCursor);
-                                    break;
-                                }
+                            if (!(inner_tuple = index->nextValue(indexCursor)).isNullTuple()) {
+                                index->moveToBeforePriorEntry(indexCursor);
                             }
                             if (inner_tuple.isNullTuple()) {
                                 index->moveToEnd(false, indexCursor);
