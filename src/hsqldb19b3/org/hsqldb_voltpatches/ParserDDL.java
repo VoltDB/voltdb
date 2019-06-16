@@ -906,6 +906,9 @@ public class ParserDDL extends ParserRoutine {
                         checkIsSimpleName();
 
                         return compileAlterTableAddColumn(t);
+
+                    // As for now we cannot alter TTL if having migrate target
+                    // This restriction may be removed in the future
                     case Tokens.USING :
                         if (t.getTTL() != null) {
                             throw Error.error(ErrorCode.X_42504);
@@ -1075,6 +1078,9 @@ public class ParserDDL extends ParserRoutine {
         //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1 MIGRATE TO TARGET <TARGET NAME>
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
+        }
+        if (alter && table.hasMigrationTarget()) {
+            throw Error.error(ErrorCode.X_42581, "May not alter TTL column");
         }
         int timeLiveValue = 0;
         String ttlUnit = "SECONDS";
