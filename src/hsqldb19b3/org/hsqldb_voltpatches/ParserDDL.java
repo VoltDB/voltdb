@@ -907,8 +907,6 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableAddColumn(t);
 
-                    // As for now we cannot alter TTL if having migrate target
-                    // This restriction may be removed in the future
                     case Tokens.USING :
                         if (t.getTTL() != null) {
                             throw Error.error(ErrorCode.X_42504);
@@ -1079,9 +1077,6 @@ public class ParserDDL extends ParserRoutine {
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
-        if (alter && table.hasMigrationTarget()) {
-            throw Error.error(ErrorCode.X_42581, "May not alter TTL column");
-        }
         int timeLiveValue = 0;
         String ttlUnit = "SECONDS";
         String ttlColumn = "";
@@ -1124,6 +1119,10 @@ public class ParserDDL extends ParserRoutine {
             int colType = col.getDataType().typeCode;
             if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
                 throw unexpectedToken();
+            }
+            // At this moment we don't allow alter TTL column of migrate table on the fly
+            if (alter && table.hasMigrationTarget() && !token.tokenString.equals(table.getTTL().ttlColumn.getNameString())) {
+                throw Error.error(ErrorCode.X_42581, "May not alter TTL column");
             }
         } else {
             throw unexpectedToken();
