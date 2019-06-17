@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.TTLManager;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltNTSystemProcedure;
@@ -89,7 +90,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
             exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
                     "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());
             // Update the hashinator and re-run the delete
-            Pair<Long, byte[]> hashinator = TheHashinator.getCurrentVersionedConfig();
+            Pair<Long, byte[]> hashinator = ((ClientResponseImpl)resp).getMispartitionedResult();
             if (hashinator != null) {
                 TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
                         hashinator.getFirst(), hashinator.getSecond(), false);

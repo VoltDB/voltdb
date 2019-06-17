@@ -3219,15 +3219,17 @@ public abstract class CatalogUtil {
         sb.append("Statement Hash: ").append(hash);
         sb.append(", Statement SQL: ").append(sqlText);
         ProcedureRunner runner = procSet.getProcByName(proc.getTypeName());
-        for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
-            for (PlanFragment frag : stmt.getFragments()) {
-                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
-                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
-                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
-                sb.append(", Plan Fragment Id:").append(planId);
-                sb.append(", Plan Stmt Text:").append(stmtText);
-                sb.append(", Json Plan:").append(new String(jsonPlan));
+        if (runner != null) {
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
             }
         }
         sb.append("\n");
