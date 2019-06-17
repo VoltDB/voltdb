@@ -31,8 +31,7 @@ import org.voltdb.types.TimestampType;
 
 
 public class MigrateExport extends VoltProcedure {
-    public final SQLStmt migrate = 
-            new SQLStmt("MIGRATE FROM export_partitioned_table WHERE type_not_null_timestamp < DATEADD(SECOND, -?, NOW)");
+    public final SQLStmt migrate = new SQLStmt("MIGRATE FROM export_partitioned_table WHERE type_not_null_timestamp < DATEADD(SECOND, -?, NOW)");
 
     public void run(int seconds)
     {

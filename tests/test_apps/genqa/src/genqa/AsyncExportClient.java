@@ -238,7 +238,7 @@ public class AsyncExportClient
             parsedServers   = servers.split(",");
             exportGroups    = apph.booleanValue("exportgroups");
             exportTimeout   = apph.intValue("timeout");
-            usemigrate      = apph.booleanValue("usemigrate");            
+            usemigrate      = apph.booleanValue("usemigrate");
             usemigrateonly  = apph.booleanValue("usemigrateonly");
 
         }
