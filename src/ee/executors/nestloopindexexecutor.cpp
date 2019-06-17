@@ -426,19 +426,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         // find the entry whose key is greater than search key,
                         // do a forward scan using initialExpr to find the correct
                         // start point to do reverse scan
-                        bool isEnd = index->moveToGreaterThanKey(&index_values, indexCursor);
-                        if (isEnd) {
-                            index->moveToEnd(false, indexCursor);
-                        } else {
-                            if (!(inner_tuple = index->nextValue(indexCursor)).isNullTuple()) {
-                                pmp.countdownProgress();
-                                // move to the valid upperbound as the starting point
-                                index->moveToBeforePriorEntry(indexCursor);
-                            }
-                            if (inner_tuple.isNullTuple()) {
-                                index->moveToEnd(false, indexCursor);
-                            }
-                        }
+                        index->moveToKeyOrLess(&index_values, indexCursor);
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
                         index->moveToCoveringCell(&index_values, indexCursor);

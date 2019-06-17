@@ -187,6 +187,21 @@ class CompactingTreeUniqueIndex : public TableIndex
         }
     }
 
+    void moveToKeyOrLess(const TableTuple *searchKey, IndexCursor& cursor) const
+    {
+        // do moveToGreaterThanKey()
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.upperBound(KeyType(searchKey));
+
+        // find prev entry
+        if (mapIter.isEnd()) {
+            moveToEnd(false, cursor);
+        } else {
+            cursor.m_forward = false;
+            mapIter.movePrev();
+        }
+    }
+
     // only be called after moveToGreaterThanKey() for LTE case
     void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
