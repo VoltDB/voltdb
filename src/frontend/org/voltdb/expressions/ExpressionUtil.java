@@ -61,6 +61,7 @@ public final class ExpressionUtil {
        put("subtract", ExpressionType.OPERATOR_MINUS);
        put("multiply", ExpressionType.OPERATOR_MULTIPLY);
        put("divide", ExpressionType.OPERATOR_DIVIDE);
+       put("is_null", ExpressionType.OPERATOR_IS_NULL);
     }};
 
     private ExpressionUtil() {}
