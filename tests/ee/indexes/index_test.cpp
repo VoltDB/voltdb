@@ -71,8 +71,6 @@
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
-#include "common/FixUnusedAssertHack.h"
-
 
 using namespace std;
 using namespace voltdb;
@@ -342,7 +340,7 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i + 20));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i * 11));
-            assert(true == table->insertTuple(tuple));
+            vassert(table->insertTuple(tuple));
         }
     }
 
@@ -583,11 +581,9 @@ TEST_F(IndexTest, IntsUnique) {
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     bool exceptionThrown = false;
-    try
-    {
+    try {
         EXPECT_EQ(false, table->insertTuple(tmptuple));
-    }
-    catch (SerializableEEException &e)
+    } catch (SerializableEEException &e)
     {
         exceptionThrown = true;
     }
