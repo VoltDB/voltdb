@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
@@ -69,6 +70,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.iv2.TxnEgo;
@@ -221,6 +223,7 @@ public class AsyncExportClient
         final boolean exportGroups;
         final int exportTimeout;
         final boolean usemigrate;
+        final boolean usemigrateonly;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval = apph.longValue("displayinterval");
@@ -236,6 +239,8 @@ public class AsyncExportClient
             exportGroups    = apph.booleanValue("exportgroups");
             exportTimeout   = apph.intValue("timeout");
             usemigrate      = apph.booleanValue("usemigrate");
+            usemigrateonly  = apph.booleanValue("usemigrateonly");
+
         }
     }
 
@@ -291,6 +296,7 @@ public class AsyncExportClient
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
+                .add("usemigrateonly","usemigrateonly","use DDL that includes MIGRATE without TTL","false")
                 .setArguments(args)
             ;
 
@@ -343,6 +349,7 @@ public class AsyncExportClient
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
             int swap_count = 0;
+            Random r = new Random();
             boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
@@ -359,6 +366,20 @@ public class AsyncExportClient
                     log.fatal("Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
+                }
+
+                // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
+                if (config.usemigrateonly && r.nextBoolean()) {
+                    try {
+                        clientRef.get().callProcedure(
+                                new NullCallback(),
+                                "MigrateExport", r.nextInt(10));
+                    }
+                    catch (Exception e) {
+                        log.fatal("Exception: " + e);
+                        e.printStackTrace();
+                        System.exit(-1);
+                    }
                 }
 
                 swap_count++;
