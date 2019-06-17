@@ -220,12 +220,13 @@ struct _TimerLevels {
 #ifdef NDEBUG
 #define vassert(expr) (void)(expr)
 #else
+extern char __assert_failure_msg__[4096];
 #define vassert(expr)             \
    if(! (expr)) {                 \
-       char msg[1024];            \
-       snprintf(msg, 1024, "%s\n(STACK TRACE:\n\t%s)\n", #expr,           \
-               voltdb::StackTrace::stringStackTrace("\t").c_str());       \
-       __assert_fail(msg, __FILE__, __LINE__, __ASSERT_FUNCTION);         \
+       snprintf(__assert_failure_msg__, sizeof __assert_failure_msg__,                      \
+               "%s\n(STACK TRACE:\n%s)\n", #expr,                                         \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());                         \
+       __assert_fail(__assert_failure_msg__, __FILE__, __LINE__, __ASSERT_FUNCTION);        \
    }
 #endif
 
