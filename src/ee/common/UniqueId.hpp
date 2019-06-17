@@ -15,11 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UNIQUEID_H_
-#define UNIQUEID_H_
+#pragma once
 
 #include "common/types.h"
-#include <cassert>
+#include "common/debuglog.h"
 #include <sstream>
 
 namespace voltdb
@@ -43,9 +42,9 @@ public:
         // compute the time in millis since VOLT_EPOCH_IN_MILLIS
         int64_t uniqueId = ts - VOLT_EPOCH_IN_MILLIS;
         // verify all fields are the right size
-        assert(uniqueId <= TIMESTAMP_MAX_VALUE);
-        assert(seqNo <= COUNTER_MAX_VALUE);
-        assert(partitionId <= PARTITIONID_MAX_VALUE);
+        vassert(uniqueId <= TIMESTAMP_MAX_VALUE);
+        vassert(seqNo <= COUNTER_MAX_VALUE);
+        vassert(partitionId <= PARTITIONID_MAX_VALUE);
 
         // put this time value in the right offset
         uniqueId = uniqueId << (COUNTER_BITS + PARTITIONID_BITS);
@@ -113,4 +112,4 @@ public:
     }
 };
 }
-#endif /* UNIQUEID_H_ */
+

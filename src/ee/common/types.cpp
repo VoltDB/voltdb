@@ -366,7 +366,7 @@ int64_t getMaxTypeValue (ValueType type) {
 }
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {
-    assert (hexString);
+    vassert(hexString);
     size_t len = strlen(hexString);
     if ((len % 2) != 0)
         return false;
@@ -379,7 +379,7 @@ bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {
             return false;
 
         int32_t result = high * 16 + low;
-        assert (result >= 0 && result < 256);
+        vassert(result >= 0 && result < 256);
         bufferdst[i] = static_cast<unsigned char>(result);
     }
     return true;

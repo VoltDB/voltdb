@@ -46,8 +46,6 @@
 #ifndef HSTORETABLEITERATOR_H
 #define HSTORETABLEITERATOR_H
 
-#include <common/debuglog.h>
-
 #include "common/LargeTempTableBlockCache.h"
 #include "common/LargeTempTableBlockId.hpp"
 #include "common/debuglog.h"
@@ -177,12 +175,12 @@ protected:
     void finishLargeTempTableScan();
 
     TBMapI getBlockIterator() const {
-        assert (m_iteratorType == PERSISTENT);
+        vassert(m_iteratorType == PERSISTENT);
         return m_state.m_persBlockIterator;
     }
 
     void setBlockIterator(const TBMapI& it) {
-        assert (m_iteratorType == PERSISTENT);
+        vassert(m_iteratorType == PERSISTENT);
         m_state.m_persBlockIterator = it;
     }
 
@@ -361,13 +359,13 @@ inline TableIterator::TableIterator(const TableIterator &that)
 {
     // This assertion could fail if we are copying an invalid iterator
     // (table changed after iterator was created)
-    assert (that.m_table->activeTupleCount() == that.m_activeTuples);
+    vassert(that.m_table->activeTupleCount() == that.m_activeTuples);
 }
 
 inline TableIterator& TableIterator::operator=(const TableIterator& that) {
     // This assertion could fail if we are copying an invalid iterator
     // (table changed after iterator was created)
-    assert (that.m_table->activeTupleCount() == that.m_activeTuples);
+    vassert(that.m_table->activeTupleCount() == that.m_activeTuples);
 
     if (*this != that) {
         if (m_iteratorType == LARGE_TEMP) {
@@ -462,7 +460,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
             m_state.m_persBlockIterator++;
         }
 
-        assert (out.columnCount() == m_table->columnCount());
+        vassert(out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
         const bool active = out.isActive();
@@ -503,7 +501,7 @@ inline bool TableIterator::tempNext(TableTuple &out) {
             ++m_state.m_tempBlockIterator;
         }
 
-        assert (out.columnCount() == m_table->columnCount());
+        vassert(out.columnCount() == m_table->columnCount());
         out.move(m_dataPtr);
 
         ++m_foundTuples;

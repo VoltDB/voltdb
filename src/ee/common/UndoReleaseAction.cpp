@@ -43,7 +43,7 @@ void SynchronizedUndoReleaseAction::release() {
 }
 
 void SynchronizedUndoOnlyAction::undo() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -54,7 +54,7 @@ void SynchronizedUndoOnlyAction::undo() {
 }
 
 void SynchronizedReleaseOnlyAction::release() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;

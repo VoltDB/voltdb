@@ -61,7 +61,7 @@ SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 EngineLocals SynchronizedThreadLock::s_mpEngine(true);
 
 void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -71,7 +71,7 @@ void SynchronizedUndoQuantumReleaseInterest::notifyQuantumRelease() {
 };
 
 void SynchronizedDummyUndoQuantumReleaseInterest::notifyQuantumRelease() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 

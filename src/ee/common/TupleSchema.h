@@ -327,12 +327,12 @@ inline uint32_t TupleSchema::tupleLength() const {
 }
 
 inline size_t TupleSchema::offsetOfHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return getColumnInfoPrivate(columnCount())->offset;
 }
 
 inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return tupleLength() - offsetOfHiddenColumns();
 }
 

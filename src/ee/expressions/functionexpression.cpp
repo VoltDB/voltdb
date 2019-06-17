@@ -148,7 +148,7 @@ namespace functionexpression {
          }
 
          NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
-            assert (m_child);
+            vassert(m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
          }
 

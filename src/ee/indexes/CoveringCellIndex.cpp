@@ -18,7 +18,6 @@
 #include <tuple>
 
 #include "indexes/CoveringCellIndex.h"
-
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -183,7 +182,7 @@ bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey,
     // Start at the highest level (smallest cells) and work to larger cells.
     // Going the other way (largest to smallest cells) would require more state,
     // since a cell has just one parent, but 4 children.
-    assert (MAX_CELL_LEVEL % CELL_LEVEL_MOD == MIN_CELL_LEVEL % CELL_LEVEL_MOD);
+    vassert(MAX_CELL_LEVEL % CELL_LEVEL_MOD == MIN_CELL_LEVEL % CELL_LEVEL_MOD);
     for (int level = MAX_CELL_LEVEL; level >= MIN_CELL_LEVEL; level -= CELL_LEVEL_MOD) {
         cell = cell.parent(level);
 

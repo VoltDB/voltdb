@@ -66,7 +66,7 @@ namespace voltdb {
 template<typename OP>
 NValue compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
 {
-    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+    vassert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
     NValue fallback_result = OP::includes_equality() ? NValue::getTrue() : NValue::getFalse();
     int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx) {
@@ -115,8 +115,8 @@ public:
         : AbstractExpression(et, left, right),
           m_quantifier(quantifier)
     {
-        assert(left != NULL);
-        assert(right != NULL);
+        vassert(left != NULL);
+        vassert(right != NULL);
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
@@ -161,7 +161,7 @@ struct NValueExtractor
     template<typename OP>
     NValue compare(const TableTuple& tuple) const
     {
-        assert(tuple.getSchema()->columnCount() == 1);
+        vassert(tuple.getSchema()->columnCount() == 1);
         return compare<OP>(tuple.getNValue(0));
     }
 
@@ -243,7 +243,7 @@ struct TupleExtractor
     template<typename OP>
     NValue compare(const NValue& nvalue) const
     {
-        assert(m_tuple.getSchema()->columnCount() == 1);
+        vassert(m_tuple.getSchema()->columnCount() == 1);
         NValue lvalue = m_tuple.getNValue(0);
         if (lvalue.isNull() && OP::isNullRejecting()) {
             return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
@@ -269,7 +269,7 @@ private:
         int subqueryId = ValuePeeker::peekInteger(value);
         ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
         Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-        assert(table != NULL);
+        vassert(table != NULL);
         return table;
     }
 
@@ -341,7 +341,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             // If for the operator, NULL is a valid value in result, construct RHS value
             // with NULL and use that to compare against outer-extractor value.
             const typename ValueExtractorInner::ValueType& innerNullValue = innerExtractor.getNullValue();
-            assert(innerExtractor.hasNullValue());
+            vassert(innerExtractor.hasNullValue());
             return outerExtractor.template compare<OP>(innerNullValue);
         }
         case QUANTIFIER_TYPE_ANY: {
@@ -353,7 +353,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         }
     }
 
-    assert (innerExtractor.resultSize() > 0);
+    vassert (innerExtractor.resultSize() > 0);
     if (!outerExtractor.hasNext() || (outerExtractor.hasNullValue() && OP::isNullRejecting()) ) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
     }

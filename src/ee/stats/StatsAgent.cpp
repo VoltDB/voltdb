@@ -119,7 +119,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
              iter++) {
 
             StatsSource *ss = iter->second;
-            assert (ss != NULL);
+            vassert(ss != NULL);
             if (ss == NULL) {
                 continue;
             }

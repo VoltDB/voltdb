@@ -608,7 +608,7 @@ inline void WindowFunctionExecutor::insertOutputTuple()
 int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
                                           const TableTuple &tuple2) const {
     const TupleSchema *schema = tuple1.getSchema();
-    assert (schema == tuple2.getSchema());
+    vassert(schema == tuple2.getSchema());
 
     for (int ii = schema->columnCount() - 1; ii >= 0; --ii) {
         int cmp = tuple2.getNValue(ii)

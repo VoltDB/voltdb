@@ -15,9 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/debuglog.h"
 #include "AbstractDRTupleStream.h"
-#include "stdarg.h"
-#include <common/debuglog.h>
+
+#include <stdarg.h>
 
 using namespace std;
 using namespace voltdb;
@@ -39,7 +40,7 @@ AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, size_t defaultBuff
 // for test purpose
 void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity)
 {
-    assert (capacity > 0);
+    vassert(capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {

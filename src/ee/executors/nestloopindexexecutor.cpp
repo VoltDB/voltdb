@@ -219,8 +219,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple inner_tuple(inner_table->schema());
     TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
-    assert (outer_tuple.columnCount() == outer_table->columnCount());
-    assert (inner_tuple.columnCount() == inner_table->columnCount());
+    vassert(outer_tuple.columnCount() == outer_table->columnCount());
+    vassert(inner_tuple.columnCount() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 

@@ -46,7 +46,7 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
 
     Table* output_table = node->getOutputTable();
     vassert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert((int)output_table->columnCount() == 1);
 
     int64_t rowCounts = 0;
     if (node->isSubqueryScan()) {

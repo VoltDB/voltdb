@@ -209,7 +209,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_catalog.reset(new catalog::Catalog());
 
     // create the template single long (int) table
-    assert (m_templateSingleLongTable == NULL);
+    vassert(m_templateSingleLongTable == NULL);
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
     memset(m_templateSingleLongTable, 0, m_templateSingleLongTableSize);
     m_templateSingleLongTable[7] = 43;  // size through start of data?
@@ -461,7 +461,7 @@ int VoltDBEngine::executePlanFragments(
         if (usedParamcnt < 0) {
             throwFatalException("parameter count is negative: %d", usedParamcnt);
         }
-        assert (usedParamcnt <= MAX_PARAM_COUNT);
+        vassert(usedParamcnt <= MAX_PARAM_COUNT);
 
         for (int j = 0; j < usedParamcnt; ++j) {
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);

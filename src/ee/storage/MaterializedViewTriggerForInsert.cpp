@@ -382,7 +382,7 @@ AbstractExpression* MaterializedViewTriggerForInsert::parsePredicate(catalog::Ma
     if (hexString.size() == 0) {
         return NULL;
     }
-    assert (hexString.length() % 2 == 0);
+    vassert(hexString.length() % 2 == 0);
     int bufferLength = (int)hexString.size() / 2 + 1;
     boost::shared_array<char> buffer(new char[bufferLength]);
     catalog::Catalog::hexDecodeString(hexString, buffer.get());

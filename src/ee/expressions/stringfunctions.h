@@ -27,7 +27,7 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <string.h>
 #include <boost/shared_ptr.hpp>
-#include "pcre2.h"
+#include <pcre2.h>
 
 #include <iostream>
 #include <sstream>
@@ -344,7 +344,7 @@ static inline std::string trim_function(std::string source, const std::string& m
         bool doltrim, bool dortrim) {
     // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
     size_t mlen = match.length();
-    assert (mlen > 0);
+    vassert(mlen > 0);
     if (doltrim) {
         while (boost::starts_with(source, match)) {
             source.erase(0, mlen);

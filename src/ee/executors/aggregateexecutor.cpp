@@ -448,7 +448,7 @@ class ValsToHyperLogLogAgg : public ApproxCountDistinctAgg {
 public:
     virtual NValue finalize(ValueType type)
     {
-        assert (type == VALUE_TYPE_VARBINARY);
+        vassert(type == VALUE_TYPE_VARBINARY);
         // serialize the hyperloglog as varbinary, to send to
         // coordinator.
         //
@@ -470,8 +470,8 @@ class HyperLogLogsToCardAgg : public ApproxCountDistinctAgg {
 public:
     virtual void advance(const NValue& val)
     {
-        assert (ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
-        assert (!val.isNull());
+        vassert(ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        vassert(!val.isNull());
 
         // TODO: we're doing some unnecessary copying here to
         // deserialize the hyperloglog and merge it with the
@@ -479,7 +479,7 @@ public:
 
         int32_t length;
         const char* buf = ValuePeeker::peekObject_withoutNull(val, &length);
-        assert (length > 0);
+        vassert(length > 0);
         std::istringstream iss(std::string(buf, length));
         hll::HyperLogLog distHll(registerBitWidth());
         distHll.restore(iss);

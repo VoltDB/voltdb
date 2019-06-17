@@ -99,18 +99,18 @@ public:
 
     inline const V* getRawPointer() const { return data_; }
     inline V& operator[](int index) {
-        assert (index >= 0);
-        assert (index < size_);
+        vassert(index >= 0);
+        vassert(index < size_);
         return data_[index];
     }
     inline const V& operator[](int index) const {
-        assert (index >= 0);
-        assert (index < size_);
+        vassert(index >= 0);
+        vassert(index < size_);
         return data_[index];
     }
     inline int size() const { return size_;}
     inline int compareValue (const GenericValueArray &rhs) const {
-        assert (size_ == rhs.size_);
+        vassert(size_ == rhs.size_);
         for (int i = 0; i < size_; ++i) {
             int ret = data_[i].compare(rhs.data_[i]);
             if (ret != 0) return ret;
@@ -202,7 +202,7 @@ class NValueArrayComparator {
     }
 
     inline bool operator()(const NValueArray& lhs, const NValueArray& rhs) const {
-        assert (lhs.size() == rhs.size());
+        vassert(lhs.size() == rhs.size());
         return lhs.compareValue(rhs) < 0;
     }
 
@@ -276,8 +276,8 @@ public:
     }
 
     inline bool operator()(const NValueArray& lhs, const NValueArray& rhs) const {
-        assert (lhs.size() == rhs.size());
-        assert (lhs.size() == static_cast<int>(colCount_));
+        vassert(lhs.size() == rhs.size());
+        vassert(lhs.size() == static_cast<int>(colCount_));
         return lhs.compareValue(rhs) == 0;
     }
 private:

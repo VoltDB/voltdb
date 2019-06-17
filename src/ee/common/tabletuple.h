@@ -252,7 +252,7 @@ public:
         vassert(columnInfo);
         const ValueType valueType = columnInfo->getVoltType();
         // shrink is permissible only on variable length column and currently only for varchar and varbinary
-        assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
+        vassert((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
         bool isColumnLngthInBytes = (valueType == VALUE_TYPE_VARBINARY) ? true : columnInfo->inBytes;
         uint32_t columnLength = columnInfo->length;
 
@@ -876,7 +876,7 @@ inline TableTuple::TableTuple(const TableTuple &rhs) :
 
 inline TableTuple::TableTuple(const TupleSchema *schema) :
     m_schema(schema), m_data(NULL) {
-    assert (m_schema);
+    vassert(m_schema);
 }
 
 /** Setup the tuple given the specified data location and schema **/
@@ -1249,7 +1249,7 @@ inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
     for (uint16_t i = 0; i < nonInlinedColCount; i++) {
         uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        assert (isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
+        vassert(isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
 
         char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
         if (*dataPtr != NULL) {

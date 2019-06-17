@@ -150,7 +150,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             std::vector<std::string> const& columnNames,
                                             bool ownsTupleSchema,
                                             int32_t compactionThreshold) {
-    assert (schema != NULL);
+    vassert(schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
     bool isTableWithStream = schema->isTableWithStream();
     if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithStream) ||
@@ -260,7 +260,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
         }
-        assert (m_columnCount == tuple->columnCount());
+        vassert(m_columnCount == tuple->columnCount());
         return;
     }
 
@@ -269,7 +269,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     TBPtr block = allocateNextBlock();
 
     // get free tuple
-    assert (m_columnCount == tuple->columnCount());
+    vassert(m_columnCount == tuple->columnCount());
 
     std::pair<char*, int> retval = block->nextFreeTuple();
 
@@ -589,7 +589,7 @@ struct CompiledSwap {
         // assert symmetry of the table definitions.
         vassert(nUsedInitializers == otherTable.indexCount());
         // assert coverage of input vectors.
-        assert (nUsedInitializers == theIndexNames.size());
+        vassert(nUsedInitializers == theIndexNames.size());
 
         for (size_t ii = 0; ii < nUsedInitializers; ++ii) {
             TableIndex* theIndex = theTable.index(theIndexNames[ii]);

@@ -77,7 +77,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     m_expressionArray = m_expressionArrayPtr.get();
 
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (m_node->getOutputColumnExpressions()[ctr] != NULL);
+        vassert(m_node->getOutputColumnExpressions()[ctr] != NULL);
         m_expressionArrayPtr[ctr] = m_node->getOutputColumnExpressions()[ctr];
         m_needsSubstitutePtr[ctr] = m_node->getOutputColumnExpressions()[ctr]->hasParameter();
     }
@@ -89,12 +89,12 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (m_node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    vassert(m_node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
     vassert(m_node);
-    assert (!m_node->isInline()); // inline projection's execute() should not be called
-    assert (m_outputTable == dynamic_cast<AbstractTempTable*>(m_node->getOutputTable()));
-    assert (m_outputTable);
-    assert (m_columnCount == (int)m_node->getOutputColumnNames().size());
+    vassert(!m_node->isInline()); // inline projection's execute() should not be called
+    vassert(m_outputTable == dynamic_cast<AbstractTempTable*>(m_node->getOutputTable()));
+    vassert(m_outputTable);
+    vassert(m_columnCount == (int)m_node->getOutputColumnNames().size());
 
     // batched insertion
     if (m_batched) {

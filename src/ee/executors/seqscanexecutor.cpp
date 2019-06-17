@@ -65,13 +65,13 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     vassert(node);
 
     // persistent table scan node must have a target table
-    assert (!node->isPersistentTableScan() || node->getTargetTable());
+    vassert(!node->isPersistentTableScan() || node->getTargetTable());
 
     // Subquery scans must have a child that produces the output to scan
-    assert (!node->isSubqueryScan() || (node->getChildren().size() == 1));
+    vassert(!node->isSubqueryScan() || (node->getChildren().size() == 1));
 
     // In the case of CTE scans, we will resolve target table below.
-    assert (!node->isCteScan() || (node->getChildren().size() == 0
+    vassert(!node->isCteScan() || (node->getChildren().size() == 0
                                    && node->getTargetTable() == NULL));
 
     // Inline aggregation can be serial, partial or hash
@@ -136,7 +136,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         input_table = node->getChildren()[0]->getOutputTable();
     }
     else {
-        assert (node->isPersistentTableScan());
+        vassert(node->isPersistentTableScan());
         input_table = node->getTargetTable();
     }
 

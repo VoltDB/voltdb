@@ -53,7 +53,6 @@
 #include "expressions/abstractexpression.h"
 
 #include <string>
-#include <common/debuglog.h>
 
 namespace voltdb {
 
@@ -70,7 +69,7 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
+        vassert(m_left);
         NValue operand = m_left->eval(tuple1, tuple2);
         // NOT TRUE is FALSE
         if (operand.isTrue()) {
@@ -140,7 +139,7 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
+        vassert(m_left);
         return m_left->eval(tuple1, tuple2).castAs(m_targetType);
     }
 
@@ -156,8 +155,8 @@ public:
     OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
         : AbstractExpression(EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, left, right)
     {
-        assert (m_left);
-        assert (m_right);
+        vassert(m_left);
+        vassert(m_right);
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -179,8 +178,8 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
-        assert (m_right);
+        vassert(m_left);
+        vassert(m_right);
         NValue thenClause = m_left->eval(tuple1, tuple2);
 
         if (thenClause.isTrue()) {

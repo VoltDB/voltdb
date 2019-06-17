@@ -219,7 +219,7 @@ void StreamedTable::undo(size_t mark, int64_t seqNo) {
             m_migrateTxnSizeGuard.estimatedDRLogSize -=
                     m_migrateTxnSizeGuard.uso - mark -
                     ExportTupleStream::getExportMetaHeaderSize() + DRTupleStream::getDRLogHeaderSize();
-            assert (m_migrateTxnSizeGuard.estimatedDRLogSize >= 0);
+            vassert(m_migrateTxnSizeGuard.estimatedDRLogSize >= 0);
             m_migrateTxnSizeGuard.uso = mark;
             if (m_migrateTxnSizeGuard.estimatedDRLogSize == 0) {
                 m_migrateTxnSizeGuard.reset();

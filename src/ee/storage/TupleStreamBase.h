@@ -169,7 +169,7 @@ TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
 template <class SB>
 void TupleStreamBase<SB>::setDefaultCapacityForTest(size_t capacity)
 {
-    assert (capacity > 0);
+    vassert(capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {

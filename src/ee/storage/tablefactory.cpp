@@ -1,10 +1,6 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2019 VoltDB Inc.
- *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
+ * * This file contains original code and/or modifications of original code. * Any modifications made by VoltDB Inc. are licensed under the following * terms and conditions: *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -44,6 +40,7 @@
  */
 
 #include <sstream>
+
 #include "tablefactory.h"
 #include "storage/LargeTempTable.h"
 #include "storage/streamedtable.h"
@@ -225,7 +222,7 @@ void TableFactory::initCommon(
     table->m_databaseId = databaseId;
     table->m_name = name;
     table->initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
-    assert (table->columnCount() == schema->columnCount());
+    vassert(table->columnCount() == schema->columnCount());
 }
 
 void TableFactory::configureStats(std::string name,

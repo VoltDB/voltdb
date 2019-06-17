@@ -33,6 +33,7 @@
 #include "logging/StdoutLogProxy.h"
 #include "storage/table.h"
 
+#include "common/debuglog.h"
 #include "common/ElasticHashinator.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
@@ -792,7 +793,7 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
-    assert (m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 

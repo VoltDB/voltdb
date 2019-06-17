@@ -495,7 +495,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
     }
-    assert (cnt <= MAX_PARAM_COUNT);
+    vassert(cnt <= MAX_PARAM_COUNT);
     deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
     return cnt;
 }
@@ -607,7 +607,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info
-        assert (num_fragments <= MAX_BATCH_COUNT);
+        vassert(num_fragments <= MAX_BATCH_COUNT);
         jlong* fragmentIdsBuffer = engine->getBatchFragmentIdsContainer();
         env->GetLongArrayRegion(plan_fragment_ids, 0, num_fragments, fragmentIdsBuffer);
 

@@ -44,7 +44,6 @@
  */
 
 #include <sstream>
-#include <common/debuglog.h>
 #include <cstdio>
 #include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
@@ -159,7 +158,7 @@ int Table::columnIndex(const std::string &name) const {
 }
 
 bool Table::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.columnCount());
+    vassert(m_columnCount == tuple.columnCount());
     for (int i = m_columnCount - 1; i >= 0; --i) {
         if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
             VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);

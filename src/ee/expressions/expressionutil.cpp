@@ -44,7 +44,6 @@
  */
 
 #include "expressionutil.h"
-
 #include "common/ValueFactory.hpp"
 #include "expressions/expressions.h"
 #include "expressions/functionexpression.h"
@@ -176,8 +175,8 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
 }
 
 static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, AbstractExpression *r) {
-    assert (l);
-    assert (r);
+    vassert(l);
+    vassert(r);
     switch (c) {
     case (EXPRESSION_TYPE_COMPARE_EQUAL):
         return new ComparisonExpression<CmpEq>(c, l, r);
@@ -212,8 +211,8 @@ static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, A
 template <typename L, typename R>
 static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
 {
-    assert (l);
-    assert (r);
+    vassert(l);
+    vassert(r);
     switch (c) {
     case (EXPRESSION_TYPE_COMPARE_EQUAL):
         return new InlinedComparisonExpression<CmpEq, L, R>(c, l, r);
@@ -379,7 +378,7 @@ static AbstractExpression* parameterValueFactory(
       PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
     // read before ctor - can then instantiate fully init'd obj.
     int param_idx = obj.valueForKey("PARAM_IDX").asInt();
-    assert (param_idx >= 0);
+    vassert(param_idx >= 0);
     return new ParameterValueExpression(param_idx);
 }
 

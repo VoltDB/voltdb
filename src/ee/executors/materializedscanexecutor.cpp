@@ -44,7 +44,7 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
     vassert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+    vassert((int)output_table->columnCount() == 1);
 
     // get the output type
     const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);

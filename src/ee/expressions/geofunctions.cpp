@@ -275,7 +275,7 @@ static void readLoop(bool is_shell,
         throwInvalidWktPoly("unexpected end of input");
     }
 
-    assert (*it == ")");
+    vassert(*it == ")");
 
     // Advance iterator to next token
     ++it;

@@ -127,7 +127,7 @@ class Table {
     virtual size_t allocatedBlockCount() const = 0;
 
     TableTuple& tempTuple() {
-        assert (m_tempTuple.m_data);
+        vassert(m_tempTuple.m_data);
         m_tempTuple.resetHeader();
         m_tempTuple.setActiveTrue();
         // Temp tuples are typically re-used so their data can change frequently.

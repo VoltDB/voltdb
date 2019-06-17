@@ -59,7 +59,7 @@ namespace voltdb {
 bool AbstractExecutor::init(VoltDBEngine* engine,
                             const ExecutorVector& executorVector)
 {
-    assert (m_abstractNode);
+    vassert(m_abstractNode);
 
     //
     // Grab the input tables directly from this node's children

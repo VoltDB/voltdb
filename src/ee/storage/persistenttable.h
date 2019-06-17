@@ -47,10 +47,10 @@
 
 #include <string>
 #include <vector>
-#include <common/debuglog.h>
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/debuglog.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -393,7 +393,7 @@ public:
     std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple& source) {
-        assert (m_tempTuple.m_data);
+        vassert(m_tempTuple.m_data);
         m_tempTuple.copy(source);
         return m_tempTuple;
     }
@@ -953,22 +953,22 @@ inline bool PersistentTableSurgeon::hasIndex() const {
 }
 
 inline bool PersistentTableSurgeon::isIndexEmpty() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return (m_index->size() == (size_t)0);
 }
 
 inline size_t PersistentTableSurgeon::indexSize() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->size();
 }
 
 inline bool PersistentTableSurgeon::isIndexingComplete() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_indexingComplete;
 }
 
 inline void PersistentTableSurgeon::setIndexingComplete() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_indexingComplete = true;
 }
 
@@ -985,13 +985,13 @@ inline void PersistentTableSurgeon::dropIndex() {
 }
 
 inline void PersistentTableSurgeon::clearIndex() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_index->clear();
     m_indexingComplete = false;
 }
 
 inline void PersistentTableSurgeon::printIndex(std::ostream& os, int32_t limit) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_index->printKeys(os,limit,m_table.m_schema,m_table);
 }
 
@@ -1000,57 +1000,57 @@ inline ElasticHash PersistentTableSurgeon::generateTupleHash(TableTuple& tuple) 
 }
 
 inline bool PersistentTableSurgeon::indexHas(TableTuple& tuple) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->has(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexAdd(TableTuple& tuple) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->add(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexRemove(TableTuple& tuple) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->remove(m_table, tuple);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createIterator();
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createIterator();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->end();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->end();
 }
 

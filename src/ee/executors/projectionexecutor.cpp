@@ -76,7 +76,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     expression_array_ptr = boost::shared_array<ExpRawPtr>(new ExpRawPtr[m_columnCount]);
     expression_array = expression_array_ptr.get();
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
+        vassert(node->getOutputColumnExpressions()[ctr] != NULL);
 
         VOLT_TRACE("OutputColumnExpressions [%d]: %s", ctr,
                 node->getOutputColumnExpressions()[ctr]->debug(true).c_str());
@@ -96,20 +96,18 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
 }
 
 bool ProjectionExecutor::p_execute(const NValueArray &params) {
-#ifndef NDEBUG
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
-#endif
-    assert (node);
-    assert (!node->isInline()); // inline projection's execute() should not be
+    vassert(node);
+    vassert(!node->isInline()); // inline projection's execute() should not be
                                 // called
-    assert (m_outputTable == dynamic_cast<AbstractTempTable*>(node->getOutputTable()));
-    assert (m_outputTable);
+    vassert(m_outputTable == dynamic_cast<AbstractTempTable*>(node->getOutputTable()));
+    vassert(m_outputTable);
     Table* input_table = m_abstractNode->getInputTable();
-    assert (input_table);
+    vassert(input_table);
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+    vassert(m_columnCount == (int)node->getOutputColumnNames().size());
     if (m_allTupleArray == NULL && m_allParamArray == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             vassert(expression_array[ctr]);
@@ -124,7 +122,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // our output table
     //
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-    assert (m_tuple.columnCount() == input_table->columnCount());
+    vassert(m_tuple.columnCount() == input_table->columnCount());
     while (iterator.next(m_tuple)) {
         //
         // Project (or replace) values from input tuple

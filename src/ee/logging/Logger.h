@@ -44,7 +44,7 @@ public:
      * @returns true if the level is loggable, false otherwise
      */
     inline bool isLoggable(LogLevel level) const {
-        assert (level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         return (level >= m_level);
     }
 
@@ -66,7 +66,7 @@ public:
      * @param statement null terminated UTF-8 string containg the statement to log
      */
     inline void log(const voltdb::LogLevel level, const char *statement) const {
-        assert (level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
+        vassert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         if (level >= m_level && m_logProxy != NULL) {
             m_logProxy->log( m_id, level, statement);
         }

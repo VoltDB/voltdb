@@ -39,7 +39,7 @@ LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSc
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
-    assert (m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
+    vassert(m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
 
     size_t nonInlinedMemorySize = source.getNonInlinedMemorySizeForTempTable();
     int tupleLength = source.tupleLength();
@@ -89,7 +89,7 @@ int64_t LargeTempTableBlock::getAllocatedMemory() const {
         return 0;
     }
 
-    assert (getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
+    vassert(getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
     return BLOCK_SIZE_IN_BYTES;
 }
 
@@ -131,7 +131,7 @@ void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
 }
 
 std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
-    assert (*getStorageAddressPointer() == m_storage.get());
+    vassert(*getStorageAddressPointer() == m_storage.get());
     std::unique_ptr<char[]> storage;
     storage.swap(m_storage);
     m_isStored = true;

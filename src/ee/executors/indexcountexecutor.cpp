@@ -111,7 +111,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     vassert(targetTable);
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    assert (tableIndex != NULL);
+    vassert(tableIndex != NULL);
 
     // This index should have a true countable flag
     vassert(tableIndex->isCountableIndex());
@@ -203,7 +203,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // e.g. TINYINT < 1000 should return all values
                 if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                     (ctr == (activeNumOfSearchKeys - 1))) {
-                    assert (localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
+                    vassert(localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
 
                     // See throwCastSQLValueOutOfRangeException to see that
                     // these three cases, TYPE_OVERFLOW, TYPE_UNDERFLOW and
@@ -275,7 +275,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 }
 
                 if (ctr == (m_numOfEndkeys - 1)) {
-                    assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
+                    vassert(m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         earlyReturnForSearchKeyOutOfRange = true;
                         break;
@@ -328,7 +328,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // POST EXPRESSION
     //
-    assert (m_node->getPredicate() == NULL);
+    vassert(m_node->getPredicate() == NULL);
 
     //
     // COUNT NULL EXPRESSION
