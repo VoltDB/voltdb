@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 import sys
+import re
 from voltcli.hostinfo import Hosts
 
 RELEASE_MAJOR_VERSION = 9
@@ -72,6 +73,12 @@ def procedureCaller(runner, type):
                               [type, '', ','.join(runner.opts.skip_requirements)]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
+    if message.find("host ids:"):
+        host_names = ','.join([hosts.hosts_by_id.get(int(id)).hostname for id in re.search('host ids: \[(.+?)\]', message).group(1).split(',')])
+        if type == Option.TEST:
+            message = "Hosts will be removed: [" + host_names + "], " + message
+        if type == Option.START:
+            message = "Starting cluster resize: Removing hosts: [" + host_names + "], " + message
     if status == 0:
         runner.info(message)
     else:
