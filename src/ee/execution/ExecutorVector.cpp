@@ -61,10 +61,10 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(
 
 boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
       VoltDBEngine* engine, const std::string& jsonPlan, int64_t fragId) {
-    PlanNodeFragment *pnf = NULL;
+    std::unique_ptr<PlanNodeFragment> pnf;
     try {
-        pnf = PlanNodeFragment::createFromCatalog(jsonPlan.c_str());
-    } catch (SerializableEEException &seee) {
+        pnf.reset(PlanNodeFragment::createFromCatalog(jsonPlan.c_str()));
+    } catch (SerializableEEException&) {
         throw;
     } catch (std::exception const& e) {
         char msg[1024 * 100];
@@ -97,7 +97,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
     // Note: the executor vector takes ownership of the plan node
     // fragment here.
     boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(
-                fragId, tempTableLogLimit, tempTableMemoryLimit, pnf));
+                fragId, tempTableLogLimit, tempTableMemoryLimit, pnf.release()));
     ev->init(engine);
     return ev;
 }
