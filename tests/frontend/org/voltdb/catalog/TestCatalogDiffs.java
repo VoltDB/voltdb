@@ -772,6 +772,39 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
     }
 
+    public void testAlterMigrateTable() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a migrate table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A MIGRATE TO TARGET TAR (C1 BIGINT NOT NULL, TS TIMESTAMP NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("A", "C1");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterMigrateTableTTL1.jar");
+
+        // add another table
+        builder.addLiteralSchema("\nCREATE TABLE B MIGRATE TO TARGET TAR (TS1 TIMESTAMP NOT NULL, TS2 TIMESTAMP NOT NULL) USING TTL 10 ON COLUMN TS1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL11.jar"));
+        Catalog catSecond = catalogForJar(testDir + File.separator + "testAlterMigrateTableTTL11.jar");
+        verifyDiff(catOriginal, catSecond, false, null, true, true, true);
+
+        // succeed when try to alter table alter TTL value
+        builder.addLiteralSchema("\nALTER TABLE B ALTER USING TTL 20 ON COLUMN TS1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL24.jar"));
+
+        // fail when try to alter table add TTL
+        builder.addLiteralSchema("\nALTER TABLE A ADD USING TTL 10 ON COLUMN TS;");
+        assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL2.jar"));
+
+        // fail when try to alter table drop TTL
+        builder.addLiteralSchema("\nALTER TABLE B DROP TTL;");
+        assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL22.jar"));
+
+        // fail when try to alter table alter TTL column
+        builder.addLiteralSchema("\nALTER TABLE B ALTER TTL USING TTL 10 ON COLUMN TS2;");
+        assertFalse("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterMigrateTableTTL23.jar"));
+    }
+
     public void testPeristentExport() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
