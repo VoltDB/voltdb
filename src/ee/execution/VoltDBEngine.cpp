@@ -1590,9 +1590,8 @@ void
 VoltDBEngine::purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams) {
     BOOST_FOREACH (LabeledStreamWrapper entry, purgedStreams) {
         if (entry.second) {
-            entry.second->periodicFlush(-1L, -1L);
-            entry.second->removeFromFlushList(this, false);
-            entry.second->pushEndOfStream();
+            // purgedStreams should have been flushed by quiesce
+            assert(!entry.second->testFlushPending());
             delete entry.second;
         }
     }
@@ -2243,7 +2242,9 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
             m_oldestExportStreamWithPendingRows = nextStreamToFlush;
         }
         else {
-            // We tried to flush a stream that has not yet hit it's flush timer
+            // We tried to flush a stream that has not yet hit it's flush timer,
+            // this stream is now at the head of the list.
+            nextStreamToFlush->setPrevFlushStream(NULL);
             break;
         }
     }
@@ -2258,6 +2259,11 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
             m_newestExportStreamWithPendingRows = newestUnflushed;
         }
         m_oldestExportStreamWithPendingRows = oldestUnflushed;
+    }
+    else {
+        if (m_oldestExportStreamWithPendingRows == NULL) {
+            m_newestExportStreamWithPendingRows = NULL;
+        }
     }
 
     m_executorContext->drStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
