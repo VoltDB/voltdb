@@ -90,7 +90,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BIN>() const {
 }
 
 template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -115,7 +115,7 @@ template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& ar
 
 
 template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -140,7 +140,7 @@ template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arg
 
 
 template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     const NValue& rval = arguments[1];
     if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
@@ -165,7 +165,7 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 
 
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     if (lval.getValueType() != VALUE_TYPE_BIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_LEFT function");
@@ -199,7 +199,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vecto
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& lval = arguments[0];
     if (lval.getValueType() != VALUE_TYPE_BIGINT) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_RIGHT function");

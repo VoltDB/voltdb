@@ -136,7 +136,7 @@ PlanNodeFragment* PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
         for (int i = 0; i < stmtCnt; i++) {
            auto const& planNode = planNodesListArray.valueAtIndex(i),
                 &executeNode = executeListArray.valueAtIndex(i);
-           assert(planNode.hasNonNullKey("STATEMENT_ID") &&
+           vassert(planNode.hasNonNullKey("STATEMENT_ID") &&
                  planNode.hasNonNullKey("PLAN_NODES") &&
                  executeNode.hasNonNullKey("EXECUTE_LIST"));
             int stmtId = planNode.valueForKey("STATEMENT_ID").asInt();
@@ -152,13 +152,13 @@ PlanNodeFragment* PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
 
 void
 PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId) {
-    assert(m_stmtExecutionListMap.find(stmtId) == m_stmtExecutionListMap.end());
+    vassert(m_stmtExecutionListMap.find(stmtId) == m_stmtExecutionListMap.end());
     // NODE_LIST
     std::vector<AbstractPlanNode*> planNodes;
     for (int i = 0; i < planNodesList.arrayLen(); i++) {
         AbstractPlanNode *node = AbstractPlanNode::fromJSONObject(planNodesList.valueAtIndex(i));
-        assert(node);
-        assert(m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end());
+        vassert(node);
+        vassert(m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end());
         m_idToNodeMap[node->getPlanNodeId()] = node;
         planNodes.push_back(node);
     }
@@ -187,7 +187,7 @@ bool PlanNodeFragment::hasDelete() const
 {
     bool has_delete = false;
     // delete node can be only in the parent statement
-    assert(m_stmtExecutionListMap.find(0) != m_stmtExecutionListMap.end());
+    vassert(m_stmtExecutionListMap.find(0) != m_stmtExecutionListMap.end());
     std::vector<AbstractPlanNode*>* planNodes = m_stmtExecutionListMap.find(0)->second;
     for (int ii = 0; ii < planNodes->size(); ii++)
     {

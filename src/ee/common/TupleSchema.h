@@ -18,7 +18,7 @@
 #ifndef TUPLESCHEMA_H_
 #define TUPLESCHEMA_H_
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <stdint.h>
 #include <string>
@@ -296,7 +296,7 @@ private:
 ///////////////////////////////////
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
-    assert(index < totalColumnCount());
+    vassert(index < totalColumnCount());
     const ColumnInfo *columnInfo = getColumnInfoPrivate(index);
     const ColumnInfo *columnInfoPlusOne = getColumnInfoPrivate(index + 1);
     // calculate the real column length in raw bytes
@@ -327,12 +327,12 @@ inline uint32_t TupleSchema::tupleLength() const {
 }
 
 inline size_t TupleSchema::offsetOfHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return getColumnInfoPrivate(columnCount())->offset;
 }
 
 inline size_t TupleSchema::lengthOfAllHiddenColumns() const {
-    assert (hiddenColumnCount() > 0);
+    vassert(hiddenColumnCount() > 0);
     return tupleLength() - offsetOfHiddenColumns();
 }
 
@@ -346,22 +346,22 @@ inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfoPrivate(int columnInde
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
-    assert(columnIndex < totalColumnCount());
+    vassert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) {
-    assert(columnIndex < totalColumnCount());
+    vassert(columnIndex < totalColumnCount());
     return getColumnInfoPrivate(columnIndex);
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) const {
-    assert(hiddenColumnIndex < m_hiddenColumnCount);
+    vassert(hiddenColumnIndex < m_hiddenColumnCount);
     return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 
 inline TupleSchema::ColumnInfo* TupleSchema::getHiddenColumnInfo(int hiddenColumnIndex) {
-    assert(hiddenColumnIndex < m_hiddenColumnCount);
+    vassert(hiddenColumnIndex < m_hiddenColumnCount);
     return getColumnInfoPrivate(m_columnCount + hiddenColumnIndex);
 }
 

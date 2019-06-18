@@ -47,10 +47,10 @@
 
 #include <string>
 #include <vector>
-#include <cassert>
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/debuglog.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -393,7 +393,7 @@ public:
     std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple& source) {
-        assert (m_tempTuple.m_data);
+        vassert(m_tempTuple.m_data);
         m_tempTuple.copy(source);
         return m_tempTuple;
     }
@@ -541,7 +541,7 @@ public:
      * Returns the purge executor vector for this table
      */
     boost::shared_ptr<ExecutorVector> getPurgeExecutorVector() {
-        assert(hasPurgeFragment());
+        vassert(hasPurgeFragment());
         return m_purgeExecutorVector;
     }
 
@@ -643,7 +643,7 @@ private:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
-            assert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
+            vassert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
             m_blocksPendingSnapshot.erase(nextBlock);
             nextBlock->swapToBucket(TBBucketPtr());
         }
@@ -953,45 +953,45 @@ inline bool PersistentTableSurgeon::hasIndex() const {
 }
 
 inline bool PersistentTableSurgeon::isIndexEmpty() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return (m_index->size() == (size_t)0);
 }
 
 inline size_t PersistentTableSurgeon::indexSize() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->size();
 }
 
 inline bool PersistentTableSurgeon::isIndexingComplete() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_indexingComplete;
 }
 
 inline void PersistentTableSurgeon::setIndexingComplete() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_indexingComplete = true;
 }
 
 inline void PersistentTableSurgeon::createIndex() {
-    assert(m_index == NULL);
+    vassert(m_index == NULL);
     m_index.reset(new ElasticIndex());
     m_indexingComplete = false;
 }
 
 inline void PersistentTableSurgeon::dropIndex() {
-    assert(m_indexingComplete == true);
+    vassert(m_indexingComplete == true);
     m_index.reset(NULL);
     m_indexingComplete = false;
 }
 
 inline void PersistentTableSurgeon::clearIndex() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_index->clear();
     m_indexingComplete = false;
 }
 
 inline void PersistentTableSurgeon::printIndex(std::ostream& os, int32_t limit) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     m_index->printKeys(os,limit,m_table.m_schema,m_table);
 }
 
@@ -1000,57 +1000,57 @@ inline ElasticHash PersistentTableSurgeon::generateTupleHash(TableTuple& tuple) 
 }
 
 inline bool PersistentTableSurgeon::indexHas(TableTuple& tuple) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->has(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexAdd(TableTuple& tuple) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->add(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexRemove(TableTuple& tuple) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->remove(m_table, tuple);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createIterator();
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createIterator();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->end();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
-    assert (m_index != NULL);
+    vassert(m_index != NULL);
     return m_index->end();
 }
 
@@ -1059,29 +1059,29 @@ inline uint32_t PersistentTableSurgeon::getTupleCount() const {
 }
 
 inline void PersistentTableSurgeon::initTableStreamer(TableStreamerInterface* streamer) {
-    assert(m_table.m_tableStreamer == NULL);
+    vassert(m_table.m_tableStreamer == NULL);
     m_table.m_tableStreamer.reset(streamer);
 }
 
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
-    assert(m_table.m_tableStreamer != NULL);
+    vassert(m_table.m_tableStreamer != NULL);
     return m_table.m_tableStreamer->hasStreamType(streamType);
 }
 
 inline boost::shared_ptr<ElasticIndexTupleRangeIterator>
 PersistentTableSurgeon::getIndexTupleRangeIterator(ElasticIndexHashRange const& range) {
-    assert(m_index != NULL);
-    assert(m_table.m_schema != NULL);
+    vassert(m_index != NULL);
+    vassert(m_table.m_schema != NULL);
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
 inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, bool deleteLastEmptyBlock) {
     // May not delete an already deleted tuple.
-    assert(tuple.isActive());
+    vassert(tuple.isActive());
 
     // The tempTuple is forever!
-    assert(&tuple != &m_tempTuple);
+    vassert(&tuple != &m_tempTuple);
 
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -1133,7 +1133,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block, 
            m_blocksWithSpace.insert(block);
         }
         m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        vassert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     } else if (transitioningToBlockWithSpace) {

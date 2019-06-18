@@ -54,7 +54,7 @@
 #include "storage/AbstractTempTable.hpp"
 #include "common/SynchronizedThreadLock.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <vector>
 
 namespace voltdb {

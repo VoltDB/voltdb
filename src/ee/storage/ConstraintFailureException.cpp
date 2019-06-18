@@ -17,7 +17,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/constraintutil.h"
 #include "storage/table.h"
-#include <cassert>
+#include <common/debuglog.h>
 
 using namespace voltdb;
 using std::string;
@@ -36,8 +36,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_otherTuple(otherTuple),
     m_type(type),
     m_surgeon(surgeon) {
-    assert(table);
-    assert(!tuple.isNullTuple());
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 ConstraintFailureException::ConstraintFailureException(
@@ -55,8 +55,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_type(CONSTRAINT_TYPE_PARTITIONING),
     m_surgeon(surgeon)
 {
-    assert(table);
-    assert(!tuple.isNullTuple());
+    vassert(table);
+    vassert(!tuple.isNullTuple());
 }
 
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {

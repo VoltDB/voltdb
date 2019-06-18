@@ -28,6 +28,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include "common/debuglog.h"
 
 namespace voltdb {
 
@@ -112,9 +113,9 @@ public:
         if (!p.second) {
             fragId = p.first->fragmentId;
             // safety check
-            assert(memcmp(p.first->core->plan, plan, length) == 0);
+            vassert(memcmp(p.first->core->plan, plan, length) == 0);
             m_plans.relocate(m_plans.begin(),p.first);
-            assert(fragId < 0);
+            vassert(fragId < 0);
             return true;
         }
         // if cache miss
@@ -122,9 +123,9 @@ public:
             // only after successful insert, allocate/copy plan data
             key.intern();
             // safety check
-            assert(memcmp(key.core->plan, plan, length) == 0);
+            vassert(memcmp(key.core->plan, plan, length) == 0);
             fragId = key.fragmentId;
-            assert(fragId < 0);
+            vassert(fragId < 0);
             return false;
         }
     }

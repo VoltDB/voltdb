@@ -159,11 +159,11 @@ class ExecutorContext {
     }
 
     void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
-        assert(executorsMap != NULL);
+        vassert(executorsMap != NULL);
         m_executorsMap = executorsMap;
-        assert(m_subqueryContextMap.empty());
+        vassert(m_subqueryContextMap.empty());
 
-        assert(m_commonTableMap.empty());
+        vassert(m_commonTableMap.empty());
     }
 
     static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
@@ -249,13 +249,12 @@ class ExecutorContext {
     /** Executor List for a given sub statement id */
     const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
     {
-        assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
+        vassert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
         return *m_executorsMap->find(subqueryId)->second;
     }
 
     /** Return pointer to a subquery context or NULL */
-    SubqueryContext* getSubqueryContext(int subqueryId)
-    {
+    SubqueryContext* getSubqueryContext(int subqueryId) {
         std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(subqueryId);
         if (it != m_subqueryContextMap.end()) {
             return &(it->second);
@@ -265,15 +264,10 @@ class ExecutorContext {
     }
 
     /** Set a new subquery context for the statement id. */
-    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
-    {
+    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams) {
         SubqueryContext fromCopy(lastParams);
-#ifndef NDEBUG
-        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
-#endif
-            m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
-        assert(result.second);
-        return &(m_subqueryContextMap.find(subqueryId)->second);
+        vassert(m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy)).second);
+        return &m_subqueryContextMap.find(subqueryId)->second;
     }
 
     /**
@@ -290,8 +284,8 @@ class ExecutorContext {
      * performance, this method takes care of all cleanup
      * aotomatically.
      */
-    UniqueTempTableResult executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                           int subqueryId = 0);
+    UniqueTempTableResult executeExecutors(
+            const std::vector<AbstractExecutor*>& executorList, int subqueryId = 0);
 
     /**
      * Similar to above method.  Execute the executors associated with
@@ -356,8 +350,8 @@ class ExecutorContext {
 
     static Pool* getTempStringPool() {
         ExecutorContext* singleton = getExecutorContext();
-        assert(singleton != NULL);
-        assert(singleton->m_tempStringPool != NULL);
+        vassert(singleton != NULL);
+        vassert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
     }
 
@@ -373,7 +367,7 @@ class ExecutorContext {
     void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
     void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
     const int64_t getModifiedTupleCount() const {
-        assert(m_tuplesModifiedStack.size() > 0);
+        vassert(m_tuplesModifiedStack.size() > 0);
         return m_tuplesModifiedStack.top();
     }
     const size_t getModifiedTupleStackSize() const { return m_tuplesModifiedStack.size(); }
@@ -381,7 +375,7 @@ class ExecutorContext {
     /** DML executors call this to indicate how many tuples
          * have been modified */
     void addToTuplesModified(int64_t amount) {
-        assert(m_tuplesModifiedStack.size() > 0);
+        vassert(m_tuplesModifiedStack.size() > 0);
         m_tuplesModifiedStack.top() += amount;
     }
 

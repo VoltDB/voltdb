@@ -73,8 +73,8 @@ ExecuteWithAllSitesMemory::ExecuteWithAllSitesMemory()
         , m_wasUsingMpMemory(SynchronizedThreadLock::usingMpMemory())
 #endif
 {
-    assert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
-    assert(SynchronizedThreadLock::isLowestSiteContext());
+    vassert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
+    vassert(SynchronizedThreadLock::isLowestSiteContext());
 }
 
 ExecuteWithAllSitesMemory::~ExecuteWithAllSitesMemory()

@@ -174,7 +174,7 @@ void MaterializedViewTriggerForInsert::mergeTupleForInsert(const TableTuple &del
                     }
                     break;
                 default:
-                    assert(false); // Should have been caught when the matview was loaded.
+                    vassert(false); // Should have been caught when the matview was loaded.
                     // no break
             }
         }
@@ -283,7 +283,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                        }
                        break;
                    default:
-                       assert(false); // Should have been caught when the matview was loaded.
+                       vassert(false); // Should have been caught when the matview was loaded.
                }
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
@@ -291,7 +291,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         // ENG-10892, if no COUNT(*) column exists
         if (numCountStar == 0) {
             // check which hidden column COUNT(*) lies in, it is always the last one
-            assert(m_dest->schema()->hiddenColumnCount() == 1);
+            vassert(m_dest->schema()->hiddenColumnCount() == 1);
             m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_increment());
         }
         // Shouldn't need to update group-key-only indexes such as the primary key
@@ -322,7 +322,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         // ENG-10892, if no COUNT(*) column exists
         if (numCountStar == 0) {
             // check which hidden column COUNT(*) lies in, it is always the last one
-            assert(m_dest->schema()->hiddenColumnCount() == 1);
+            vassert(m_dest->schema()->hiddenColumnCount() == 1);
             m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(1));
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
@@ -382,7 +382,7 @@ AbstractExpression* MaterializedViewTriggerForInsert::parsePredicate(catalog::Ma
     if (hexString.size() == 0) {
         return NULL;
     }
-    assert (hexString.length() % 2 == 0);
+    vassert(hexString.length() % 2 == 0);
     int bufferLength = (int)hexString.size() / 2 + 1;
     boost::shared_array<char> buffer(new char[bufferLength]);
     catalog::Catalog::hexDecodeString(hexString, buffer.get());
@@ -456,7 +456,7 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         }
         // Not used for Complex Aggregation case
         const catalog::Column *srcCol = destCol->matviewsource();
-        assert(srcCol);
+        vassert(srcCol);
         m_aggColIndexes[aggIndex] = srcCol->index();
     }
 
@@ -501,7 +501,7 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     }
     // ENG-10892, if no COUNT(*) exists
     if (m_countStarColumnIndex == -1) {
-        assert(m_dest->schema()->hiddenColumnCount() == 1);
+        vassert(m_dest->schema()->hiddenColumnCount() == 1);
         m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(0));
     }
     m_dest->insertPersistentTuple(m_updatedTuple, fallible);
@@ -514,7 +514,7 @@ bool MaterializedViewTriggerForInsert::findExistingTupleUsingDelta(const TableTu
     if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_dest->iterator();
         iterator.next(m_existingTuple);
-        assert( ! m_existingTuple.isNullTuple());
+        vassert( ! m_existingTuple.isNullTuple());
         return true;
     }
 
@@ -531,7 +531,7 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
     if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_dest->iterator();
         iterator.next(m_existingTuple);
-        assert( ! m_existingTuple.isNullTuple());
+        vassert( ! m_existingTuple.isNullTuple());
         return true;
     }
 

@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
 #include <set>
@@ -69,15 +69,15 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init Update Executor");
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
-    assert(m_node);
-    assert(m_node->getInputTableCount() == 1);
+    vassert(m_node);
+    vassert(m_node->getInputTableCount() == 1);
     // input table should be temptable
     m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable());
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     // target table should be persistenttable
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     setDMLCountOutputTable(executorVector.limits());
 
@@ -94,7 +94,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
             pnt == PLAN_NODE_TYPE_INDEXSCAN) {
         proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(NULL != proj_node);
+        vassert(NULL != proj_node);
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
@@ -113,7 +113,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
         }
     }
 
-    assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
+    vassert(m_inputTargetMap.size() == (output_column_names.size() - 1));
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
 
@@ -126,12 +126,12 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool UpdateExecutor::p_execute(const NValueArray &params) {
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     // target table should be persistenttable
     // Note that the target table pointer in the node's tcd can change between p_init and p_execute (at least for delete)
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
@@ -141,7 +141,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     int64_t modified_tuples = 0;
 
     {
-        assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
+        vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -165,8 +165,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                }
             }
 
-            assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-            assert(targetTuple.columnCount() == targetTable->columnCount());
+            vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+            vassert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a

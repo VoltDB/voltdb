@@ -27,7 +27,7 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <string.h>
 #include <boost/shared_ptr.hpp>
-#include "pcre2.h"
+#include <pcre2.h>
 
 #include <iostream>
 #include <sstream>
@@ -129,7 +129,7 @@ template<> inline NValue NValue::callUnary<FUNC_FOLD_UPPER>() const {
 
 /** implement the 2-argument SQL REPEAT function */
 template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
     if (strValue.isNull()) {
         return strValue;
@@ -180,7 +180,7 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
 
 /** implement the 2-argument SQL FUNC_POSITION_CHAR function */
 template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& target = arguments[0];
     if (target.isNull()) {
         return getNullValue(VALUE_TYPE_INTEGER);
@@ -210,7 +210,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
 
 /** implement the 2-argument SQL LEFT function */
 template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
     if (strValue.isNull()) {
         return strValue;
@@ -240,7 +240,7 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
 
 /** implement the 2-argument SQL RIGHT function */
 template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
     if (strValue.isNull()) {
         return strValue;
@@ -276,7 +276,7 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
 
 /** implement the 2-or-more-argument SQL CONCAT function */
 template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() >= 2);
+    vassert(arguments.size() >= 2);
     int64_t size = 0;
     for (std::vector<NValue>::const_iterator iter = arguments.begin();
         iter !=arguments.end(); iter++) {
@@ -315,7 +315,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
 
 /** implement the 2-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
     if (strValue.isNull()) {
         return strValue;
@@ -344,7 +344,7 @@ static inline std::string trim_function(std::string source, const std::string& m
         bool doltrim, bool dortrim) {
     // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
     size_t mlen = match.length();
-    assert (mlen > 0);
+    vassert(mlen > 0);
     if (doltrim) {
         while (boost::starts_with(source, match)) {
             source.erase(0, mlen);
@@ -362,7 +362,7 @@ static inline std::string trim_function(std::string source, const std::string& m
 
 /** implement the 2-argument SQL TRIM functions */
 inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     for (int i = 0; i < arguments.size(); i++) {
         const NValue& arg = arguments[i];
@@ -415,7 +415,7 @@ template<> inline NValue NValue::call<FUNC_TRIM_TRAILING_CHAR>(const std::vector
 
 /** implement the 3-argument SQL REPLACE function */
 template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
+    vassert(arguments.size() == 3);
 
     for (int i = 0; i < arguments.size(); i++) {
         const NValue& arg = arguments[i];
@@ -453,7 +453,7 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
 
 /** implement the 3-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
+    vassert(arguments.size() == 3);
     const NValue& strValue = arguments[0];
     if (strValue.isNull()) {
         return strValue;
@@ -517,7 +517,7 @@ static inline std::string overlay_function(const char* ptrSource, size_t lengthS
 
 /** implement the 3 or 4 argument SQL OVERLAY function */
 template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3 || arguments.size() == 4);
+    vassert(arguments.size() == 3 || arguments.size() == 4);
 
     for (int i = 0; i < arguments.size(); i++) {
         const NValue& arg = arguments[i];
@@ -566,7 +566,7 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         length = getCharLength(insertChars, lenInsert);
     }
 
-    assert(start >= 1);
+    vassert(start >= 1);
     std::string resultStr = overlay_function(srcChars, lenSrc, insertStr, start, length);
 
     return getTempStringValue(resultStr.c_str(), resultStr.length());
@@ -584,7 +584,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     static TTInt one("1");
     static TTInt five("5");
 
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const NValue &arg1 = arguments[0];
     if (arg1.isNull()) {
         return getNullStringValue();
@@ -747,7 +747,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_STR>(const std::vector<NValue>& 
     static TTInt one("1");
     static TTInt five("5");
 
-    assert(arguments.size() > 0 && arguments.size() < 4);
+    vassert(arguments.size() > 0 && arguments.size() < 4);
     const NValue &arg1 = arguments[0];
     if (arg1.isNull()) {
         return getNullStringValue();
@@ -861,7 +861,7 @@ static std::string pcre2_error_code_message(int error_code, std::string prefix)
 
 /** Implement the VoltDB SQL function regexp_position for re-based pattern matching */
 template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2 || arguments.size() == 3);
+    vassert(arguments.size() == 2 || arguments.size() == 3);
 
     const NValue& source = arguments[0];
     if (source.isNull()) {

@@ -100,7 +100,7 @@ ThreadLocalPool::~ThreadLocalPool() {
     if (p == NULL) {
         VOLT_ERROR("Failed to find context");
         VOLT_ERROR_STACK();
-        assert(p != NULL);
+        vassert(p != NULL);
     }
     if (p != NULL) {
         if (p->first == 1) {
@@ -124,7 +124,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
-                assert(false);
+                vassert(false);
             }
             pthread_mutex_lock(&s_sharedMemoryMutex);
             SizeBucketMap_t& mapBySize = s_allocations[*enginePartitionIdPtr];
@@ -146,7 +146,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                         nextAlloc++;
                     } while (nextAlloc != allocMap.end());
                     allocMap.clear();
-                    assert(false);
+                    vassert(false);
                 }
                 mapBySize.erase(mapBySize.begin());
             }
@@ -169,7 +169,7 @@ ThreadLocalPool::~ThreadLocalPool() {
                 VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from partition %d on thread %d:", getEnginePartitionId(), getThreadPartitionId());
                 VOLT_ERROR_STACK();
-                assert(false);
+                vassert(false);
             }
 #endif
         }
@@ -178,7 +178,7 @@ ThreadLocalPool::~ThreadLocalPool() {
 
 void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping)
 {
-    assert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
+    vassert(mapping.enginePartitionId != NULL && getThreadPartitionId() != 16383);
 
     pthread_setspecific(m_allocatedKey, static_cast<const void *>(mapping.allocated));
     pthread_setspecific(m_key, static_cast<const void *>(mapping.poolData));
@@ -344,7 +344,7 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         // TODO: ENG-14906: improve thread local pool
         // implementation and tracking mechanism
         // throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d", alloc_size);
-        assert(false);
+        vassert(false);
     } else {
        // Free the raw allocation from the found pool.
        iter->second->free(sized);
@@ -376,7 +376,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
             mapForAdd = mapBySize.insert(std::make_pair(sz, AllocTraceMap_t())).first;
         }
         else {
-            assert(mapForAdd->second.size() == 0);
+            vassert(mapForAdd->second.size() == 0);
         }
 #endif
     }
@@ -384,7 +384,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         pool = iter->second.get();
 #ifdef VOLT_POOL_CHECKING
         mapForAdd = mapBySize.find(sz);
-        assert(mapForAdd != mapBySize.end());
+        vassert(mapForAdd != mapBySize.end());
 #endif
     }
     /**
@@ -432,7 +432,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         mapForAdd->second[newMem]->printLocalTrace();
         delete st;
 #endif
-        assert(false);
+        vassert(false);
     }
     VOLT_DEBUG("Allocated %p of size %lu on engine %d, thread %d", newMem, sz,
             getEnginePartitionId(), getThreadPartitionId());
@@ -579,7 +579,7 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
             SizeBucketMap_t& mapBySize = it->second;
             SizeBucketMap_t::iterator it2 = mapBySize.begin();
             while (it2 != mapBySize.end()) {
-                assert(it2->second.empty());
+                vassert(it2->second.empty());
                 it2++;
                 mapBySize.erase(mapBySize.begin());
             }

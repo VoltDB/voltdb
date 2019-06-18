@@ -74,7 +74,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-    assert(pnf->getRootNode());
+    vassert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
         char msg[1024];
@@ -108,7 +108,7 @@ void ExecutorVector::init(VoltDBEngine* engine) {
     // Initialize each node!
     for (PlanNodeFragment::PlanNodeMapIterator it = m_fragment->executeListBegin();
          it != m_fragment->executeListEnd(); ++it) {
-        assert(it->second != NULL);
+        vassert(it->second != NULL);
         const std::vector<AbstractPlanNode*>& planNodeList = *it->second;
         std::auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
         BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
@@ -136,8 +136,8 @@ std::string ExecutorVector::debug() const {
 }
 
 void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) {
-    assert(node);
-    assert(node->getExecutor() == NULL);
+    vassert(node);
+    vassert(node->getExecutor() == NULL);
 
     // Executor is created here. An executor is *devoted* to this
     // plannode so that it can cache anything for the plannode
@@ -181,13 +181,13 @@ void ExecutorVector::setupContext(ExecutorContext* executorContext) {
 void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 
 const std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
-    assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
+    vassert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
     return *(m_subplanExecListMap.find(planId)->second);
 }
 
 void ExecutorVector::getRidOfSendExecutor(int planId) {
     std::map<int, std::vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.find(planId);
-    assert(it != m_subplanExecListMap.end());
+    vassert(it != m_subplanExecListMap.end());
     std::vector<AbstractExecutor*> executorList = *(it->second);
     std::auto_ptr<std::vector<AbstractExecutor*> > executorListWithoutSend(new std::vector<AbstractExecutor*>());
     BOOST_FOREACH (AbstractExecutor* executor, executorList) {

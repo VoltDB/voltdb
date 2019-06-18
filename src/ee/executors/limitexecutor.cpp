@@ -57,7 +57,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init limit Executor");
 
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     //
     // Skip if we are inline
@@ -67,7 +67,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Just copy the table schema of our input table
         //
-        assert(node->getInputTableCount() == 1);
+        vassert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
                            buildCopiedTempTable(node->getInputTable()->name(),
@@ -81,11 +81,11 @@ bool
 LimitExecutor::p_execute(const NValueArray &params)
 {
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
-    assert(node);
+    vassert(node);
     Table* output_table = node->getOutputTable();
-    assert(output_table);
+    vassert(output_table);
     Table* input_table = node->getInputTable();
-    assert(input_table);
+    vassert(input_table);
 
     //
     // Grab the iterator for our input table, and loop through until

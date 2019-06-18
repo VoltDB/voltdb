@@ -51,7 +51,7 @@
 
 #include "expressions/abstractexpression.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 #include <sstream>
 
@@ -231,7 +231,7 @@ struct IntsKey
 
     IntsKey(const TableTuple *tuple) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
-        assert(tuple);
+        vassert(tuple);
         const TupleSchema *keySchema = tuple->getSchema();
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
@@ -442,13 +442,13 @@ struct GenericKey
     }
 
     GenericKey(const TableTuple *tuple) {
-        assert(tuple);
+        vassert(tuple);
         ::memcpy(data, tuple->address() + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
     }
 
     GenericKey(const TableTuple *tuple, const std::vector<int> &indices,
                const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
-        assert(tuple);
+        vassert(tuple);
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
         const int columnCount = keySchema->columnCount();
@@ -494,10 +494,10 @@ struct GenericPersistentKey : public GenericKey<keySize>
         : GenericKey<keySize>()
         , m_keySchema(keySchema)
     {
-        assert(tuple);
+        vassert(tuple);
         // Assume that there are indexed expressions.
         // Columns-only indexes don't use GenericPersistentKey
-        assert(indexed_expressions.size() > 0);
+        vassert(indexed_expressions.size() > 0);
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
         const int columnCount = keySchema->columnCount();
@@ -696,7 +696,7 @@ struct TupleKey
 
     // Set a key from a key-schema tuple.
     TupleKey(const TableTuple *tuple) {
-        assert(tuple);
+        vassert(tuple);
         m_columnIndices = NULL;
         m_indexedExprs = NULL;
         m_keyTuple = tuple->address();
@@ -706,8 +706,8 @@ struct TupleKey
     // Set a key from a table-schema tuple.
     TupleKey(const TableTuple *tuple, const std::vector<int> &indices,
              const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *unused_keySchema) {
-        assert(tuple);
-        assert(indices.size() > 0);
+        vassert(tuple);
+        vassert(indices.size() > 0);
         m_columnIndices = &indices;
         if (indexed_expressions.size() != 0) {
             m_indexedExprs = &indexed_expressions;

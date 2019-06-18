@@ -167,7 +167,7 @@ inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue
     // match any format with the regular expression:
     std::string fancyText = fancy.str();
     size_t ePos = fancyText.find('E', 3); // find E after "[-]n.n".
-    assert(ePos != std::string::npos);
+    vassert(ePos != std::string::npos);
     size_t endSignifMantissa;
     // Never truncate mantissa down to the bare '.' EVEN for the case of "n.0".
     for (endSignifMantissa = ePos; fancyText[endSignifMantissa-2] != '.'; --endSignifMantissa) {
@@ -460,13 +460,13 @@ class NValue {
             // prefix byte and continuation bytes that will not cause a read
             // off the end of the buffer.
             // That done, extractCodePoint could be considerably simpler/faster.
-            assert(m_cursor <= m_end);
+            vassert(m_cursor <= m_end);
             }
 
         //Construct a one-off with an alternative current cursor position
         UTF8Iterator(const UTF8Iterator& other, const char *start) :
             m_cursor(start), m_end(other.m_end) {
-               assert(m_cursor <= m_end);
+               vassert(m_cursor <= m_end);
             }
 
         const char * getCursor() { return m_cursor; }
@@ -494,7 +494,7 @@ class NValue {
          * That wouldn't be needed if we pre-validated the buffer.
          */
         uint32_t extractCodePoint() {
-            assert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
+            vassert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
             /*
              * Copy the next 6 bytes to a temp buffer and retrieve.
              * We should only get 4 byte code points, and the library
@@ -723,7 +723,7 @@ class NValue {
         if (isNull()) {
             return 0;
         }
-        assert( ! getSourceInlined());
+        vassert( ! getSourceInlined());
         const StringRef* sref = getObjectPointer();
         return sref->getAllocatedSizeInPersistentStorage();
     }
@@ -735,7 +735,7 @@ class NValue {
         if (isNull()) {
             return 0;
         }
-        assert( ! getSourceInlined());
+        vassert( ! getSourceInlined());
         const StringRef* sref = getObjectPointer();
         return sref->getAllocatedSizeInTempStorage();
     }
@@ -918,99 +918,99 @@ private:
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
         } else {
            char const* retVal = getObjectPointer()->getObject(lengthOut);
-           assert(lengthOut >= 0);
+           vassert(lengthOut >= 0);
            return retVal;
         }
     }
 
     // getters
     const int8_t& getTinyInt() const {
-        assert(getValueType() == VALUE_TYPE_TINYINT);
+        vassert(getValueType() == VALUE_TYPE_TINYINT);
         return *reinterpret_cast<const int8_t*>(m_data);
     }
 
     int8_t& getTinyInt() {
-        assert(getValueType() == VALUE_TYPE_TINYINT);
+        vassert(getValueType() == VALUE_TYPE_TINYINT);
         return *reinterpret_cast<int8_t*>(m_data);
     }
 
     const int16_t& getSmallInt() const {
-        assert(getValueType() == VALUE_TYPE_SMALLINT);
+        vassert(getValueType() == VALUE_TYPE_SMALLINT);
         return *reinterpret_cast<const int16_t*>(m_data);
     }
 
     int16_t& getSmallInt() {
-        assert(getValueType() == VALUE_TYPE_SMALLINT);
+        vassert(getValueType() == VALUE_TYPE_SMALLINT);
         return *reinterpret_cast<int16_t*>(m_data);
     }
 
     const int32_t& getInteger() const {
-        assert(getValueType() == VALUE_TYPE_INTEGER);
+        vassert(getValueType() == VALUE_TYPE_INTEGER);
         return *reinterpret_cast<const int32_t*>(m_data);
     }
 
     int32_t& getInteger() {
-        assert(getValueType() == VALUE_TYPE_INTEGER);
+        vassert(getValueType() == VALUE_TYPE_INTEGER);
         return *reinterpret_cast<int32_t*>(m_data);
     }
 
     const int64_t& getBigInt() const {
-       assert((getValueType() == VALUE_TYPE_BIGINT) || (getValueType() == VALUE_TYPE_TIMESTAMP) ||
+       vassert((getValueType() == VALUE_TYPE_BIGINT) || (getValueType() == VALUE_TYPE_TIMESTAMP) ||
              (getValueType() == VALUE_TYPE_ADDRESS));
         return *reinterpret_cast<const int64_t*>(m_data);
     }
 
     int64_t& getBigInt() {
-        assert((getValueType() == VALUE_TYPE_BIGINT) ||
+        vassert((getValueType() == VALUE_TYPE_BIGINT) ||
                (getValueType() == VALUE_TYPE_TIMESTAMP) ||
                (getValueType() == VALUE_TYPE_ADDRESS));
         return *reinterpret_cast<int64_t*>(m_data);
     }
 
     const int64_t& getTimestamp() const {
-        assert(getValueType() == VALUE_TYPE_TIMESTAMP);
+        vassert(getValueType() == VALUE_TYPE_TIMESTAMP);
         return *reinterpret_cast<const int64_t*>(m_data);
     }
 
     int64_t& getTimestamp() {
-        assert(getValueType() == VALUE_TYPE_TIMESTAMP);
+        vassert(getValueType() == VALUE_TYPE_TIMESTAMP);
         return *reinterpret_cast<int64_t*>(m_data);
     }
 
     const double& getDouble() const {
-        assert(getValueType() == VALUE_TYPE_DOUBLE);
+        vassert(getValueType() == VALUE_TYPE_DOUBLE);
         return *reinterpret_cast<const double*>(m_data);
     }
 
     double& getDouble() {
-        assert(getValueType() == VALUE_TYPE_DOUBLE);
+        vassert(getValueType() == VALUE_TYPE_DOUBLE);
         return *reinterpret_cast<double*>(m_data);
     }
 
     const TTInt& getDecimal() const {
-        assert(getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(getValueType() == VALUE_TYPE_DECIMAL);
         const void* retval = reinterpret_cast<const void*>(m_data);
         return *reinterpret_cast<const TTInt*>(retval);
     }
 
     TTInt& getDecimal() {
-        assert(getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(getValueType() == VALUE_TYPE_DECIMAL);
         void* retval = reinterpret_cast<void*>(m_data);
         return *reinterpret_cast<TTInt*>(retval);
     }
 
     const bool& getBoolean() const {
-        assert(getValueType() == VALUE_TYPE_BOOLEAN);
+        vassert(getValueType() == VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<const bool*>(m_data);
     }
 
     bool& getBoolean() {
-        assert(getValueType() == VALUE_TYPE_BOOLEAN);
+        vassert(getValueType() == VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<bool*>(m_data);
     }
 
     GeographyPointValue& getGeographyPointValue() {
-        assert(getValueType() == VALUE_TYPE_POINT);
+        vassert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<GeographyPointValue*>(m_data);
     }
 
@@ -1019,12 +1019,12 @@ private:
         BOOST_STATIC_ASSERT_MSG(sizeof(GeographyPointValue) <= sizeof(m_data),
                                 "Size of Point is too large for NValue m_data");
 
-        assert(getValueType() == VALUE_TYPE_POINT);
+        vassert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<const GeographyPointValue*>(m_data);
     }
 
     const GeographyValue getGeographyValue() const {
-        assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+        vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
 
         if (isNull()) {
             return GeographyValue();
@@ -1066,10 +1066,10 @@ private:
      * DOUBLE, DECIMAL should not be handled here
      */
     int64_t castAsBigIntAndGetValue() const {
-       assert(isNull() == false);
+       vassert(isNull() == false);
 
        const ValueType type = getValueType();
-       assert(type != VALUE_TYPE_NULL);
+       vassert(type != VALUE_TYPE_NULL);
        switch (type) {
           case VALUE_TYPE_TINYINT:
              return static_cast<int64_t>(getTinyInt());
@@ -1092,7 +1092,7 @@ private:
      * DOUBLE, DECIMAL should not be handled here
      */
     int32_t castAsIntegerAndGetValue() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         const ValueType type = getValueType();
         int64_t value;
@@ -1118,7 +1118,7 @@ private:
     }
 
     double castAsDoubleAndGetValue() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
         const ValueType type = getValueType();
         switch (type) {
         case VALUE_TYPE_NULL:
@@ -1154,7 +1154,7 @@ private:
     }
 
     TTInt castAsDecimalAndGetValue() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
         const ValueType type = getValueType();
         switch (type) {
           case VALUE_TYPE_TINYINT:
@@ -1193,7 +1193,7 @@ private:
      * This function does not check NULL value.
      */
     double getNumberFromString() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
         int32_t length;
         const char* buf = getObject_withoutNull(length);
         // Guarantee termination at end of object -- or strtod might not stop there.
@@ -1219,7 +1219,7 @@ private:
     }
 
     NValue castAsBigInt() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_BIGINT);
         const ValueType type = getValueType();
@@ -1263,7 +1263,7 @@ private:
     }
 
     NValue castAsTimestamp() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_TIMESTAMP);
         const ValueType type = getValueType();
@@ -1378,7 +1378,7 @@ private:
     }
 
     NValue castAsSmallInt() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_SMALLINT);
         const ValueType type = getValueType();
@@ -1426,7 +1426,7 @@ private:
     }
 
     NValue castAsTinyInt() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_TINYINT);
         const ValueType type = getValueType();
@@ -1466,7 +1466,7 @@ private:
     }
 
     NValue castAsDouble() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_DOUBLE);
         const ValueType type = getValueType();
@@ -1505,7 +1505,7 @@ private:
     void streamTimestamp(std::stringstream& value) const;
 
     NValue castAsString() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         std::stringstream value;
         const ValueType type = getValueType();
@@ -1564,7 +1564,7 @@ private:
     }
 
     NValue castAsBinary() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
 
         NValue retval(VALUE_TYPE_VARBINARY);
         const ValueType type = getValueType();
@@ -1585,7 +1585,7 @@ private:
     }
 
     NValue castAsDecimal() const {
-        assert(isNull() == false);
+        vassert(isNull() == false);
         NValue retval(VALUE_TYPE_DECIMAL);
         const ValueType type = getValueType();
         if (isNull()) {
@@ -1813,7 +1813,7 @@ private:
     }
 
     int compareTinyInt (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_TINYINT);
+        vassert(m_valueType == VALUE_TYPE_TINYINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
@@ -1832,7 +1832,7 @@ private:
     }
 
     int compareSmallInt (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_SMALLINT);
+        vassert(m_valueType == VALUE_TYPE_SMALLINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
@@ -1851,7 +1851,7 @@ private:
     }
 
     int compareInteger (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_INTEGER);
+        vassert(m_valueType == VALUE_TYPE_INTEGER);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
@@ -1870,7 +1870,7 @@ private:
     }
 
     int compareBigInt (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_BIGINT);
+        vassert(m_valueType == VALUE_TYPE_BIGINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
@@ -1889,7 +1889,7 @@ private:
 
 
     int compareBooleanValue (const NValue &rhs) const {
-        assert(m_valueType == VALUE_TYPE_BOOLEAN);
+        vassert(m_valueType == VALUE_TYPE_BOOLEAN);
 
         // get the right hand side as an integer.
         if (rhs.getValueType() == VALUE_TYPE_BOOLEAN) {
@@ -1917,7 +1917,7 @@ private:
     }
 
     int compareTimestamp (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_TIMESTAMP);
+        vassert(m_valueType == VALUE_TYPE_TIMESTAMP);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
@@ -1936,7 +1936,7 @@ private:
     }
 
     int compareDoubleValue (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_DOUBLE);
+        vassert(m_valueType == VALUE_TYPE_DOUBLE);
 
         const double lhsValue = getDouble();
         double rhsValue;
@@ -1986,7 +1986,7 @@ private:
     }
 
     int compareStringValue (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_VARCHAR);
+        vassert(m_valueType == VALUE_TYPE_VARCHAR);
 
         ValueType rhsType = rhs.getValueType();
         if (rhsType != VALUE_TYPE_VARCHAR) {
@@ -1996,7 +1996,7 @@ private:
             throw SQLException(SQLException::data_exception_most_specific_type_mismatch, message);
         }
 
-        assert(m_valueType == VALUE_TYPE_VARCHAR);
+        vassert(m_valueType == VALUE_TYPE_VARCHAR);
 
         int32_t leftLength;
         const char* left = getObject_withoutNull(leftLength);
@@ -2017,7 +2017,7 @@ private:
     }
 
     int compareBinaryValue (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_VARBINARY);
+        vassert(m_valueType == VALUE_TYPE_VARBINARY);
 
         if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
             char message[128];
@@ -2051,7 +2051,7 @@ private:
     }
 
     int compareDecimalValue (const NValue& rhs) const {
-        assert(m_valueType == VALUE_TYPE_DECIMAL);
+        vassert(m_valueType == VALUE_TYPE_DECIMAL);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_DECIMAL:
             return compareValue<TTInt>(getDecimal(), rhs.getDecimal());
@@ -2107,7 +2107,7 @@ private:
     }
 
     int comparePointValue (const NValue &rhs) const {
-        assert(m_valueType == VALUE_TYPE_POINT);
+        vassert(m_valueType == VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_POINT:
             return getGeographyPointValue().compareWith(rhs.getGeographyPointValue());
@@ -2124,7 +2124,7 @@ private:
     }
 
     int compareGeographyValue (const NValue &rhs) const {
-        assert(m_valueType == VALUE_TYPE_GEOGRAPHY);
+        vassert(m_valueType == VALUE_TYPE_GEOGRAPHY);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_GEOGRAPHY:
             return getGeographyValue().compareWith(rhs.getGeographyValue());
@@ -2252,10 +2252,10 @@ private:
     }
 
     static NValue opAddDecimals(const NValue& lhs, const NValue& rhs) {
-        assert(lhs.isNull() == false);
-        assert(rhs.isNull() == false);
-        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.isNull() == false);
+        vassert(rhs.isNull() == false);
+        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -2268,10 +2268,10 @@ private:
     }
 
     static NValue opSubtractDecimals(const NValue& lhs, const NValue& rhs) {
-        assert(lhs.isNull() == false);
-        assert(rhs.isNull() == false);
-        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.isNull() == false);
+        vassert(rhs.isNull() == false);
+        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -2290,10 +2290,10 @@ private:
      * E-12, which can overflow unnecessarily at the middle step.
      */
     static NValue opMultiplyDecimals(const NValue& lhs, const NValue& rhs) {
-        assert(lhs.isNull() == false);
-        assert(rhs.isNull() == false);
-        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.isNull() == false);
+        vassert(rhs.isNull() == false);
+        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
@@ -2325,10 +2325,10 @@ private:
      */
 
     static NValue opDivideDecimals(const NValue& lhs, const NValue& rhs) {
-        assert(lhs.isNull() == false);
-        assert(rhs.isNull() == false);
-        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
-        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(lhs.isNull() == false);
+        vassert(rhs.isNull() == false);
+        vassert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        vassert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
@@ -2533,7 +2533,7 @@ inline bool NValue::isFalse() const {
 }
 
 inline bool NValue::isBooleanNULL() const {
-    assert(getValueType() == VALUE_TYPE_BOOLEAN);
+    vassert(getValueType() == VALUE_TYPE_BOOLEAN);
     return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
 }
 
@@ -2548,7 +2548,7 @@ inline void NValue::free() const {
       case VALUE_TYPE_VARBINARY:
       case VALUE_TYPE_GEOGRAPHY:
       case VALUE_TYPE_ARRAY:
-         assert(!getSourceInlined());
+         vassert(!getSourceInlined());
          sref = *reinterpret_cast<StringRef* const*>(m_data);
          if (sref != NULL) {
             StringRef::destroy(sref);
@@ -2633,7 +2633,7 @@ inline int NValue::compareNull(const NValue& rhs) const {
  * comparison in favor of op_*.
  */
 inline int NValue::compare_withoutNull(const NValue& rhs) const {
-   assert(isNull() == false && rhs.isNull() == false);
+   vassert(isNull() == false && rhs.isNull() == false);
 
    switch (m_valueType) {
       case VALUE_TYPE_VARCHAR:
@@ -2757,7 +2757,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         if (isInlined) {
             //If it is inlined the storage area contains the actual data so copy a reference
             //to the storage area
-            assert (type != VALUE_TYPE_GEOGRAPHY);
+            vassert(type != VALUE_TYPE_GEOGRAPHY);
             const char* inline_data = reinterpret_cast<const char*>(storage);
             *reinterpret_cast<const char**>(retval.m_data) = inline_data;
             retval.setSourceInlined(true);
@@ -2846,7 +2846,7 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
     case VALUE_TYPE_GEOGRAPHY: {
         //Potentially non-inlined type requires special handling
         if (isInlined) {
-            assert (type != VALUE_TYPE_GEOGRAPHY);
+            vassert(type != VALUE_TYPE_GEOGRAPHY);
             serializeInlineObjectToTupleStorage(static_cast<char*>(storage), maxLength, isInBytes);
             return;
         }
@@ -2925,8 +2925,8 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
             throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
         }
         if (isInlined) {
-            assert(type != VALUE_TYPE_GEOGRAPHY);
-            assert(length <= OBJECT_MAX_LENGTH_SHORT_LENGTH);
+            vassert(type != VALUE_TYPE_GEOGRAPHY);
+            vassert(length <= OBJECT_MAX_LENGTH_SHORT_LENGTH);
             // Always reset the bits regardless of how long the actual value is.
             storage[0] = static_cast<char>(length);
             ::memset(storage+1, 0, maxLength);
@@ -3166,7 +3166,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 
 inline size_t NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const {
     size_t sz = 0;
-    assert(isNull() == false);
+    vassert(isNull() == false);
     const ValueType type = getValueType();
     switch (type) {
     case VALUE_TYPE_VARCHAR:
@@ -3237,7 +3237,7 @@ inline void NValue::allocateObjectFromPool(Pool* pool) {
         return;
     }
 
-    assert(isVariableLengthType(m_valueType));
+    vassert(isVariableLengthType(m_valueType));
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
@@ -3809,8 +3809,8 @@ inline NValue NValue::like(const NValue& rhs) const {
         }
     }
 
-    assert(valueChars);
-    assert(patternChars);
+    vassert(valueChars);
+    vassert(patternChars);
 
     /*
      * Because lambdas are for poseurs.

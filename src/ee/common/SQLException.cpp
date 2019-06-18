@@ -58,25 +58,25 @@ namespace {
 SQLException::SQLException(std::string const& sqlState, std::string const& message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
     m_sqlState(sqlState), m_internalFlags(0) {
-    assert(m_sqlState.length() == 5);
+    vassert(m_sqlState.length() == 5);
 }
 
 SQLException::SQLException(std::string const& sqlState, int error_no, std::string const& message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, make_error_message(error_no, message)),
     m_sqlState(sqlState), m_internalFlags(0) {
-    assert(m_sqlState.length() == 5);
+    vassert(m_sqlState.length() == 5);
 }
 
 SQLException::SQLException(std::string const& sqlState, std::string const& message, VoltEEExceptionType type) :
     SerializableEEException(type, message),
     m_sqlState(sqlState), m_internalFlags(0) {
-    assert(m_sqlState.length() == 5);
+    vassert(m_sqlState.length() == 5);
 }
 
 SQLException::SQLException(std::string const& sqlState, std::string const& message, int internalFlags) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
     m_sqlState(sqlState), m_internalFlags(internalFlags) {
-    assert(m_sqlState.length() == 5);
+    vassert(m_sqlState.length() == 5);
 }
 
 void SQLException::p_serialize(ReferenceSerializeOutput *output) const {

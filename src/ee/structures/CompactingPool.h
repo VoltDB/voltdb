@@ -15,11 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _EE_STRUCTURES_COMPACTINGPOOL_H_
-#define _EE_STRUCTURES_COMPACTINGPOOL_H_
+#pragma once
 
 #include "ContiguousAllocator.h"
-
 #include <cassert>
 #include <cstring>
 #include <unordered_map>
@@ -167,4 +165,3 @@ namespace voltdb
 
 } // namespace voltdb
 
-#endif // _EE_STRUCTURES_COMPACTINGPOOL_H_

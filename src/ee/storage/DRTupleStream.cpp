@@ -34,7 +34,7 @@
 #include <cstdio>
 #include <limits>
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 #include <ctime>
 #include <utility>
 #include <math.h>
@@ -131,7 +131,7 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
         // the initial value, which is TXN_PAR_HASH_REPLICATED
-        assert(m_hashFlag == m_initialHashFlag);
+        vassert(m_hashFlag == m_initialHashFlag);
         return false;
     }
 
@@ -353,7 +353,7 @@ bool DRTupleStream::transactionChecks(int64_t spHandle, int64_t uniqueId)
                     UniqueId::toString(UniqueId(m_openUniqueId)).c_str(), UniqueId::toString(UniqueId(uniqueId)).c_str());
         }
     }
-    assert(m_opened);
+    vassert(m_opened);
     return switchedToOpen;
 }
 
@@ -404,7 +404,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
 {
-    assert(!m_opened);
+    vassert(!m_opened);
 
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -601,7 +601,7 @@ bool DRTupleStream::checkOpenTransaction(DrStreamBlock* sb, size_t minLength, si
         }
         return true;
     }
-    assert(!m_opened);
+    vassert(!m_opened);
     return false;
 }
 
@@ -624,7 +624,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
-        assert(!m_opened);
+        vassert(!m_opened);
         ++m_openSequenceNumber;
     }
 
@@ -702,7 +702,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
         break;
     }
     default:
-        assert(false);
+        vassert(false);
     }
 }
 

@@ -53,7 +53,7 @@ public:
                     m_blocks.erase(block->address());
                     m_blockIterator = m_blocks.find(newNextBlock->address());
                     m_end = m_blocks.end();
-                    assert(m_blockIterator != m_end);
+                    vassert(m_blockIterator != m_end);
                 } else {
                     //No block after the one compacted away
                     //set everything to end
@@ -66,7 +66,7 @@ public:
                 m_blocks.erase(block->address());
                 m_blockIterator = m_blocks.find(nextBlock->address());
                 m_end = m_blocks.end();
-                assert(m_blockIterator != m_end);
+                vassert(m_blockIterator != m_end);
             }
         }
     }

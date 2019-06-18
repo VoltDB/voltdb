@@ -19,10 +19,9 @@
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/FixUnusedAssertHack.h"
 #include "expressions/hashrangeexpression.h"
 #include "logging/LogManager.h"
-#include <cassert>
+#include <common/debuglog.h>
 #include <sstream>
 #include <limits>
 
@@ -211,7 +210,7 @@ bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 {
     if (m_indexActive) {
         StreamPredicateList &predicates = getPredicates();
-        assert(predicates.size() > 0);
+        vassert(predicates.size() > 0);
         if (predicates[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }

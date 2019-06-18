@@ -82,7 +82,7 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
 
 void LargeTempTable::finishInserts() {
     if (m_blockForWriting) {
-        assert (m_blockIds.size() > 0 && m_blockIds.back() == m_blockForWriting->id());
+        vassert(m_blockIds.size() > 0 && m_blockIds.back() == m_blockForWriting->id());
         if (m_blockForWriting->isPinned()) {
             // In general, if m_blockForWriting is not null, then the
             // block it points to will be pinned.  The only case where
@@ -138,7 +138,7 @@ std::vector<LargeTempTableBlockId>::iterator LargeTempTable::releaseBlock(std::v
 }
 
 void LargeTempTable::swapContents(AbstractTempTable* otherTable) {
-    assert (dynamic_cast<LargeTempTable*>(otherTable));
+    vassert(dynamic_cast<LargeTempTable*>(otherTable));
     LargeTempTable* otherLargeTable = static_cast<LargeTempTable*>(otherTable);
 
     if (m_blockForWriting || otherLargeTable->m_blockForWriting) {
@@ -376,7 +376,7 @@ private:
     // N is a compile time parameter here to encourage loop unrolling.
     template<int N>
     void insertionSort(LargeTempTableBlock::iterator beginIt) {
-        assert (N > 1);
+        vassert(N > 1);
 
         for (difference_type i = 0; i < N; ++i) {
             int j = i;

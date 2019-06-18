@@ -112,7 +112,7 @@ bool UnionSetOperator::processTuples()
     //
     for (size_t ctr = 0, cnt = m_input_tablerefs.size(); ctr < cnt; ctr++) {
         Table* input_table = m_input_tablerefs[ctr].getTable();
-        assert(input_table);
+        vassert(input_table);
         TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
@@ -181,7 +181,7 @@ bool ExceptIntersectSetOperator::processTuples()
     // The value - tuple's repeat count in the final table.
     TupleMap tuples;
 
-    assert( ! m_input_tables.empty());
+    vassert( ! m_input_tables.empty());
 
     size_t ii = m_input_tablerefs.size();
     while (ii--) {
@@ -206,7 +206,7 @@ bool ExceptIntersectSetOperator::processTuples()
     for (size_t ctr = 1, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
         next_tuples.clear();
         input_table = m_input_tables[ctr];
-        assert(input_table);
+        vassert(input_table);
         collectTuples(*input_table, next_tuples);
         if (m_is_except) {
             exceptTupleMaps(tuples, next_tuples);
@@ -307,15 +307,15 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
                            const ExecutorVector& executorVector)
 {
     VOLT_TRACE("init Union Executor");
-    assert(! executorVector.isLargeQuery());
+    vassert(! executorVector.isLargeQuery());
 
     UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     //
     // First check to make sure they have the same number of columns
     //
-    assert(node->getInputTableCount() > 0);
+    vassert(node->getInputTableCount() > 0);
 
     Table* input_table_0 = node->getInputTable(0);
     const TupleSchema *table_0_schema = input_table_0->schema();

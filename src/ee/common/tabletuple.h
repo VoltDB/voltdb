@@ -54,7 +54,7 @@
 #include "common/FatalException.hpp"
 #include "common/ExportSerializeIo.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <ostream>
 #include <iostream>
 #include <vector>
@@ -136,12 +136,12 @@ public:
             StackTrace::printStackTrace();
         }
 #endif
-        assert(m_schema != NULL || address == NULL);
+        vassert(m_schema != NULL || address == NULL);
         m_data = reinterpret_cast<char*> (address);
     }
 
     inline void moveNoHeader(void *address) {
-        assert(m_schema);
+        vassert(m_schema);
         // isActive() and all the other methods expect a header
         m_data = reinterpret_cast<char*> (address) - TUPLE_HEADER_SIZE;
     }
@@ -149,8 +149,8 @@ public:
     // Used to wrap read only tuples in indexing code. TODO Remove
     // constedeness from indexing code so this cast isn't necessary.
     inline void moveToReadOnlyTuple(const void *address) {
-        assert(m_schema);
-        assert(address);
+        vassert(m_schema);
+        vassert(address);
         //Necessary to move the pointer back TUPLE_HEADER_SIZE
         // artificially because Tuples used as keys for indexes do not
         // have the header.
@@ -247,12 +247,12 @@ public:
      * columns ot type varchar and varbinary.
      */
     void shrinkAndSetNValue(const int idx, const voltdb::NValue& value) {
-        assert(m_schema);
+        vassert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        assert(columnInfo);
+        vassert(columnInfo);
         const ValueType valueType = columnInfo->getVoltType();
         // shrink is permissible only on variable length column and currently only for varchar and varbinary
-        assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
+        vassert((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
         bool isColumnLngthInBytes = (valueType == VALUE_TYPE_VARBINARY) ? true : columnInfo->inBytes;
         uint32_t columnLength = columnInfo->length;
 
@@ -289,14 +289,14 @@ public:
      */
     void setNValue(const int idx, voltdb::NValue value)
     {
-        assert(m_schema);
+        vassert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, false);
     }
 
     void setHiddenNValue(const int idx, voltdb::NValue value)
     {
-        assert(m_schema);
+        vassert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         setNValue(columnInfo, value, false);
     }
@@ -326,7 +326,7 @@ public:
     template<class POOL>
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
                                           POOL *dataPool) {
-        assert(m_schema);
+        vassert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         setNValue(columnInfo, value, true, dataPool);
     }
@@ -392,9 +392,9 @@ public:
 
     /** Get the value of a specified column (const). */
     inline const NValue getNValue(const int idx) const {
-        assert(m_schema);
-        assert(m_data);
-        assert(idx < m_schema->totalColumnCount());   // column index might point to a hidden column of migrating table
+        vassert(m_schema);
+        vassert(m_data);
+        vassert(idx < m_schema->totalColumnCount());   // column index might point to a hidden column of migrating table
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -407,9 +407,9 @@ public:
 
     /** Like the above method but for hidden columns. */
     inline const NValue getHiddenNValue(const int idx) const {
-        assert(m_schema);
-        assert(m_data);
-        assert(idx < m_schema->hiddenColumnCount());
+        vassert(m_schema);
+        vassert(m_data);
+        vassert(idx < m_schema->hiddenColumnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -610,14 +610,14 @@ private:
     char *m_data;
 
     inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
-        assert(m_schema);
-        assert(m_data);
+        vassert(m_schema);
+        vassert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
     inline const char* getDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
-        assert(m_schema);
-        assert(m_data);
+        vassert(m_schema);
+        vassert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
@@ -735,7 +735,7 @@ private:
     void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
                    bool allocateObjects, POOL* tempPool)
     {
-        assert(m_data);
+        vassert(m_data);
         voltdb::ValueType columnType = columnInfo->getVoltType();
         value = value.castAs(columnType);
         bool isInlined = columnInfo->inlined;
@@ -833,7 +833,7 @@ class StandAloneTupleStorage {
          * and initializes tuple to point to this memory
          */
         void init(const TupleSchema* schema) {
-            assert(schema != NULL);
+            vassert(schema != NULL);
 
             // TupleSchema can go away, so copy it here and keep it with our tuple.
             if (m_tupleSchema != NULL) {
@@ -876,13 +876,13 @@ inline TableTuple::TableTuple(const TableTuple &rhs) :
 
 inline TableTuple::TableTuple(const TupleSchema *schema) :
     m_schema(schema), m_data(NULL) {
-    assert (m_schema);
+    vassert(m_schema);
 }
 
 /** Setup the tuple given the specified data location and schema **/
 inline TableTuple::TableTuple(char *data, const voltdb::TupleSchema *schema) {
-    assert(data);
-    assert(schema);
+    vassert(data);
+    vassert(schema);
     m_data = data;
     m_schema = schema;
 }
@@ -896,9 +896,9 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 /** Multi column version. */
 inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end)
 {
-    assert(m_schema);
-    assert(lhs.getSchema());
-    assert(beginIdx + end - begin <= columnCount());
+    vassert(m_schema);
+    vassert(lhs.getSchema());
+    vassert(beginIdx + end - begin <= columnCount());
     while (begin != end) {
         setNValue(beginIdx++, lhs.getNValue(begin++));
     }
@@ -910,10 +910,10 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 template<class POOL>
 inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, POOL *pool)
 {
-    assert(m_schema);
-    assert(source.m_schema);
-    assert(source.m_data);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(source.m_schema);
+    vassert(source.m_data);
+    vassert(m_data);
 
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
 
@@ -951,8 +951,8 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
 inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                                                 std::vector<char*> &oldObjects, std::vector<char*> &newObjects)
 {
-    assert(m_schema);
-    assert(m_schema->equals(source.m_schema));
+    vassert(m_schema);
+    vassert(m_schema->equals(source.m_schema));
     const int columnCount = m_schema->columnCount();
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
     /*
@@ -1013,7 +1013,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
         if (m_schema->hiddenColumnCount() > 0) {
             // If we ever add support for uninlined hidden columns,
             // we'll need to do update this code.
-            assert(m_schema->getUninlinedObjectHiddenColumnCount() == 0);
+            vassert(m_schema->getUninlinedObjectHiddenColumnCount() == 0);
             ::memcpy(m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
                      source.m_data + TUPLE_HEADER_SIZE + m_schema->offsetOfHiddenColumns(),
                      m_schema->lengthOfAllHiddenColumns());
@@ -1029,10 +1029,10 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
 }
 
 inline void TableTuple::copy(const TableTuple &source) {
-    assert(m_schema);
-    assert(source.m_schema);
-    assert(source.m_data);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(source.m_schema);
+    vassert(source.m_data);
+    vassert(m_data);
 
 #ifndef NDEBUG
     if( ! m_schema->isCompatibleForMemcpy(source.m_schema)) {
@@ -1051,8 +1051,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     TableTuple::deserializeFrom(tupleIn, dataPool, false);
 }
 inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool, bool elastic) {
-    assert(m_schema);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(m_data);
 
     const int32_t columnCount  = m_schema->columnCount();
     const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
@@ -1119,8 +1119,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
 }
 
 inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Pool *dataPool) {
-    assert(m_schema);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(m_data);
     const int32_t columnCount  = m_schema->columnCount();
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
     const uint8_t *nullArray = reinterpret_cast<const uint8_t*>(tupleIn.getRawPointer(nullMaskLength));
@@ -1228,8 +1228,8 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includ
 }
 
 inline void TableTuple::setAllNulls() {
-    assert(m_schema);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(m_data);
 
     for (int ii = 0; ii < m_schema->columnCount(); ++ii) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
@@ -1249,7 +1249,7 @@ inline void TableTuple::relocateNonInlinedFields(std::ptrdiff_t offset) {
     for (uint16_t i = 0; i < nonInlinedColCount; i++) {
         uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        assert (isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
+        vassert(isVariableLengthType(columnInfo->getVoltType()) && !columnInfo->inlined);
 
         char **dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
         if (*dataPtr != NULL) {
