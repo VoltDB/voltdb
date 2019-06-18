@@ -906,6 +906,7 @@ public class ParserDDL extends ParserRoutine {
                         checkIsSimpleName();
 
                         return compileAlterTableAddColumn(t);
+
                     case Tokens.USING :
                         if (t.getTTL() != null) {
                             throw Error.error(ErrorCode.X_42504);
@@ -977,9 +978,14 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.ALTER : {
                 read();
 
-                if (token.tokenType == Tokens.EXPORT ) {
+                if (token.tokenType == Tokens.EXPORT) {
                     return readPersistentExport(t, true);
                 }
+
+                if (token.tokenType == Tokens.USING) {
+                    return readTimeToLive(t, true);
+                }
+
                 if (token.tokenType == Tokens.COLUMN) {
                     read();
                 }
@@ -990,9 +996,6 @@ public class ParserDDL extends ParserRoutine {
                 read();
 
                 return compileAlterColumn(t, column, columnIndex);
-            }
-            case Tokens.USING : {
-                return readTimeToLive(t, true);
             }
             default : {
                 throw unexpectedToken();
@@ -1116,6 +1119,10 @@ public class ParserDDL extends ParserRoutine {
             int colType = col.getDataType().typeCode;
             if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
                 throw unexpectedToken();
+            }
+            // At this moment we don't allow alter TTL column of migrate table on the fly
+            if (alter && table.hasMigrationTarget() && !token.tokenString.equals(table.getTTL().ttlColumn.getNameString())) {
+                throw Error.error(ErrorCode.X_42581, "May not alter TTL column");
             }
         } else {
             throw unexpectedToken();
