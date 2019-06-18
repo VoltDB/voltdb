@@ -152,9 +152,9 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     vassert(schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    bool isTableWithStream = schema->isTableWithStream();
-    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithStream) ||
-        (hiddenColumnCount == 2 && isTableWithStream))) {
+    bool isTableWithMigrate = schema->isTableWithMigrate();
+    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithMigrate) ||
+        (hiddenColumnCount == 2 && isTableWithMigrate))) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.
@@ -1465,8 +1465,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
     if (lookupType != LOOKUP_FOR_UNDO &&
             m_schema->getUninlinedObjectColumnCount() != 0) {
         bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        while (ti.next(tableTuple)) {
             if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
                 return tableTuple;
             }
@@ -1484,8 +1483,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
         // Do an inline tuple byte comparison
         // to avoid matching duplicate tuples with different pointers to Object storage
         // -- which would cause erroneous releases of the wrong Object storage copy.
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        while (ti.next(tableTuple)) {
             char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
             char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
             if (::memcmp(tableTupleData, tupleData, tuple_length) == 0) {
@@ -2190,9 +2188,8 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
 
     int64_t mispartitionedRows = 0;
 
-    while (iter.hasNext()) {
-        TableTuple tuple(schema());
-        iter.next(tuple);
+    TableTuple tuple(schema());
+    while (iter.next(tuple)) {
         int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
         if (newPartitionId != partitionId) {
             std::ostringstream buffer;
@@ -2524,7 +2521,7 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
-   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %ld, batch remaining: %ld",
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
         name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
    return true;
 }

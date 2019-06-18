@@ -46,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -84,7 +85,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final StreamSnapshotAckReceiver m_ackReceiver;
 
     // Skip all subsequent writes if one fails
-    private final AtomicReference<IOException> m_writeFailed = new AtomicReference<IOException>();
+    private final AtomicReference<Exception> m_writeFailed = new AtomicReference<>();
     // true if the failure is already reported to the SnapshotSiteProcessor, prevent throwing
     // the same exception multiple times.
     private boolean m_failureReported = false;
@@ -356,7 +357,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                                         "Node rejoin may need to be retried",
                                 (now - work.m_ts) / 1000));
                 rejoinLog.error(exception.getMessage());
-                m_writeFailed.compareAndSet(null, exception);
+                setWriteFailed(exception);
             }
         }
     }
@@ -377,6 +378,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
         m_outstandingWork.clear();
         m_outstandingWorkCount.set(0);
+        notifyAll();
     }
 
     /**
@@ -397,7 +399,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (work.receiveAck()) {
             rejoinLog.trace("Received ack for targetId " + m_targetId +
                     " removes block for index " + String.valueOf(blockIndex));
-            m_outstandingWorkCount.decrementAndGet();
+            if (m_outstandingWorkCount.decrementAndGet() == 0) {
+                notifyAll();
+            }
             m_outstandingWork.remove(blockIndex);
             work.discard();
         }
@@ -405,6 +409,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             rejoinLog.trace("Received ack for targetId " + m_targetId +
                     " decrements counter for block index " + String.valueOf(blockIndex));
         }
+    }
+
+    @Override
+    public synchronized void receiveError(Exception exception) {
+        setWriteFailed(exception);
     }
 
     /**
@@ -528,7 +537,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
                     IOException e = new IOException("Trying to write snapshot data " +
                             "after the stream is closed");
-                    m_writeFailed.set(e);
+                    setWriteFailed(e);
                     return Futures.immediateFailedFuture(e);
                 }
 
@@ -581,9 +590,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     synchronized ListenableFuture<Boolean> send(StreamSnapshotMessageType type, int blockIndex, BBContainer chunk, boolean replicatedTable) {
         SettableFuture<Boolean> sendFuture = SettableFuture.create();
-        rejoinLog.trace("Sending block " + blockIndex + " of type " + (replicatedTable?"REPLICATED ":"PARTITIONED ") + type.name() +
-                " from targetId " + m_targetId + " to " + CoreUtils.hsIdToString(m_destHSId) +
-                (replicatedTable?", " + CoreUtils.hsIdCollectionToString(m_otherDestHostHSIds):""));
+        if (rejoinLog.isTraceEnabled()) {
+            rejoinLog.trace("Sending block " + blockIndex + " of type " + (replicatedTable?"REPLICATED ":"PARTITIONED ") + type.name() +
+                    " from targetId " + m_targetId + " to " + CoreUtils.hsIdToString(m_destHSId) +
+                    (replicatedTable?", " + CoreUtils.hsIdCollectionToString(m_otherDestHostHSIds):""));
+        }
         SendWork sendWork = new SendWork(type, m_targetId, m_destHSId,
                 replicatedTable?m_otherDestHostHSIds:null, chunk, sendFuture);
         m_outstandingWork.put(blockIndex, sendWork);
@@ -644,8 +655,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
         // If there was an error during close(), throw it so that the snapshot
         // can be marked as failed.
-        if (m_writeFailed.get() != null) {
-            throw m_writeFailed.get();
+        Exception e = m_writeFailed.get();
+        if (e != null) {
+            Throwables.propagateIfPossible(e, IOException.class);
+            throw new IOException(e);
         }
     }
 
@@ -670,10 +683,18 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         waitForOutstandingWork();
     }
 
-    private void waitForOutstandingWork()
+    private synchronized void waitForOutstandingWork()
     {
+        boolean interrupted = false;
         while (m_writeFailed.get() == null && (m_outstandingWorkCount.get() > 0)) {
-            Thread.yield();
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
 
         // if here because a write failed, cleanup outstanding work
@@ -701,10 +722,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (exception != null) {
             return exception;
         }
-        exception = m_ackReceiver.m_lastException;
-        if (exception != null) {
-            return exception;
-        }
+
         return m_writeFailed.get();
     }
 
@@ -727,5 +745,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         bb.getInt(); // skip first four (partition id)
 
         return bb.getInt();
+    }
+
+    private synchronized void setWriteFailed(Exception exception) {
+        m_ackReceiver.forceStop();
+        if (m_writeFailed.compareAndSet(null, exception)) {
+            notifyAll();
+        }
     }
 }

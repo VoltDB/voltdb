@@ -503,7 +503,12 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                     // FIXME: reject this case for now
                     // FIXME: we could select the sequence that has the oldest entry and delete
                     // the other files
-                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce);
+                    StringBuilder sb = new StringBuilder();
+                    for (Deque<Long> seq : sequences) {
+                        sb.append("\nsequence:" + seq);
+                    }
+                    throw new IOException("Found " + sequences.size() + " PBD sequences for " + m_nonce +
+                            sb.toString() );
                 }
                 Deque<Long> sequence = sequences.getFirst();
                 long index = 1L;

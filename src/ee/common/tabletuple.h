@@ -489,6 +489,7 @@ public:
     bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
 
     int compare(const TableTuple &other) const;
+    int compareNullAsMax(const TableTuple &other) const;
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool, bool elasticJoin);
@@ -641,7 +642,7 @@ private:
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
         // Exclude the hidden column for persistent table with stream
         uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
-        if (m_schema->isTableWithStream()) {
+        if (m_schema->isTableWithMigrate()) {
             hiddenColumnCount--;
         }
         for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
@@ -1093,24 +1094,29 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 
-    bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithStream() : false);
+    bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithMigrate() : false);
     for (int j = 0; j < hiddenColumnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+
+        // tupleIn may not have hidden column
+        if (!tupleIn.hasRemaining()) {
+            std::ostringstream message;
+            message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
+                    << "(index=" << j << ")"
+                    << "hidden column count=" << m_schema->hiddenColumnCount()
+                    << std::endl;
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
+        }
+
         if (hiddenColumnMigrateElastic && j == hiddenColumnCount -1) {
+            vassert(columnInfo->getVoltType() == VALUE_TYPE_BIGINT);
+            // TableTuple::serializeTo includes the migrate column so just discard it
+            tupleIn.readLong();
+
             NValue value = NValue::getNullValue(columnInfo->getVoltType());
-            setHiddenNValue(j, value);
+            setNValue(columnInfo, value, false);
             VOLT_DEBUG("Deserializing migrate hidden column for elastic operation");
         } else {
-            // tupleIn may not have hidden column
-            if (!tupleIn.hasRemaining()) {
-                std::ostringstream message;
-                message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
-                        << "(index=" << j << ")"
-                        << "hidden column count=" << m_schema->hiddenColumnCount()
-                        << std::endl;
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
-            }
-
             char *dataPtr = getWritableDataPtr(columnInfo);
             NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
@@ -1146,11 +1152,11 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 
     int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
-    bool isTableWithStream = m_schema->isTableWithStream();
+    bool isTableWithMigrate = m_schema->isTableWithMigrate();
 
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        if (isTableWithStream && i == hiddenColumnCount - 1) {
+        if (isTableWithMigrate && i == hiddenColumnCount - 1) {
             // Set the hidden column for persistent table to null
             NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
             setHiddenNValue(i, value);
@@ -1269,6 +1275,24 @@ inline int TableTuple::compare(const TableTuple &other) const {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
         diff = lhs.compare(rhs);
+        if (diff) {
+            return diff;
+        }
+    }
+    return VALUE_COMPARE_EQUAL;
+}
+
+/**
+ * Compare two tuples. Null value in the rhs tuple will be treated as maximum.
+ */
+inline int TableTuple::compareNullAsMax(const TableTuple &other) const {
+    const int columnCount = m_schema->columnCount();
+    assert(columnCount == other.m_schema->columnCount());
+    int diff;
+    for (int ii = 0; ii < columnCount; ii++) {
+        const NValue& lhs = getNValue(ii);
+        const NValue& rhs = other.getNValue(ii);
+        diff = lhs.compareNullAsMax(rhs);
         if (diff) {
             return diff;
         }

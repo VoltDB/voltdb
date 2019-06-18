@@ -38,7 +38,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;

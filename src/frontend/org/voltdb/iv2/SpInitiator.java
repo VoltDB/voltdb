@@ -129,7 +129,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks, getInitiatorHSId());
         m_scheduler.m_repairLog = m_repairLog;
     }
 

@@ -135,6 +135,9 @@ public class SpProcedureTask extends ProcedureTask
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
         }
+        if (HOST_DEBUG_ENABLED) {
+            hostLog.debug("START for rejoin: " + this);
+        }
 
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response =
@@ -160,7 +163,7 @@ public class SpProcedureTask extends ProcedureTask
         LatencyWatchdog.pet();
 
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("START replaying txn: " + this);
+            hostLog.debug("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
             m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -194,7 +197,7 @@ public class SpProcedureTask extends ProcedureTask
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         }
         if (HOST_DEBUG_ENABLED) {
-            hostLog.trace("COMPLETE replaying txn: " + this);
+            hostLog.debug("COMPLETE replaying txn: " + this);
         }
 
         logToDR(siteConnection.getDRGateway(), txnState);

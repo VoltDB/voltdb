@@ -37,7 +37,7 @@ public class JiggleExportGroupDoneTable extends VoltProcedure {
         // Execute last statement batch
         voltExecuteSQL(true);
 
-        // Retun to caller
+        // Return to caller
         return txid;
     }
 }

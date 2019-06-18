@@ -94,7 +94,7 @@ public class ExportCoordinator {
         private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
         public ExportCoordinationStateMachine(SynchronizedStatesManager ssm) {
-            ssm.super(s_coordinatorTaskName, exportLog);
+            ssm.super(s_coordinatorTaskName, ssmLog);
         }
 
         @Override
@@ -123,11 +123,12 @@ public class ExportCoordinator {
                             }
                             Integer newLeaderHostId = initialState.getInt();
                             m_leaderHostId = newLeaderHostId;
-                            StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
-                                    .append(m_leaderHostId)
-                                    .append(isPartitionLeader() ? " (localHost) " : " ")
-                                    .append("is the leader at initial state");
-                            exportLog.info(sb.toString());
+
+                            if (isPartitionLeader()) {
+                                exportLog.info(getLeaderMessageAtInitialState());
+                            } else if (exportLog.isDebugEnabled()) {
+                                exportLog.debug(getLeaderMessageAtInitialState());
+                            }
                             setCoordinatorInitialized();
                             invokeNext();
 
@@ -144,6 +145,14 @@ public class ExportCoordinator {
             } catch (Exception e) {
                 exportLog.error("Failed to handle initial state: " + e);
             }
+        }
+
+        private String getLeaderMessageAtInitialState() {
+            StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
+                    .append(m_leaderHostId)
+                    .append(isPartitionLeader() ? " (localHost) " : " ")
+                    .append("is the leader at initial state");
+            return sb.toString();
         }
 
         @Override
@@ -261,7 +270,9 @@ public class ExportCoordinator {
                 }
                 Runnable runnable = m_invocations.poll();
                 if (runnable == null) {
-                    exportLog.warn("No runnable to invoke, canceling lock");
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("No runnable to invoke, canceling lock");
+                    }
                     cancelLockRequest();
                     m_pending.set(false);
                     return;
@@ -337,11 +348,12 @@ public class ExportCoordinator {
                                 return;
                             }
                             m_leaderHostId = newLeaderHostId;
-                            StringBuilder sb = new StringBuilder("Host ")
-                                    .append(m_leaderHostId)
-                                    .append(isPartitionLeader() ? " (localHost) " : " ")
-                                    .append("is the new leader");
-                            exportLog.info(sb.toString());
+
+                            if (isPartitionLeader()) {
+                                exportLog.info(getNewLeaderMessage());
+                            } else if (exportLog.isDebugEnabled()) {
+                                exportLog.debug(getNewLeaderMessage());
+                            }
 
                             // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
                             // Note: cannot initiate a coordinator task directly from here, must go
@@ -369,6 +381,14 @@ public class ExportCoordinator {
             } catch (Exception e) {
                 exportLog.error("Failed to handle state resolution: " + e);
             }
+        }
+
+        private String getNewLeaderMessage() {
+            StringBuilder sb = new StringBuilder("Host ")
+                    .append(m_leaderHostId)
+                    .append(isPartitionLeader() ? " (localHost) " : " ")
+                    .append("is the new leader");
+            return sb.toString();
         }
 
         @Override
@@ -406,32 +426,42 @@ public class ExportCoordinator {
                                 if (lastReleasedSeqNo < m_eds.getLastReleaseSeqNo()) {
                                     // Leader is behind on acks, ask the ExportDataSource to resend
                                     // an ack to all the other hosts.
-                                    StringBuilder sb = new StringBuilder("Leader host ")
-                                            .append(m_leaderHostId)
-                                            .append(" released sequence number (")
-                                            .append(lastReleasedSeqNo)
-                                            .append(") is behind the local released sequence number (")
-                                            .append(m_eds.getLastReleaseSeqNo())
-                                            .append(")");
-                                    exportLog.warn(sb.toString());
+                                    if (exportLog.isDebugEnabled()) {
+                                        StringBuilder sb = new StringBuilder("Leader host ")
+                                                .append(m_leaderHostId)
+                                                .append(" released sequence number (")
+                                                .append(lastReleasedSeqNo)
+                                                .append(") is behind the local released sequence number (")
+                                                .append(m_eds.getLastReleaseSeqNo())
+                                                .append(")");
+                                        exportLog.debug(sb.toString());
+                                    }
                                     m_eds.forwardAckToOtherReplicas();
 
                                 } else if (m_eds.getLastReleaseSeqNo() < lastReleasedSeqNo) {
                                     // Leader is ahead on acks, do a local release
-                                    StringBuilder sb = new StringBuilder("Leader host ")
-                                            .append(m_leaderHostId)
-                                            .append(" released sequence number (")
-                                            .append(lastReleasedSeqNo)
-                                            .append(") is ahead of the local released sequence number (")
-                                            .append(m_eds.getLastReleaseSeqNo())
-                                            .append(")");
-                                    exportLog.warn(sb.toString());
+                                    if (exportLog.isDebugEnabled()) {
+                                        StringBuilder sb = new StringBuilder("Leader host ")
+                                                .append(m_leaderHostId)
+                                                .append(" released sequence number (")
+                                                .append(lastReleasedSeqNo)
+                                                .append(") is ahead of the local released sequence number (")
+                                                .append(m_eds.getLastReleaseSeqNo())
+                                                .append(")");
+                                        exportLog.debug(sb.toString());
+                                    }
                                     m_eds.localAck(lastReleasedSeqNo, lastReleasedSeqNo);
                                 }
                             }
 
-                            // Get the EDS tracker (note, this is a duplicate)
-                            ExportSequenceNumberTracker tracker = m_eds.getTracker();
+                            // Try to get our normalized tracker first: in case the EDS tracker
+                            // is empty, a rejoining node might infer a leading gap that doesn't
+                            // exist (ENG-16589).
+                            ExportSequenceNumberTracker tracker = m_trackers.get(m_hostId);
+                            if (tracker == null) {
+                                // Otherwise, get the EDS tracker (note, this is a duplicate)
+                                tracker = m_eds.getTracker();
+                            }
                             lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
                             if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
                                 if (exportLog.isDebugEnabled()) {
@@ -491,16 +521,20 @@ public class ExportCoordinator {
                             for(Map.Entry<String, ByteBuffer> entry : results.entrySet()) {
                                 ByteBuffer buf = entry.getValue();
                                 if ((buf == null)) {
-                                    if (ourTask) {
-                                        exportLog.warn("No response from: " + entry.getKey() + ", request trackers again");
-                                    } else if (exportLog.isDebugEnabled()) {
-                                        exportLog.warn("No response from: " + entry.getKey() + ", wait for complete trackers");
+                                    if (exportLog.isDebugEnabled()) {
+                                        if (ourTask) {
+                                            exportLog.debug("No response from: " + entry.getKey() + ", request trackers again");
+                                        } else if (exportLog.isDebugEnabled()) {
+                                            exportLog.debug("No response from: " + entry.getKey() + ", wait for complete trackers");
+                                        }
                                     }
                                     requestAgain = true;
                                     break;
                                 }
                                 else if (!buf.hasRemaining()) {
-                                    exportLog.warn("Received empty response from: " + entry.getKey());
+                                    if (exportLog.isDebugEnabled()) {
+                                        exportLog.debug("Received empty response from: " + entry.getKey());
+                                    }
                                 }
                                 else {
                                     int host = buf.getInt();
@@ -587,7 +621,9 @@ public class ExportCoordinator {
                             // from one host. Note also that the request goes through another EDS runnable.
                             if (!addedMembers.isEmpty()) {
                                 if (isPartitionLeader()) {
-                                    exportLog.info("Leader requests trackers for added members: " + addedMembers);
+                                    if (exportLog.isDebugEnabled()) {
+                                        exportLog.debug("Leader requests trackers for added members: " + addedMembers);
+                                    }
                                     requestTrackers();
 
                                 } else if (exportLog.isDebugEnabled()) {
@@ -595,8 +631,9 @@ public class ExportCoordinator {
                                 }
 
                             } else if (!removedMembers.isEmpty()){
-                                exportLog.info("Removing members: " + removedMembers);
-
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Removing members: " + removedMembers);
+                                }
                                 for (String memberId: removedMembers) {
                                     Integer hostId = m_hosts.remove(memberId);
                                     if (hostId == null) {
@@ -613,7 +650,9 @@ public class ExportCoordinator {
                                     tracker = null;
                                     if (m_leaderHostId == hostId) {
                                         // If the leader went away, wait for the next leader
-                                        exportLog.warn("Lost leader host " + hostId + " reset coordinator");
+                                        if (exportLog.isDebugEnabled()) {
+                                            exportLog.debug("Lost leader host " + hostId + " reset coordinator");
+                                        }
                                         resetCoordinator(true, true);
                                         return;
                                     }
@@ -640,6 +679,7 @@ public class ExportCoordinator {
     }
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final VoltLogger ssmLog = new VoltLogger("SSM");
     public static final String s_coordinatorTaskName = "coordinator";
 
     // ExportSequenceNumberTracker uses closed ranges and using
@@ -738,8 +778,10 @@ public class ExportCoordinator {
 
             task = new ExportCoordinationStateMachine(ssm);
 
-            exportLog.info("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
-                    + ", leaderHostId: " + m_leaderHostId);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Created export coordinator for topic " + topicName + ", and hostId " + m_hostId
+                        + ", leaderHostId: " + m_leaderHostId);
+            }
 
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Failed to initialize ExportCoordinator state machine", true, e);
@@ -809,9 +851,10 @@ public class ExportCoordinator {
             m_stateMachine.registerStateMachineWithManager(initialState);
 
             String topicName = getTopicName(m_eds.getTableName(), m_eds.getPartitionId());
-            exportLog.info("Initializing export coordinator for topic " + topicName + ", and hostId " + m_hostId
-                    + ", leaderHostId: " + m_leaderHostId);
-
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Initializing export coordinator for topic " + topicName + ", and hostId " + m_hostId
+                        + ", leaderHostId: " + m_leaderHostId);
+            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Failed to initialize ExportCoordinator state machine", true, e);
         }
@@ -833,7 +876,9 @@ public class ExportCoordinator {
             m_eds.onCoordinatorShutdown();
             return;
         }
-        exportLog.info("Export coordinator requesting shutdown: clearing pending invocations");
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export coordinator requesting shutdown: clearing pending invocations");
+        }
         m_stateMachine.clearInvocations();
 
         // We want to shutdown after we get the lock
@@ -873,7 +918,9 @@ public class ExportCoordinator {
             return;
         }
         if (m_hostId.equals(m_leaderHostId)) {
-            exportLog.warn(m_eds + " is already the partition leader");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(m_eds + " is already the partition leader");
+            }
             return;
         }
 
@@ -1007,7 +1054,9 @@ public class ExportCoordinator {
                 m_safePoint = gap.getFirst() - 1;
             }
 
-            exportLog.info("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Leader host " + m_leaderHostId + " is Export Master until safe point " + m_safePoint);
+            }
             return m_isMaster;
         }
 
@@ -1072,7 +1121,9 @@ public class ExportCoordinator {
      * The request carries the leader's last released sequence number.
      */
     private void requestTrackers() {
-        exportLog.info("Host: " + m_hostId + " requesting export trackers");
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Host: " + m_hostId + " requesting export trackers");
+        }
 
         m_stateMachine.invoke(new Runnable() {
             @Override
@@ -1096,7 +1147,8 @@ public class ExportCoordinator {
 
     /**
      * Normalize the trackers to account for any host having a gap at the end; one
-     * of the other hosts will have a higher sequence number.
+     * of the other hosts will have a higher sequence number. Handle trackers already
+     * normalized to end at INFINITE_SEQNO.
      *
      * Normalize the trackers for gaps at the beginning.
      */
@@ -1105,22 +1157,32 @@ public class ExportCoordinator {
         long highestSeqNo = 0L;
         long lowestSeqNo = Long.MAX_VALUE;
 
+        // Find highest (unnormalized) and lowest seqNos across all trackers
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
                 continue;
             }
             lowestSeqNo = Math.min(lowestSeqNo, tracker.getFirstSeqNo());
-            highestSeqNo = Math.max(highestSeqNo, tracker.getLastSeqNo());
+            long lastSeqNo = tracker.getLastSeqNo();
+            highestSeqNo = lastSeqNo == INFINITE_SEQNO ? highestSeqNo : Math.max(highestSeqNo, lastSeqNo);
         }
         if (lowestSeqNo == Long.MAX_VALUE) {
             lowestSeqNo = 1L;
         }
+
+        // Normalize all trackers to start at lowest seqNo and end at INFINITE_SEQNO
+        // with potential trailing and leading gaps
         for (ExportSequenceNumberTracker tracker : m_trackers.values()) {
             if (tracker.isEmpty()) {
                 tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
-                tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                if (tracker.getLastSeqNo() < INFINITE_SEQNO) {
+                    // Tracker is not already normalized to infinite,
+                    // extend it (potentially creating trailing gap).
+                    tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                }
                 if (tracker.getFirstSeqNo() > lowestSeqNo) {
+                    // Create a leading gap on tracker
                     tracker.addRange(lowestSeqNo, lowestSeqNo);
                 }
             }

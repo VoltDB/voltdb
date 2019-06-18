@@ -73,8 +73,7 @@ void TempTable::deleteAllTempTupleDeepCopies() {
     if (m_schema->getUninlinedObjectColumnCount() > 0) {
         TableTuple target(m_schema);
         TableIterator iter(this, m_data.begin(), false);
-        while (iter.hasNext()) {
-            iter.next(target);
+        while (iter.next(target)) {
             target.freeObjectColumns();
         }
     }

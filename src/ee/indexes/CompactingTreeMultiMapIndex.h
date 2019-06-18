@@ -189,6 +189,44 @@ class CompactingTreeMultiMapIndex : public TableIndex
         }
     }
 
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) {
+        // do moveToGreaterThanKey(), null values in the search key will be treated as maximum
+
+        // IntsKey will pack the key data into uint64, so we can not tell if it is
+        // a NULL value then (a TINYINT NULL is a valid value in INT).
+        // In that case, we will change all numeric null key values into maximum.
+        for (int i = 0; i < searchKey->getSchema()->totalColumnCount(); i++) {
+            if (searchKey->getNValue(i).isNull()) {
+                const ValueType valueType = searchKey->getSchema()->columnType(i);
+                switch (valueType) {
+                    case VALUE_TYPE_BIGINT:
+                        searchKey->setNValue(i, ValueFactory::getBigIntValue(INT64_MAX));
+                        break;
+                    case VALUE_TYPE_INTEGER:
+                        searchKey->setNValue(i, ValueFactory::getIntegerValue(INT32_MAX));
+                        break;
+                    case VALUE_TYPE_SMALLINT:
+                        searchKey->setNValue(i, ValueFactory::getSmallIntValue(INT16_MAX));
+                        break;
+                    case VALUE_TYPE_TINYINT:
+                        searchKey->setNValue(i, ValueFactory::getTinyIntValue(INT8_MAX));
+                        break;
+                    default: // other null types will be handled in GenericComparator
+                        break;
+                }
+            }
+        }
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.upperBoundNullAsMax(KeyType(searchKey));
+        // find prev entry
+        if (mapIter.isEnd()) {
+            moveToEnd(false, cursor);
+        } else {
+            cursor.m_forward = false;
+            mapIter.movePrev();
+        }
+    }
+
     // only be called after moveToGreaterThanKey() for LTE case
     void moveToBeforePriorEntry(IndexCursor& cursor) const
     {

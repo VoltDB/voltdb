@@ -642,13 +642,13 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     //   * function ID (int32_t)
     //   * parameters.
     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
-    for (int i = 0; i < arguments.size(); i++) {
+    for (int index = 0; index < arguments.size(); ++index) {
         // It is very common that the argument we are going to pass is in
         // a compatible data type which does not exactly match the type that
         // is defined in the function.
         // We need to cast it to the target data type before the serialization.
-        arguments[i] = arguments[i].castAs(info->paramTypes[i]);
-        bufferSizeNeeded += arguments[i].serializedSize();
+        arguments[index] = arguments[index].castAs(info->paramTypes[index]);
+        bufferSizeNeeded += arguments[index].serializedSize();
     }
 
     // Check buffer size here.
@@ -665,8 +665,8 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     m_udfOutput.writeInt(functionId);
 
     // Serialize UDF parameters to the buffer.
-    for (int i = 0; i < arguments.size(); i++) {
-        arguments[i].serializeTo(m_udfOutput);
+    for (auto const& value : arguments) {
+        value.serializeTo(m_udfOutput);
     }
     // Make sure we did the correct size calculation.
     vassert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());

@@ -825,6 +825,29 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         known_error_messages, known_valid_show_responses, hanging_sql_commands, \
         find_in_log_output_files, debug
 
+    # Count the number of semicolons, which determines the number of
+    # distinct SQL statements within 'sql'; in the (somewhat unusual)
+    # case that there is more than one, split them up and handle them
+    # separately
+    sql_statement_count = sql.count(';')
+    if sql_statement_count > 1:
+        start_index = 0
+        for i in range(sql_statement_count):
+            end_index = sql.find(';', start_index)
+            if end_index <= 0:
+                print '\nWARNING: in print_sql_statement, apparently miscounted semicolons/SQL statements:'
+                print '         sql:\n', str(sql)
+                print '         sql_statement_count:', str(sql_statement_count)
+                print '         i                  :', str(i)
+                print '         start_index        :', str(start_index)
+                print '         end_index          :', str(end_index)
+                print '         sql[start_index:]  :\n', str(sql[start_index:])
+                break
+            sql_substring = sql[start_index:end_index].strip() + ';'
+            print_sql_statement(sql_substring, num_chars_in_sql_type)
+            start_index = end_index + 1
+        return
+
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
 
@@ -1061,9 +1084,8 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
 
     count = 0
     # Include any initial statements (e.g. INSERT) in the total count
-    if (count_sql_statements and count_sql_statements.get('total')
-                and count_sql_statements['total'].get('total')):
-        count = count_sql_statements['total'].get('total')
+    if (count_sql_statements and count_sql_statements.get('total')):
+        count = count_sql_statements['total'].get('total', 0)
 
     while count < num_sql_statements:
         count += 1
@@ -1106,12 +1128,15 @@ if __name__ == "__main__":
     parser.add_option("-r", "--seed", dest="seed", default=None,
                       help="seed for random number generator; a blank string, or None, means that the seed "
                           + "should itself be randomly generated [default: None]")
-    parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
+    parser.add_option("-i", "--initial_type", dest="initial_type",
+                      default="create-table-statement,partition-table-stmnt,create-non-table-stmnt,"
+                          + "insert-statement,upsert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; "
                           + "typically used to initialize the database using DDL and INSERT statements "
-                          + "[default: ddl-statement,insert-statement]")
-    parser.add_option("-I", "--initial_number", dest="initial_number", default=5,
-                      help="the number of each INITIAL_TYPE of SQL statement to generate [default: 200]")
+                          + "[default: create-table-statement,partition-table-stmnt,create-non-table-stmnt,"
+                          + "insert-statement,upsert-statement]")
+    parser.add_option("-I", "--initial_number", dest="initial_number", default=20,
+                      help="the number of each INITIAL_TYPE of SQL statement to generate [default: 20]")
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
                          + "(after the initial ones, if any) [default: sql-statement]")
@@ -1363,6 +1388,12 @@ if __name__ == "__main__":
                             ['SQL Aggregate function calls with subquery expression arguments are not allowed'],
                             ['Column', 'not found', 'Please update your query'],
                             ['Index: 0, Size: 0'],    # See ENG-15736
+                            ['Column', 'cannot be nullable for TTL'],
+                            ['Partition columns must be an integer, varchar or varbinary type'],
+                            ['Partition columns must be constrained "NOT NULL"'],
+                            ['PARTITION has unknown COLUMN'],
+                            ['Invalid use of PRIMARY KEY'],
+                            ['Invalid use of UNIQUE'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
@@ -1380,8 +1411,10 @@ if __name__ == "__main__":
     # and run each in sqlcmd, if the sqlcmd option was specified
     count_sql_statements = {}
     if options.initial_number:
+        total_initial_statement_count = 0
         for sql_statement_type in options.initial_type.split(','):
-            generate_sql_statements(sql_statement_type, int(options.initial_number))
+            total_initial_statement_count += int(options.initial_number)
+            generate_sql_statements(sql_statement_type, int(total_initial_statement_count))
     for sql_statement_type in options.type.split(','):
         generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
                                 options.delete_type, options.delete_number)

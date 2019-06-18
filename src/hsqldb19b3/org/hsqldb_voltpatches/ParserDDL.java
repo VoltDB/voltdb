@@ -1058,7 +1058,7 @@ public class ParserDDL extends ParserRoutine {
             }
         }
         if (triggers.isEmpty()) {
-            triggers= Arrays.asList("DELETE","INSERT","UPDATE");
+            triggers= Arrays.asList("INSERT");
         }
 
         Object[] args = new Object[] {

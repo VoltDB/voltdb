@@ -467,26 +467,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
             tableIndex->moveToLessThanKey(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-            // find the entry whose key is greater than search key,
-            // do a forward scan using initialExpr to find the correct
-            // start point to do reverse scan
-            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
-            if (isEnd) {
-                tableIndex->moveToEnd(false, indexCursor);
-            }
-            else {
-                while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
-                    pmp.countdownProgress();
-                    if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
-                        // just passed the first failed entry, so move 2 backward
-                        tableIndex->moveToBeforePriorEntry(indexCursor);
-                        break;
-                    }
-                }
-                if (tuple.isNullTuple()) {
-                    tableIndex->moveToEnd(false, indexCursor);
-                }
-            }
+            // find the entry whose key is less than or equal to search key
+            // as the start point to do a reverse scan
+            tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
             tableIndex->moveToCoveringCell(&searchKey, indexCursor);

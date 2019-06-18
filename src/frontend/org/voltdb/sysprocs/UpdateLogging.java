@@ -52,6 +52,11 @@ public class UpdateLogging extends VoltSystemProcedure
     }
 
     @Override
+    public boolean allowableSysprocForTaskLog() {
+        return true;
+    }
+
+    @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
