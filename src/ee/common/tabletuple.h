@@ -1146,9 +1146,11 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 
     int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
+    bool isTableWithStream = m_schema->isTableWithStream();
+
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        if (i == hiddenColumnCount - 1) {
+        if (isTableWithStream && i == hiddenColumnCount - 1) {
             // Set the hidden column for persistent table to null
             NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
             setHiddenNValue(i, value);
