@@ -1146,19 +1146,21 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 
     int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
-
-    // Exclude the hidden column for persistent table with stream for de-serialization
-    if (m_schema->isTableWithStream()) {
-        hiddenColumnCount--;
-    }
+    bool isTableWithStream = m_schema->isTableWithStream();
 
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
-        NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
-                            tupleIn, dataPool, dataPtr,
-                            hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
-                            static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
+        if (isTableWithStream && i == hiddenColumnCount - 1) {
+            // Set the hidden column for persistent table to null
+            NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
+            setHiddenNValue(i, value);
+        } else {
+            char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
+            NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
+                    tupleIn, dataPool, dataPtr,
+                    hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
+                    static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
+        }
     }
 }
 
