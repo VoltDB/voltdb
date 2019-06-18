@@ -44,5 +44,8 @@
  */
 
 #include "debuglog.h"
+#ifndef NDEBUG
+#ifndef MACOSX
 char __assert_failure_msg__[4096];
-
+#endif
+#endif

@@ -218,15 +218,30 @@ struct _TimerLevels {
 
 // A custom assert macro that adds stacktrace on message
 #ifdef NDEBUG
+// **NOTE**: We allow expr inside `vassert' to have side effect,
+// which GNU libc does not (by simply ommiting the expression)
 #define vassert(expr) (void)(expr)
+#else
+#ifdef MACOSX
+// MACOS does not have an equivalent of __assert_fail; so we do
+// what the header there does, see
+// https://gist.github.com/vrx/17c31cbfe0511645a41a#file-assert-h-L71
+#define vassert(expr)             \
+   if(! (expr)) {                 \
+       printf("%s%u: failed assertion\n(STACK TRACE:\n%s)\n", __FILE__, __LINE__,              \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());                            \
+       abort();                                                                                \
+   }
 #else
 extern char __assert_failure_msg__[4096];
 #define vassert(expr)             \
    if(! (expr)) {                 \
-       snprintf(__assert_failure_msg__, sizeof __assert_failure_msg__,                      \
-               "%s\n(STACK TRACE:\n%s)\n", #expr,                                         \
-               voltdb::StackTrace::stringStackTrace("\t").c_str());                         \
-       __assert_fail(__assert_failure_msg__, __FILE__, __LINE__, __ASSERT_FUNCTION);        \
+       snprintf(__assert_failure_msg__, sizeof __assert_failure_msg__,                         \
+               "%s\n(STACK TRACE:\n%s)\n", #expr,                                              \
+               voltdb::StackTrace::stringStackTrace("\t").c_str());                            \
+       __assert_fail(__assert_failure_msg__, __FILE__, __LINE__, __ASSERT_FUNCTION);           \
    }
+#endif
+
 #endif
 
