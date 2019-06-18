@@ -52,17 +52,7 @@
 
 namespace voltdb {
 
-AbstractPlanNode::AbstractPlanNode()
-    : m_planNodeId(-1)
-    , m_children()
-    , m_childIds()
-    , m_executor()
-    , m_inlineNodes()
-    , m_isInline(false)
-    , m_outputTable()
-    , m_inputTables()
-    , m_validOutputColumnCount(0)
-    , m_outputSchema() { }
+AbstractPlanNode::AbstractPlanNode(): m_executor() {}
 
 AbstractPlanNode::~AbstractPlanNode() {
     map<PlanNodeType, AbstractPlanNode*>::iterator iter;
@@ -238,7 +228,7 @@ TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema() {
 // ----------------------------------------------------
 //  Serialization Functions
 // ----------------------------------------------------
-AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
+std::unique_ptr<AbstractPlanNode> AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
     std::unique_ptr<AbstractPlanNode> node(
@@ -250,12 +240,8 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
         for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
             PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-            AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
-
-            // todo: if this throws, new Node can be leaked.
-            // As long as newNode is not NULL, this will not throw.
-            assert(newNode);
-            node->addInlinePlanNode(newNode);
+            auto newNode = fromJSONObject(inlineNodeObj);
+            node->addInlinePlanNode(newNode.release());
         }
     }
 
@@ -282,13 +268,8 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         // whose output schema is known from its context or is otherwise not of any interest.
         node->m_validOutputColumnCount = SCHEMA_UNDEFINED_SO_GET_FROM_CHILD;
     }
-
     node->loadFromJSONObject(obj);
-
-    AbstractPlanNode* retval = node.get();
-    node.release();
-    assert(retval);
-    return retval;
+    return node;
 }
 
 void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,

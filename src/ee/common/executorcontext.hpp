@@ -263,9 +263,9 @@ class ExecutorContext {
 
     /** Set a new subquery context for the statement id. */
     SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams) {
-        SubqueryContext fromCopy(lastParams);
-        assert(m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy)).second);
-        return &(m_subqueryContextMap.find(subqueryId)->second);
+        auto const& r = m_subqueryContextMap.emplace(subqueryId, SubqueryContext(lastParams));
+        assert(r.second);
+        return &r.first->second;
     }
 
     /**

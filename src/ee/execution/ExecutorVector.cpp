@@ -148,24 +148,19 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     // If this PlanNode has an internal PlanNode (e.g.,
     // AbstractScanPlanNode can have internal Projections), set
     // that internal node's executor as well.
-    std::map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
-    for (internal_it = node->getInlinePlanNodes().begin();
-         internal_it != node->getInlinePlanNodes().end(); internal_it++) {
-        AbstractPlanNode* inline_node = internal_it->second;
-        initPlanNode(engine, inline_node);
+    for (auto iter : node->getInlinePlanNodes()) {
+        initPlanNode(engine, iter.second);
     }
 
     // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(engine, *this)) {
-        return;
+    if (! executor->init(engine, *this)) {
+        char msg[1024 * 10];
+        snprintf(msg, sizeof(msg),
+                "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
+                node->debug().c_str(), (intmax_t)m_fragId);
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
-
-    char msg[1024 * 10];
-    snprintf(msg, sizeof(msg),
-             "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
-             node->debug().c_str(), (intmax_t)m_fragId);
-    VOLT_ERROR("%s", msg);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
 }
 
 void ExecutorVector::setupContext(ExecutorContext* executorContext) {

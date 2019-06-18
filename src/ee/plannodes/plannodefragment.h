@@ -67,7 +67,7 @@ class AbstractPlanNode;
  */
 class PlanNodeFragment {
     // construct a new fragment from a serialized json object
-    static PlanNodeFragment* fromJSONObject(PlannerDomValue const& planNodesArray);
+    static std::unique_ptr<PlanNodeFragment> fromJSONObject(PlannerDomValue const& planNodesArray);
     // read node list for a given sub statement
     void nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId);
 

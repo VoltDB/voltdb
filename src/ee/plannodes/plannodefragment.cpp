@@ -81,15 +81,15 @@ PlanNodeFragment* PlanNodeFragment::createFromCatalog(const char* value) {
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     try {
-        return PlanNodeFragment::fromJSONObject(PlannerDomRoot(value)());
+        return fromJSONObject(PlannerDomRoot(value)()).release();
     } catch (UnexpectedEEException& ue) {
         ue.appendContextToMessage(string("\ncreateFromCatalog:\n").append(value));
         throw;
     }
 }
 
-PlanNodeFragment* PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
-    PlanNodeFragment *retval = new PlanNodeFragment();
+std::unique_ptr<PlanNodeFragment> PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
+    std::unique_ptr<PlanNodeFragment> retval(new PlanNodeFragment());
     if (obj.hasNonNullKey("IS_LARGE_QUERY")) {
         retval->m_isLargeQuery = obj.valueForKey("IS_LARGE_QUERY").asBool();
     } else {
@@ -121,14 +121,13 @@ PlanNodeFragment* PlanNodeFragment::fromJSONObject(PlannerDomValue const& obj) {
     return retval;
 }
 
-void
-PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue const& planNodesList,
+void PlanNodeFragment::nodeListFromJSONObject(PlannerDomValue const& planNodesList,
         PlannerDomValue const& executeList, int stmtId) {
     assert(m_stmtExecutionListMap.find(stmtId) == m_stmtExecutionListMap.end());
     // NODE_LIST
     std::vector<AbstractPlanNode*> planNodes;
     for (int i = 0; i < planNodesList.arrayLen(); i++) {
-        AbstractPlanNode *node = AbstractPlanNode::fromJSONObject(planNodesList.valueAtIndex(i));
+        AbstractPlanNode *node = AbstractPlanNode::fromJSONObject(planNodesList.valueAtIndex(i)).release();
         assert(node);
         assert(m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end());
         m_idToNodeMap.emplace(node->getPlanNodeId(), node);
