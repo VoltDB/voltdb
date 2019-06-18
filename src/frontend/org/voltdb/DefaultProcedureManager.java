@@ -58,6 +58,7 @@ public class DefaultProcedureManager {
     private final Database m_fakeDb;
 
     public static final String NIBBLE_DELETE_PROC = "nibbledelete";
+    public static final String NIBBLE_MIGRATE_PROC = "nibblemigrate";
 
     public DefaultProcedureManager(Database db) {
         m_db = db;
@@ -166,7 +167,6 @@ public class DefaultProcedureManager {
         String name = defaultProc.getClassname();
         String[] parts = name.split("\\.");
         String action = parts[1];
-
         Table table = defaultProc.getPartitiontable();
         Column partitionColumn = defaultProc.getPartitioncolumn();
 
@@ -203,15 +203,15 @@ public class DefaultProcedureManager {
             } else {
                 return generateCrudReplicatedDelete(table, pkey);
             }
-        case "migrate":
-            return generateCrudMigrate(table, defaultProc.getSinglepartition() ? partitionColumn : null, pkey);
+        case DefaultProcedureManager.NIBBLE_MIGRATE_PROC:
+            return generateNibbleDelete(defaultProc);
         case "upsert":
             if (defaultProc.getSinglepartition()) {
                 return generateCrudUpsert(table, partitionColumn);
             } else {
                 return generateCrudReplicatedUpsert(table, pkey);
             }
-        case "nibbledelete":
+        case DefaultProcedureManager.NIBBLE_DELETE_PROC:
             return generateNibbleDelete(defaultProc);
         default:
             throw new RuntimeException("Invalid input to default proc SQL generator (" + action + ")");

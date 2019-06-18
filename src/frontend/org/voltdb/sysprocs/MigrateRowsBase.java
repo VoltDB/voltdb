@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.DefaultProcedureManager;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
@@ -191,7 +192,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
         ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getMigrateProcRunner(
-                tableName + ".autogenMigrate"+ op.toString(), catTable, column, op);
+                tableName + "." + DefaultProcedureManager.NIBBLE_MIGRATE_PROC, catTable, column, op);
 
         Procedure newCatProc = pr.getCatalogProcedure();
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
