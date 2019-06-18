@@ -371,9 +371,12 @@ public class AsyncExportClient
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
                 if (config.usemigrateonly && r.nextBoolean()) {
                     try {
+                        int i = r.nextInt(10);
+                        log.info("Calling MigrateExport for rows older than " + i + " seconds before now."); 
                         clientRef.get().callProcedure(
                                 new NullCallback(),
-                                "MigrateExport", r.nextInt(10));
+                                "MigrateExport");
+                                // "MigrateExport", r.nextInt(10));
                     }
                     catch (Exception e) {
                         log.fatal("Exception: " + e);

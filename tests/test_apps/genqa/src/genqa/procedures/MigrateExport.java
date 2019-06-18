@@ -26,22 +26,28 @@ import java.util.Random;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 
 public class MigrateExport extends VoltProcedure {
-    public final SQLStmt migrate = new SQLStmt("MIGRATE FROM export_partitioned_table WHERE type_not_null_timestamp < DATEADD(SECOND, -?, NOW)");
+    public final SQLStmt migrate = new SQLStmt("MIGRATE FROM export_partitioned_table WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, -5, NOW)");
+    // public final SQLStmt migrate = new SQLStmt("MIGRATE FROM export_partitioned_table WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
 
-    public void run(int seconds)
+    public  VoltTable[] run()
+    // public long run(int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
-        voltQueueSQL(migrate, -seconds);
+        voltQueueSQL(migrate);
+        // voltQueueSQL(migrate, -seconds);
 
         // Execute last statement batch
-        voltExecuteSQL(true);
+         VoltTable[] v = voltExecuteSQL(true);
+        // voltExecuteSQL(true);
 
         // Return to caller
-        return;
+        return v;
+        // return seconds;
     }
 }
