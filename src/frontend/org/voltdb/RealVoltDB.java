@@ -5130,6 +5130,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_flc.logMessage(timestampMilis, user, ip);
     }
 
+    public void setClusterSettingsForTest(ClusterSettings settings) {
+        m_clusterSettings.set(settings, 1);
+    }
+
     public int getHostCount() {
         return m_clusterSettings.get().hostcount();
     }
