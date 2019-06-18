@@ -2361,7 +2361,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public boolean isClusterComplete() {
-        return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
+        return (m_clusterSettings.get().hostcount() == m_messenger.getLiveHostIds().size());
     }
 
     private void startMigratePartitionLeaderTask() {
@@ -2372,7 +2372,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //MigratePartitionLeader service will be started up only after the last rejoining has finished
-        if(!isClusterComplete() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
+        if(!isClusterComplete() || m_clusterSettings.get().hostcount() == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
@@ -2382,7 +2382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         MigratePartitionLeaderMessage msg = new MigratePartitionLeaderMessage();
         msg.setStartTask();
-        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
+        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_clusterSettings.get().hostcount());
         Set<Integer> hosts = m_messenger.getLiveHostIds();
         for (int hostId : hosts) {
             final int currentMasters = m_cartographer.getMasterCount(hostId);
@@ -5131,7 +5131,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public int getHostCount() {
-        return m_config.m_hostCount;
+        return m_clusterSettings.get().hostcount();
     }
 
     @Override
