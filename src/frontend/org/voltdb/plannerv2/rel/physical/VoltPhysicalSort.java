@@ -46,6 +46,12 @@ import org.voltdb.plannodes.OrderByPlanNode;
 
 import com.google.common.base.Preconditions;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
 public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
 
     private final int m_splitCount;
@@ -104,6 +110,9 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
         final List<Integer> collations =
                 PlanCostUtil.collationIndices(getTraitSet().getTrait(RelCollationTraitDef.INSTANCE));
         final double cpu;
+        // NOTE: it is not necessary to discount based on index, since VoltPhysicalSort is only used on single table scan;
+        // and the VoltPhysicalTable{Sequential,Index}TableScan node beneath are sufficient to pick the best candidate.
+        /*
         if (getIndexes((VolcanoPlanner) planner).stream()
                 .filter(index -> index.getPredicatejson().isEmpty())   // partial index cannot be used
                 .map(PlanCostUtil::indexColumns)
@@ -112,10 +121,10 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
             cpu = 1;
         } else { // no matching index: the worst-case time complexity is mandated to be O(nlogn)
             cpu = rowCount * Math.log(rowCount);
-        }
+        }*/
+        cpu = rowCount * Math.log(rowCount);
         return planner.getCostFactory().makeCost(rowCount, cpu, 0);
     }
-
 
     private static List<Index> getIndexes(VolcanoPlanner planner) {
         final List<Table> tables = planner.getRelNodes().stream()

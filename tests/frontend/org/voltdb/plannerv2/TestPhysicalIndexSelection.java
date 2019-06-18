@@ -70,9 +70,9 @@ public class TestPhysicalIndexSelection extends Plannerv2TestCase {
     public void testMultiColumnWin1() {
         // Single column RI5_IND_III wins over not-fully covered Two column Index RI5_IND_II_III
         m_tester.sql("SELECT * FROM RI5 where II = 3")
-                .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[3], " +
-                        "expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_II_INVALIDEQ1_1])\n")
-                .pass();
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[3], " +
+                "expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_II_INVALIDEQ1_1])\n")
+        .pass();
     }
 
     public void testPartialWin() {

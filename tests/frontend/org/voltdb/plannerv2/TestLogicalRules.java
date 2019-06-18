@@ -477,7 +477,7 @@ public class TestLogicalRules extends Plannerv2TestCase {
                         "$condition=[$t4])\n" +
                         "      VoltLogicalTableScan(table=[[public, R3]])\n" +
                         "    VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t1):VARCHAR(256) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5])\n" +
+                        "\"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], I=[$t2], SI=[$t3], V00=[$t5])\n" +
                         "      VoltLogicalJoin(condition=[=($4, $0)], joinType=[inner])\n" +
                         "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0], V=[$t5])\n" +
                         "          VoltLogicalTableScan(table=[[public, R2]])\n" +
@@ -555,13 +555,13 @@ public class TestLogicalRules extends Plannerv2TestCase {
     public void testENG15245() {
         m_tester.sql("select CAST(border as VARCHAR) from R5")
                 .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t3):VARCHAR(2048) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                        "\"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .pass();
 
         m_tester.sql("select CAST(point as VARCHAR) from R5")
                 .transform("VoltLogicalCalc(expr#0..4=[{inputs}], expr#5=[CAST($t4):VARCHAR(2048) CHARACTER SET " +
-                        "\"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], EXPR$0=[$t5])\n" +
+                        "\"UTF-8\" COLLATE \"UTF-8$en_US$primary\"], EXPR$0=[$t5])\n" +
                         "  VoltLogicalTableScan(table=[[public, R5]])\n")
                 .pass();
     }
@@ -751,6 +751,15 @@ public class TestLogicalRules extends Plannerv2TestCase {
                     "expr#9=[2], expr#10=[=($t0, $t9)], expr#11=[5.0], expr#12=[=($t4, $t11)], expr#13=[AND($t8, $t10, $t12)], "  +
                     "proj#0..5=[{exprs}], $condition=[$t13])\n" +
                     "  VoltLogicalTableScan(table=[[public, R2]])\n")
+        .pass();
+    }
+
+    // Unicode characters that are not part of the 'ISO-8859-1' character set should be correctly interpreted
+    public void testCharSet() {
+        m_tester.sql("select * from R1 where v like '你好' or v like 'foo'")
+        .transform("VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=['你好'], expr#7=[LIKE($t5, $t6)], expr#8=['foo'], " +
+                    "expr#9=[LIKE($t5, $t8)], expr#10=[OR($t7, $t9)], proj#0..5=[{exprs}], $condition=[$t10])\n" +
+                    "  VoltLogicalTableScan(table=[[public, R1]])\n")
         .pass();
     }
 }
