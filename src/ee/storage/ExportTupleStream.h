@@ -118,6 +118,11 @@ public:
         m_nextFlushStream = NULL;
         m_prevFlushStream = NULL;
     }
+
+    inline void setPrevFlushStream(ExportTupleStream* prevFlushStream) {
+        m_prevFlushStream = prevFlushStream;
+    }
+
     void appendToList(ExportTupleStream** oldest, ExportTupleStream** newest);
     void stitchToNextNode(ExportTupleStream* next);
     void removeFromFlushList(VoltDBEngine* engine, bool moveToTail);
