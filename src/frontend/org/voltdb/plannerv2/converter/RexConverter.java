@@ -400,8 +400,12 @@ public class RexConverter {
                 tableIdx = 0;
             }
             if (inputProgram != null) {
-                final RexLocalRef outerLocalRef = inputProgram.getProjectList().get(exprInputIndx);
-                AbstractExpression ae = inputProgram.expandLocalRef(outerLocalRef).accept(this);
+                final RexLocalRef localRef = inputProgram.getProjectList().get(exprInputIndx);
+                RexNode expandedLocalRef = inputProgram.expandLocalRef(localRef);
+                // Resolve an expression using a single (outer or inner) program only
+                // since this expression is either from the outer or inner table
+                AbstractExpression ae = expandedLocalRef.accept(
+                        new RefExpressionConvertingVisitor(inputProgram));
                 ae.findAllTupleValueSubexpressions().stream().forEach(
                         tve -> tve.setTableIndex(tableIdx));
                 Preconditions.checkNotNull(ae);

@@ -34,7 +34,7 @@ public class TestMergeJoinsSuite extends RegressionSuite {
     }
 
     private static final String[] TABLES =
-            new String[] { "R1", "R2", "R3", "R4", "R5" };
+            new String[] { "R1", "R2", "R3", "R4", "R5", "R6" };
 
 
     public void testMergeJoins() throws Exception {
@@ -78,7 +78,7 @@ public class TestMergeJoinsSuite extends RegressionSuite {
         client.callProcedure("R4.INSERT", 5, 4);
         client.callProcedure("R4.INSERT", 6, 6);
 
-        // TODO Calcite read uncomment
+        // TODO Calcite ready uncomment
         //checkQueryPlan(client, query,"MERGE INNER JOIN");
 
         validateTableOfLongs(client, query, new long[][]{
@@ -108,22 +108,22 @@ public class TestMergeJoinsSuite extends RegressionSuite {
     }
 
     private void subtestCompoundIndexMergeJoin(Client client) throws Exception {
-        String query = "SELECT R4.A, R4.G, R5.SI, R5.BI FROM R4 INNER JOIN R5 " +
-              "ON R4.G = R5.SI AND R4.A = R5.BI ORDER BY 1,2,3,4;";
+        String query = "SELECT R6.A, R6.G, R5.SI, R5.BI FROM R6 INNER JOIN R5 " +
+              "ON R6.G = R5.SI AND R6.A = R5.BI ORDER BY 1,2,3,4;";
 
-        client.callProcedure("R4.INSERT", 5, 1);
-        client.callProcedure("R4.INSERT", 4, 0);
-        client.callProcedure("R4.INSERT", 4, 1);
-        client.callProcedure("R4.INSERT", 5, 2);
-        client.callProcedure("R4.INSERT", 5, 3);
-        client.callProcedure("R4.INSERT", 10, 8);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 5, "1", 1);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 4, "2", 0);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 4, "3", 1);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 5, "4", 2);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 5, "5", 3);
+        client.callProcedure("@AdHoc", "insert into R6 values(?, ?, ?)", 10, "6", 8);
 
-        client.callProcedure("@AdHoc", "insert into R5 values(?, ?)", 1, 5);
-        client.callProcedure("@AdHoc", "insert into R5 values(?, ?)", 3, 5);
-        client.callProcedure("@AdHoc", "insert into R5 values(?, ?)", 4, 1);
-        client.callProcedure("@AdHoc", "insert into R5 values(?, ?)", 8, 10);
+        client.callProcedure("@AdHoc", "insert into R5 values(?, ?, ?)", 1, "1", 5);
+        client.callProcedure("@AdHoc", "insert into R5 values(?, ?, ?)", 3, "2", 5);
+        client.callProcedure("@AdHoc", "insert into R5 values(?, ?, ?)", 4, "3", 1);
+        client.callProcedure("@AdHoc", "insert into R5 values(?, ?, ?)", 8, "4", 10);
 
-        // TODO Calcite read uncomment
+        // TODO Calcite ready uncomment
         //checkQueryPlan(client, query,"MERGE INNER JOIN");
 
         validateTableOfLongs(client, query, new long[][]{
