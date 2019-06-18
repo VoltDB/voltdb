@@ -135,8 +135,8 @@ static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
 static double getDistance(const GeographyPointValue &point1,
                           const GeographyPointValue &point2)
 {
-    assert(!point1.isNull());
-    assert(!point2.isNull());
+    vassert(!point1.isNull());
+    vassert(!point2.isNull());
 
     const S2LatLng latLng1 = S2LatLng(point1.toS2Point()).Normalized();
     const S2LatLng latLng2 = S2LatLng(point2.toS2Point()).Normalized();
@@ -275,7 +275,7 @@ static void readLoop(bool is_shell,
         throwInvalidWktPoly("unexpected end of input");
     }
 
-    assert (*it == ")");
+    vassert(*it == ")");
 
     // Advance iterator to next token
     ++it;
@@ -486,8 +486,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vector<NValue>& arguments) {
-    assert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
-    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(arguments[1].getValueType() == VALUE_TYPE_POINT);
 
     if (arguments[0].isNull() || arguments[1].isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
@@ -503,8 +503,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vect
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector<NValue>& arguments) {
-    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
-    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    vassert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    vassert(arguments[1].getValueType() == VALUE_TYPE_POINT);
 
     if (arguments[0].isNull() || arguments[1].isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
@@ -516,7 +516,7 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
-    assert(getValueType() == VALUE_TYPE_POINT);
+    vassert(getValueType() == VALUE_TYPE_POINT);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
@@ -526,7 +526,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
-    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
@@ -578,7 +578,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
  * close to the same thing.  Maybe they could be unified?
  */
 template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
-    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
     }
@@ -595,7 +595,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_IS_VALID_POLYGON>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
-    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
@@ -614,7 +614,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
-    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(getValueType() == VALUE_TYPE_GEOGRAPHY);
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
     }
@@ -630,13 +630,13 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
     }
     if ( ! poly.IsValid(&msg)) {
         std::string res (msg.str());
-        assert(res.size() > 0);
+        vassert(res.size() > 0);
         throwInvalidMakeValidPoly(res);
         // No return from here.
     }
     else if ( isMultiPolygon(poly, &msg)) {
         std::string res (msg.str());
-        assert(res.size() > 0);
+        vassert(res.size() > 0);
         throwInvalidMakeValidPoly(res);
         // No return from here.
     }
@@ -645,7 +645,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
     // So, msg will not be the empty string, and we can package
     // this polygon up.
     //
-    assert(msg.str().size() == 0);
+    vassert(msg.str().size() == 0);
     int length = poly.serializedLength();
     NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
     char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
@@ -655,9 +655,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_MAKE_VALID_POLYGON>() const {
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
-    assert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
-    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
-    assert(isNumeric(arguments[2].getValueType()));
+    vassert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
+    vassert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    vassert(isNumeric(arguments[2].getValueType()));
 
     if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
@@ -676,9 +676,9 @@ template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vecto
 }
 
 template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POINT_POINT>(const std::vector<NValue>& arguments) {
-    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
-    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
-    assert(isNumeric(arguments[2].getValueType()));
+    vassert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    vassert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    vassert(isNumeric(arguments[2].getValueType()));
 
     if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);

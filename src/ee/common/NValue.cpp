@@ -207,7 +207,7 @@ int32_t NValue::serializedSize() const {
  * Serialize sign and value using radix point (no exponent).
  */
 std::string NValue::createStringFromDecimal() const {
-    assert(!isNull());
+    vassert(!isNull());
     std::ostringstream buffer;
     TTInt scaledValue = getDecimal();
     if (scaledValue.IsSign()) {
@@ -439,12 +439,12 @@ void NValue::allocateANewNValueList(size_t length, ValueType elementType)
 
 void NValue::setArrayElements(std::vector<NValue> &args) const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = const_cast<NValueList*>(
         reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
     // Assign each of the elements.
     int ii = (int)args.size();
-    assert(ii == listOfNValues->m_length);
+    vassert(ii == listOfNValues->m_length);
     while (ii--) {
         listOfNValues->m_values[ii] = args[ii];
     }
@@ -454,17 +454,17 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
 
 int NValue::arrayLength() const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
     return static_cast<int>(listOfNValues->m_length);
 }
 
 const NValue& NValue::itemAtIndex(int index) const
 {
-    assert(m_valueType == VALUE_TYPE_ARRAY);
+    vassert(m_valueType == VALUE_TYPE_ARRAY);
     const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
-    assert(index >= 0);
-    assert(index < listOfNValues->m_length);
+    vassert(index >= 0);
+    vassert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];
 }
 

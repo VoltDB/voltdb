@@ -57,7 +57,7 @@
 namespace voltdb {
 
 bool AbstractExecutor::init(VoltDBEngine* engine, const ExecutorVector& executorVector) {
-    assert (m_abstractNode);
+    vassert(m_abstractNode);
 
     //
     // Grab the input tables directly from this node's children
@@ -109,7 +109,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine, const ExecutorVector& executor
                 return false;
             }
             TableCatalogDelegate * tcd = engine->getTableDelegate(targetTableName);
-            assert(tcd != NULL);
+            vassert(tcd != NULL);
             if (scan_node) {
                 scan_node->setTargetTableDelegate(tcd);
             } else if (oper_node) {
@@ -139,7 +139,7 @@ void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     int column_count = schema->columnCount();
     std::vector<std::string> column_names(column_count);
-    assert(column_count >= 1);
+    vassert(column_count >= 1);
     const std::vector<SchemaColumn*>& outputSchema = m_abstractNode->getOutputSchema();
 
     for (int ctr = 0; ctr < column_count; ctr++) {
@@ -172,8 +172,8 @@ AbstractExecutor::~AbstractExecutor() {}
 
 AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
     const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size()) {
-    assert(keys.size() == dirs.size());
-    assert(std::find(m_dirs.begin(), m_dirs.end(), SORT_DIRECTION_TYPE_INVALID) == m_dirs.end());
+    vassert(keys.size() == dirs.size());
+    vassert(std::find(m_dirs.begin(), m_dirs.end(), SORT_DIRECTION_TYPE_INVALID) == m_dirs.end());
 }
 
 bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) const {

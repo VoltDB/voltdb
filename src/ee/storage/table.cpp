@@ -44,7 +44,6 @@
  */
 
 #include <sstream>
-#include <cassert>
 #include <cstdio>
 #include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
@@ -71,7 +70,7 @@ Table::Table(int tableAllocationTargetSize) :
 
 Table::~Table() {
     // not all tables are reference counted but this should be invariant
-    assert(m_refcount == 0);
+    vassert(m_refcount == 0);
 
     // clear the schema
     if (m_ownsTupleSchema) {
@@ -159,7 +158,7 @@ int Table::columnIndex(const std::string &name) const {
 }
 
 bool Table::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.columnCount());
+    vassert(m_columnCount == tuple.columnCount());
     for (int i = m_columnCount - 1; i >= 0; --i) {
         if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
             VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
@@ -241,7 +240,7 @@ size_t Table::getAccurateSizeToSerialize() {
         bytes += tuple.serializationSize();  // tuple size
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 
     return bytes;
 }
@@ -249,7 +248,7 @@ size_t Table::getAccurateSizeToSerialize() {
 size_t Table::getColumnHeaderSizeToSerialize() {
     // use a cache if possible
     if (m_columnHeaderData) {
-        assert(m_columnHeaderSize != -1);
+        vassert(m_columnHeaderSize != -1);
         return m_columnHeaderSize;
     }
 
@@ -278,7 +277,7 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
 
     // use a cache
     if (m_columnHeaderData) {
-        assert(m_columnHeaderSize != -1);
+        vassert(m_columnHeaderSize != -1);
         serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
         return;
     }
@@ -308,7 +307,7 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
         const string& name = columnName(i);
         // column names can't be null, so length must be >= 0
         int32_t length = static_cast<int32_t>(name.size());
-        assert(length >= 0);
+        vassert(length >= 0);
 
         // this is standard string serialization for voltdb
         serialOutput.writeInt(length);
@@ -318,7 +317,7 @@ void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
 
     // write the header size which is a non-inclusive int
     getColumnHeaderSizeToSerialize();
-    assert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
+    vassert(static_cast<int32_t>(serialOutput.position() - start) == m_columnHeaderSize);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
     serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
 
@@ -354,11 +353,11 @@ void Table::serializeTo(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
-    assert(sz > 0);
+    vassert(sz > 0);
     serialOutput.writeIntAt(pos, sz);
 }
 
@@ -374,7 +373,7 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
         tuple.serializeTo(serialOutput);
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+    vassert(written_count == m_tupleCount);
 }
 
 /**
@@ -382,12 +381,12 @@ void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
  * Used by the exception stuff Ariel put in.
  */
 void Table::serializeTupleTo(SerializeOutput &serialOutput, voltdb::TableTuple *tuples, int numTuples) {
-    //assert(m_schema->equals(tuples[0].getSchema()));
+    //vassert(m_schema->equals(tuples[0].getSchema()));
 
     std::size_t pos = serialOutput.position();
     serialOutput.writeInt(-1);
 
-    assert(!tuples[0].isNullTuple());
+    vassert(!tuples[0].isNullTuple());
 
     serializeColumnHeaderTo(serialOutput);
 
@@ -444,7 +443,7 @@ bool Table::equals(voltdb::Table *other) {
 void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
                                    Pool *stringPool) {
     int tupleCount = serialInput.readInt();
-    assert(tupleCount >= 0);
+    vassert(tupleCount >= 0);
 
     int32_t serializedTupleCount = 0;
     size_t tupleCountPosition = 0;
@@ -485,7 +484,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialInput,
     serialInput.readByte();
 
     int16_t colcount = serialInput.readShort();
-    assert(colcount >= 0);
+    vassert(colcount >= 0);
 
     // Store the following information so that we can provide them to the user
     // on failure

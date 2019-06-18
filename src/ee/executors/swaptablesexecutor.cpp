@@ -58,10 +58,10 @@ bool SwapTablesExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init SwapTable Executor");
     SwapTablesPlanNode* node = dynamic_cast<SwapTablesPlanNode*>(m_abstractNode);
 #ifndef NDEBUG
-    assert(node);
-    assert(node->getTargetTable());
-    assert(node->getOtherTargetTable());
-    assert(node->getInputTableCount() == 0);
+    vassert(node);
+    vassert(node->getTargetTable());
+    vassert(node->getOtherTargetTable());
+    vassert(node->getInputTableCount() == 0);
 #endif
 
     m_replicatedTableOperation = static_cast<PersistentTable*>(node->getTargetTable())->isReplicatedTable();
@@ -73,12 +73,12 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     // target tables should be persistent tables
     // update target table references from table delegates
     SwapTablesPlanNode* node = static_cast<SwapTablesPlanNode*>(m_abstractNode);
-    assert(dynamic_cast<SwapTablesPlanNode*>(m_abstractNode));
+    vassert(dynamic_cast<SwapTablesPlanNode*>(m_abstractNode));
     PersistentTable* theTargetTable = static_cast<PersistentTable*>(node->getTargetTable());
-    assert(theTargetTable);
-    assert(theTargetTable == dynamic_cast<PersistentTable*>(node->getTargetTable()));
+    vassert(theTargetTable);
+    vassert(theTargetTable == dynamic_cast<PersistentTable*>(node->getTargetTable()));
     PersistentTable* otherTargetTable = node->getOtherTargetTable();
-    assert(otherTargetTable);
+    vassert(otherTargetTable);
 
     int64_t modified_tuples = 0;
 
@@ -86,7 +86,7 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
                theTargetTable->name().c_str(),
                otherTargetTable->name().c_str());
     {
-        assert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
+        vassert(m_replicatedTableOperation == theTargetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {

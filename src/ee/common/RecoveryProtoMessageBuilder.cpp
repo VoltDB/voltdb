@@ -31,7 +31,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
     m_tupleCount(0),
     m_maxSerializedSize(schema->getMaxSerializedTupleSize(true))
 {
-    assert(m_out);
+    vassert(m_out);
     m_out->writeByte(static_cast<int8_t>(type));
     m_out->writeInt(tableId);
     m_out->writeInt(*reinterpret_cast<int32_t*>(&totalTupleCount));
@@ -42,8 +42,8 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
  * Add a tuple to be inserted or updated at the recovering partition.
  */
 void RecoveryProtoMsgBuilder::addTuple(TableTuple tuple) {
-    assert(m_out);
-    assert(canAddMoreTuples());
+    vassert(m_out);
+    vassert(canAddMoreTuples());
     tuple.serializeTo(*m_out, true);
     m_tupleCount++;
 }

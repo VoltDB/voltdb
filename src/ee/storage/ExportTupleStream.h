@@ -23,7 +23,7 @@
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
-#include <cassert>
+#include <common/debuglog.h>
 namespace voltdb {
 
 //If you change this constant here change it in Java in the StreamBlockQueue where
@@ -65,7 +65,7 @@ public:
 
     /** Set the total number of bytes used and starting sequence number for new buffer (for rejoin/recover) */
     void setBytesUsed(int64_t seqNo, size_t count) {
-        assert(m_uso == 0);
+        vassert(m_uso == 0);
         m_uso = count;
         // set start and committed sequence numbers of stream block
         m_nextSequenceNumber = seqNo + 1;
@@ -102,7 +102,7 @@ public:
     void commit(VoltDBEngine* engine, int64_t spHandle, int64_t uniqueId);
     inline void rollbackExportTo(size_t mark, int64_t seqNo) {
         // make the stream of tuples contiguous outside of actual system failures
-        assert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
+        vassert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
         m_nextSequenceNumber = seqNo;
         TupleStreamBase::rollbackBlockTo(mark);
         m_currBlock->truncateExportTo(mark, seqNo);

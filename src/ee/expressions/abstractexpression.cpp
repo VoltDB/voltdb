@@ -152,12 +152,12 @@ AbstractExpression* AbstractExpression::buildExpressionTree_recurse(PlannerDomVa
 
     // read the expression type
     peek_type = static_cast<ExpressionType>(obj.valueForKey("TYPE").asInt());
-    assert(peek_type != EXPRESSION_TYPE_INVALID);
+    vassert(peek_type != EXPRESSION_TYPE_INVALID);
 
     if (obj.hasNonNullKey("VALUE_TYPE")) {
         int32_t value_type_int = obj.valueForKey("VALUE_TYPE").asInt();
         value_type = static_cast<ValueType>(value_type_int);
-        assert(value_type != VALUE_TYPE_INVALID);
+        vassert(value_type != VALUE_TYPE_INVALID);
 
         if (obj.hasNonNullKey("IN_BYTES")) {
             inBytes = true;

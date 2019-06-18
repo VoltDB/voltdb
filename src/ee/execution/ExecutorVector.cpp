@@ -74,7 +74,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-    assert(pnf->getRootNode());
+    vassert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
         char msg[1024];
@@ -130,8 +130,8 @@ std::string ExecutorVector::debug() const {
 }
 
 void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) {
-    assert(node);
-    assert(node->getExecutor() == NULL);
+    vassert(node);
+    vassert(node->getExecutor() == NULL);
 
     // Executor is created here. An executor is *devoted* to this
     // plannode so that it can cache anything for the plannode
@@ -170,13 +170,13 @@ void ExecutorVector::setupContext(ExecutorContext* executorContext) {
 void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 
 const std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
-    assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
+    vassert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
     return m_subplanExecListMap.find(planId)->second;
 }
 
 void ExecutorVector::getRidOfSendExecutor(int planId) {
     auto iter = m_subplanExecListMap.find(planId);
-    assert(iter != m_subplanExecListMap.end());
+    vassert(iter != m_subplanExecListMap.end());
     std::vector<AbstractExecutor*> const executorList = iter->second;
     iter->second.clear();
     for(AbstractExecutor* executor : executorList) {

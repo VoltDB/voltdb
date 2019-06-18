@@ -29,7 +29,7 @@
 #include <sys/time.h>
 #include "harness.h"
 #include "structures/CompactingMap.h"
-#include "common/FixUnusedAssertHack.h"
+#include "common/debuglog.h"
 
 using namespace voltdb;
 using namespace std;
@@ -65,10 +65,8 @@ public:
     }
 
     void print(voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> &m) {
-        voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator iter;
-
         printf(" compactmap [ ");
-        for (iter = m.begin(); !iter.isEnd(); iter.moveNext()) {
+        for (auto iter = m.begin(); !iter.isEnd(); iter.moveNext()) {
             printf("%d ", iter.key());
         }
         printf("]\n");
@@ -76,10 +74,8 @@ public:
     }
 
     void print(std::multimap<int, int> &m) {
-        std::multimap<int, int>::iterator iter;
-
         printf("   multimap [ ");
-        for (iter = m.begin(); iter != m.end(); iter++) {
+        for (auto iter = m.cbegin(); iter != m.cend(); ++iter) {
             printf("%d ", iter->first);
         }
         printf("]\n");
@@ -87,10 +83,8 @@ public:
     }
 
     void print(std::map<int, int> &m) {
-        std::map<int, int>::iterator iter;
-
         printf("       map [ ");
-        for (iter = m.begin(); iter != m.end(); iter++) {
+        for (auto iter = m.cbegin(); iter != m.cend(); ++iter) {
             printf("%d ", iter->first);
         }
         printf("]\n");
@@ -103,11 +97,9 @@ public:
      * that stl and volt returned equal value sets.
      * Record cardinality of largest value set evaluated in chainCounter
      */
-    void verifyIterators(std::multimap<std::string, std::string> &stl,
-                         std::multimap<std::string, std::string>::iterator &stli,
-                         voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator &volti,
-                         std::string val, int *chainCounter)
-    {
+    void verifyIterators(std::multimap<std::string, std::string> &stl, std::multimap<std::string, std::string>::iterator &stli,
+            voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator &volti,
+            std::string val, int *chainCounter) {
         std::vector<std::string> stlv;
         std::vector<std::string> voltv;
 
@@ -129,14 +121,14 @@ public:
         }
 
         ASSERT_TRUE(stlv.size() > 0);
-        ASSERT_TRUE(stlv.size() == voltv.size());
+        ASSERT_EQ(stlv.size(), voltv.size());
         if (chainCounter && ((int)stlv.size() > (int)*chainCounter)) {
             *chainCounter = (int)stlv.size();
         }
         std::sort(stlv.begin(), stlv.end());
         std::sort(voltv.begin(), voltv.end());
         for (int i=0; i < stlv.size(); i++) {
-            ASSERT_TRUE(stlv[i].compare(voltv[i]) == 0);
+            ASSERT_EQ(stlv[i].compare(voltv[i]), 0);
         }
     }
 
@@ -430,7 +422,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
         }
     }
 
-    assert(volt.verify());
+    ASSERT_TRUE(volt.verify());
 
     timeval tp;
     gettimeofday(&tp, NULL);
@@ -583,7 +575,6 @@ TEST_F(CompactingMapTest, RandomMulti) {
     srand(0);
 
     // just check that an error can be found
-    // assert(false);
 
     for (int i = 0; i < ITERATIONS; i++) {
         if ((i % 1000) == 0) {
@@ -627,7 +618,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
                 stli = stl.insert(std::pair<std::string, std::string>(val, val_value));
                 ASSERT_TRUE(stli != stl.end());
                 bool success = volt.insert(std::pair<std::string, std::string>(val, val_value));
-                assert(success);
+                ASSERT_TRUE(success);
             }
         }
         //

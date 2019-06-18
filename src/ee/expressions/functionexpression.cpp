@@ -54,7 +54,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
 
 /** implement the 2-argument forced SQL ERROR function (for test and example purposes) */
 template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const char* sqlstatecode;
     char msg_format_buffer[1024];
     char state_format_buffer[6];
@@ -148,7 +148,7 @@ namespace functionexpression {
          }
 
          NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
-            assert (m_child);
+            vassert(m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
          }
 
@@ -176,7 +176,7 @@ namespace functionexpression {
 
             virtual bool hasParameter() const override {
                for (size_t i = 0; i < m_args.size(); i++) {
-                  assert(m_args[i]);
+                  vassert(m_args[i]);
                   if (m_args[i]->hasParameter()) {
                      return true;
                   }
@@ -228,7 +228,7 @@ namespace functionexpression {
 
          bool hasParameter() const override {
             for (size_t i = 0; i < m_args.size(); i++) {
-               assert(m_args[i]);
+               vassert(m_args[i]);
                if (m_args[i]->hasParameter()) {
                   return true;
                }

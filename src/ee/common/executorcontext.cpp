@@ -24,6 +24,7 @@
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
 #include "plannodes/insertnode.h"
+#include "debuglog.h"
 
 #ifdef LINUX
 #include <malloc.h>
@@ -197,7 +198,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
     int ctr = 0;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert(executor);
+            vassert(executor);
 
             if (isTraceOn()) {
                 char name[32];
@@ -247,7 +248,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
         // (potential) inline children could also be smart enough to clean up
         // after its inline children, and this post-processing would not be needed.
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-            assert (executor);
+            vassert(executor);
             AbstractPlanNode * node = executor->getPlanNode();
             std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
             std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
@@ -271,7 +272,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
-    assert(!executorList.empty());
+    vassert(!executorList.empty());
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
@@ -310,7 +311,7 @@ void ExecutorContext::cleanupAllExecutors()
 
 void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
-        assert(executor);
+        vassert(executor);
         executor->cleanupTempOutputTable();
     }
 }
@@ -326,7 +327,7 @@ void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
     }
-    assert (m_tuplesModifiedStack.size() == 0);
+    vassert(m_tuplesModifiedStack.size() == 0);
 
     executorVector->resetLimitStats();
 }
@@ -372,9 +373,9 @@ bool ExecutorContext::allOutputTempTablesAreEmpty() const {
 }
 
 void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
-    assert (m_drStream != NULL);
-    assert (drStream != NULL);
-    assert (m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
+    vassert(m_drStream != NULL);
+    vassert(drStream != NULL);
+    vassert(m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openSpHandle);
     m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
@@ -387,7 +388,7 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
         m_drReplicatedStream = drReplicatedStream;
         return;
     }
-    assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
+    vassert(m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
     int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
     m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;

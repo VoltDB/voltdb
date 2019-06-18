@@ -49,6 +49,7 @@
 
 #include "catalog/database.h"
 #include "common/ids.h"
+#include "common/debuglog.h"
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
 
@@ -109,15 +110,15 @@ public:
 
         void setTable(TableCatalogDelegate* tcd)
         {
-            assert(! m_tcd);
-            assert(! m_tempTable);
+            vassert(! m_tcd);
+            vassert(! m_tempTable);
             m_tcd = tcd;
         }
 
         void setTable(AbstractTempTable* table)
         {
-            assert(! m_tcd);
-            assert(! m_tempTable);
+            vassert(! m_tcd);
+            vassert(! m_tempTable);
             m_tempTable = table;
         }
 
@@ -176,7 +177,7 @@ public:
     int getValidOutputColumnCount() const
     {
         // Assert that this plan node defined (derialized in) its own output schema.
-        assert(m_validOutputColumnCount >= 0);
+        vassert(m_validOutputColumnCount >= 0);
         return m_validOutputColumnCount;
     }
 

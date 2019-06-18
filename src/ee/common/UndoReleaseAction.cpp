@@ -23,7 +23,7 @@
 namespace voltdb {
 
 void SynchronizedUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -33,7 +33,7 @@ void SynchronizedUndoReleaseAction::undo() {
 }
 
 void SynchronizedUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -43,7 +43,7 @@ void SynchronizedUndoReleaseAction::release() {
 }
 
 void SynchronizedUndoOnlyAction::undo() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -54,7 +54,7 @@ void SynchronizedUndoOnlyAction::undo() {
 }
 
 void SynchronizedReleaseOnlyAction::release() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
     {
         ExecuteWithMpMemory usingMpMemory;
@@ -64,23 +64,23 @@ void SynchronizedReleaseOnlyAction::release() {
 }
 
 void SynchronizedDummyUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 
 }
 
 void SynchronizedDummyUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 void SynchronizedDummyUndoOnlyAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 
 void SynchronizedDummyReleaseOnlyAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
+    vassert(!SynchronizedThreadLock::isInSingleThreadMode());
     SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
 }
 

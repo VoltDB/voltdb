@@ -20,7 +20,7 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <stdint.h>
 #include <limits>
@@ -130,7 +130,7 @@ namespace voltdb
         }
 
         inline void commonConsumed(size_t consumed) {
-            assert ((m_offset + consumed) <= m_capacity);
+            vassert((m_offset + consumed) <= m_capacity);
             m_offset += consumed;
         }
 

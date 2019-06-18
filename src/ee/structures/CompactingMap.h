@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <utility>
 #include <limits>
-#include <cassert>
+#include <common/debuglog.h>
 
 typedef u_int32_t NodeCount;
 
@@ -121,7 +121,7 @@ protected:
         void* operator new(std::size_t unused_sz, ContiguousAllocator& ca)
         {
             void *memory = ca.alloc();
-            assert(memory);
+            vassert(memory);
             return memory;
         }
 
@@ -305,7 +305,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(const Key &key)
 template<typename KeyValuePair, typename Compare, bool hasRank>
 bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(iterator &iter)
 {
-    assert(iter.m_node != &NIL);
+    vassert(iter.m_node != &NIL);
     erase(iter.m_node);
     return true;
 }
@@ -351,7 +351,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
             }
         }
 
-        assert(y != &NIL);
+        vassert(y != &NIL);
 
         // create a new node using the custom operator new
         TreeNode *z = new (m_allocator) TreeNode(&NIL, y);
@@ -376,7 +376,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
         m_root = z;
     }
     m_count++;
-    assert(m_allocator.count() == m_count);
+    vassert(m_allocator.count() == m_count);
     return NULL;
 }
 
@@ -687,28 +687,28 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
     if (last == x) {
         delete last;
         m_allocator.trim();
-        assert(m_allocator.count() == m_count);
+        vassert(m_allocator.count() == m_count);
         return;
     }
 
     // last should be a real node
-    //assert(isReachableNode(m_root, last));
+    //vassert(isReachableNode(m_root, last));
 
     if (last->parent == &NIL) {
         // fix the root pointer if needed
-        assert(last == m_root);
+        vassert(last == m_root);
         m_root = x;
     }
     else {
-        assert(last != m_root);
+        vassert(last != m_root);
         // Last has a parent node.
         // Make its pointer to last now point to the hole.
-        //assert(isReachableNode(m_root, last->parent));
+        //vassert(isReachableNode(m_root, last->parent));
         if (last->parent->left == last) {
             last->parent->left = x;
         }
         else {
-            assert(last->parent->right == last);
+            vassert(last->parent->right == last);
             last->parent->right = x;
         }
     }
@@ -722,7 +722,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
     }
 
     // Copy the last node over the hole left by the deleted node.
-    assert(x != &NIL);
+    vassert(x != &NIL);
     x->parent = last->parent;
     x->left = last->left;
     x->right = last->right;
@@ -734,7 +734,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank>::fragmentFixup(TreeNode *x) {
 
     delete last;
     m_allocator.trim();
-    assert(m_allocator.count() == m_count);
+    vassert(m_allocator.count() == m_count);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>

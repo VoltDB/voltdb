@@ -131,7 +131,7 @@ StringRef* StringRef::create(int32_t sz, const char* source, Pool* tempPool)
 
 StringRef* StringRef::create(int32_t sz, const char* source, LargeTempTableBlock* lttBlock)
 {
-    assert (lttBlock != NULL);
+    vassert(lttBlock != NULL);
     StringRef* result;
     result = new (lttBlock->allocate(sizeof(StringRef)+sizeof(ThreadLocalPool::Sized) + sz)) StringRef(NULL, sz);
 

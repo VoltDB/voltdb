@@ -50,8 +50,8 @@
 namespace voltdb {
 
 std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) const {
-    assert(m_schema);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(m_data);
 
     std::ostringstream buffer;
     if (tableName.empty()) {
@@ -97,8 +97,8 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
 }
 
 std::string TableTuple::debugNoHeader() const {
-    assert(m_schema);
-    assert(m_data);
+    vassert(m_schema);
+    vassert(m_data);
     return debug("");
 }
 

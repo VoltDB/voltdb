@@ -97,12 +97,12 @@ void AbstractPlanNode::setInputTables(const vector<Table*>& val) {
         PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(val[ii]);
         if (persistentTable) {
             VoltDBEngine* engine = ExecutorContext::getEngine();
-            assert(engine);
+            vassert(engine);
             TableCatalogDelegate* tcd = engine->getTableDelegate(persistentTable->name());
             m_inputTables[ii].setTable(tcd);
         } else {
             AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(val[ii]);
-            assert(abstractTempTable);
+            vassert(abstractTempTable);
             m_inputTables[ii].setTable(abstractTempTable);
         }
     }
@@ -116,7 +116,7 @@ void AbstractPlanNode::setOutputTable(Table* table) {
         m_outputTable.setTable(tcd);
     } else {
         AbstractTempTable* abstractTempTable = dynamic_cast<AbstractTempTable*>(table);
-        assert(abstractTempTable);
+        vassert(abstractTempTable);
         m_outputTable.setTable(abstractTempTable);
     }
 }

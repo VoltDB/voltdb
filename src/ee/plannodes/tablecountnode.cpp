@@ -29,7 +29,7 @@ std::string TableCountPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
-    assert(m_predicate == NULL);
+    vassert(m_predicate == NULL);
     std::string tmpString = isSubqueryScan() ? "TEMPORARY " : "";
     buffer << spacer << tmpString << "TABLE COUNT Expression: <NULL>";
     return buffer.str();

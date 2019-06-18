@@ -103,7 +103,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
     // Predicates, if supplied, are one per output stream (previously asserted).
     StreamPredicateList::iterator ipredicate;
     std::vector<bool>::iterator iDeleteFlag;
-    assert(m_predicates != NULL);
+    vassert(m_predicates != NULL);
 
     if (!m_predicates->empty()) {
         ipredicate = m_predicates->begin();
@@ -121,7 +121,7 @@ bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
             // Keep walking through predicates in lock-step with the streams.
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.
-            assert(ipredicate != m_predicates->end());
+            vassert(ipredicate != m_predicates->end());
             if (accepted && deleteRow != NULL) {
                 (*deleteRow) = (*deleteRow) || *iDeleteFlag;
             }

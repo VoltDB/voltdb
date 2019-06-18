@@ -20,7 +20,7 @@
 #include "LogDefs.h"
 #include "LogProxy.h"
 #include <jni.h>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 

@@ -47,7 +47,7 @@
 #define COMPACTINGTREEMULTIMAPINDEX_H_
 
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
 #include "structures/CompactingMap.h"
@@ -98,7 +98,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
      */
     bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
-        assert(originalTuple.address() != destinationTuple.address());
+        vassert(originalTuple.address() != destinationTuple.address());
         // The KeyType will always depend on tuple address, excpet for CompactingTreeMultiIndexTest.
         if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
@@ -192,7 +192,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     // only be called after moveToGreaterThanKey() for LTE case
     void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -210,7 +210,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     void moveToPriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 

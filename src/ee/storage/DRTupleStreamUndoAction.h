@@ -27,7 +27,7 @@ public:
 DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
     : m_stream(stream), m_mark(mark), m_cost(cost)
     {
-        assert(stream);
+        vassert(stream);
     }
 
     void undo() {
