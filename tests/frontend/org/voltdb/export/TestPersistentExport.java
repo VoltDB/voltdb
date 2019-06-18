@@ -129,7 +129,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         checkTupleCount(client, "T3", 200, true);
 
         // Change trigger to update_new
-        client.callProcedure("@AdHoc", "ALTER TABLE T3 EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         client.drain();
         TestExportBaseSocketExport.waitForStreamedTargetAllocatedMemoryZero(client);
