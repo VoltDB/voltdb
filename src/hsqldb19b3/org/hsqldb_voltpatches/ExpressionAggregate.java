@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.Objects;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -256,7 +257,11 @@ public class ExpressionAggregate extends Expression {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
+        if (opType == OpTypes.USER_DEFINE_AGGREGATE) {
+            dataType = FunctionDescriptor.fn_by_name(name).getDataType();
+        } else {
+            dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
+        }
     }
 
     @Override

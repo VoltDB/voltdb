@@ -938,7 +938,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         public udfObjectInputStream(InputStream in) throws IOException {
 			super(in);
-			// TODO Auto-generated constructor stub
 		}
 
 		@Override

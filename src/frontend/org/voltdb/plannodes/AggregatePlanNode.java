@@ -257,6 +257,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
+    public int getUserAggregateId() {
+        return m_userAggregateId.get(0);
+    }
+
     public void setOutputSchema(NodeSchema schema) {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
@@ -383,7 +387,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (aggInputExpr.getUserAggregateId() != null) {
             m_userAggregateId.add(Integer.parseInt(aggInputExpr.getUserAggregateId()));
         }
-        m_workerOrCoordinator.add("COORDINATOR");
+        m_workerOrCoordinator.add("WORKER");
     }
 
     public void updateAggregate(
@@ -405,7 +409,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public void updateWorkerOrCoordinator(int index) {
-        m_workerOrCoordinator.set(index, "WORKER");
+        m_workerOrCoordinator.set(index, "COORDINATOR");
     }
 
     public void addGroupByExpression(AbstractExpression expr)

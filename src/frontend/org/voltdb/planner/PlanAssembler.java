@@ -21,6 +21,7 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import com.google_voltpatches.common.collect.Lists;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableType;
 import org.voltdb.VoltType;
@@ -3004,16 +3005,22 @@ public class PlanAssembler {
         boolean hasApproxCountDistinct = false;
         for (int i = 0; i < distAggTypes.size(); ++i) {
             ExpressionType et = distAggTypes.get(i);
-            distNode.updateWorkerOrCoordinator(i);
             if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                 hasApproxCountDistinct = true;
                 distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG);
             }
         }
 
+        List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
+        for (int i = 0; i < coordAggTypes.size(); ++i) {
+            coordNode.updateWorkerOrCoordinator(i);
+            String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId()).getNameString();
+            VoltType returnType = VoltType.typeFromString(typeName);
+            coordNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
+        }
+
         if (hasApproxCountDistinct) {
             // Now, patch up any APPROX_COUNT_DISTINCT on the coordinating node.
-            List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
             for (int i = 0; i < coordAggTypes.size(); ++i) {
                 ExpressionType et = coordAggTypes.get(i);
                 if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {

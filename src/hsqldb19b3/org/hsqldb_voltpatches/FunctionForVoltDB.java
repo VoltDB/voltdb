@@ -487,7 +487,7 @@ public class FunctionForVoltDB extends FunctionSQL {
          * @param anyCase
          * @return
          */
-        static FunctionDescriptor fn_by_name(String anyCase) {
+        public static FunctionDescriptor fn_by_name(String anyCase) {
             String downCase = anyCase.toLowerCase();
             FunctionDescriptor answer;
             answer = m_by_LC_name.get(downCase);
@@ -496,6 +496,16 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             return answer;
         }
+
+        public static Type getReturnType(int functionId) {
+            for (FunctionDescriptor func : FunctionDescriptor.m_defined_functions.values()) {
+                if (func.getId() == functionId) {
+                    return func.getDataType();
+                }
+            }
+            return null;
+        }
+
 
         public int getTypeParameter() {
             return m_typeParameter;

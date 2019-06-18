@@ -1791,6 +1791,10 @@ public class Expression {
             FunctionSQL fn = (FunctionSQL)this;
             return fn.voltAnnotateFunctionXML(exp);
 
+        case OpTypes.USER_DEFINE_AGGREGATE:
+            exp.attributes.put("valuetype", dataType.getNameString());
+            return exp;
+
         case OpTypes.COUNT:
         case OpTypes.SUM:
         case OpTypes.AVG:
