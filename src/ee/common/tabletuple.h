@@ -641,7 +641,7 @@ private:
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
         // Exclude the hidden column for persistent table with stream
         uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
-        if (m_schema->isTableWithStream()) {
+        if (m_schema->isTableWithMigrate()) {
             hiddenColumnCount--;
         }
         for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
@@ -1093,7 +1093,7 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 
-    bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithStream() : false);
+    bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithMigrate() : false);
     for (int j = 0; j < hiddenColumnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
 
@@ -1151,11 +1151,11 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 
     int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
-    bool isTableWithStream = m_schema->isTableWithStream();
+    bool isTableWithMigrate = m_schema->isTableWithMigrate();
 
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
-        if (isTableWithStream && i == hiddenColumnCount - 1) {
+        if (isTableWithMigrate && i == hiddenColumnCount - 1) {
             // Set the hidden column for persistent table to null
             NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
             setHiddenNValue(i, value);

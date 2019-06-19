@@ -112,7 +112,7 @@ namespace functionexpression {
    template<> NValue ConstantFunctionExpression<FUNC_VOLT_MIGRATING>::eval(
          const TableTuple* tuple1, const TableTuple*) const {
       // For MIGRATING(), check if we are evaluating on a migrating table (the table with a migrate target).
-      if (tuple1 != NULL && tuple1->getSchema()->isTableWithStream()) {
+      if (tuple1 != NULL && tuple1->getSchema()->isTableWithMigrate()) {
          // we have at most 3 hidden columns, DR Timestamp, count for view and transaction id for migrating
          // and transaction id for migrating is always the last one.
          return tuple1->getHiddenNValue( // use callUnary instead of callConstant since callConstant is a static method

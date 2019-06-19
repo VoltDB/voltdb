@@ -82,7 +82,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
     bool needsHiddenCountForView = false;
-    bool needsHiddenCloumnTableWithStream = isTableWithStream(static_cast<TableType>(catalogTable.tableType()));
+    bool needsHiddenCloumnTableWithMigrate = isTableWithMigrate(static_cast<TableType>(catalogTable.tableType()));
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
 
     // only looking for potential existing table count(*) when this is a Materialized view table
@@ -104,7 +104,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // DR timestamp and hidden COUNT(*) should not appear at the same time
     vassert(!(needsDRTimestamp && needsHiddenCountForView));
     int numHiddenColumns = (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0;
-    if (needsHiddenCloumnTableWithStream) {
+    if (needsHiddenCloumnTableWithMigrate) {
          numHiddenColumns++;
     }
     TupleSchemaBuilder schemaBuilder(numColumns, numHiddenColumns);
@@ -143,7 +143,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
 
     // Always create the hidden column for migrate last so the hidden columns can be handled correctly on java side
     // for snapshot write plans.
-    if (needsHiddenCloumnTableWithStream) {
+    if (needsHiddenCloumnTableWithMigrate) {
         VOLT_DEBUG("Adding hidden column for migrate table %s index %d", catalogTable.name().c_str(), hiddenIndex);
         schemaBuilder.setHiddenColumnAtIndex(hiddenIndex, VALUE_TYPE_BIGINT, 8, true, false, true);
     }
