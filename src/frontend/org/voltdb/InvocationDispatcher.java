@@ -1171,10 +1171,15 @@ public final class InvocationDispatcher {
             try {
                 catalog = MiscUtils.fileToBytes(catalogFH);
             } catch (IOException e) {
-                log.warn("Unable to access file " + catalogFH, e);
+                HostMessenger hm = VoltDB.instance().getHostMessenger();
+                log.warn("Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
+                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
+                        " may has redundant copies elsewhere.");
+                log.info("Stacktrace: ", e);
                 return unexpectedFailureResponse(
-                        "Unable to access file " + catalogFH,
-                        task.clientHandle);
+                        "Unable to access schema and procedure file " + catalogFH + " on " + hm.getHostname() +
+                        ", if you believe the path is correct, please retry the command on other hosts, this file" +
+                        " may has redundant copies elsewhere.", task.clientHandle);
             }
             final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
 
