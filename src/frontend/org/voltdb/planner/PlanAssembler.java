@@ -3014,9 +3014,12 @@ public class PlanAssembler {
         List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
         for (int i = 0; i < coordAggTypes.size(); ++i) {
             coordNode.updateWorkerOrCoordinator(i);
-            String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId()).getNameString();
-            VoltType returnType = VoltType.typeFromString(typeName);
-            coordNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
+            if (coordNode.getUserAggregateId() != -1) {
+                String typeName = FunctionDescriptor.getReturnType(coordNode.getUserAggregateId()).getNameString();
+                VoltType returnType = VoltType.typeFromString(typeName);
+                coordNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
+                distNode.updateAggregate(i, ExpressionType.USER_DEFINE_WORKER);
+            }
         }
 
         if (hasApproxCountDistinct) {

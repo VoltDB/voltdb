@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -67,7 +68,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected boolean m_inBytes = false;
     protected String user_aggregate_id;
     protected String name;
-    protected boolean receive_or_seqscan;
+    protected String plan_node_type;
 
     /**
      * We set this to non-null iff the expression has a non-deterministic
@@ -151,8 +152,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         m_right = right;
     }
 
-    public void setReceiveOrSeqscan(boolean b) {
-        receive_or_seqscan = b;
+    public void setPlanNodeType(String s) {
+        plan_node_type = s;
     }
 
     public void validate() throws Exception {
@@ -629,10 +630,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
         }
         else {
-            if (user_aggregate_id != null && receive_or_seqscan) {
-                stringer.keySymbolValuePair(Members.VALUE_TYPE, "25");
-                stringer.keySymbolValuePair(Members.VALUE_SIZE, "1048576");
-            } else {
+            if (user_aggregate_id != null) {
+                if (plan_node_type == "RECEIVE") {
+                    stringer.keySymbolValuePair(Members.VALUE_TYPE, "25");
+                }
+                else if (plan_node_type == "SEQSCAN" && m_valueType.getValue() != 25 && m_valueSize != 65537) {
+                    String returnType = FunctionDescriptor.getReturnType(Integer.parseInt(user_aggregate_id)).getNameString();
+                    byte returnValue = VoltType.typeFromString(returnType).getValue();
+                    stringer.keySymbolValuePair(Members.VALUE_TYPE, Integer.toString(returnValue));
+                }
+                else {
+                    stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
+                }
+            }
+            else {
                 stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
             }
             if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {

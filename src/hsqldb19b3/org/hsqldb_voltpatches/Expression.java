@@ -1399,7 +1399,7 @@ public class Expression {
             return;
         }
 
-        if (e.opType == OpTypes.USER_DEFINE_AGGREGATE) {
+        if (e.opType == OpTypes.USER_DEFINE_AGGREGATE || e.opType == OpTypes.USER_DEFINE_WORKER) {
             return;
         }
 
@@ -1581,6 +1581,7 @@ public class Expression {
 
         // user defined aggregate function
         prototypes.put(OpTypes.USER_DEFINE_AGGREGATE, (new VoltXMLElement("aggregation")).withValue("optype", "user_define_aggregate"));
+        prototypes.put(OpTypes.USER_DEFINE_WORKER, (new VoltXMLElement("aggregation")).withValue("optype", "user_define_worker"));
     }
 
     /**

@@ -1016,27 +1016,39 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
         int functionId = m_udfBuffer.getInt();
         UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
+        int num_of_coordinator = m_udfBuffer.getInt();
         Throwable throwable = null;
         Object returnValue = null;
+        VoltType returnType = null;
         try {
             assert(udafRunner != null);
-            // get the instance
-            Object worker_instance = udafRunner.getFunctionInstance();
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutput out = null;
-            try {
-               out = new ObjectOutputStream(bos);
-               out.writeObject(worker_instance);
-               out.flush();
-               returnValue = bos.toByteArray();
-            } finally {
-              try {
-                  bos.close();
-              } catch (IOException ex) {
-                // ignore close exception
-              }
+            // if there is a coordinator, we serialized the object to a byte array
+            // and the return type for a worker is a varbinary
+            if (num_of_coordinator == 1) {
+                Object worker_instance = udafRunner.getFunctionInstance();
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutput out = null;
+                try {
+                   out = new ObjectOutputStream(bos);
+                   out.writeObject(worker_instance);
+                   out.flush();
+                   returnValue = bos.toByteArray();
+                } finally {
+                  try {
+                      bos.close();
+                  } catch (IOException ex) {
+                    // ignore close exception
+                  }
+                }
+                returnType = VoltType.VARBINARY;
             }
-            VoltType returnType = VoltType.VARBINARY;
+            // However, if there is no coordinator, this worker will simply call the end method
+            // and return the original type
+            else {
+                returnValue = udafRunner.end();
+                returnType = udafRunner.getReturnType();
+            }
+
             // If the function we are running returns variable-length return value,
             // it may be possible that the buffer is not large enough to hold it.
             // Check the required buffer size and enlarge the existing buffer when necessary.

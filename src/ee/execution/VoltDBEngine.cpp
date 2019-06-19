@@ -814,7 +814,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const
     }
 }
 
-NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
+NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ValueType type) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
         // There must be serious inconsistency in the catalog if this could happen.
@@ -839,9 +839,14 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
     // Serialize buffer size, function ID.
     m_udfOutput.writeInt(bufferSizeNeeded);
     m_udfOutput.writeInt(functionId);
+    if (type == VALUE_TYPE_VARBINARY) {
+        m_udfOutput.writeInt(1);
+    } else {
+        m_udfOutput.writeInt(0);
+    }
 
     // Make sure we did the correct size calculation.
-    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+    assert(bufferSizeNeeded + 2 * sizeof(int32_t) == m_udfOutput.position());
 
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function according to the function ID and the parameters
@@ -850,7 +855,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId) {
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     if (returnCode == 0) {
         // After the the invocation, read the return value from the buffer.
-        NValue retval = ValueFactory::getNValueOfType(VALUE_TYPE_VARBINARY);
+        NValue retval = ValueFactory::getNValueOfType(type);
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
         return retval;
     }

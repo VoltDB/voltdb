@@ -515,7 +515,7 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
         if (worc == "WORKER") {
-            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId);
+            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId, type);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
@@ -569,6 +569,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
+    case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
         return new (memoryPool) UserDefineAgg(agg_id, worc);
     default:
         {

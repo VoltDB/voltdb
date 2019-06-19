@@ -449,6 +449,7 @@ public class SetFunction implements Serializable {
             case OpTypes.MIN :
             case OpTypes.MAX :
             case OpTypes.USER_DEFINE_AGGREGATE :
+            case OpTypes.USER_DEFINE_WORKER :
                 return type;
 
             case OpTypes.EVERY :
