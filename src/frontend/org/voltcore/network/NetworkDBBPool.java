@@ -17,63 +17,41 @@
 
 package org.voltcore.network;
 
-import java.util.Deque;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 
-import java.util.concurrent.ConcurrentLinkedDeque;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 public class NetworkDBBPool {
 
-    private final Deque<BBContainer> m_buffers = new ConcurrentLinkedDeque<BBContainer>();
     private static final int LIMIT = Integer.getInteger("NETWORK_DBB_LIMIT", 512);
     private static final int SIZE = Integer.getInteger("NETWORK_DBB_SIZE", (1024 * 32));
 
-    private final int m_numBuffers;
+    private final Queue<BBContainer> m_buffers;
     private final int m_allocationSize;
+
     public NetworkDBBPool(int numBuffers) {
-        m_numBuffers = numBuffers;
-        m_allocationSize = SIZE;
+        this(numBuffers, SIZE);
     }
 
     NetworkDBBPool(int numBuffers, int allocSize) {
-        m_numBuffers = numBuffers;
+        m_buffers = new ArrayBlockingQueue<>(numBuffers);
         m_allocationSize = allocSize;
     }
 
     public NetworkDBBPool() {
-        m_numBuffers = LIMIT;
-        m_allocationSize = SIZE;
+        this(LIMIT, SIZE);
     }
 
     BBContainer acquire() {
-       final BBContainer cont = m_buffers.poll();
+        BBContainer cont = m_buffers.poll();
+
         if (cont == null) {
-           final BBContainer originContainer = DBBPool.allocateDirect(m_allocationSize);
-           return new BBContainer(originContainer.b()) {
-                @Override
-                public void discard() {
-                    checkDoubleFree();
-                    //If we had to allocate over the desired limit, start discarding
-                    if (m_buffers.size() > m_numBuffers) {
-                        originContainer.discard();
-                        return;
-                    }
-                    m_buffers.push(originContainer);
-                }
-           };
-       }
-       return new BBContainer(cont.b()) {
-           @Override
-           public void discard() {
-               checkDoubleFree();
-               if (m_buffers.size() > m_numBuffers) {
-                   cont.discard();
-                   return;
-               }
-               m_buffers.push(cont);
-           }
-       };
+            cont = DBBPool.allocateDirect(m_allocationSize);
+        }
+
+        return new CachedContainer(cont);
     }
 
     void clear() {
@@ -83,4 +61,20 @@ public class NetworkDBBPool {
         }
     }
 
+    private final class CachedContainer extends BBContainer {
+        private final BBContainer m_original;
+
+        CachedContainer(BBContainer container) {
+            super(container.b());
+            m_original = container;
+        }
+
+        @Override
+        public void discard() {
+            checkDoubleFree();
+            if (!m_buffers.offer(m_original)) {
+                m_original.discard();
+            }
+        }
+    }
 }
