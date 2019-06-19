@@ -1096,21 +1096,26 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     bool hiddenColumnMigrateElastic = (elastic ? m_schema->isTableWithStream() : false);
     for (int j = 0; j < hiddenColumnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+
+        // tupleIn may not have hidden column
+        if (!tupleIn.hasRemaining()) {
+            std::ostringstream message;
+            message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
+                    << "(index=" << j << ")"
+                    << "hidden column count=" << m_schema->hiddenColumnCount()
+                    << std::endl;
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
+        }
+
         if (hiddenColumnMigrateElastic && j == hiddenColumnCount -1) {
+            vassert(columnInfo->getVoltType() == VALUE_TYPE_BIGINT);
+            // TableTuple::serializeTo includes the migrate column so just discard it
+            tupleIn.readLong();
+
             NValue value = NValue::getNullValue(columnInfo->getVoltType());
-            setHiddenNValue(j, value);
+            setNValue(columnInfo, value, false);
             VOLT_DEBUG("Deserializing migrate hidden column for elastic operation");
         } else {
-            // tupleIn may not have hidden column
-            if (!tupleIn.hasRemaining()) {
-                std::ostringstream message;
-                message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
-                        << "(index=" << j << ")"
-                        << "hidden column count=" << m_schema->hiddenColumnCount()
-                        << std::endl;
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
-            }
-
             char *dataPtr = getWritableDataPtr(columnInfo);
             NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
