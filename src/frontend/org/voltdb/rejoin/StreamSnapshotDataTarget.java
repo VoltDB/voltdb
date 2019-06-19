@@ -46,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -84,7 +85,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final StreamSnapshotAckReceiver m_ackReceiver;
 
     // Skip all subsequent writes if one fails
-    private final AtomicReference<IOException> m_writeFailed = new AtomicReference<IOException>();
+    private final AtomicReference<Exception> m_writeFailed = new AtomicReference<>();
     // true if the failure is already reported to the SnapshotSiteProcessor, prevent throwing
     // the same exception multiple times.
     private boolean m_failureReported = false;
@@ -410,6 +411,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
     }
 
+    @Override
+    public synchronized void receiveError(Exception exception) {
+        setWriteFailed(exception);
+    }
+
     /**
      * Thread that runs send work (sending snapshot blocks). One per node
      */
@@ -649,8 +655,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
         // If there was an error during close(), throw it so that the snapshot
         // can be marked as failed.
-        if (m_writeFailed.get() != null) {
-            throw m_writeFailed.get();
+        Exception e = m_writeFailed.get();
+        if (e != null) {
+            Throwables.propagateIfPossible(e, IOException.class);
+            throw new IOException(e);
         }
     }
 
@@ -714,10 +722,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (exception != null) {
             return exception;
         }
-        exception = m_ackReceiver.m_lastException;
-        if (exception != null) {
-            return exception;
-        }
+
         return m_writeFailed.get();
     }
 
@@ -743,6 +748,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     private synchronized void setWriteFailed(Exception exception) {
+        m_ackReceiver.forceStop();
         if (m_writeFailed.compareAndSet(null, exception)) {
             notifyAll();
         }
