@@ -1194,7 +1194,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                      m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.elastic.ElasticJoinNodeCoordinator", "Elastic",
                             ProClass.HANDLER_LOG, m_messenger, VoltDB.instance().getVoltDBRootPath(), kfactor);
                     if (!MiscUtils.validateLicense(getLicenseApi(),
-                            m_clusterSettings.get().hostcount() + m_joinCoordinator.getHostsJoining(),
+                            getHostCount() + m_joinCoordinator.getHostsJoining(),
                             DrRoleType.fromValue(getCatalogContext().getCluster().getDrrole()),
                             m_config.m_startAction)) {
                         VoltDB.crashLocalVoltDB("VoltDB license constraints are not met.");
@@ -1271,7 +1271,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 m_eligibleAsLeader = determineIfEligibleAsLeader(partitions, partitionGroupPeers, topo);
 
-                m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
+                m_messenger.setPartitionGroupPeers(partitionGroupPeers, getHostCount());
 
                 // The partition id list must be in sorted order
                 assert(Ordering.natural().isOrdered(partitions));
@@ -1780,7 +1780,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     final int missing = m_leaderAppointer.getKSafetyStatsSet().stream()
                             .max((s1,s2) -> s1.getMissingCount() - s2.getMissingCount())
                             .map(s->s.getMissingCount()).orElse(failedHosts.size());
-                    final int expected = m_clusterSettings.getReference().hostcount();
+                    final int expected = getHostCount();
                     m_snmp.statistics(FaultFacility.CLUSTER,
                             "Node lost. Cluster is down to " + (expected - missing)
                             + " members out of original "+ expected + ".");
@@ -2171,7 +2171,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // initial start or recover
-            int hostcount = m_clusterSettings.get().hostcount();
+            int hostcount = getHostCount();
             if (hostInfos.size() != (hostcount - m_config.m_missingHostCount)) {
                 VoltDB.crashLocalVoltDB("The total number of live and missing hosts must be the same as the cluster host count", false, null);
             }
@@ -2183,7 +2183,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Not enough nodes to ensure K-Safety.", false, null);
             }
             // Missing hosts can't be more than number of partition groups times k-factor
-            int partitionGroupCount = m_clusterSettings.get().hostcount() / (kfactor + 1);
+            int partitionGroupCount = getHostCount() / (kfactor + 1);
             if (m_config.m_missingHostCount > (partitionGroupCount * kfactor)) {
                 VoltDB.crashLocalVoltDB("Too many nodes are missing at startup. This cluster only allow up to "
                         + (partitionGroupCount * kfactor) + " missing hosts.");
@@ -2249,7 +2249,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void createSecondaryConnections(boolean isRejoin) {
-        int partitionGroupCount = m_clusterSettings.get().hostcount() / (m_configuredReplicationFactor + 1);
+        int partitionGroupCount = getHostCount() / (m_configuredReplicationFactor + 1);
         if (m_configuredReplicationFactor > 0 && partitionGroupCount > 1) {
             m_messenger.createAuxiliaryConnections(isRejoin);
         }
@@ -2361,7 +2361,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public boolean isClusterComplete() {
-        return (m_clusterSettings.get().hostcount() == m_messenger.getLiveHostIds().size());
+        return (getHostCount() == m_messenger.getLiveHostIds().size());
     }
 
     private void startMigratePartitionLeaderTask() {
@@ -2372,7 +2372,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //MigratePartitionLeader service will be started up only after the last rejoining has finished
-        if(!isClusterComplete() || m_clusterSettings.get().hostcount() == 1 || m_configuredReplicationFactor == 0) {
+        if(!isClusterComplete() || getHostCount() == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
@@ -2382,7 +2382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         MigratePartitionLeaderMessage msg = new MigratePartitionLeaderMessage();
         msg.setStartTask();
-        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_clusterSettings.get().hostcount());
+        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / getHostCount());
         Set<Integer> hosts = m_messenger.getLiveHostIds();
         for (int hostId : hosts) {
             final int currentMasters = m_cartographer.getMasterCount(hostId);
@@ -3200,7 +3200,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final Supplier<Integer> hostCountSupplier = new Supplier<Integer>() {
             @Override
             public Integer get() {
-                return m_clusterSettings.get().hostcount();
+                return getHostCount();
             }
         };
 
