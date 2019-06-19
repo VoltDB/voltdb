@@ -372,7 +372,7 @@ public class AsyncExportClient
                 if (config.usemigrateonly && r.nextBoolean()) {
                     try {
                         int i = r.nextInt(10);
-                        log.info("Calling MigrateExport for rows older than " + i + " seconds before now."); 
+                        log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
                         clientRef.get().callProcedure(
                                 new NullCallback(),
                                 "MigrateExport");
