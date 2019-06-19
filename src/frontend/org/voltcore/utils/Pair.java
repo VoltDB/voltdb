@@ -17,6 +17,8 @@
 
 package org.voltcore.utils;
 
+import java.util.Objects;
+
 /**
  * Class representing a pair of generic-ized types. Supports equality, hashing
  * and all that other nice Java stuff. Based on STL's pair class in C++.
@@ -44,17 +46,22 @@ public class Pair<T, U> implements java.io.Serializable {
         this(first, second, true);
     }
 
+    @Override
     public String toString() {
-        return "<" + m_first.toString() + ", " + m_second.toString() + ">";
+        return "<" + m_first + ", " + m_second + ">";
     }
 
+    @Override
     public int hashCode() {
         return m_hash;
     }
 
     public Object get(int idx) {
-        if (idx == 0) return m_first;
-        else if (idx == 1) return m_second;
+        if (idx == 0) {
+            return m_first;
+        } else if (idx == 1) {
+            return m_second;
+        }
         return null;
     }
 
@@ -63,12 +70,10 @@ public class Pair<T, U> implements java.io.Serializable {
      * @return Is the object equal to a value in the pair.
      */
     public boolean contains(Object o) {
-        if ((m_first != null) && (m_first.equals(o))) return true;
-        if ((m_second != null) && (m_second.equals(o))) return true;
-        if (o != null) return false;
-        return ((m_first == null) || (m_second == null));
+        return Objects.equals(o, m_first) || Objects.equals(o, m_second);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
