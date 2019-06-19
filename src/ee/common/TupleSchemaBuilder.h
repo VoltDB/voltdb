@@ -49,7 +49,7 @@ public:
         , m_hiddenSizes(0)
         , m_hiddenAllowNullFlags(0)
         , m_hiddenInBytesFlags(0)
-        , m_isTableWithStream(false)
+        , m_isTableWithMigrate(false)
     {
     }
 
@@ -64,7 +64,7 @@ public:
         , m_hiddenSizes(numHiddenCols)
         , m_hiddenAllowNullFlags(numHiddenCols)
         , m_hiddenInBytesFlags(numHiddenCols)
-        , m_isTableWithStream(false)
+        , m_isTableWithMigrate(false)
     {
     }
 
@@ -105,10 +105,10 @@ public:
                                  int32_t colSize,
                                  bool allowNull,
                                  bool inBytes,
-                                 bool isTableWithStream)
+                                 bool isTableWithMigrate)
      {
          setHiddenColumnAtIndex(index, valueType, colSize, allowNull, inBytes);
-         m_isTableWithStream = isTableWithStream;
+         m_isTableWithMigrate = isTableWithMigrate;
      }
     /** Finally, build the schema with the attributes specified. */
     TupleSchema* build() const
@@ -121,7 +121,7 @@ public:
                                               m_hiddenSizes,
                                               m_hiddenAllowNullFlags,
                                               m_hiddenInBytesFlags,
-                                              m_isTableWithStream);
+                                              m_isTableWithMigrate);
     }
 
     /** A special build method for index keys, which use "headerless" tuples */
@@ -223,7 +223,7 @@ private:
     std::vector<int32_t> m_hiddenSizes;
     std::vector<bool> m_hiddenAllowNullFlags;
     std::vector<bool> m_hiddenInBytesFlags;
-    bool m_isTableWithStream;
+    bool m_isTableWithMigrate;
 };
 
 } // end namespace voltdb
