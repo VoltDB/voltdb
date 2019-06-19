@@ -35,6 +35,8 @@ import com.google_voltpatches.common.base.Preconditions;
 public class StreamSnapshotAckReceiver implements Runnable {
     public static interface AckCallback {
         public void receiveAck(int blockIndex);
+
+        public void receiveError(Exception exception);
     }
 
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
@@ -43,9 +45,8 @@ public class StreamSnapshotAckReceiver implements Runnable {
     private final StreamSnapshotBase.MessageFactory m_msgFactory;
     private final Map<Long, AckCallback> m_callbacks;
     private final AtomicInteger m_expectedEOFs;
-
-    volatile Exception m_lastException = null;
-    private volatile boolean m_stop;
+    private volatile boolean stopped = false;
+    private volatile Thread m_thread;
 
     public StreamSnapshotAckReceiver(Mailbox mb)
     {
@@ -58,7 +59,6 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_msgFactory = msgFactory;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
-        m_stop = false;
     }
 
     public void setCallback(long targetId, AckCallback callback, int expectedAcksForEOF) {
@@ -67,26 +67,36 @@ public class StreamSnapshotAckReceiver implements Runnable {
     }
 
     public void forceStop() {
-        m_stop = true;
+        stopped = true;
+        Thread thread = this.m_thread;
+        if (thread != null) {
+            // Interrupt the thread to wake up the call to recvBlocking
+            thread.interrupt();
+        }
     }
 
     @Override
     public void run() {
-        if (rejoinLog.isTraceEnabled()) {
-            rejoinLog.trace("Starting ack receiver thread");
-        }
+        m_thread = Thread.currentThread();
+        rejoinLog.trace("Starting ack receiver thread");
 
         try {
-            while (!m_stop) {
-                if (rejoinLog.isTraceEnabled()) {
-                    rejoinLog.trace("Blocking on receiving mailbox");
+            while (true) {
+                if (stopped) {
+                    rejoinLog.debug("Ack reciever thread stopped");
+                    return;
                 }
+
+                rejoinLog.trace("Blocking on receiving mailbox");
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
+                if (stopped) {
+                    rejoinLog.debug("Ack reciever thread stopped");
+                    return;
+                }
+
                 if (msg == null) {
-                    if (!m_stop) {
-                        rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
-                                       " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
-                    }
+                    rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
+                                   " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
                     continue;
                 }
 
@@ -97,18 +107,20 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
                 SerializableException se = m_msgFactory.getException(msg);
                 if (se != null) {
-                    m_lastException = se;
-                    rejoinLog.error("Received exception in ack receiver", se);
+                    handleException("Received exception in ack receiver", se);
                     return;
                 }
 
                 AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));
                 if (ackCallback == null) {
-                    rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
-                                    " in stream snapshot ack message");
+                    rejoinLog.warn("Unknown target ID " + m_msgFactory.getAckTargetId(msg)
+                            + " in stream snapshot ack message");
                     continue;
-                } else if (m_msgFactory.getAckBlockIndex(msg) != -1) {
-                    ackCallback.receiveAck(m_msgFactory.getAckBlockIndex(msg));
+                }
+
+                int ackBlockIndex = m_msgFactory.getAckBlockIndex(msg);
+                if (ackBlockIndex != -1) {
+                    ackCallback.receiveAck(ackBlockIndex);
                 }
 
                 if (m_msgFactory.isAckEOS(msg)) {
@@ -122,12 +134,15 @@ public class StreamSnapshotAckReceiver implements Runnable {
                 }
             }
         } catch (Exception e) {
-            m_lastException = e;
-            rejoinLog.error("Error reading a message from a recovery stream", e);
+            handleException("Error reading a message from a recovery stream", e);
         } finally {
-            if (rejoinLog.isTraceEnabled()) {
-                rejoinLog.trace("Ack receiver thread exiting");
-            }
+            m_thread = null;
+            rejoinLog.trace("Ack receiver thread exiting");
         }
+    }
+
+    private void handleException(String message, Exception exception) {
+        rejoinLog.error(message, exception);
+        m_callbacks.values().forEach(c -> c.receiveError(exception));
     }
 }
