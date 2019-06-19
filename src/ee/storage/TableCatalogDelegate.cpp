@@ -417,16 +417,10 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     }
     VOLT_DEBUG("Creating %s %s as %s, type: %d", m_materialized?"VIEW":"TABLE",
                tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED", catalogTable.tableType());
-    Table* table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, m_signatureHash,
-                                                    m_materialized,
-                                                    partitionColumnIndex,
-                                                    m_tableType,
-                                                    tableAllocationTargetSize,
-                                                    catalogTable.tuplelimit(),
-                                                    m_compactionThreshold,
-                                                    drEnabled,
-                                                    isReplicated);
+    Table* table = TableFactory::getPersistentTable(
+            databaseId, tableName.c_str(), schema, columnNames, m_signatureHash,
+            m_materialized, partitionColumnIndex, m_tableType, tableAllocationTargetSize,
+            catalogTable.tuplelimit(), m_compactionThreshold, drEnabled, isReplicated);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
         vassert(pkeyIndexId.empty());

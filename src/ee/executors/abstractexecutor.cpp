@@ -56,20 +56,15 @@
 
 namespace voltdb {
 
-bool AbstractExecutor::init(VoltDBEngine* engine,
-                            const ExecutorVector& executorVector)
-{
+bool AbstractExecutor::init(VoltDBEngine* engine, const ExecutorVector& executorVector) {
     vassert(m_abstractNode);
 
     //
     // Grab the input tables directly from this node's children
     //
     vector<Table*> input_tables;
-    for (int ctr = 0,
-             cnt = static_cast<int>(m_abstractNode->getChildren().size());
-         ctr < cnt;
-         ctr++)
-    {
+    for (int ctr = 0, cnt = static_cast<int>(m_abstractNode->getChildren().size());
+            ctr < cnt; ctr++) {
         Table* table = m_abstractNode->getChildren()[ctr]->getOutputTable();
         if (table == NULL) {
             VOLT_ERROR("Output table from PlanNode '%s' is NULL",
@@ -86,12 +81,9 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     // from the VoltDBEngine. This is kind of a hack job here... is
     // there a better way?
 
-    AbstractScanPlanNode* scan_node =
-        dynamic_cast<AbstractScanPlanNode*>(m_abstractNode);
-    AbstractOperationPlanNode* oper_node =
-        dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
-    if (scan_node || oper_node)
-    {
+    AbstractScanPlanNode* scan_node = dynamic_cast<AbstractScanPlanNode*>(m_abstractNode);
+    AbstractOperationPlanNode* oper_node = dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
+    if (scan_node || oper_node) {
         Table* target_table = NULL;
 
         string targetTableName;
@@ -131,7 +123,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         return false;
     }
 
-    if (m_tmpOutputTable == NULL) {
+    if (m_tmpOutputTable == nullptr) {
         m_tmpOutputTable = dynamic_cast<AbstractTempTable*>(m_abstractNode->getOutputTable());
     }
 
@@ -143,7 +135,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
  * Called from p_init.
  */
 void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
-                                          const string tempTableName) {
+        const string tempTableName) {
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     int column_count = schema->columnCount();
     std::vector<std::string> column_names(column_count);
@@ -155,15 +147,11 @@ void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
     }
 
     if (executorVector.isLargeQuery()) {
-        m_tmpOutputTable = TableFactory::buildLargeTempTable(tempTableName,
-                                                             schema,
-                                                             column_names);
-    }
-    else {
-        m_tmpOutputTable = TableFactory::buildTempTable(tempTableName,
-                                                        schema,
-                                                        column_names,
-                                                        executorVector.limits());
+        m_tmpOutputTable = TableFactory::buildLargeTempTable(
+                tempTableName, schema, column_names);
+    } else {
+        m_tmpOutputTable = TableFactory::buildTempTable(
+                tempTableName, schema, column_names, executorVector.limits());
     }
 
     m_abstractNode->setOutputTable(m_tmpOutputTable);
@@ -173,35 +161,30 @@ void AbstractExecutor::setTempOutputTable(const ExecutorVector& executorVector,
  * Set up a single-column temp output table for DML executors that require one to return their counts.
  * Called from p_init.
  */
-void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
+void AbstractExecutor::setDMLCountOutputTable(TempTableLimits const* limits) {
     TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
     const std::vector<std::string> columnNames(1, "modified_tuples");
-    m_tmpOutputTable = TableFactory::buildTempTable("temp",
-                                                    schema,
-                                                    columnNames,
-                                                    limits);
+    m_tmpOutputTable = TableFactory::buildTempTable("temp", schema, columnNames, limits);
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
 AbstractExecutor::~AbstractExecutor() {}
 
 AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
-    const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
-{
+    const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size()) {
     vassert(keys.size() == dirs.size());
     vassert(std::find(m_dirs.begin(), m_dirs.end(), SORT_DIRECTION_TYPE_INVALID) == m_dirs.end());
 }
 
-bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) const
-{
-    for (size_t i = 0; i < m_keyCount; ++i)
-    {
+bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) const {
+    for (size_t i = 0; i < m_keyCount; ++i) {
         AbstractExpression* k = m_keys[i];
         SortDirectionType dir = m_dirs[i];
         int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-
-        if (cmp < 0) return (dir == SORT_DIRECTION_TYPE_ASC);
-        if (cmp > 0) return (dir == SORT_DIRECTION_TYPE_DESC);
+        if (cmp < 0)
+            return dir == SORT_DIRECTION_TYPE_ASC;
+        else if (cmp > 0)
+            return dir == SORT_DIRECTION_TYPE_DESC;
     }
     return false; // ta == tb on these keys
 }

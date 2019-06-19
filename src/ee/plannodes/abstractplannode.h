@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREPLANNODE_H
-#define HSTOREPLANNODE_H
+#pragma once
 
 #include "SchemaColumn.h"
 
@@ -198,7 +197,7 @@ public:
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------
-    static AbstractPlanNode* fromJSONObject(PlannerDomValue obj);
+    static std::unique_ptr<AbstractPlanNode> fromJSONObject(PlannerDomValue obj);
 
     // Debugging convenience methods
     std::string debug() const;
@@ -252,25 +251,25 @@ protected:
                                                             PlannerDomValue obj);
 
     // Every PlanNode will have a unique id assigned to it at compile time
-    int32_t m_planNodeId;
+    int32_t m_planNodeId = -1;
 
     //
     // A node can have multiple children references, initially serialized as Ids
     //
-    std::vector<AbstractPlanNode*> m_children;
-    std::vector<int32_t> m_childIds;
+    std::vector<AbstractPlanNode*> m_children{};
+    std::vector<int32_t> m_childIds{};
 
     // Keep a pointer to this node's executor for memeory management purposes.
     boost::scoped_ptr<AbstractExecutor> m_executor;
 
     // Some Executors can take advantage of multiple internal PlanNodes to perform tasks inline.
     // This can be a big speed increase and/or temp table memory decrease.
-    std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes;
+    std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes{};
     // This PlanNode may be getting referenced in that way.
     // Currently, it is still assigned an executor that either goes unused or
     // provides some service to the parent executor. This allows code sharing between inline
     // and non-inline uses of the same PlanNode type.
-    bool m_isInline;
+    bool m_isInline = false;
 
 private:
     static const int SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION = -1;
@@ -278,20 +277,19 @@ private:
 
     // Output Table
     // This is where we will write the results of the plan node's execution
-    TableOwner m_outputTable;
+    TableOwner m_outputTable{};
 
     // Input Tables
     // These tables are derived from the output of this node's children
-    std::vector<TableReference> m_inputTables;
+    std::vector<TableReference> m_inputTables{};
 
     // This is mostly used to hold one of the SCHEMA_UNDEFINED_SO_GET_FROM_ flags
     // or some/any non-negative value indicating that m_outputSchema is valid.
     // the fact that it also matches the size of m_outputSchema -- when it is valid
     // -- MIGHT come in handy?
-    int m_validOutputColumnCount;
-    std::vector<SchemaColumn*> m_outputSchema;
+    int m_validOutputColumnCount = 0;
+    std::vector<SchemaColumn*> m_outputSchema{};
 };
 
 } // namespace voltdb
 
-#endif

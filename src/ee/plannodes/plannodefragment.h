@@ -44,8 +44,7 @@
  */
 
 
-#ifndef VOLTDB_PLANNODEFRAGMENT_HPP
-#define VOLTDB_PLANNODEFRAGMENT_HPP
+#pragma once
 
 #include <vector>
 #include <map>
@@ -62,32 +61,42 @@ namespace voltdb {
 
 class AbstractPlanNode;
 
-
 /**
  * Represents the full intra-fragment node relationships and provides
  * a viable (but not necessarily exclusive) node execution order.
  */
 class PlanNodeFragment {
+    // construct a new fragment from a serialized json object
+    static std::unique_ptr<PlanNodeFragment> fromJSONObject(PlannerDomValue const& planNodesArray);
+    // read node list for a given sub statement
+    void nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId);
 
-  public:
-    typedef std::map<int, std::vector<AbstractPlanNode*>* >::iterator PlanNodeMapIterator;
-    typedef std::map<int, std::vector<AbstractPlanNode*>* >::const_iterator PlanNodeMapIteratorConst;
-    typedef std::vector<AbstractPlanNode*>::iterator PlanNodeListIterator;
+    // translate id from catalog to pointer to plannode
+    std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
+    // Pointers to nodes in execution order grouped by substatement
+    // The statement id is the key. The top statement (parent) always has id = 0
+    std::map<int, std::vector<AbstractPlanNode*>> m_stmtExecutionListMap;
+
+    bool m_isLargeQuery;
+
+public:
+    using PlanNodeMapIterator = std::map<int, std::vector<AbstractPlanNode*>>::iterator;
+    using PlanNodeMapIteratorConst = std::map<int, std::vector<AbstractPlanNode*>>::const_iterator;
 
     PlanNodeFragment();
     virtual ~PlanNodeFragment();
 
     // construct a new fragment from the catalog's serialization
-    static PlanNodeFragment * createFromCatalog(const std::string);
+    static PlanNodeFragment* createFromCatalog(const char*);
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
     void constructTree(AbstractPlanNode *node);
 
     // first node from the statement plan
-    AbstractPlanNode * getRootNode(int stmtId = 0) {
+    AbstractPlanNode* getRootNode(int stmtId = 0) {
         vassert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
-        return m_stmtExecutionListMap[stmtId]->front();
+        return m_stmtExecutionListMap[stmtId].front();
     }
 
     // the list of plannodes in execution order for a given sub-statement
@@ -115,28 +124,8 @@ class PlanNodeFragment {
 
     // produce a string describing pnf's content
     std::string debug();
-
-  private:
-
-    // construct a new fragment from a serialized json object
-    static PlanNodeFragment* fromJSONObject(PlannerDomValue const& planNodesArray);
-    // read node list for a given sub statement
-    void nodeListFromJSONObject(PlannerDomValue const& planNodesList, PlannerDomValue const& executeList, int stmtId);
-
-    // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
-    std::string m_serializedType;
-    // translate id from catalog to pointer to plannode
-    std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
-    // Pointers to nodes in execution order grouped by substatement
-    // The statement id is the key. The top statement (parent) always has id = 0
-    std::map<int, std::vector<AbstractPlanNode*>* > m_stmtExecutionListMap;
-
-    bool m_isLargeQuery;
 };
 
 
 }
 
-
-
-#endif

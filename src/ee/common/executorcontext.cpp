@@ -297,7 +297,7 @@ void ExecutorContext::cleanupAllExecutors()
     // If something failed before we could even instantiate the plan,
     // there won't even be an executors map.
     if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        typedef std::map<int, std::vector<AbstractExecutor*>>::value_type MapEntry;
         BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
             int subqueryId = entry.first;
             cleanupExecutorsForSubquery(subqueryId);
@@ -359,10 +359,9 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
-    if (m_executorsMap != NULL) {
-        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-        BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
-            BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+    if (m_executorsMap != nullptr) {
+        for(auto& entry : *m_executorsMap) {
+            for(auto const* executor : entry.second) {
                 if (! executor->outputTempTableIsEmpty()) {
                     return false;
                 }

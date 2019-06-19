@@ -318,7 +318,8 @@ public:
         m_engine->initialize(0, 0, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
         partitionCount = htonl(partitionCount);
         m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
-        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames, signature));
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id,
+                    "test_table", schema, columnNames, signature));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
