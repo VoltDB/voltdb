@@ -211,6 +211,10 @@ public final class ExpressionUtil {
             assert !colName.isEmpty();
             return new TupleValueExpression(tblName, colName, colIndex);
         } else if (elm.name.equals("value")) {
+            // add support for dyanmic parameter
+            if (elm.getStringAttribute("isparam", "").equals("true")) {
+                return new ParameterValueExpression();
+            }
             final ConstantValueExpression expr = new ConstantValueExpression();
             expr.setValue(elm.getStringAttribute("value", ""));
             expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", typeHint)));
