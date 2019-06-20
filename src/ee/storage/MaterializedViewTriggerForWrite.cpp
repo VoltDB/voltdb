@@ -242,7 +242,8 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
         }
         else {
             // max()
-            selectedIndex->moveToKeyOrLess(&m_minMaxSearchKeyTuple, minMaxCursor);
+            selectedIndex->moveToGreaterThanKey(&m_minMaxSearchKeyTuple, minMaxCursor);
+            selectedIndex->moveToPriorEntry(minMaxCursor);
         }
         while ( ! (tuple = selectedIndex->nextValue(minMaxCursor)).isNullTuple() ) {
             // If the cursor already moved out of the dest group range, exit the loop.

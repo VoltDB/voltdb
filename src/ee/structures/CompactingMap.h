@@ -221,6 +221,7 @@ public:
 
     iterator lowerBound(const Key &key) const;
     iterator upperBound(const Key &key) const;
+    iterator upperBoundNullAsMax(const Key &key) const;
 
     std::pair<iterator, iterator> equalRange(const Key &key) const;
 
@@ -419,6 +420,25 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBound(const Key &key) const
     }
     return iterator(this, y);
 
+}
+
+template<typename KeyValuePair, typename Compare, bool hasRank>
+typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator
+CompactingMap<KeyValuePair, Compare, hasRank>::upperBoundNullAsMax(const Key &key) const {
+    Key tmpKey(key);
+    setPointerValue(tmpKey, MAXPOINTER);
+    TreeNode *x = m_root;
+    TreeNode *y = const_cast<TreeNode *>(&NIL);
+    while (x != &NIL) {
+        int cmp = (*m_comper.getNullAsMaxComparator())(x->key(), tmpKey);
+        if (cmp <= 0) {
+            x = x->right;
+        } else {
+            y = x;
+            x = x->left;
+        }
+    }
+    return iterator(this, y);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>

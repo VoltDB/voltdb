@@ -376,6 +376,10 @@ struct IntsComparator
     int compareWithoutPointer(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         return operator()(lhs, rhs);
     }
+
+    const IntsComparator * getNullAsMaxComparator() const {
+        return this;
+    }
 };
 
 /**
@@ -590,6 +594,28 @@ private:
     const TupleSchema *m_keySchema;
 };
 
+template <std::size_t keySize>
+struct GenericNullAsMaxComparator
+{
+    /** Type information passed to the constuctor as it's not in the key itself */
+    GenericNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
+
+    inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        // lexographical compare could be faster for fixed N
+        return lhTuple.compareNullAsMax(rhTuple);
+    }
+
+    // This method is provided to be compatible with ComparatorWithPointer.
+    int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+        return operator()(lhs, rhs);
+    }
+
+private:
+    const TupleSchema *m_keySchema;
+};
+
 /**
  * Function object returns -1/0/1 if lhs </==/> rhs.
  * Required by CompactingMap keyed by GenericKey<>
@@ -610,6 +636,11 @@ struct GenericComparator
     // This method is provided to be compatible with ComparatorWithPointer.
     int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
         return operator()(lhs, rhs);
+    }
+
+    const std::unique_ptr<GenericNullAsMaxComparator<keySize>> getNullAsMaxComparator() const {
+        return std::unique_ptr<GenericNullAsMaxComparator<keySize>>(
+                new GenericNullAsMaxComparator<keySize>(m_keySchema));
     }
 private:
     const TupleSchema *m_keySchema;
@@ -748,6 +779,37 @@ protected:
     const TupleSchema *m_keyTupleSchema;
 };
 
+struct TupleKeyNullAsMaxComparator
+{
+    TupleKeyNullAsMaxComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
+
+    // return -1/0/1 if lhs </==/> rhs
+    inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
+        TableTuple lhTuple = lhs.getTupleForComparison();
+        TableTuple rhTuple = rhs.getTupleForComparison();
+        NValue lhValue, rhValue;
+
+        const int columnCount = m_keySchema->columnCount();
+        for (int ii=0; ii < columnCount; ++ii) {
+            lhValue = lhs.indexedValue(lhTuple, ii);
+            rhValue = rhs.indexedValue(rhTuple, ii);
+
+            int comparison = lhValue.compareNullAsMax(rhValue);
+
+            if (comparison != VALUE_COMPARE_EQUAL) return comparison;
+        }
+        return VALUE_COMPARE_EQUAL;
+    }
+
+    // This method is provided to be compatible with ComparatorWithPointer.
+    int compareWithoutPointer(const TupleKey &lhs, const TupleKey &rhs) const {
+        return operator()(lhs, rhs);
+    }
+
+private:
+    const TupleSchema *m_keySchema;
+};
+
 /**
  * Required by CompactingMap keyed by TupleKey
  */
@@ -776,6 +838,11 @@ struct TupleKeyComparator
     // This method is provided to be compatible with ComparatorWithPointer.
     int compareWithoutPointer(const TupleKey &lhs, const TupleKey &rhs) const {
         return operator()(lhs, rhs);
+    }
+
+    const std::unique_ptr<TupleKeyNullAsMaxComparator> getNullAsMaxComparator() const {
+        return std::unique_ptr<TupleKeyNullAsMaxComparator>(
+                new TupleKeyNullAsMaxComparator(m_keySchema));
     }
 
 private:

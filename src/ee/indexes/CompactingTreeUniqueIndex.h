@@ -187,12 +187,31 @@ class CompactingTreeUniqueIndex : public TableIndex
         }
     }
 
-    void moveToKeyOrLess(const TableTuple *searchKey, IndexCursor& cursor) const
-    {
+    void moveToKeyOrLess(TableTuple *searchKey, IndexCursor &cursor) {
+        for (int i = 0; i < searchKey->getSchema()->totalColumnCount(); i++) {
+            if (searchKey->getNValue(i).isNull()) {
+                const ValueType valueType = searchKey->getSchema()->columnType(i);
+                switch (valueType) {
+                    case VALUE_TYPE_BIGINT:
+                        searchKey->setNValue(i, ValueFactory::getBigIntValue(INT64_MAX));
+                        break;
+                    case VALUE_TYPE_INTEGER:
+                        searchKey->setNValue(i, ValueFactory::getIntegerValue(INT32_MAX));
+                        break;
+                    case VALUE_TYPE_SMALLINT:
+                        searchKey->setNValue(i, ValueFactory::getSmallIntValue(INT16_MAX));
+                        break;
+                    case VALUE_TYPE_TINYINT:
+                        searchKey->setNValue(i, ValueFactory::getTinyIntValue(INT8_MAX));
+                        break;
+                    default: // other null types will be handled in GenericComparator
+                        break;
+                }
+            }
+        }
         // do moveToGreaterThanKey()
         MapIterator &mapIter = castToIter(cursor);
-        mapIter = m_entries.upperBound(KeyType(searchKey));
-
+        mapIter = m_entries.upperBoundNullAsMax(KeyType(searchKey));
         // find prev entry
         if (mapIter.isEnd()) {
             moveToEnd(false, cursor);
