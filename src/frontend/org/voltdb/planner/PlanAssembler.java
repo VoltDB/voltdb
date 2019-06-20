@@ -2683,7 +2683,6 @@ public class PlanAssembler {
                             "", col.m_alias,
                             rootExpr, outputColumnIndex);
                     tve.setDifferentiator(col.m_differentiator);
-                    //tve.setUserAggregateId(tempRoot.getUserAggregateId());
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     if (tempRoot.getUserAggregateId() != null) {
@@ -3124,6 +3123,9 @@ public class PlanAssembler {
         else {
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
+            String typeName = FunctionDescriptor.getReturnType(rootAggNode.getUserAggregateId()).getNameString();
+            VoltType returnType = VoltType.typeFromString(typeName);
+            rootAggNode.getOutputSchema().getColumn(0).getExpression().setValueType(returnType);
         }
 
         // Set post predicate for final Aggregation node.

@@ -490,8 +490,8 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, std::string worc_in)
-        : functionId(id), worc(worc_in)
+    UserDefineAgg(int id, std::string worc_in, ExpressionType agg_type_in)
+        : functionId(id), worc(worc_in), agg_type(agg_type_in)
     {
         ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
     }
@@ -515,7 +515,7 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
         if (worc == "WORKER") {
-            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId, type);
+            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
@@ -532,6 +532,7 @@ private:
     //Pool* m_memoryPool;
     int functionId;
     std::string worc;
+    ExpressionType agg_type;
 };
 
 /*
@@ -570,7 +571,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
-        return new (memoryPool) UserDefineAgg(agg_id, worc);
+        return new (memoryPool) UserDefineAgg(agg_id, worc, agg_type);
     default:
         {
             char message[128];

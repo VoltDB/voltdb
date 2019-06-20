@@ -110,9 +110,12 @@ public class AggregateExpression extends AbstractExpression {
             expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
             break;
         case AGGREGATE_VALS_TO_HYPERLOGLOG:
-        case USER_DEFINE_WORKER:
             expr.m_valueType = VoltType.VARBINARY;
             expr.m_valueSize = 65537;
+            break;
+        case USER_DEFINE_WORKER:
+            expr.m_valueType = VoltType.VARBINARY;
+            expr.m_valueSize = 1048576;
             break;
         case AGGREGATE_AVG:
         case AGGREGATE_MAX:

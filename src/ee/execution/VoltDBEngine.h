@@ -236,7 +236,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void callJavaUserDefinedAggregateStart(int32_t functionId);
         void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument);
         void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument);
-        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ValueType type);
+        NValue callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type);
         NValue callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId);
 
 
