@@ -113,15 +113,9 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     // test sql funtion contains ?
     public void testENG16508() throws Exception {
         String ddl = "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT, ts TIMESTAMP);\n";
-        try {
-            setup(ddl);
-            ClientResponse res = m_client.callProcedure("@Adhoc", "MIGRATE FROM without_ttl where not migrating and ts < dateAdd(second, ?, now);", 1);
-            assertEquals(res.getStatus(), ClientResponse.SUCCESS);
-        } catch (Exception e) {
-            //  Auto-generated catch block
-        } finally {
-            teardownSystem();
-        }
-
+        setup(ddl);
+        ClientResponse res = m_client.callProcedure("@AdHoc", "MIGRATE FROM without_ttl where not migrating and ts < dateAdd(second, ?, now);", 1);
+        assertEquals(res.getStatus(), ClientResponse.SUCCESS);
+        teardownSystem();
     }
 }
