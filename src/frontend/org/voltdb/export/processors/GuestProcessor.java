@@ -131,7 +131,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 synchronized(GuestProcessor.this) {
                     if (m_shutdown) {
                         if (EXPORTLOG.isDebugEnabled()) {
-                            EXPORTLOG.info("Skipping mastership notification for export because processor has been shut down.");
+                            EXPORTLOG.debug("Skipping mastership notification for export because processor has been shut down.");
                         }
                         return;
                     }
@@ -256,7 +256,9 @@ public class GuestProcessor implements ExportDataProcessor {
                                 m_source.setReadyForPolling(true); // Tell source it is OK to start polling now.
                                 synchronized (GuestProcessor.this) {
                                     if (m_shutdown) {
-                                        EXPORTLOG.warn("Got shutdown before starting polling.");
+                                        if (EXPORTLOG.isDebugEnabled()) {
+                                            EXPORTLOG.debug("Got shutdown before starting polling.");
+                                        }
                                         return;
                                     }
                                     buildListener(ads);
@@ -275,11 +277,15 @@ public class GuestProcessor implements ExportDataProcessor {
                     private void resubmitSelf() {
                         synchronized (GuestProcessor.this) {
                             if (m_shutdown) {
-                                EXPORTLOG.warn("Got shutdown while waiting for truncation.");
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Got shutdown while waiting for truncation.");
+                                }
                                 return;
                             }
                             if (m_source.getExecutorService().isShutdown()) {
-                                EXPORTLOG.warn("Data source shutdown while waiting for truncation.");
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Data source shutdown while waiting for truncation.");
+                                }
                                 return;
                             }
                             try {
@@ -289,17 +295,23 @@ public class GuestProcessor implements ExportDataProcessor {
 
                                 // TODO: When truncation is finished, generation roll-over does not happen.
                                 // Log a message to and revisit the error handling for this case
-                                EXPORTLOG.warn("Got rejected execution exception while waiting for truncation to finish");
+                                if (EXPORTLOG.isDebugEnabled()) {
+                                    EXPORTLOG.debug("Got rejected execution exception while waiting for truncation to finish");
+                                }
                             }
                         }
                     }
                 };
                 if (m_shutdown) {
-                    EXPORTLOG.warn("Got shutdown while starting.");
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Got shutdown while starting.");
+                    }
                     return;
                 }
                 if (m_source.getExecutorService().isShutdown()) {
-                    EXPORTLOG.warn("Data source shutdown while starting.");
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Data source shutdown while starting.");
+                    }
                     return;
                 }
                 try {
@@ -309,7 +321,9 @@ public class GuestProcessor implements ExportDataProcessor {
 
                     // TODO: When truncation is finished, generation roll-over does not happen.
                     // Log a message to and revisit the error handling for this case
-                    EXPORTLOG.warn("Got rejected execution exception while trying to start");
+                    if (EXPORTLOG.isDebugEnabled()) {
+                        EXPORTLOG.debug("Got rejected execution exception while trying to start");
+                    }
                 }
             }
         }
