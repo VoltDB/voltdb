@@ -32,15 +32,17 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.TestExportBase;
+import org.voltdb.export.SocketExportTestServer;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 
 public class TestPrepareShutdownWithExport extends TestExportBase
 {
-    private ServerListener m_serverSocket;
+    private SocketExportTestServer m_serverSocket;
     public TestPrepareShutdownWithExport(String name) {
         super(name);
     }
@@ -51,7 +53,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         m_password = "password";
         ExportLocalClusterBase.resetDir();
         super.setUp();
-        m_serverSocket = new ServerListener(5001);
+        m_serverSocket = new SocketExportTestServer(5001);
         m_serverSocket.start();
     }
 
@@ -59,7 +61,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
     public void tearDown() throws Exception {
         super.tearDown();
         try {
-            m_serverSocket.close();
+            m_serverSocket.shutdown();
             m_serverSocket = null;
         } catch (Exception e) {}
     }
@@ -79,7 +81,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
 
         //push out export buffer and verify if there are any export queue.
         waitForExportAllocatedMemoryZero(client2);
-        verifyExportedTuples(10000);
+        m_serverSocket.verifyExportedTuples(10000);
 
         long sum = Long.MAX_VALUE;
         while (sum > 0) {
@@ -125,7 +127,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         Properties props = new Properties();
         props.put("replicated", "true");
         props.put("skipinternals", "true");
-        project.addExport(true, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
 
         LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);

@@ -103,6 +103,11 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("UNEXPECTED REPLAY SENTINAL");
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 

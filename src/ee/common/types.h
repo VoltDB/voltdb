@@ -524,6 +524,7 @@ enum DREventType {
 // Types of DR records
 // ------------------------------------------------------------------
 enum DRRecordType {
+    DR_RECORD_INVALID = -1,
     DR_RECORD_INSERT = 0,
     DR_RECORD_DELETE = 1,
     DR_RECORD_UPDATE = 2,
@@ -606,6 +607,9 @@ enum DRConflictOnPK {
     CONFLICT_ON_PK,
 };
 
+/*
+ * Keep it sync with frontend/org/voltdb/TableType.java
+ */
 enum TableType {
      // This will be unset and hence 0 for pre-9.0 catalogs
      INVALID = 0,
@@ -613,8 +617,8 @@ enum TableType {
       // Regular PersistentTable
      PERSISTENT = 1,
 
-      // StreamTable without ExportTupleStream (Views only)
-     STREAM_VIEW_ONLY = 2,
+      // StreamTable without ExportTupleStream
+     CONNECTOR_LESS_STREAM = 2,
 
      // StreamTable with ExportTupleStream
      STREAM = 3,
@@ -623,28 +627,68 @@ enum TableType {
      PERSISTENT_MIGRATE  = 4,
 
      // PersistentTable with associated Stream for linking INSERTS
-     PERSISTENT_EXPORT = 5,
+     PERSISTENT_EXPORT_INSERT = 8,
+     PERSISTENT_EXPORT_DELETE = 16,
+     PERSISTENT_EXPORT_UPDATE_OLD = 32,
+     PERSISTENT_EXPORT_UPDATE_NEW = 64,
+     PERSISTENT_EXPORT_INSERT_DELETE = PERSISTENT_EXPORT_INSERT +
+                                       PERSISTENT_EXPORT_DELETE,
+     PERSISTENT_EXPORT_INSERT_UPDATEold = PERSISTENT_EXPORT_INSERT +
+                                          PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_DELETE_UPDATEold = PERSISTENT_EXPORT_DELETE +
+                                          PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATEold = PERSISTENT_EXPORT_INSERT_DELETE +
+                                                 PERSISTENT_EXPORT_UPDATE_OLD,
+     PERSISTENT_EXPORT_INSERT_UPDATEnew = PERSISTENT_EXPORT_INSERT +
+                                          PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_DELETE_UPDATEnew = PERSISTENT_EXPORT_DELETE +
+                                          PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATEnew = PERSISTENT_EXPORT_INSERT_DELETE +
+                                                 PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_UPDATE = PERSISTENT_EXPORT_UPDATE_OLD + PERSISTENT_EXPORT_UPDATE_NEW,
+     PERSISTENT_EXPORT_INSERT_UPDATE = PERSISTENT_EXPORT_INSERT +
+                                       PERSISTENT_EXPORT_UPDATE,
+     PERSISTENT_EXPORT_DELETE_UPDATE = PERSISTENT_EXPORT_DELETE +
+                                       PERSISTENT_EXPORT_UPDATE,
+     PERSISTENT_EXPORT_INSERT_DELETE_UPDATE = PERSISTENT_EXPORT_INSERT_DELETE +
+                                              PERSISTENT_EXPORT_UPDATE,
 };
 
 inline bool tableTypeIsExportStream(TableType tableType) {
     return tableType == STREAM;
 }
 
-inline bool tableTypeIsViewStream(TableType tableType) {
-    return tableType == STREAM_VIEW_ONLY;
+inline bool tableTypeIsConnectorLessStream(TableType tableType) {
+    return tableType == CONNECTOR_LESS_STREAM;
 }
 
 inline bool tableTypeIsStream(TableType tableType) {
     return tableTypeIsExportStream(tableType) ||
-            tableTypeIsViewStream(tableType);
+            tableTypeIsConnectorLessStream(tableType);
 }
 
 inline bool isTableWithExport(TableType tableType) {
-    return tableType == PERSISTENT_EXPORT;
+    return tableType >= PERSISTENT_EXPORT_INSERT;
+}
+
+inline bool isTableWithExportInserts(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_INSERT);
+}
+
+inline bool isTableWithExportDeletes(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_DELETE);
+}
+
+inline bool isTableWithExportUpdateOld(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_UPDATE_OLD);
+}
+
+inline bool isTableWithExportUpdateNew(TableType tableType) {
+    return static_cast<int>(tableType) & static_cast<int>(PERSISTENT_EXPORT_UPDATE_NEW);
 }
 
 inline bool isTableWithStream(TableType tableType) {
-    return tableType == PERSISTENT_MIGRATE || tableType == PERSISTENT_EXPORT;
+    return tableType == PERSISTENT_MIGRATE || tableType >= PERSISTENT_EXPORT_INSERT;
 }
 
 inline bool tableTypeNeedsTupleStream(TableType tableType) {

@@ -343,7 +343,10 @@ public class Tokens {
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
     // A VoltDB extension NIBBLE EXPORT
+    static final String        T_EXPORT            = "EXPORT";
     static final String        T_TARGET            = "TARGET";
+    static final String        T_UPDATEOLD         = "UPDATE_OLD";
+    static final String        T_UPDATENEW         = "UPDATE_NEW";
     // End of VoltDB extension
     static final String        T_THEN              = "THEN";
     public static final String T_TIME              = "TIME";
@@ -1123,6 +1126,9 @@ public class Tokens {
     public static final int STREAM                           = 1305;
     public static final int MIGRATE                          = 1400;
     public static final int TARGET                           = 1401;
+    public static final int EXPORT                           = 1402;
+    public static final int UPDATEOLD                        = 1403;
+    public static final int UPDATENEW                        = 1404;
     // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
@@ -1814,6 +1820,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_LEFT, LEFT);
         reservedKeys.put(Tokens.T_LIKE, LIKE);
         reservedKeys.put(Tokens.T_LIKE_REGX, LIKE_REGEX);
+        reservedKeys.put(Tokens.T_LIMIT, LIMIT);
         reservedKeys.put(Tokens.T_LN, LN);
         reservedKeys.put(Tokens.T_LOCAL, LOCAL);
         reservedKeys.put(Tokens.T_LOCALTIME, LOCALTIME);
@@ -1942,6 +1949,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_STREAM, STREAM);
         reservedKeys.put(Tokens.T_MIGRATE, MIGRATE);
         reservedKeys.put(Tokens.T_TARGET, TARGET);
+        reservedKeys.put(Tokens.T_EXPORT, EXPORT);
+        reservedKeys.put(Tokens.T_UPDATEOLD, UPDATEOLD);
+        reservedKeys.put(Tokens.T_UPDATENEW, UPDATENEW);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);
@@ -2334,10 +2344,10 @@ public class Tokens {
             CAST, CORRESPONDING, CONVERT, COUNT, COALESCE, CREATE, CROSS,
             DISTINCT, DROP, ELSE, END, EVERY, EXISTS, EXCEPT, FOR, FROM, FULL,
             GRANT, GROUP, HAVING, INTO, IS, IN, INTERSECT, JOIN, INNER, LEFT,
-            LEADING, LIKE, MAX, MIN, NATURAL, NULLIF, NOT, ON, ORDER, OR,
-            OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME, STDDEV_POP,
-            STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
-            UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
+            LEADING, LIKE, LIMIT, MAX, MIN, NATURAL, NULLIF, NOT, OFFSET, ON,
+            ORDER, OR, OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME,
+            STDDEV_POP, STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER,
+            UNION, UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE,
             // A VoltDB extension to support the MIGRATING index attribute.

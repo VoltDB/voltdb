@@ -76,7 +76,7 @@ public:
                           bool allowNull,
                           bool inBytes)
     {
-        assert(index < m_types.size());
+        vassert(index < m_types.size());
         m_types[index] = valueType;
         m_sizes[index] = colSize;
         m_allowNullFlags[index] = allowNull;
@@ -91,7 +91,7 @@ public:
                                 bool allowNull,
                                 bool inBytes)
     {
-        assert(index < m_hiddenTypes.size());
+        vassert(index < m_hiddenTypes.size());
         m_hiddenTypes[index] = valueType;
         m_hiddenSizes[index] = colSize;
         m_hiddenAllowNullFlags[index] = allowNull;
@@ -168,7 +168,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (! isVariableLengthType(valueType));
+        vassert(! isVariableLengthType(valueType));
 
         setColumnAtIndex(index, valueType,
                          NValue::getTupleStorageSize(valueType),
@@ -204,7 +204,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (! isVariableLengthType(valueType));
+        vassert(! isVariableLengthType(valueType));
 
         setHiddenColumnAtIndex(index,
                                valueType,

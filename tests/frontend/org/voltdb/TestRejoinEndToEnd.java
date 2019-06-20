@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.junit.After;
 import org.junit.Test;
@@ -42,7 +43,10 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.SocketExportTestServer;
+import org.voltdb.exportclient.SocketExporter;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -905,7 +909,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         //builder.setTableAsExportOnly("blah_replicated", false);
         //builder.setTableAsExportOnly("PARTITIONED", false);
         //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
-        builder.addExport(true, "file", null);  // authGroups (off)
+        builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -998,7 +1002,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
-        builder.addExport(true, "file", null);  // authGroups (off)
+        builder.addExport(true, ServerExportEnum.FILE, null);  // authGroups (off)
 
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         String dexportClientClassName = System.getProperty("exportclass", "");
@@ -1088,23 +1092,43 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
-    @Test
+    @Test(timeout = 120_000)
     public void testRejoinWithOnlyAStream() throws Exception {
-        LocalCluster lc = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        SocketExportTestServer socketServer = new SocketExportTestServer(5001);
+
+        LocalCluster lc = new LocalCluster("rejoin.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
         lc.overrideAnyRequestForValgrind();
         VoltProjectBuilder vpb = new VoltProjectBuilder();
         vpb.setUseDDLSchema(true);
+        vpb.addExport(true, ServerExportEnum.CUSTOM, SocketExporter.class.getName(), new Properties(),
+                "exporter");
         assertTrue(lc.compile(vpb));
         lc.setHasLocalServer(false);
         try {
+            socketServer.start();
             lc.startUp();
             Client client = lc.createClient(new ClientConfig());
             client.callProcedure("@AdHoc", "CREATE STREAM stream_towns PARTITION ON COLUMN state "
-                    + "EXPORT TO TARGET stream_test1 (town VARCHAR(64), state VARCHAR(2) not null);");
-            lc.killSingleHost(1);
-            lc.recoverOne(1, 0, "");
+                    + "EXPORT TO TARGET exporter (town VARCHAR(64), state VARCHAR(2) not null);");
+            for (int i = 0; i < 20; ++i) {
+                client.callProcedure("@AdHoc", "INSERT INTO stream_towns VALUES ('" + i + "', 'MA');");
+            }
+            for (int i = 0; i < 2; ++i) {
+                lc.killSingleHost(i);
+                lc.recoverOne(i, (i + 1) % 2, "");
+            }
+
+            client.close();
+            client = lc.createClient(new ClientConfig());
+
+            for (int i = 0; i < 5; ++i) {
+                client.callProcedure("@AdHoc", "INSERT INTO stream_towns VALUES ('" + i + "', 'MA');");
+            }
+
+            socketServer.verifyExportedTuples(25, 30_000);
         } finally {
             lc.shutDown();
+            socketServer.shutdown();
         }
     }
 

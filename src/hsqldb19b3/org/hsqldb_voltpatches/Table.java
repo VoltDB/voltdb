@@ -67,6 +67,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -149,7 +150,9 @@ public class Table extends TableBase implements SchemaObject {
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
     TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
+    PersistentExport      persistentExport;    //export to target(VOLTDB)
     private boolean isStream = false;          //is this a stream (VOLTDB)
+    private boolean hasMigrationTarget = false; // does the table has a migration target (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2735,11 +2738,16 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
-            ttl.attributes.put("migrationTarget", timeToLive.migrationTarget);
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
 
+        if (persistentExport != null) {
+            VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
+            pe.attributes.put("target", persistentExport.target);
+            pe.attributes.put("triggers", String.join(",", persistentExport.triggers));
+            table.children.add(pe);
+        }
         return table;
     }
 
@@ -2769,10 +2777,10 @@ public class Table extends TableBase implements SchemaObject {
 
     // A VoltDB extension to support TTL
     public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize,
-            int maxFrequency, String streamName) {
+            int maxFrequency) {
         dropTTL();
         timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)),
-                batchSize, maxFrequency, streamName);
+                batchSize, maxFrequency);
     }
 
     public TimeToLiveVoltDB getTTL() {
@@ -2780,12 +2788,24 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn,
-            int batchSize, int maxFrequency, String streamName) {
-        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, streamName);
+            int batchSize, int maxFrequency) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
     }
 
     public void dropTTL() {
         timeToLive = null;
+    }
+
+    public void addPersistentExport(String target, List<String> triggers) {
+        persistentExport = new PersistentExport(target, triggers);
+    }
+
+    public PersistentExport getPersistentExport() {
+        return persistentExport;
+    }
+
+    public void dropPersistentExport() {
+        persistentExport = null;
     }
     // End of VoltDB extension
 
@@ -2805,7 +2825,11 @@ public class Table extends TableBase implements SchemaObject {
         this.isStream = isStream;
     }
 
-    public boolean isForMigration() {
-        return (timeToLive != null && !StringUtil.isEmpty(timeToLive.migrationTarget));
+    public boolean hasMigrationTarget() {
+        return hasMigrationTarget;
+    }
+
+    public void setHasMigrationTarget(boolean hasMigrationTarget) {
+        this.hasMigrationTarget = hasMigrationTarget;
     }
 }

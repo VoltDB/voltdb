@@ -203,4 +203,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     public String getMessageInfo() {
         return getClass().getSimpleName() + " TxnId:" + TxnEgo.txnIdToString(m_txnId);
     }
+
+    public abstract void toDuplicateCounterString(StringBuilder sb);
 }

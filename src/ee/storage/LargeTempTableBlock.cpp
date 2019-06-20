@@ -39,7 +39,7 @@ LargeTempTableBlock::LargeTempTableBlock(LargeTempTableBlockId id, const TupleSc
 }
 
 bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
-    assert (m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
+    vassert(m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
 
     size_t nonInlinedMemorySize = source.getNonInlinedMemorySizeForTempTable();
     int tupleLength = source.tupleLength();
@@ -66,21 +66,21 @@ bool LargeTempTableBlock::insertTuple(const TableTuple& source) {
 
     ++m_activeTupleCount;
     ++(*getStorageTupleCount());
-    assert(m_activeTupleCount == *getStorageTupleCount());
+    vassert(m_activeTupleCount == *getStorageTupleCount());
     m_tupleInsertionPoint += target.tupleLength();
 
     // Make sure that the values we computed for the size check match
     // the actual sizes... m_nonInlinedInsertionPoint will have been
     // updated by a call to LargeTempTableBlock::allocate().
-    assert(m_tupleInsertionPoint == newTupleInsertionPoint);
-    assert(m_nonInlinedInsertionPoint == newNonInlinedInsertionPoint);
+    vassert(m_tupleInsertionPoint == newTupleInsertionPoint);
+    vassert(m_nonInlinedInsertionPoint == newNonInlinedInsertionPoint);
 
     return true;
 }
 
 void* LargeTempTableBlock::allocate(std::size_t size) {
     m_nonInlinedInsertionPoint -= size;
-    assert(m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
+    vassert(m_tupleInsertionPoint <= m_nonInlinedInsertionPoint);
     return m_nonInlinedInsertionPoint;
 }
 
@@ -89,7 +89,7 @@ int64_t LargeTempTableBlock::getAllocatedMemory() const {
         return 0;
     }
 
-    assert (getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
+    vassert(getAllocatedTupleMemory() + getAllocatedPoolMemory() <= BLOCK_SIZE_IN_BYTES);
     return BLOCK_SIZE_IN_BYTES;
 }
 
@@ -110,10 +110,10 @@ int64_t LargeTempTableBlock::getAllocatedPoolMemory() const {
 }
 
 void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
-    assert(m_storage.get() == NULL);
+    vassert(m_storage.get() == NULL);
     storage.swap(m_storage);
 
-    assert(m_activeTupleCount == *getStorageTupleCount());
+    vassert(m_activeTupleCount == *getStorageTupleCount());
 
     char* origAddress = *(getStorageAddressPointer());
 
@@ -131,7 +131,7 @@ void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
 }
 
 std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
-    assert (*getStorageAddressPointer() == m_storage.get());
+    vassert(*getStorageAddressPointer() == m_storage.get());
     std::unique_ptr<char[]> storage;
     storage.swap(m_storage);
     m_isStored = true;

@@ -169,7 +169,7 @@ public class Benchmark {
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> enabledThreads = null;
 
-        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt".split(",")));
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt,partttlMigratelt,replttlMigratelt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -559,8 +559,10 @@ public class Benchmark {
     DdlThread ddlt = null;
     List<ClientThread> clientThreads = null;
     UpdateClassesThread updcls = null;
-    NibbleDeleteLoader partNDlt = null;
-    NibbleDeleteLoader replNDlt = null;
+    TTLLoader partNDlt = null;
+    TTLLoader replNDlt = null;
+    TTLLoader partttlMigratelt = null;
+    TTLLoader replttlMigratelt = null;
 
     /**
      * Core benchmark code.
@@ -661,18 +663,29 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
 
         // Nibble delete Loader
-        partNDlt = null;
         if (!(config.disabledThreads.contains("partNDlt") || config.disabledThreads.contains("NDlt"))) {
-            partNDlt = new NibbleDeleteLoader(client, "nibdp",
-                    100000, 1024, 50, permits, partitionCount);
+            partNDlt = new TTLLoader(client, "nibdp",
+                    100000, 1024, 50, permits, partitionCount, "TTL");
             partNDlt.start();
         }
 
-        replNDlt = null;
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
-            replNDlt = new NibbleDeleteLoader(client, "nibdr",
-                    100000, 1024, 3, permits, partitionCount);
+            replNDlt = new TTLLoader(client, "nibdr",
+                    100000, 1024, 3, permits, partitionCount, "TTL");
             replNDlt.start();
+        }
+
+        // TTL/Migrate to Export
+        if (!config.disabledThreads.contains("partttlMigratelt")) {
+            partttlMigratelt = new TTLLoader(client, "ttlmigratep",
+                    100000, 1024, 50, permits, partitionCount, "EXPORT");
+            partttlMigratelt.start();
+        }
+
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
+            replttlMigratelt = new TTLLoader(client, "ttlmigrater",
+                    100000, 1024, 3, permits, partitionCount, "EXPORT");
+            replttlMigratelt.start();
         }
 
         // print periodic statistics to the console
@@ -747,17 +760,23 @@ public class Benchmark {
                 adHocMayhemThread.start();
             }
         }
+
         if (!config.disabledThreads.contains("idpt")) {
             idpt = new InvokeDroppedProcedureThread(client);
             idpt.start();
-        } if (!config.disabledThreads.contains("ddlt")) {
+        }
+
+        if (!config.disabledThreads.contains("ddlt")) {
             ddlt = new DdlThread(client);
             // XXX/PSR ddlt.start();
         }
+
         if (!config.disabledThreads.contains("updateclasses")) {
             updcls = new UpdateClassesThread(client, config.duration);
             updcls.start();
         }
+
+
         log.info("All threads started...");
 
         while (true) {

@@ -48,9 +48,7 @@ public:
     void pushExportBuffer(
             int32_t partitionId,
             std::string signature,
-            ExportStreamBlock *block,
-            bool sync,
-            int64_t generationId);
+            ExportStreamBlock *block);
     void pushEndOfStream(
             int32_t partitionId,
             std::string signature);

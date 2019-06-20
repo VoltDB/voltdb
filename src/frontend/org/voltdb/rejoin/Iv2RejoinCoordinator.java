@@ -128,7 +128,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
-        String nonce = makeSnapshotNonce("Rejoin", HSIds.get(0));
+        String nonce = SnapshotUtil.makeSnapshotNonce("Rejoin", HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
         synchronized (m_lock) {
@@ -155,10 +155,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests, Long lowestSiteSinkHSId)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, lowestSiteSinkHSId);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, lowestSiteSinkHSId);
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
-        return makeSnapshotRequest(config);
+        return SnapshotUtil.makeSnapshotRequest(config);
     }
 
     public static void acquireLock(HostMessenger messenger )
@@ -195,7 +195,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         m_catalog = catalog;
         boolean schemaHasPersistentTables = false;
         for (Table t : catalog.getTables()) {
-            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.STREAM_VIEW_ONLY.get()) {
+            if (t.getTabletype() != TableType.STREAM.get() && t.getTabletype() != TableType.CONNECTOR_LESS_STREAM.get()) {
                 schemaHasPersistentTables = true;
                 break;
             }
@@ -254,9 +254,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId,
-                                   boolean schemaHasPersistentTables)
-    {
+    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId) {
         String nonce = null;
         String data = null;
         synchronized(m_lock) {
@@ -282,7 +280,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
                     CoreUtils.hsIdToString(HSId));
         }
-        if (data != null && schemaHasPersistentTables) {
+        if (data != null) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotPathType.SNAP_NO_PATH, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
@@ -306,8 +304,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             assert(m_catalog != null);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
-            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),
-                              rm.schemaHasPersistentTables());
+            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());
         } else {
             VoltDB.crashLocalVoltDB("Wrong rejoin message of type " + type +
                                     " sent to the rejoin coordinator", false, null);

@@ -9,32 +9,55 @@
 #ifndef BOOST_FUNCTION_INPUT_ITERATOR
 #define BOOST_FUNCTION_INPUT_ITERATOR
 
+#include <boost/config.hpp>
 #include <boost/assert.hpp>
+#include <boost/core/addressof.hpp>
 #include <boost/mpl/if.hpp>
 #include <boost/function_types/is_function_pointer.hpp>
-#include <boost/function_types/is_function_reference.hpp>
 #include <boost/function_types/result_type.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/utility/result_of.hpp>
+
+#ifdef BOOST_RESULT_OF_USE_TR1
+#include <boost/type_traits/is_function.hpp>
+#endif
 
 namespace boost {
 
+namespace iterators {
+
     namespace impl {
+
+        // Computes the return type of an lvalue-call with an empty argument,
+        // i.e. decltype(declval<F&>()()). F should be a nullary lvalue-callable
+        // or function.
+        template <class F>
+        struct result_of_nullary_lvalue_call
+        {
+            typedef typename result_of<
+#ifdef BOOST_RESULT_OF_USE_TR1
+                typename mpl::if_<is_function<F>, F&, F>::type()
+#else
+                F&()
+#endif
+            >::type type;
+        };
 
         template <class Function, class Input>
         class function_input_iterator
             : public iterator_facade<
             function_input_iterator<Function, Input>,
-            typename Function::result_type,
+            typename result_of_nullary_lvalue_call<Function>::type,
             single_pass_traversal_tag,
-            typename Function::result_type const &
+            typename result_of_nullary_lvalue_call<Function>::type const &
             >
         {
         public:
             function_input_iterator() {}
-            function_input_iterator(Function & f_, Input state_ = Input()) 
-                : f(&f_), state(state_) {}
+            function_input_iterator(Function & f_, Input state_ = Input())
+                : f(boost::addressof(f_)), state(state_) {}
 
             void increment() {
                 if(value)
@@ -44,7 +67,7 @@ namespace boost {
                 ++state;
             }
 
-            typename Function::result_type const & 
+            typename result_of_nullary_lvalue_call<Function>::type const &
                 dereference() const {
                     return (value ? value : value = (*f)()).get();
             }
@@ -56,7 +79,7 @@ namespace boost {
         private:
             Function * f;
             Input state;
-            mutable optional<typename Function::result_type> value;
+            mutable optional<typename result_of_nullary_lvalue_call<Function>::type> value;
         };
 
         template <class Function, class Input>
@@ -96,38 +119,20 @@ namespace boost {
             mutable optional<typename function_types::result_type<Function>::type> value;
         };
 
-        template <class Function, class Input>
-        class function_reference_input_iterator
-            : public function_pointer_input_iterator<Function*,Input>
-        {
-        public:
-            function_reference_input_iterator(Function & f_, Input state_ = Input())
-                : function_pointer_input_iterator<Function*,Input>(&f_, state_)
-            {}
-        };
-
     } // namespace impl
 
     template <class Function, class Input>
-    class function_input_iterator 
+    class function_input_iterator
         : public mpl::if_<
             function_types::is_function_pointer<Function>,
             impl::function_pointer_input_iterator<Function,Input>,
-            typename mpl::if_<
-                function_types::is_function_reference<Function>,
-                impl::function_reference_input_iterator<Function,Input>,
-                impl::function_input_iterator<Function,Input>
-            >::type
+            impl::function_input_iterator<Function,Input>
         >::type
     {
         typedef typename mpl::if_<
             function_types::is_function_pointer<Function>,
             impl::function_pointer_input_iterator<Function,Input>,
-            typename mpl::if_<
-                function_types::is_function_reference<Function>,
-                impl::function_reference_input_iterator<Function,Input>,
-                impl::function_input_iterator<Function,Input>
-            >::type
+            impl::function_input_iterator<Function,Input>
         >::type base_type;
     public:
         function_input_iterator(Function & f, Input i)
@@ -154,7 +159,14 @@ namespace boost {
         bool operator==(infinite &) const { return false; };
         bool operator==(infinite const &) const { return false; };
     };
-}
+
+} // namespace iterators
+
+using iterators::function_input_iterator;
+using iterators::make_function_input_iterator;
+using iterators::infinite;
+
+} // namespace boost
 
 #endif
 

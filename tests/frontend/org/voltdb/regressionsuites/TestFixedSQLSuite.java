@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
+import org.junit.Assert;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -335,8 +336,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                                     + "x'deadbeef');", new long[][]{{1}});
 
                     if (!isHSQL()) {
-                        String errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                                + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                        String errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                                 + "Incompatible parameter type: can not convert type 'byte\\[\\]\\[\\]' to 'INLIST_OF_BIGINT' "
                                 + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE VARBIN IN \\?;. "
                                 + "Try explicitly using a long\\[\\] parameter";
@@ -357,8 +357,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                                 new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
                         assertEquals(1, results[0].getRowCount());
 
-                        errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                                + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                        errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                                 + "Incompatible parameter type: can not convert type 'double\\[\\]' to 'INLIST_OF_BIGINT' "
                                 + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE NUM IN \\?;. "
                                 + "Try explicitly using a long\\[\\] parameter";
@@ -371,8 +370,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                                 new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
                         assertEquals(1, results[0].getRowCount());
 
-                        errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                                + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                        errMsg = "org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
                                 + "Incompatible parameter type: can not convert type 'BigDecimal\\[\\]' to 'INLIST_OF_BIGINT' "
                                 + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE DEC IN \\?;. "
                                 + "Try explicitly using a long\\[\\] parameter";
@@ -440,13 +438,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("BoxedByteArrays", "BIGD", 4, null,
                     null, null, null, null);
 
+            /* TODO???
             // Long cannot be converted to long in arrays
             errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 4: "
-                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "*/
+        // Long cannot be converted to long in arrays
+        errMsg = "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
                     + "Unable to match parameter array:java.lang.Long to provided long";
             verifyProcFails(client, errMsg, "BoxedByteArrays",
                     "LNGARR", null, null, null, new Long[]{1L, 2L, 3L}, null, null);
 
+            /* TODO???
             // Integer cannot be converted to int in arrays
             errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 5: "
                     + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
@@ -467,10 +469,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         + "Try explicitly using a long[] parameter";
                 assertTrue(e.getMessage().contains(errMsg));
             }
+            */
+        // Integer cannot be converted to int in arrays
+        errMsg = "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                + "Unable to match parameter array:java.lang.Integer to provided int";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "INTARR", null, null, null, null, new Integer[]{1, 2, 3}, null);
 
-            String query = "select * from ENG_539";
-            results = client.callProcedure("@AdHoc", query).getResults();
-            System.out.println(results);
+        try {
+            Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
+                                                    ArrayUtils.toObject(Encoder.hexDecode("1E")) };
+            results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
+                        null, null, null).getResults();
+        } catch (Exception e) {
+            errMsg = "org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT * FROM ENG_539 WHERE VARBIN IN ?;. "
+                    + "Try explicitly using a long[] parameter";
+            assertTrue(e.getMessage().contains(errMsg));
+        }
+
+        String query =
+                String.format("select * from ENG_539");
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results);
         }, "ENG_539");
     }
 
@@ -1571,29 +1593,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
             return;
         }
         runWithClient(getClient(), client -> {
-            VoltTable result;
-
-            // it used to throw EE exception
-            // when inserting a non-json encoded var char into a column that has a field() index;
-            client.callProcedure("NO_JSON.insert", 1, "jpiekos1", "foo", "no json");
-
-            result = client.callProcedure("@AdHoc", "select id, var1, var2, var3 from no_json;").getResults()[0];
-            assertTrue(result.advanceRow());
-            assertEquals(1, result.getLong(0));
-
-            assertEquals("jpiekos1", result.getString(1));
-            assertEquals("foo", result.getString(2));
-            assertEquals("no json", result.getString(3));
-
-            client.callProcedure("NO_JSON.insert", 2, "jpiekos2", "foo2", "no json2");
-
-            result = client.callProcedure("@AdHoc", "select id from no_json " +
-                    "order by var2, field(var3,'color');").getResults()[0];
-            validateTableOfLongs(result, new long[][]{{1}, {2}});
-
-            result = client.callProcedure("@AdHoc", "select id from no_json " +
+            try {
+                client.callProcedure("NO_JSON.insert", 1, "jpiekos1", "foo", "no json");
+                Assert.fail("Should have failed inserting non-json string into the table with field() index.");
+            } catch (ProcCallException e) { }
+            final VoltTable result = client.callProcedure("@AdHoc", "select id from no_json " +
                     "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
-            assertEquals(0, result.getRowCount());
+            assertFalse("Table with JSON field() index should be empty", result.advanceRow());
         }, "NO_JSON");
     }
 

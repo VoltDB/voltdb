@@ -57,7 +57,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init limit Executor");
 
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
-    assert(node);
+    vassert(node);
 
     //
     // Skip if we are inline
@@ -67,7 +67,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Just copy the table schema of our input table
         //
-        assert(node->getInputTableCount() == 1);
+        vassert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
                            buildCopiedTempTable(node->getInputTable()->name(),
@@ -78,36 +78,36 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool LimitExecutor::p_execute(const NValueArray &params) {
-   LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
-   assert(node);
-   Table* output_table = node->getOutputTable();
-   assert(output_table);
-   Table* input_table = node->getInputTable();
-   assert(input_table);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+    vassert(node);
+    Table* output_table = node->getOutputTable();
+    vassert(output_table);
+    Table* input_table = node->getInputTable();
+    vassert(input_table);
 
-   //
-   // Grab the iterator for our input table, and loop through until
-   // we have copy enough tuples for the limit specified by the node
-   //
-   TableTuple tuple(input_table->schema());
-   TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+    //
+    // Grab the iterator for our input table, and loop through until
+    // we have copy enough tuples for the limit specified by the node
+    //
+    TableTuple tuple(input_table->schema());
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
-   int tuple_ctr = 0;
-   int limit = -1;
-   int offset = -1;
-   node->getLimitAndOffsetByReference(params, limit, offset);
+    int tuple_ctr = 0;
+    int limit = -1;
+    int offset = -1;
+    node->getLimitAndOffsetByReference(params, limit, offset);
 
-   if (iterator.advance(tuple, offset) < offset) {
-      return true;     // offset beyond table count: empty table
-   } else {
-      while((limit < 0 || tuple_ctr++ < limit) && iterator.next(tuple)) {
-         if (!output_table->insertTuple(tuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
-                  input_table->name().c_str(), output_table->name().c_str());
-            return false;
-         }
-      }
-      return true;
-   }
+    if (iterator.advance(tuple, offset) < offset) {
+        return true;     // offset beyond table count: empty table
+    } else {
+        while((limit < 0 || tuple_ctr++ < limit) && iterator.next(tuple)) {
+            if (!output_table->insertTuple(tuple)) {
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
+                        input_table->name().c_str(), output_table->name().c_str());
+                return false;
+            }
+        }
+        return true;
+    }
 }
 

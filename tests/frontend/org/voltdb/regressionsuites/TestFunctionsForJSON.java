@@ -37,6 +37,10 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 /**
  * Tests for SQL that was recently (early 2012) unsupported, related to JSON
  * functions (which are supported by VoltDB but not HSQL or other databases).
+ *
+ * NOTE: the latest JSONCPP library stores floating number as floating number;
+ * whereas it used to be stored as a string. Consequently, it now makes little
+ * sense to test number serialization/deserialization.
  */
 
 public class TestFunctionsForJSON extends RegressionSuite {
@@ -87,13 +91,13 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "            \"third\": {\n" +
                 "                \"meats\": \"yum\",\n" +
                 "                \"dairy\": \"%d\",\n" +
-                "                \"numeric\": 2.3\n" +
+                "                \"numeric\": \"2.3\"\n" +
                 "            }\n" +
                 "        },\n" +
                 "        \"arr\": [\n" +
                 "            0,\n" +
-                "            %d,\n" +
-                "            3.4\n" +
+                "            \"%d\",\n" +
+                "            \"3.4\"\n" +
                 "        ]\n" +
                 "    },\n" +
                 "    \"arr\": [\n" +
@@ -114,7 +118,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "        {\n" +
                 "            \"veggies\": \"good for you\",\n" +
                 "            \"dairy\": \"%d\",\n" +
-                "            \"numeric\": 5.6\n" +
+                "            \"numeric\": \"5.6\"\n" +
                 "        }\n" +
                 "    ],\n" +
                 "    \"dot.char\": \"foo.bar\",\n" +
@@ -1218,7 +1222,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function:
         // note that none of these have any effect
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id.veggies", -9, 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", -9.1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", "\"-9.1\"", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool.veggies", "true", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag.veggies", "\"newTagValue\"", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last.veggies", "\"newLastValue\"", 1);
@@ -1226,7 +1230,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.0", -9, 1);
 
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id[0]", -9, 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", -9.1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", "\"-9.1\"", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool[0]", "true", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag[0]", "\"newTagValue\"", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last[0]", "\"newLastValue\"", 1);
@@ -1234,7 +1238,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Similar calls on a row without those primitives, arrays or objects defined do have an effect
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id.veggies", -9, 5);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", -9.1, 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", "\"-9.1\"", 5);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool.veggies", "true", 5);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag.veggies", "\"newTagValue\"", 5);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last.veggies", "\"newLastValue\"", 5);
@@ -1242,7 +1246,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.0", -9, 5);
 
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id2[0]", -9, 4);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", -9.1, 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", "\"-9.1\"", 4);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool2[0]", "true", 4);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag[0]", "\"newTagValue\"", 4);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last[0]", "\"newLastValue\"", 4);
@@ -1251,7 +1255,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         // Call the SET_FIELD function directly, using ad-hoc queries:
         // again, none of these have any effect
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id.veggies', '-9') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '-9.1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '\"-9.1\"') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool.veggies', 'true') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 2");
@@ -1259,7 +1263,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 2");
 
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id[0]', '-9') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '-9.1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '\"-9.1\"') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool[0]', 'true') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 2");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 2");
@@ -1267,7 +1271,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Similar calls on a row without those primitives, arrays or objects defined do have an effect
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2.veggies', '-9') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '-9.1') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '\"-9.1\"') WHERE ID = 9");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2.veggies', 'true') WHERE ID = 9");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 9");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 9");
@@ -1275,7 +1279,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 9");
 
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2[0]', '-9') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '-9.1') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '\"-9.1\"') WHERE ID = 7");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2[0]', 'true') WHERE ID = 7");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 7");
         testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 7");
@@ -1332,7 +1336,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         // Confirm expected results before calling the SET_FIELD function
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "numeric", "1.2", "1.20");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "numeric", "-1.2", "-1.20");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "numeric", "-2.3", "-2.30");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "numeric", "\"-2.3\"", "-2.30");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
@@ -1372,23 +1376,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
         // Confirm modified results after calling the SET_FIELD function
         testProcWithValidJSON(TABLE_ROW3,   client, "NumericFieldProc", "numeric", "1.2", "1.20");
         testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "numeric", "-1.2", "-1.20");
-        testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "numeric", "-2.3", "-2.30");
         testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
-        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
         testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
         testProcWithValidJSON(TABLE_ROWS13, client, "NumericFieldProc", "arr3d[1][1][2]", "-4.5", "-4.50");
         testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
-        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
         testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
-        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
         testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newnum");
-        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newnum", "6.789", "6.7890");
         testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newobj");
-        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newobj.newnum", "7.8", "7.80");
         testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newarr");
         testProcWithValidJSON(EMPTY_TABLE,  client, "NotNullFieldProc", "newarr[0]");
-        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[1]", "8.9", "8.90");
-        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[2]", "9.1", "9.10");
     }
 
     /** Used to test ENG-6879, for various null values (in various parameters,

@@ -57,7 +57,7 @@ import com.google_voltpatches.common.collect.Sets;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class SpInitiator extends BaseInitiator implements Promotable
+public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private final TickProducer m_tickProducer;
@@ -78,12 +78,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
             Set<Long> leaders = Sets.newHashSet();
             for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                Long HSId = entry.getValue().m_HSId;
-                leaders.add(HSId);
-                if (HSId == getInitiatorHSId()){
-                    if (!m_promoted) {
-                        acceptPromotionImpl(entry.getValue().m_lastHSId,
-                                entry.getValue().m_isMigratePartitionLeaderRequested);
+                LeaderCallBackInfo info = entry.getValue();
+                leaders.add(info.m_HSId);
+                if (info.m_HSId == getInitiatorHSId()){
+
+                    // Test case: Interrupt leader promotion process
+                    if (info.m_lastHSId == LeaderCache.TEST_LAST_HSID) {
+                        break;
+                    }
+                    boolean reinstate = reinstateAsLeader(info);
+                    if (!m_promoted || reinstate) {
+                        acceptPromotionImpl(info.m_lastHSId, (reinstate || info.m_isMigratePartitionLeaderRequested));
                         m_promoted = true;
                     }
                     break;
@@ -107,6 +112,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
+    // When the leader is migrated away from this site, m_scheduler is marked as not-a-leader. If the host for new leader fails
+    // before leader migration is completed. The previous leader, the current site, must be reinstated.
+    private boolean reinstateAsLeader(LeaderCallBackInfo info) {
+        return (!m_scheduler.m_isLeader && info.m_lastHSId == info.m_HSId);
+    }
+
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
             SnapshotCompletionMonitor snapMonitor,
             StartAction startAction)
@@ -115,12 +126,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor,
                         startAction != StartAction.JOIN),
                 "SP", agent, startAction);
-        ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()),
-                m_initiatorMailbox);
+        m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
-        ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
+        m_scheduler.m_repairLog = m_repairLog;
     }
 
     @Override
@@ -213,8 +223,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            int deadSPIHost = lastLeaderHSId == Long.MAX_VALUE ?
-                    Integer.MAX_VALUE : CoreUtils.getHostIdFromHSId(lastLeaderHSId);
+            int deadSPIHost = Integer.MAX_VALUE;
+            if ((lastLeaderHSId != Long.MAX_VALUE && lastLeaderHSId != m_initiatorMailbox.getHSId())) {
+                deadSPIHost = CoreUtils.getHostIdFromHSId(lastLeaderHSId);
+            }
             while (!success) {
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
@@ -258,11 +270,16 @@ public class SpInitiator extends BaseInitiator implements Promotable
                         String hsidStr = LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(
                                 m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId, hsidStr);
-                        tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
+                        if (lastLeaderHSId == m_initiatorMailbox.getHSId()) {
+                            tmLog.info(m_whoami + "reinstate as partition leader.");
+                            m_initiatorMailbox.setLeaderMigrationState(false);
+                        } else {
+                            tmLog.info(m_whoami + "becomes new leader from MigratePartitionLeader request.");
+                            m_initiatorMailbox.setLeaderMigrationState(true);
+                        }
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
-                    m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -277,12 +294,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
-            if (!migratePartitionLeader) {
+            if (!migratePartitionLeader && lastLeaderHSId != m_initiatorMailbox.getHSId()) {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
                 }
-                ExportManager.instance().takeMastership(m_partitionId);
+                ExportManager.instance().becomeLeader(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
@@ -336,11 +353,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         return m_scheduler.isLeader();
     }
 
-    public void resetMigratePartitionLeaderStatus(int failedHostId) {
-        m_initiatorMailbox.resetMigratePartitionLeaderStatus();
-        ((SpScheduler)m_scheduler).updateReplicasFromMigrationLeaderFailedHost(failedHostId);
-    }
-
     public Scheduler getScheduler() {
         return m_scheduler;
     }
@@ -351,6 +363,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         if (m_term != null) {
             replicasAdded = ((SpTerm) m_term).updateReplicas(snapshotTransactionState);
         }
-        ((SpScheduler) m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
+        m_scheduler.forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
+    }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new InitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
     }
 }

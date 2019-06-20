@@ -30,6 +30,7 @@ import java.util.Properties;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.export.ExportTestClient;
@@ -190,7 +191,7 @@ public class TestExportRejoinWithView extends TestExportBase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         Properties props = new Properties();
-        project.addExport(true /* enabled */, "custom", props);
+        project.addExport(true, ServerExportEnum.CUSTOM, props);
 
         /*
          * compile the catalog all tests start with

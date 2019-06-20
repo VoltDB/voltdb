@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDOINSERTACTION_H_
-#define PERSISTENTTABLEUNDOINSERTACTION_H_
+#pragma once
 
 #include "common/UndoReleaseAction.h"
 #include "common/types.h"
@@ -24,26 +23,23 @@
 
 namespace voltdb {
 
-
 class PersistentTableUndoInsertAction: public UndoOnlyAction {
 public:
-    inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *tableSurgeon)
-        : m_tuple(insertedTuple)
-        , m_tableSurgeon(tableSurgeon)
-    { }
+    PersistentTableUndoInsertAction(
+          char* insertedTuple, voltdb::PersistentTableSurgeon *tableSurgeon) :
+       m_tuple(insertedTuple), m_tableSurgeon(tableSurgeon) { }
 
     virtual ~PersistentTableUndoInsertAction() { }
 
     /*
      * Undo whatever this undo action was created to undo
      */
-    virtual void undo() {
-        m_tableSurgeon->deleteTupleForUndo(m_tuple);
+    void undo() override {
+       m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
-
-    char * getTupleForTest() const { return m_tuple; }
-
+    char const* getTupleForTest() const {
+       return m_tuple;
+    }
 private:
     char* m_tuple;
     PersistentTableSurgeon *m_tableSurgeon;
@@ -51,4 +47,3 @@ private:
 
 }
 
-#endif /* PERSISTENTTABLEUNDOINSERTACTION_H_ */

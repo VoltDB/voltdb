@@ -73,17 +73,16 @@ public:
      * This is the static factory method for creating instances of
      * this class from a plan serialized to JSON.
      */
-    static boost::shared_ptr<ExecutorVector> fromJsonPlan(VoltDBEngine* engine,
-                                                          const std::string& jsonPlan,
-                                                          int64_t fragId);
-    static boost::shared_ptr<ExecutorVector> fromCatalogStatement(VoltDBEngine* engine,
-                                                                  catalog::Statement *stmt);
+    static boost::shared_ptr<ExecutorVector> fromJsonPlan(
+            VoltDBEngine* engine, const std::string& jsonPlan, int64_t fragId);
+    static boost::shared_ptr<ExecutorVector> fromCatalogStatement(
+            VoltDBEngine* engine, catalog::Statement *stmt);
 
     /** Accessor function to satisfy boost::multi_index::const_mem_fun template. */
     int64_t getFragId() const { return m_fragId; }
 
-    TempTableLimits* limits() const {
-        return const_cast<TempTableLimits*>(&m_limits);
+    TempTableLimits const* limits() const {
+        return &m_limits;
     }
 
     bool isLargeQuery() const {
@@ -102,9 +101,6 @@ public:
     const std::vector<AbstractExecutor*>& getExecutorList(int planId = 0);
 
     void getRidOfSendExecutor(int planId = 0);
-
-    ~ExecutorVector();
-
 private:
 
     /**
@@ -121,14 +117,8 @@ private:
      * (automatically via boost::scoped_ptr) when this instance goes
      * away.
      */
-    ExecutorVector(int64_t fragmentId,
-                   int64_t logThreshold,
-                   int64_t memoryLimit,
-                   PlanNodeFragment* fragment)
-        : m_fragId(fragmentId)
-        , m_limits(memoryLimit, logThreshold)
-        , m_fragment(fragment)
-    { }
+    ExecutorVector(int64_t fragmentId, int64_t logThreshold, int64_t memoryLimit, PlanNodeFragment* fragment)
+        : m_fragId(fragmentId) , m_limits(memoryLimit, logThreshold) , m_fragment(fragment) { }
 
     /** Build the list of executors from its plan node fragment */
     void init(VoltDBEngine* engine);
@@ -136,7 +126,7 @@ private:
     void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node);
 
     const int64_t m_fragId;
-    std::map<int, std::vector<AbstractExecutor*>* > m_subplanExecListMap;
+    std::map<int, std::vector<AbstractExecutor*>> m_subplanExecListMap;
     TempTableLimits m_limits;
     boost::scoped_ptr<PlanNodeFragment> m_fragment;
 };

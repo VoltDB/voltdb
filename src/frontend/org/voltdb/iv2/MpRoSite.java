@@ -41,6 +41,7 @@ import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
@@ -199,6 +200,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
+        }
+
+        @Override
+        public long getGenerationId() {
+            return m_context.m_genId;
         }
 
         @Override
@@ -562,20 +568,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId, String tableSignature)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public int deleteMigratedRows(long txnid,
+    public boolean deleteMigratedRows(long txnid,
                                       long spHandle,
                                       long uniqueId,
                                       String tableName,
-                                      long deletableTxnId,
-                                      int maxRowCount)
+                                      long deletableTxnId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -596,7 +600,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -705,7 +709,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteTxnUniqueId, byte[] logsData) {
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, long remoteUniqueId, byte[] logsData) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 
@@ -759,5 +763,20 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public ProcedureRunner getMigrateProcRunner(String procName, Table catTable, Column column,
             ComparisonOperation op) {
         return null;
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        throw new RuntimeException("disableExternalStreams should not be called on MpRoSite");
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        throw new RuntimeException("externalStreamsEnabled should not be called on MpRoSite");
+    }
+
+    @Override
+    public long getMaxTotalMpResponseSize() {
+        return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE / MpRoSitePool.MAX_POOL_SIZE;
     }
 }

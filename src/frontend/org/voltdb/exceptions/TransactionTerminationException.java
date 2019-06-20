@@ -18,6 +18,8 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.client.ClientResponse;
+
 /**
  * This exception is used in IV2 MPI to terminate the currently running
  * MP transaction at the MPI while a node is being shutdown
@@ -54,5 +56,15 @@ public class TransactionTerminationException extends SerializableException {
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_txnId);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.UNEXPECTED_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "Transaction Interrupted";
     }
 }

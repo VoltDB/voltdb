@@ -1,13 +1,14 @@
-m4_include(gtest/m4/acx_pthread.m4)
+m4_include(../googletest/m4/acx_pthread.m4)
 
 AC_INIT([Google C++ Mocking Framework],
-        [1.7.0],
+        [1.8.0],
         [googlemock@googlegroups.com],
         [gmock])
 
 # Provide various options to initialize the Autoconf and configure processes.
 AC_PREREQ([2.59])
 AC_CONFIG_SRCDIR([./LICENSE])
+AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([build-aux/config.h])
 AC_CONFIG_FILES([Makefile])
@@ -24,18 +25,11 @@ AC_PROG_CXX
 AC_LANG([C++])
 AC_PROG_LIBTOOL
 
-# TODO(chandlerc@google.com): Currently we aren't running the Python tests
-# against the interpreter detected by AM_PATH_PYTHON, and so we condition
-# HAVE_PYTHON by requiring "python" to be in the PATH, and that interpreter's
-# version to be >= 2.3. This will allow the scripts to use a "/usr/bin/env"
-# hashbang.
 PYTHON=  # We *do not* allow the user to specify a python interpreter
 AC_PATH_PROG([PYTHON],[python],[:])
 AS_IF([test "$PYTHON" != ":"],
       [AM_PYTHON_CHECK_VERSION([$PYTHON],[2.3],[:],[PYTHON=":"])])
 AM_CONDITIONAL([HAVE_PYTHON],[test "$PYTHON" != ":"])
-
-# TODO(chandlerc@google.com) Check for the necessary system headers.
 
 # Configure pthreads.
 AC_ARG_WITH([pthreads],
@@ -83,10 +77,7 @@ dependency upon GoogleTest to build, please provide a version, or allow
 GoogleMock to use any installed version and fall back upon its internal
 version.])])
 
-# Setup various GTEST variables. TODO(chandlerc@google.com): When these are
-# used below, they should be used such that any pre-existing values always
-# trump values we set them to, so that they can be used to selectively override
-# details of the detection process.
+# Setup various GTEST variables.
 AC_ARG_VAR([GTEST_CONFIG],
            [The exact path of Google Test's 'gtest-config' script.])
 AC_ARG_VAR([GTEST_CPPFLAGS],
@@ -101,7 +92,7 @@ AC_ARG_VAR([GTEST_VERSION],
            [The version of Google Test available.])
 HAVE_BUILT_GTEST="no"
 
-GTEST_MIN_VERSION="1.7.0"
+GTEST_MIN_VERSION="1.8.0"
 
 AS_IF([test "x${enable_external_gtest}" = "xyes"],
       [# Begin filling in variables as we are able.
@@ -129,18 +120,15 @@ AS_IF([test "x${HAVE_BUILT_GTEST}" = "xyes"],
       GTEST_LDFLAGS=`${GTEST_CONFIG} --ldflags`
       GTEST_LIBS=`${GTEST_CONFIG} --libs`
       GTEST_VERSION=`${GTEST_CONFIG} --version`],
-      [AC_CONFIG_SUBDIRS([gtest])
-      # GTEST_CONFIG needs to be executable both in a Makefile environmont and
+      [
+      # GTEST_CONFIG needs to be executable both in a Makefile environment and
       # in a shell script environment, so resolve an absolute path for it here.
-      GTEST_CONFIG="`pwd -P`/gtest/scripts/gtest-config"
-      GTEST_CPPFLAGS='-I$(top_srcdir)/gtest/include'
+      GTEST_CONFIG="`pwd -P`/../googletest/scripts/gtest-config"
+      GTEST_CPPFLAGS='-I$(top_srcdir)/../googletest/include'
       GTEST_CXXFLAGS='-g'
       GTEST_LDFLAGS=''
-      GTEST_LIBS='$(top_builddir)/gtest/lib/libgtest.la'
+      GTEST_LIBS='$(top_builddir)/../googletest/lib/libgtest.la'
       GTEST_VERSION="${GTEST_MIN_VERSION}"])
-
-# TODO(chandlerc@google.com) Check the types, structures, and other compiler
-# and architecture characteristics.
 
 # Output the generated files. No further autoconf macros may be used.
 AC_OUTPUT

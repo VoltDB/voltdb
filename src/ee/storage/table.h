@@ -59,7 +59,7 @@
 
 #include <vector>
 #include <string>
-#include <cassert>
+#include <common/debuglog.h>
 
 namespace voltdb {
 class TableIterator;
@@ -76,19 +76,13 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
  * factory class (TableFactory).
  */
 class Table {
-    friend class TableFactory;
-    friend class TableIterator;
-    friend class LargeTempTableIterator;
-    friend class TableTupleFilter;
-    friend class CopyOnWriteContext;
-    friend class ExecutionEngine;
-    friend class TableStats;
-    friend class StatsSource;
-    friend class TupleBlock;
-    friend class PersistentTableUndoDeleteAction;
-    friend class PersistentTableUndoTruncateTableAction;
+   friend class TableFactory;
+    char* m_columnHeaderData = nullptr;
+    int32_t m_columnHeaderSize = -1;
+    int32_t m_refcount = 0;
+    ThreadLocalPool m_tlPool;
+    int m_compactionThreshold = 95;
 
-  private:
     Table();
     Table(Table const&);
 
@@ -133,7 +127,7 @@ class Table {
     virtual size_t allocatedBlockCount() const = 0;
 
     TableTuple& tempTuple() {
-        assert (m_tempTuple.m_data);
+        vassert(m_tempTuple.m_data);
         m_tempTuple.resetHeader();
         m_tempTuple.setActiveTrue();
         // Temp tuples are typically re-used so their data can change frequently.
@@ -195,7 +189,7 @@ class Table {
     // ------------------------------------------------------------------
     // SERIALIZATION
     // ------------------------------------------------------------------
-    size_t getColumnHeaderSizeToSerialize() const;
+    size_t getColumnHeaderSizeToSerialize();
 
     size_t getAccurateSizeToSerialize();
 
@@ -233,18 +227,18 @@ class Table {
      * Set the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+    virtual void setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed, int64_t generationIdCreated) {
         // this should be overidden by any table involved in an export
-        assert(false);
+        vassert(false);
     }
 
     /**
      * Get the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed) {
+    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed, int64_t &genId) {
         // this should be overidden by any table involved in an export
-        assert(false);
+        vassert(false);
     }
 
     /**
@@ -288,6 +282,26 @@ class Table {
         return 0;
     }
 
+    // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
+    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May only use releaseBlock with instances of LargeTempTable.");
+    }
+
+    virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May only use freeLastScannedBlock with instances of TempTable.");
+    }
+
+    bool equals(voltdb::Table* other);
+    virtual voltdb::TableStats* getTableStats() = 0;
+
+    // Return tuple blocks addresses
+    virtual std::vector<uint64_t> getBlockAddresses() const = 0;
+
+    virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
+        throwFatalException("Unsupported operation");
+    }
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -300,31 +314,8 @@ protected:
                                     bool shouldDRStreamRow = false,
                                     bool ignoreTupleLimit = true) { }
 
-    virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
-        throwFatalException("Unsupported operation");
-    }
-
-public:
-
-    bool equals(voltdb::Table* other);
-    virtual voltdb::TableStats* getTableStats() = 0;
-
-protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple* tuple) = 0;
-    virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May only use freeLastScannedBlock with instances of TempTable.");
-    }
-
-    // Used by delete-as-you-go iterators.  Returns an iterator to the block id of the next block.
-    virtual std::vector<LargeTempTableBlockId>::iterator releaseBlock(std::vector<LargeTempTableBlockId>::iterator it) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May only use releaseBlock with instances of LargeTempTable.");
-    }
-
-    // Return tuple blocks addresses
-    virtual std::vector<uint64_t> getBlockAddresses() const = 0;
 
     Table(int tableAllocationTargetSize);
     void resetTable();
@@ -344,51 +335,41 @@ protected:
         return unusedTupleCount > actualThreshold;
     }
 
-    virtual void initializeWithColumns(TupleSchema* schema,
-                                       std::vector<std::string> const& columnNames,
-                                       bool ownsTupleSchema,
-                                       int32_t compactionThreshold = 95);
+    virtual void initializeWithColumns(TupleSchema* schema, std::vector<std::string> const& columnNames,
+          bool ownsTupleSchema, int32_t compactionThreshold = 95);
     bool checkNulls(TableTuple& tuple) const;
 
-protected:
     // ------------------------------------------------------------------
     // DATA
     // ------------------------------------------------------------------
-    TableTuple m_tempTuple;
+    TableTuple m_tempTuple{};
     boost::scoped_array<char> m_tempTupleMemory;
 
-    TupleSchema* m_schema;
+    TupleSchema* m_schema = nullptr;
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
     // schema as array of string names
-    std::vector<std::string> m_columnNames;
-    char* m_columnHeaderData;
-    int32_t m_columnHeaderSize;
+    std::vector<std::string> m_columnNames{};
 
-    uint32_t m_tupleCount;
-    uint32_t m_tuplesPinnedByUndo;
-    uint32_t m_columnCount;
-    uint32_t m_tuplesPerBlock;
+    uint32_t m_tupleCount = 0;
+    uint32_t m_tuplesPinnedByUndo = 0;
+    uint32_t m_columnCount = 0;
+    uint32_t m_tuplesPerBlock = 0;
     uint32_t m_tupleLength;
-    int64_t m_nonInlinedMemorySize;
+    int64_t m_nonInlinedMemorySize = 0;
 
     // identity information
-    CatalogId m_databaseId;
-    std::string m_name;
+    CatalogId m_databaseId = -1;
+    std::string m_name{};
 
     // If this table owns the TupleSchema it is responsible for deleting it in the destructor
-    bool m_ownsTupleSchema;
+    bool m_ownsTupleSchema = true;
 
     int const m_tableAllocationTargetSize;
     // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
-
-private:
-    int32_t m_refcount;
-    ThreadLocalPool m_tlPool;
-    int m_compactionThreshold;
 };
 
 }

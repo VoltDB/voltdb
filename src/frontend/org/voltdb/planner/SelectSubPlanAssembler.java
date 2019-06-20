@@ -58,13 +58,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
-    private static final Runtime RUNTIME = Runtime.getRuntime();
+    private static final Runtime RUN_TIME = Runtime.getRuntime();
     // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
     // and early exit if too large heap size had been used.
     private static final int PLAN_ESTIMATE_PERIOD = 300;
     // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
     private static final short MAX_HEAP_MEMORY_USAGE_PCT = 80;
-    private static final long MAX_ALLOWED_PLAN_MEMORY = RUNTIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
+    private static final long MAX_ALLOWED_PLAN_MEMORY = RUN_TIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
 
     /**
      * Stop further planning, if we have used more heap memory than we could hopefully exhaustively plan it out,
@@ -74,7 +74,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * rounds.
      */
     private static boolean shouldStopPlanning() {
-        return RUNTIME.totalMemory() - RUNTIME.freeMemory() >= MAX_ALLOWED_PLAN_MEMORY;
+        return RUN_TIME.totalMemory() - RUN_TIME.freeMemory() >= MAX_ALLOWED_PLAN_MEMORY;
     }
     /**
      *
@@ -82,8 +82,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
-    SelectSubPlanAssembler(ParsedSelectStmt selectStmt, StatementPartitioning partitioning)
-    {
+    SelectSubPlanAssembler(ParsedSelectStmt selectStmt, StatementPartitioning partitioning) {
         super(selectStmt, partitioning);
         if (selectStmt.hasJoinOrder()) {
             // If a join order was provided or large number of tables join
@@ -449,8 +448,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // the inner join expression will effectively filter out inner tuple prior to the NLJ.
         if (parentNode.getJoinType() != JoinType.FULL) {
             filterExprs = parentNode.m_joinInnerList;
-        }
-        else {
+        } else {
             postExprs = parentNode.m_joinInnerList;
         }
         StmtTableScan innerTable = innerChildNode.getTableScan();
@@ -506,8 +504,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             if (parentNode.getJoinType() != JoinType.FULL) {
                 filterExprs = parentNode.m_joinInnerList;
                 postExprs = parentNode.m_joinInnerOuterList;
-            }
-            else {
+            } else {
                 // For FULL join type the inner join expressions must be part of the post predicate
                 // in order to stay at the join node and not be pushed down to the inner node
                 filterExprs = null;
@@ -533,9 +530,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
      */
-    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode,
-                                                       int nextNode, List<JoinNode> nodes)
-    {
+    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode, int nextNode, List<JoinNode> nodes) {
         assert(nodes.size() > nextNode);
         JoinNode joinNode = nodes.get(nextNode);
         if (nodes.size() == nextNode + 1) {
@@ -603,8 +598,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
             if (answer == null) {
                 return null;
+            } else {
+                return answer.planNode();
             }
-            return answer.planNode();
         }
 
         // End of recursion
@@ -634,10 +630,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph
      * or null if a valid plan can not be produced for given access paths.
      */
-    private IndexSortablePlanNode getSelectSubPlanForJoin(BranchNode joinNode,
-                                                     AbstractPlanNode outerPlan,
-                                                     AbstractPlanNode innerPlan)
-    {
+    private IndexSortablePlanNode getSelectSubPlanForJoin(
+            BranchNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
         // Filter (post-join) expressions
         ArrayList<AbstractExpression> whereClauses  = new ArrayList<>();
         whereClauses.addAll(joinNode.m_whereInnerList);
@@ -710,14 +704,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean canHaveNLJ = true;
         boolean canHaveNLIJ = true;
         if (innerPlan instanceof IndexScanPlanNode) {
-            if (hasInnerOuterIndexExpression(joinNode.getRightNode().getTableAlias(),
-                                             innerAccessPath.indexExprs,
-                                             innerAccessPath.initialExpr,
-                                             innerAccessPath.endExprs)) {
+            if (hasInnerOuterIndexExpression(
+                        joinNode.getRightNode().getTableAlias(), innerAccessPath.indexExprs,
+                        innerAccessPath.initialExpr, innerAccessPath.endExprs)) {
                 canHaveNLJ = false;
             }
-        }
-        else {
+        } else {
             canHaveNLIJ = false;
         }
         if (needInnerSendReceive) {
@@ -761,14 +753,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 IndexScanPlanNode scanNode = null;
                 if (innerPlan instanceof IndexScanPlanNode) {
                     scanNode = (IndexScanPlanNode)innerPlan;
-                }
-                else {
+                } else {
                     assert(innerPlan instanceof NestLoopIndexPlanNode);
                     scanNode = ((NestLoopIndexPlanNode) innerPlan).getInlineIndexScan();
                 }
                 scanNode.setPredicate(innerExpr);
-            }
-            else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() != JoinType.INNER) {
+            } else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() != JoinType.INNER) {
                 // If the innerJoinNode is a LEAF node OR if the join type is an INNER join,
                 // the conditions that apply to the inner side
                 // have been applied as predicates to the inner scan node already.
@@ -797,8 +787,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             nljNode.addAndLinkChild(innerPlan);
             ajNode = nljNode;
-        }
-        else if (canHaveNLIJ) {
+        } else if (canHaveNLIJ) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
@@ -812,8 +801,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             nlijNode.addAndLinkChild(outerPlan);
 
             ajNode = nlijNode;
-        }
-        else {
+        } else {
             m_recentErrorMsg =
                 "Unsupported special case of complex OUTER JOIN between replicated outer table and partitioned inner table.";
             return null;
@@ -859,11 +847,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param endExprs - a list of expressions used in the indexing
      * @return true if at least one of the expression lists references a TVE.
      */
-    private static boolean hasInnerOuterIndexExpression(String innerTableAlias,
-                                                 Collection<AbstractExpression> indexExprs,
-                                                 Collection<AbstractExpression> initialExpr,
-                                                 Collection<AbstractExpression> endExprs)
-    {
+    private static boolean hasInnerOuterIndexExpression(
+            String innerTableAlias, Collection<AbstractExpression> indexExprs,
+            Collection<AbstractExpression> initialExpr, Collection<AbstractExpression> endExprs) {
         HashSet<AbstractExpression> indexedExprs = new HashSet<>();
         indexedExprs.addAll(indexExprs);
         indexedExprs.addAll(initialExpr);

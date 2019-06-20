@@ -129,8 +129,6 @@ public:
 
     ~CompactionTest() {
         delete m_engine;
-        // Clear the dummy StreamedTable so that PersistentTable is deallocated cleanly.
-        m_table->setStreamedTable(NULL);
         delete m_table;
         voltdb::globalDestroyOncePerProcess();
     }
@@ -177,9 +175,10 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature));
-        // Set a dummy StreamedTable to avoid asserts in the main path
-        m_table->setStreamedTable((StreamedTable*) 1);
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature,
+                        false,
+                        0,
+                        PERSISTENT_MIGRATE));
 
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -206,7 +205,7 @@ public:
                 // Need to find the memory in the tuple block to update the hidden column (simulate migrate)
                 const UndoReleaseAction* undo = ExecutorContext::currentUndoQuantum()->getLastUndoActionForTest();
                 const PersistentTableUndoInsertAction* insertUndo = (const PersistentTableUndoInsertAction*) undo;
-                TableTuple targetTuple = TableTuple(static_cast<char*>(insertUndo->getTupleForTest()), tuple.getSchema());
+                TableTuple targetTuple = TableTuple(const_cast<char*>(insertUndo->getTupleForTest()), tuple.getSchema());
                 targetTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(txnId));
                 dynamic_cast<voltdb::PersistentTable *>(table)->migratingAdd(txnId, targetTuple);
             }

@@ -23,18 +23,7 @@
 
 package org.voltdb.export;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -49,8 +38,6 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public class TestExportBase extends RegressionSuite {
 
@@ -303,113 +290,7 @@ public class TestExportBase extends RegressionSuite {
         assertTrue(passed);
     }
 
-    protected void verifyExportedTuples(int expsize) {
-        assertTrue(m_seenIds.size() > 0);
-        long end = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(5);
-        boolean passed = false;
-        while (true) {
-            if (m_seenIds.size() == expsize) {
-                passed = true;
-                break;
-            }
-            long ctime = System.currentTimeMillis();
-            if (ctime > end) {
-                System.out.println("Waited too long...");
-                break;
-            }
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException ex) {
-            }
-        }
-        System.out.println("Seen Id size is: " + m_seenIds.size() + " expected:" + expsize + " Passed: " + passed);
-        assertTrue(passed);
-    }
-
-    protected final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
-    public class ClientConnectionHandler extends Thread {
-        private final Socket m_clientSocket;
-        private boolean m_closed = false;
-        final CSVParser m_parser = new CSVParser();
-        public ClientConnectionHandler(Socket clientSocket) {
-            m_clientSocket = clientSocket;
-        }
-
-        @Override
-        public void run() {
-            try {
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(m_clientSocket.getInputStream()));
-                while (!m_closed) {
-                    String line = in.readLine();
-                    //You should convert your data to params here.
-                    if (line == null && m_closed) {
-                        break;
-                    }
-                    if (line == null) continue;
-                    String parts[] = m_parser.parseLine(line);
-                    if (parts == null) {
-                        continue;
-                    }
-                    Long i = Long.parseLong(parts[0]);
-                    if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
-                        synchronized(m_seenIds) {
-                            m_seenIds.get(i).incrementAndGet();
-                        }
-                    }
-                }
-                m_clientSocket.close();
-            } catch (IOException ioe) {
-            }
-        }
-
-        public void stopClient() {
-            m_closed = true;
-        }
-    }
-
-    protected final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-
-    public class ServerListener extends Thread {
-        private ServerSocket ssocket;
-        private boolean shuttingDown = false;
-        public ServerListener(int port) {
-            try {
-                ssocket = new ServerSocket(port);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        public void close() throws IOException {
-            shuttingDown = true;
-            try {
-                ssocket.close();
-            } catch (Exception e) {}
-            ssocket = null;
-        }
-
-        @Override
-        public void run() {
-            while (!shuttingDown && m_clients.size() < 4) {
-                try {
-                    Socket clientSocket = ssocket.accept();
-                    ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
-                    m_clients.add(ch);
-                    ch.start();
-                } catch (IOException ex) {
-                }
-            }
-        }
-    }
-
     public void tearDown() throws Exception {
         super.tearDown();
-        System.out.println("Shutting down client and server");
-        for (ClientConnectionHandler s : m_clients) {
-            s.stopClient();
-        }
-        m_clients.clear();
-        m_seenIds.clear();
     }
 }

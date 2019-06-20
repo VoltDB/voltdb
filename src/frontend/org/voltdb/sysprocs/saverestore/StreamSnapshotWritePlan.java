@@ -21,10 +21,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -37,7 +35,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExtensibleSnapshotDigestData;
-import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
@@ -55,12 +52,9 @@ import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Multimap;
-import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -88,9 +82,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(jsData, context.getDatabase());
         final List<StreamSnapshotRequestConfig.Stream> localStreams =
-            filterRemoteStreams(config.streams, Longs.asList(tracker.getLocalSites()));
+                filterRemoteStreams(config.streams, tracker.getSitesForHost(context.getHostId()));
         final Map<Integer, Set<Long>> destsByHostId = collectTargetSitesByHostId(config.streams);
-        final Set<Integer> partitionsToAdd = getPartitionsToAdd(localStreams);
 
         /*
          * The snapshot (if config.shouldTruncate) will only contain existing partitions. Write the new partition count
@@ -109,10 +102,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        final int newPartitionCount = partitionsToAdd.isEmpty() ? context.getNumberOfPartitions() : Collections.max(partitionsToAdd) + 1;
+        Integer newPartitionCount = config.newPartitionCount;
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
+            assert newPartitionCount != null;
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                                            context, result,
                                            extraSnapshotData,
@@ -120,12 +114,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                            hashinatorData,
                                            timestamp,
                                            newPartitionCount);
-        }
-
-        // Create post snapshot update hashinator work
-        List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        if (!partitionsToAdd.isEmpty()) {
-            createUpdatePartitionCountTasksForSites(localPartitions, newPartitionCount);
+        } else if (newPartitionCount != null) {
+            // Create post snapshot update hashinator work
+            createUpdatePartitionCountTasksForSites(tracker, context, newPartitionCount);
         }
 
         // Mark snapshot start in registry
@@ -144,7 +135,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
             VoltTable schemaTable;
-            final boolean preserveMigrateHiddenColumn = TableType.needsMigrateHiddenColumn(table.getTabletype());
+            final boolean preserveMigrateHiddenColumn = TableType.needsShadowStream(table.getTabletype());
             if (XDCR && table.getIsdred()) {
                 if (preserveMigrateHiddenColumn) {
                     schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
@@ -177,19 +168,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     private static boolean haveAnyStreamPairs(List<StreamSnapshotRequestConfig.Stream> localStreams) {
-        boolean haveAny = false;
         if (localStreams != null && !localStreams.isEmpty()) {
-            int pairCount = 0;
-            Iterator<StreamSnapshotRequestConfig.Stream> itr = localStreams.iterator();
-            while (itr.hasNext() && pairCount == 0) {
-                StreamSnapshotRequestConfig.Stream stream = itr.next();
-                if (stream != null && stream.streamPairs != null) {
-                    pairCount = stream.streamPairs.size();
+            for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
+                if (stream != null && stream.streamPairs != null && !stream.streamPairs.isEmpty()) {
+                    return true;
                 }
             }
-            haveAny = pairCount > 0;
         }
-        return haveAny;
+        return false;
     }
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
@@ -232,12 +218,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                                             (destHSId == stream.lowestSiteSinkHSId),
                                                                             destsByHostId.get(CoreUtils.getHostIdFromHSId(destHSId)),
                                                                             hashinatorConfig, schemas, sender, ackReceiver));
-//                    if (destHSId == stream.lowestSiteSinkHSId) {
-//                        sdts.add(0, nextTarget);
-//                    }
-//                    else {
-                        sdts.add(nextTarget);
-//                    }
+                    sdts.add(nextTarget);
                 }
             }
         }
@@ -273,8 +254,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, null, context,
-                        result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount);
+                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
+                        new SnapshotRequestConfig(newPartitionCount, context.getDatabase()), context, result,
+                        extraSnapshotData, tracker, hashinatorData, timestamp);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {
@@ -297,16 +279,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // For Rejoin, there will only be one element in this list
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
             ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
-
-            for (Entry<Long, Long> streamPair : stream.streamPairs.entries()) {
-                // Only include entries where the sourceHSId is a local HSID
-                if (localHSIds.contains(streamPair.getKey())) {
-                    streamPairs.put(streamPair.getKey(), streamPair.getValue());
+            for (Long localHsId : localHSIds) {
+                Collection<Long> destinations = stream.streamPairs.get(localHsId);
+                if (!destinations.isEmpty()) {
+                    streamPairs.putAll(localHsId, destinations);
                 }
             }
 
             localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
-                                                                    stream.newPartition,
                                                                     stream.lowestSiteSinkHSId));
         }
 
@@ -321,14 +301,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // For Rejoin, there will only be one element in this list
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
             for (Long targetHSId : stream.streamPairs.values()) {
-                int hostId = CoreUtils.getHostIdFromHSId(targetHSId);
+                Integer hostId = CoreUtils.getHostIdFromHSId(targetHSId);
                 Set<Long> targetSet = targetHSIdsByHostId.get(hostId);
                 if (targetSet == null) {
-                    targetHSIdsByHostId.put(hostId, new HashSet<Long>(Arrays.asList(targetHSId)));
+                    targetSet = new HashSet<>();
+                    targetHSIdsByHostId.put(hostId, targetSet);
                 }
-                else {
-                    targetSet.add(targetHSId);
-                }
+                targetSet.add(targetHSId);
             }
         }
 
@@ -392,58 +371,6 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             } else {
                 placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             }
-        }
-    }
-
-    /**
-     * Look at all streams and consolidate the ranges of all streams.
-     * @return A map of tokens to partition IDs
-     */
-    private static Set<Integer> getPartitionsToAdd(Collection<StreamSnapshotRequestConfig.Stream> streams)
-    {
-        ImmutableSet.Builder<Integer> builder = ImmutableSet.builder();
-        for (StreamSnapshotRequestConfig.Stream stream : streams) {
-            if (stream.newPartition != null) {
-                builder.add(stream.newPartition);
-            }
-        }
-        return builder.build();
-    }
-
-    private static void createUpdatePartitionCountTasksForSites(Collection<Integer> localPartitions,
-                                                                Integer newPartitionCount)
-    {
-        Preconditions.checkNotNull(newPartitionCount);
-        PostSnapshotTask task = new UpdatePartitionCount(newPartitionCount);
-        assert !localPartitions.isEmpty();
-        Iterator<Integer> iter = localPartitions.iterator();
-        while (iter.hasNext()) {
-            int partition = iter.next();
-            SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(partition, task);
-        }
-    }
-
-    /**
-     * A post-snapshot site task that updates the partition count on each site.
-     */
-    private static class UpdatePartitionCount implements PostSnapshotTask {
-        private final int m_newPartitionCount;
-
-        public UpdatePartitionCount(int newPartitionCount)
-        {
-            m_newPartitionCount = newPartitionCount;
-        }
-
-        @Override
-        public void run(SystemProcedureExecutionContext context)
-        {
-            if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("P" + context.getPartitionId() +
-                               " updating partition count to: " + m_newPartitionCount);
-            }
-
-            // Update partition count stored on this site
-            context.setNumberOfPartitions(m_newPartitionCount);
         }
     }
 

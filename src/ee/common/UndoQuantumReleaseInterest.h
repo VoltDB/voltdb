@@ -34,6 +34,7 @@ public:
             return true;
         }
     }
+    inline int64_t getLastSeenUndoToken() const { return m_lastSeenUndoToken; }
 private:
     int64_t m_lastSeenUndoToken;
 };

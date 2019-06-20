@@ -53,7 +53,6 @@
 #include "expressions/abstractexpression.h"
 
 #include <string>
-#include <cassert>
 
 namespace voltdb {
 
@@ -70,7 +69,7 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
+        vassert(m_left);
         NValue operand = m_left->eval(tuple1, tuple2);
         // NOT TRUE is FALSE
         if (operand.isTrue()) {
@@ -97,7 +96,7 @@ class OperatorIsNullExpression : public AbstractExpression {
     };
 
    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-       assert(m_left);
+       vassert(m_left);
        NValue tmp = m_left->eval(tuple1, tuple2);
        if (tmp.isNull()) {
            return NValue::getTrue();
@@ -120,7 +119,7 @@ class OperatorUnaryMinusExpression : public AbstractExpression {
     };
 
    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-       assert(m_left);
+       vassert(m_left);
        NValue tmp = m_left->eval(tuple1, tuple2);
        return tmp.op_unary_minus();
    }
@@ -140,7 +139,7 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
+        vassert(m_left);
         return m_left->eval(tuple1, tuple2).castAs(m_targetType);
     }
 
@@ -156,8 +155,8 @@ public:
     OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
         : AbstractExpression(EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, left, right)
     {
-        assert (m_left);
-        assert (m_right);
+        vassert(m_left);
+        vassert(m_right);
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -179,8 +178,8 @@ public:
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
-        assert (m_right);
+        vassert(m_left);
+        vassert(m_right);
         NValue thenClause = m_left->eval(tuple1, tuple2);
 
         if (thenClause.isTrue()) {
@@ -241,8 +240,8 @@ class OperatorExpression : public AbstractExpression {
     NValue
     eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
-        assert(m_left);
-        assert(m_right);
+        vassert(m_left);
+        vassert(m_right);
         return oper.op(m_left->eval(tuple1, tuple2),
                        m_right->eval(tuple1, tuple2));
     }

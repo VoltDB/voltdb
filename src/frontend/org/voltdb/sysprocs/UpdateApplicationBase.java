@@ -32,7 +32,6 @@ import java.util.stream.StreamSupport;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -90,17 +89,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * For UpdateClasses, this will contain the class deletion patterns
      * For AdHoc DDL work, this will be null
      */
-    public static CatalogChangeResult prepareApplicationCatalogDiff(String invocationName,
-                                                                    final byte[] operationBytes,
-                                                                    final String operationString,
-                                                                    final String[] adhocDDLStmts,
-                                                                    final List<SqlNode> sqlNodes,
-                                                                    final byte[] replayHashOverride,
-                                                                    final boolean isPromotion,
-                                                                    final boolean useAdhocDDL,
-                                                                    String hostname,
-                                                                    String user)
-    {
+    public static CatalogChangeResult prepareApplicationCatalogDiff(
+            String invocationName, final byte[] operationBytes, final String operationString,
+            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
+            final boolean isPromotion, final boolean useAdhocDDL, String hostname, String user) {
         final DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
         // create the change result and set up all the boiler plate
@@ -126,15 +118,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
                 if ((operationBytes == null) || (operationBytes.length == 0)) {
                     newCatalogJar = oldJar;
-                }
-                else {
+                } else {
                     newCatalogJar = CatalogUtil.loadInMemoryJarFile(operationBytes);
                 }
                 // If the deploymentString is null, we'll fill it in with current deployment later
                 // Otherwise, deploymentString has the right contents, don't need to touch it
-            }
-            else if ("@UpdateClasses".equals(invocationName)) {
-                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes.");
+            } else if ("@UpdateClasses".equals(invocationName)) {
+                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes: " + context.catalogVersion);
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (operationBytes != null) {
@@ -150,8 +140,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     } else {
                         newCatalogJar = modifiedJar;
                     }
-                }
-                catch (ClassNotFoundException e) {
+                } catch (ClassNotFoundException e) {
                     retval.errorMsg = "Classes not found in @UpdateClasses jar: " + e.getMessage();
                     return retval;
                 }
@@ -161,26 +150,21 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
                 // mark it as non-schema change
                 retval.hasSchemaChange = false;
-            }
-            else if ("@AdHoc".equals(invocationName)) {
+            } else if ("@AdHoc".equals(invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
                     newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes, drRole == DrRoleType.XDCR);
-                }
-                catch (IOException | VoltCompilerException e) {
+                } catch (IOException | VoltCompilerException e) {
                     retval.errorMsg = e.getMessage();
                     return retval;
-                }
-                catch (Exception ex) {
-                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage() +
-                            Arrays.stream(ex.getStackTrace()).map(st -> st.toString()).collect(Collectors.joining("\n"));
+                } catch (Exception ex) {
+                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage();
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
-            }
-            else {
+            } else {
                 // Shouldn't ever get here
                 retval.errorMsg = invocationName + " is not supported";
                 return retval;
@@ -197,8 +181,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             Pair<InMemoryJarfile, String> loadResults = null;
             try {
                 loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogJar, drRole == DrRoleType.XDCR);
-            }
-            catch (IOException ioe) {
+            } catch (IOException ioe) {
                 // Preserve a nicer message from the jarfile loading rather than
                 // falling through to the ZOMG message in the big catch
                 retval.errorMsg = ioe.getMessage();
@@ -248,13 +231,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (dt == null) {
                 retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
                 return retval;
-            }
+            } else if (context.getDeployment().getCluster().getSitesperhost() != dt.getCluster().getSitesperhost()) {
             // Since sitesPerHost is no longer part of catalog, check it here before diff engine
-            if (context.getDeployment().getCluster().getSitesperhost() != dt.getCluster().getSitesperhost()) {
                 retval.errorMsg = "Unable to update deployment configuration: sites per host cannot be changed";
                 return retval;
-            }
-            if (isPromotion && drRole == DrRoleType.REPLICA) {
+            } else if (isPromotion && drRole == DrRoleType.REPLICA) {
                 assert dt.getDr().getRole() == DrRoleType.REPLICA;
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
@@ -305,8 +286,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
             retval.hasSecurityUserChange = diff.hasSecurityUserChanges();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             retval.errorMsg = "Unexpected error in catalog update from " + invocationName + ": " + e.getClass() + ", " +
                     e.getMessage();
         }
@@ -318,9 +298,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * jarfile
      * @throws VoltCompilerException
      */
-    protected static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, List<SqlNode> sqlNodes, boolean isXDCR)
-    throws IOException, VoltCompilerException
-    {
+    protected static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile,
+            String[] adhocDDLStmts, List<SqlNode> sqlNodes, boolean isXDCR)
+            throws IOException, VoltCompilerException {
         StringBuilder sb = new StringBuilder();
         compilerLog.info("Applying the following DDL to cluster:");
         for (String stmt : adhocDDLStmts) {
@@ -345,8 +325,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      */
     private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
             InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql)
-                    throws IOException, ClassNotFoundException, VoltCompilerException
-    {
+            throws IOException, ClassNotFoundException, VoltCompilerException {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
         boolean deletedClasses = false;
@@ -400,9 +379,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     /** Check if something should run based on admin/paused/internal status */
     static protected boolean allowPausedModeWork(boolean internalCall, boolean adminConnection) {
-        return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
-                internalCall ||
-                adminConnection);
+        return (VoltDB.instance().getMode() != OperationMode.PAUSED || internalCall || adminConnection);
     }
 
     /** Error generating shortcut method */
@@ -418,8 +395,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * Check the results map from every host and return error message if needed.
      * @return  A String describing the error messages. If all hosts return success, NULL is returned.
      */
-    protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr)
-    {
+    protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr) {
         String procedureName = "@VerifyCatalogAndWriteJar";
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
@@ -485,48 +461,33 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // ENG-14511- these calls may hit assertion failures in testing environments
         try {
             return UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(),
-                    m_generationId.incrementAndGet(),
-                    MpInitiator.MP_INIT_PID);
-        }
-        catch (Throwable t) {
+                    m_generationId.incrementAndGet(), MpInitiator.MP_INIT_PID);
+        } catch (Throwable t) {
             // Try resetting the generation
             m_generationId.set(0L);
             return UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(),
-                    m_generationId.incrementAndGet(),
-                    MpInitiator.MP_INIT_PID);
+                    m_generationId.incrementAndGet(), MpInitiator.MP_INIT_PID);
         }
     }
 
-    protected CompletableFuture<ClientResponse> updateApplication(String invocationName,
-                                                                  final byte[] operationBytes,
-                                                                  final String operationString,
-                                                                  final String[] adhocDDLStmts,
-                                                                  final List<SqlNode> sqlNodes,
-                                                                  final byte[] replayHashOverride,
-                                                                  final boolean isPromotion,
-                                                                  final boolean useAdhocDDL)
-    {
+    protected CompletableFuture<ClientResponse> updateApplication(
+            String invocationName, final byte[] operationBytes, final String operationString,
+            final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
+            final boolean isPromotion, final boolean useAdhocDDL) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         CatalogChangeResult ccr = null;
 
         String errMsg = VoltZK.createActionBlocker(zk, VoltZK.catalogUpdateInProgress, CreateMode.EPHEMERAL,
-                                                    hostLog, "catalog update(" + invocationName + ")" );
+                hostLog, "catalog update(" + invocationName + ")" );
         if (errMsg != null) {
             return makeQuickResponse(ClientResponse.USER_ABORT, errMsg);
         }
 
         // Now we holds the UAC blocker lock
         try {
-            ccr = prepareApplicationCatalogDiff(invocationName,
-                                                operationBytes,
-                                                operationString,
-                                                adhocDDLStmts,
-                                                sqlNodes,
-                                                replayHashOverride,
-                                                isPromotion,
-                                                useAdhocDDL,
-                                                getHostname(),
-                                                getUsername());
+            ccr = prepareApplicationCatalogDiff(
+                    invocationName, operationBytes, operationString, adhocDDLStmts, sqlNodes,
+                    replayHashOverride, isPromotion, useAdhocDDL, getHostname(), getUsername());
         } catch (Exception e) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
@@ -536,9 +497,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         if (ccr.errorMsg != null) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
-        }
+        } else if (ccr.upgradedFromVersion != null) {
         // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
             compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
                     ccr.upgradedFromVersion));
         }
@@ -547,11 +507,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             String msg = invocationName + " with no catalog changes was skipped.";
             compilerLog.info(msg);
             return makeQuickResponse(ClientResponseImpl.SUCCESS, msg);
-        }
-        if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
+        } else if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
             // This means no more @UAC calls when using DDL mode.
             noteRestoreCompleted();
             compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
+        }
+
+        // catalog update will wait for snap shot to be completed, which will block site thread.
+        if (ccr.requiresSnapshotIsolation && VoltZK.hasHostsSnapshotting(zk)) {
+            VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
+            errMsg = "Snapshot in progress. Please retry catalog update later.";
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
         // write the new catalog to a temporary jar file
@@ -565,30 +531,20 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         long genId = 0L;
         try {
             genId = getNextGenerationId();
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             errMsg = "Unexpected error generating Id: " + ex.getMessage();
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
         // update the catalog jar
-        CompletableFuture<ClientResponse> first = callProcedure("@UpdateCore",
-                                                    ccr.encodedDiffCommands,
-                                                    ccr.expectedCatalogVersion,
-                                                    genId,
-                                                    ccr.catalogBytes,
-                                                    ccr.catalogHash,
-                                                    ccr.deploymentBytes,
-                                                    ccr.deploymentHash,
-                                                    ccr.worksWithElastic ? 1 : 0,
-                                                    ccr.tablesThatMustBeEmpty,
-                                                    ccr.reasonsForEmptyTables,
-                                                    ccr.requiresSnapshotIsolation ? 1 : 0,
-                                                    ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                                                    ccr.hasSchemaChange ?  1 : 0,
-                                                    ccr.requiresNewExportGeneration ? 1 : 0,
-                                                    ccr.hasSecurityUserChange ? 1 : 0);
+        CompletableFuture<ClientResponse> first = callProcedure(
+                "@UpdateCore", ccr.encodedDiffCommands, ccr.expectedCatalogVersion,
+                genId, ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes, ccr.deploymentHash,
+                ccr.worksWithElastic ? 1 : 0, ccr.tablesThatMustBeEmpty, ccr.reasonsForEmptyTables,
+                ccr.requiresSnapshotIsolation ? 1 : 0, ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                ccr.hasSchemaChange ?  1 : 0, ccr.requiresNewExportGeneration ? 1 : 0,
+                ccr.hasSecurityUserChange ? 1 : 0);
         // inject unlocking callback
         CompletableFuture<ClientResponse> second = first.thenCompose(f -> CompletableFuture.supplyAsync(()-> {
             // holds the lock until now to guarantee sequential execution

@@ -82,7 +82,8 @@ public:
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
     /** Returns ColumnIds of TupleValueExpression expressions from passed axpression.*/
-    static void extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds);
+    static void extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int>&);
+    static std::vector<int> extractTupleValuesColumnIdx(const AbstractExpression* expr);
 
     static AbstractExpression* operatorFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 

@@ -198,11 +198,8 @@ class ExpressionOrColumn {
         this(indexEntryNumber, null, expr, sortDir, null);
     }
 
-    ExpressionOrColumn(int aIndexEntryNumber,
-                       StmtTableScan tableScan,
-                       AbstractExpression expr,
-                       SortDirectionType sortDir,
-                       ColumnRef colRef) {
+    ExpressionOrColumn(int aIndexEntryNumber, StmtTableScan tableScan, AbstractExpression expr,
+            SortDirectionType sortDir, ColumnRef colRef) {
         // Exactly one of expr or colRef can be null.
         Preconditions.checkArgument((expr == null) == (colRef != null),
                 "Exactly one of argument expr or colRef must be null.");

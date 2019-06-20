@@ -39,6 +39,8 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.exportclient.ExportRowSchema;
+import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.VoltFile;
 
 import junit.framework.TestCase;
@@ -68,8 +70,25 @@ public class TestStreamBlockQueue extends TestCase {
 
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
         g_seqNo += 100;
-        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)),
-                null, g_seqNo, g_seqNo, 1, 0L, -1, false);
+        BBContainer cont = DBBPool.wrapBB(getFilledBuffer(fillValue));
+        BinaryDequeReader.Entry<ExportRowSchema> entry = new BinaryDequeReader.Entry<ExportRowSchema>() {
+
+            @Override
+            public ExportRowSchema getExtraHeader() {
+                return null;
+            }
+
+            @Override
+            public ByteBuffer getData() {
+                return cont.b();
+            }
+
+            @Override
+            public void release() {
+                cont.discard();
+            }
+        };
+        return new StreamBlock(entry, g_seqNo, g_seqNo, 1, 0L, false);
     }
 
     @Override
@@ -89,7 +108,7 @@ public class TestStreamBlockQueue extends TestCase {
             testDir.delete();
         }
         testDir.mkdir();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName");
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, m_mockVoltDB.getCatalogContext().m_genId);
         defaultBuffer.clear();
     }
 
@@ -135,7 +154,7 @@ public class TestStreamBlockQueue extends TestCase {
         System.gc();
         System.runFinalization();
 
-        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE, "TableName");
+        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE, "TableName", 1, m_sbq.getGenerationIdCreated());
         sb = m_sbq.peek();
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
@@ -182,7 +201,7 @@ public class TestStreamBlockQueue extends TestCase {
                     break;
                 case 1:
                     System.out.println("Iteration " + iteration + " Action sync");
-                    m_sbq.sync(r.nextBoolean());
+                    m_sbq.sync();
                     break;
                 case 2:
                     System.out.println("Iteration " + iteration + " Action peek");
@@ -350,7 +369,7 @@ public class TestStreamBlockQueue extends TestCase {
         long weirdSizeValue = 1024 * 1024 * 2 * 30;
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
 
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
@@ -415,13 +434,14 @@ public class TestStreamBlockQueue extends TestCase {
         long weirdSizeValue = ((1024 * 1024 * 2) * 30);
         assertEquals(m_sbq.sizeInBytes(), weirdSizeValue);
 
-        m_sbq.sync(true);
+        m_sbq.sync();
+        long genId = m_sbq.getGenerationIdCreated();
 
         m_sbq.close();
         m_sbq = null;
         System.gc();
         System.runFinalization();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName");
+        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, genId);
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;

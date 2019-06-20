@@ -75,6 +75,11 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("UNEXPECTED END OF LOG");
+    }
+
+    @Override
     public String toString() {
         return "END OF COMMAND LOG FOR PARTITION, PARTITION ID: " + m_pid;
     }

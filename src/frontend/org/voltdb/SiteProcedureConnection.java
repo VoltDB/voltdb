@@ -23,8 +23,8 @@ import java.util.concurrent.Future;
 
 import javax.annotation_voltpatches.Nullable;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
@@ -215,7 +215,7 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers,
@@ -234,13 +234,12 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long uso,
-                             Long sequenceNumber,
+                             ExportSnapshotTuple sequences,
                              Integer partitionId,
                              String tableSignature);
 
-    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount);
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId);
 
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
@@ -270,4 +269,26 @@ public interface SiteProcedureConnection {
     public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId);
 
     public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId);
+
+    /**
+     * Use this to disable all external streams (DR, export) from this site.
+     * This is used by Elastic Shrink after all data from this site has been migrated.
+     * The site continues to participate in MP txns until the partition is fully removed from
+     * the cluster, but this will disable all external writes as well so that in effect the sites
+     * are not participating.
+     * <p> By default this is enabled in all sites.
+     */
+    public void disableExternalStreams();
+
+    /**
+     * Returns value showing whether external streams (DR and export) are enabled for this Site.
+     *
+     * @return true if external streams are enabled for this site, false otherwise.
+     */
+    public boolean externalStreamsEnabled();
+
+    /**
+     * @return the max size for all MP responses
+     */
+    public long getMaxTotalMpResponseSize();
 }

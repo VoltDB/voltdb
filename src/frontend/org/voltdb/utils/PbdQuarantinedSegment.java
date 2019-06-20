@@ -18,18 +18,20 @@
 package org.voltdb.utils;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.BinaryDequeValidator;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
 /**
  * Dummy PBDSegment which represents a quarantined segment. A quarantined segment cannot be read because of header
  * corruption but is kept around in case any data in the segment is needed to recover data.
  */
-class PbdQuarantinedSegment extends PBDSegment {
+class PbdQuarantinedSegment<M> extends PBDSegment<M> {
     PbdQuarantinedSegment(File file, long index, long id) {
         super(file, index, id);
     }
@@ -50,13 +52,14 @@ class PbdQuarantinedSegment extends PBDSegment {
     }
 
     @Override
-    PBDSegmentReader openForRead(String cursorId) {
+    PBDSegmentReader<M> openForRead(String cursorId) {
         return getReader(cursorId);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    PBDSegmentReader getReader(String cursorId) {
-        return READER;
+    PBDSegmentReader<M> getReader(String cursorId) {
+        return (PBDSegmentReader<M>) READER;
     }
 
     @Override
@@ -105,7 +108,7 @@ class PbdQuarantinedSegment extends PBDSegment {
     }
 
     @Override
-    void writeExtraHeader(DeferredSerialization ds) {
+    void writeExtraHeader(M extraHeader) {
         throw new UnsupportedOperationException();
     }
 
@@ -123,6 +126,11 @@ class PbdQuarantinedSegment extends PBDSegment {
     }
 
     @Override
+    int validate(BinaryDequeValidator<M> validator) throws IOException {
+        return 0;
+    }
+
+    @Override
     boolean isFinal() {
         return false;
     }
@@ -130,7 +138,12 @@ class PbdQuarantinedSegment extends PBDSegment {
     @Override
     void finalize(boolean close) {}
 
-    private static final PBDSegmentReader READER = new PBDSegmentReader() {
+    @Override
+    M getExtraHeader() {
+        return null;
+    }
+
+    private static final PBDSegmentReader<Void> READER = new PBDSegmentReader<Void>() {
         @Override
         public int uncompressedBytesToRead() {
             return 0;

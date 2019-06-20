@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -111,6 +113,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.ALTER_TABLE :
             case StatementTypes.ALTER_TRANSFORM :
             case StatementTypes.ALTER_TTL :
+            case StatementTypes.ALTER_EXPORT :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -434,6 +437,21 @@ public class StatementSchema extends Statement {
                     return Result.newErrorResult(e, sql);
                 }
             }
+            case StatementTypes.ALTER_EXPORT : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    String target = (String)arguments[1];
+                    @SuppressWarnings("unchecked")
+                    List<String> triggers = (List<String>)arguments[2];
+                    table.addPersistentExport(target, triggers);
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
             case StatementTypes.ALTER_TTL : {
                 try {
                     HsqlName name       = (HsqlName) arguments[0];
@@ -445,8 +463,7 @@ public class StatementSchema extends Statement {
                     String ttlColumn = (String)arguments[3];
                     int batchSize = (Integer) arguments[4];
                     int maxFrequency = (Integer) arguments[5];
-                    String stream = (String)arguments[6];
-                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, stream);
+                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);

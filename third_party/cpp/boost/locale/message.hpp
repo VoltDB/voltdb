@@ -20,6 +20,13 @@
 #include <memory>
 #include <boost/locale/formatting.hpp>
 
+// glibc < 2.3.4 declares those as macros if compiled with optimization turned on
+#ifdef gettext
+#  undef gettext
+#  undef ngettext
+#  undef dgettext
+#  undef dngettext
+#endif
 
 namespace boost {
     namespace locale {
@@ -496,13 +503,13 @@ namespace boost {
         /// Convenience typedef for wchar_t
         ///
         typedef basic_message<wchar_t> wmessage;
-        #ifdef BOOST_HAS_CHAR16_T
+        #ifdef BOOST_LOCALE_ENABLE_CHAR16_T
         ///
         /// Convenience typedef for char16_t
         ///
         typedef basic_message<char16_t> u16message;
         #endif
-        #ifdef BOOST_HAS_CHAR32_T
+        #ifdef BOOST_LOCALE_ENABLE_CHAR32_T
         ///
         /// Convenience typedef for char32_t
         ///
@@ -722,7 +729,7 @@ namespace boost {
             static std::locale::id id;
         };
         
-        #ifdef BOOST_HAS_CHAR16_T
+        #ifdef BOOST_LOCALE_ENABLE_CHAR16_T
 
         template<>
         struct BOOST_LOCALE_DECL base_message_format<char16_t> : public std::locale::facet 
@@ -735,7 +742,7 @@ namespace boost {
 
         #endif
 
-        #ifdef BOOST_HAS_CHAR32_T
+        #ifdef BOOST_LOCALE_ENABLE_CHAR32_T
 
         template<>
         struct BOOST_LOCALE_DECL base_message_format<char32_t> : public std::locale::facet 

@@ -60,7 +60,7 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
     // Schemas produced by the base query and the recursive query must
     // match exactly!  Otherwise memory corruption will occur.
     const AbstractTempTable* recOutput = ec->getExecutors(recursiveStmtId).back()->getTempOutputTable();
-    assert(recOutput->schema()->isCompatibleForMemcpy(inputTable->schema()));
+    vassert(recOutput->schema()->isCompatibleForMemcpy(inputTable->schema()));
 #endif
 
     while (inputTable->activeTupleCount() > 0) {
@@ -83,7 +83,7 @@ bool CommonTableExecutor::p_execute(const NValueArray& params) {
 
         // inputTable now has recursive output
         // recursiveOutputTable is now empty
-        assert(recursiveOutputTable->activeTupleCount() == 0);
+        vassert(recursiveOutputTable->activeTupleCount() == 0);
     }
 
     // Finally, the main query that references this CTE should see the

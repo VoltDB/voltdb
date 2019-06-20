@@ -55,7 +55,7 @@ bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Receive Executor");
 
-    assert(dynamic_cast<ReceivePlanNode*>(abstract_node));
+    vassert(dynamic_cast<ReceivePlanNode*>(abstract_node));
 
     // Create output table based on output schema from the plan
     setTempOutputTable(executorVector);

@@ -48,6 +48,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.MpInitiator;
@@ -60,6 +61,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ListMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
@@ -121,10 +123,13 @@ public class SnapshotSiteProcessor {
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
      * that reaches the snapshot.
      */
-    private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
-        new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+    private static final Map<String, Map<Integer, ExportSnapshotTuple>> s_exportSequenceNumbers =
+        new HashMap<String, Map<Integer, ExportSnapshotTuple>>();
 
-    private static final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo = new HashMap<>();
+    private static final Map<Integer, TupleStreamStateInfo> s_drTupleStreamInfo = new HashMap<>();
+    // Stores whether external streams (DR and export) are enabled from this site.
+    // This will be set to false when we remove a partition for Elastic Shrink, for example.
+    private static final Set<Integer> s_disabledStreams = new HashSet<>();
 
     private ExtensibleSnapshotDigestData m_extraSnapshotData;
 
@@ -209,44 +214,54 @@ public class SnapshotSiteProcessor {
      * site that gets the setup permit will  use getExportSequenceNumbers to retrieve the full
      * set and reset the contents.
      */
-    public static void populateSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
+    public static void populateExternalStreamsStatesFromSites(SystemProcedureExecutionContext context) {
         Database database = context.getDatabase();
         for (Table t : database.getTables()) {
             if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
 
-            Map<Integer, Pair<Long,Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
+            Map<Integer, ExportSnapshotTuple> sequenceNumbers = s_exportSequenceNumbers.get(t.getTypeName());
             if (sequenceNumbers == null) {
-                sequenceNumbers = new HashMap<Integer, Pair<Long, Long>>();
-                m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
+                sequenceNumbers = new HashMap<Integer, ExportSnapshotTuple>();
+                s_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
             long[] usoAndSequenceNumber =
                     context.getSiteProcedureConnection().getUSOForExportTable(t.getTypeName());
             sequenceNumbers.put(
                             context.getPartitionId(),
-                            Pair.of(
+                            new ExportSnapshotTuple(
                                 usoAndSequenceNumber[0],
-                                usoAndSequenceNumber[1]));
+                                usoAndSequenceNumber[1],
+                                usoAndSequenceNumber[2]));
         }
         TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
-        m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
+        s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
         if (drStateInfo.containsReplicatedStreamInfo) {
-            m_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+            s_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+        }
+
+        if (!context.getSiteProcedureConnection().externalStreamsEnabled()) {
+            s_disabledStreams.add(context.getPartitionId());
         }
     }
 
-    public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
-        HashMap<String, Map<Integer, Pair<Long, Long>>> sequenceNumbers =
-                new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
-        m_exportSequenceNumbers.clear();
+    public static Map<String, Map<Integer, ExportSnapshotTuple>> getExportSequenceNumbers() {
+        HashMap<String, Map<Integer, ExportSnapshotTuple>> sequenceNumbers = new HashMap<>(s_exportSequenceNumbers);
+        s_exportSequenceNumbers.clear();
         return sequenceNumbers;
     }
 
     public static Map<Integer, TupleStreamStateInfo> getDRTupleStreamStateInfo() {
-        Map<Integer, TupleStreamStateInfo> stateInfo = ImmutableMap.copyOf(m_drTupleStreamInfo);
-        m_drTupleStreamInfo.clear();
+        Map<Integer, TupleStreamStateInfo> stateInfo = ImmutableMap.copyOf(s_drTupleStreamInfo);
+        s_drTupleStreamInfo.clear();
         return stateInfo;
+    }
+
+    public static Set<Integer> getDisabledExternalStreams() {
+        Set<Integer> disabledStreams = ImmutableSet.copyOf(s_disabledStreams);
+        s_disabledStreams.clear();
+        return disabledStreams;
     }
 
     private long m_quietUntil = 0;

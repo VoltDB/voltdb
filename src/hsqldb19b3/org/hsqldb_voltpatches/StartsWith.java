@@ -42,7 +42,6 @@ class StartsWith {
     private boolean  isRightNull;
     boolean          hasCollation;
     boolean          isVariable      = true;
-    boolean          isBinary        = false;
     Type             dataType;
 
     StartsWith() {}
@@ -54,35 +53,22 @@ class StartsWith {
     private Object getStartsWith() {
 
         if (iLen == 0) {
-            return isBinary ? BinaryData.zeroLengthBinary
-                            : "";
+            return "";
         }
 
-        StringBuffer              sb = null;
-        HsqlByteArrayOutputStream os = null;
-
-        if (isBinary) {
-            os = new HsqlByteArrayOutputStream();
-        } else {
-            sb = new StringBuffer();
-        }
+        StringBuffer              sb = new StringBuffer();
 
         int i = 0;
 
         for (; i < iLen; i++) {
-            if (isBinary) {
-                os.writeByte(cStartsWith[i]);
-            } else {
-                sb.append(cStartsWith[i]);
-            }
+            sb.append(cStartsWith[i]);
         }
 
         if (i == 0) {
             return null;
         }
 
-        return isBinary ? new BinaryData(os.toByteArray(), false)
-                        : sb.toString();
+        return sb.toString();
     }
 
     Boolean compare(Session session, Object o) {
@@ -100,29 +86,11 @@ class StartsWith {
     }
 
     char getChar(Object o, int i) {
-
-        char c;
-
-        if (isBinary) {
-            c = (char) ((BinaryData) o).getBytes()[i];
-        } else {
-            c = ((String) o).charAt(i);
-        }
-
-        return c;
+        return ((String) o).charAt(i);
     }
 
     int getLength(SessionInterface session, Object o, String s) {
-
-        int l;
-
-        if (isBinary) {
-            l = (int) ((BinaryData) o).length(session);
-        } else {
-            l = ((String) o).length();
-        }
-
-        return l;
+        return ((String) o).length();
     }
 
     private boolean compareAt(Object o, int i, int j, int jLen) {
@@ -199,11 +167,7 @@ class StartsWith {
             return null;
         }
 
-        if (isBinary) {
-            return new BinaryData(session, (BinaryData) o, maxByteValue);
-        } else {
-            return dataType.concat(session, o, "\uffff");
-        }
+        return dataType.concat(session, o, "\uffff");
     }
 
     public String describe(Session session) {

@@ -224,7 +224,7 @@ public class RegressionSuite extends TestCase {
     /**
      * @return a reference to the associated VoltServerConfig
      */
-    final VoltServerConfig getServerConfig() {
+    public VoltServerConfig getServerConfig() {
         return m_config;
     }
 
@@ -240,11 +240,11 @@ public class RegressionSuite extends TestCase {
         return getClient(1000 * 60 * 10, scheme); // 10 minute default
     }
 
-    Client getClientToHostId(int hostId) throws IOException {
+    public Client getClientToHostId(int hostId) throws IOException {
         return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
     }
 
-    Client getClientToSubsetHosts(int[] hostIds) throws IOException {
+    public Client getClientToSubsetHosts(int[] hostIds) throws IOException {
         return getClientToSubsetHosts(hostIds, 1000 * 60 * 10); // 10 minute default
     }
 
@@ -401,7 +401,7 @@ public class RegressionSuite extends TestCase {
     /**
      * Release a client instance and any resources associated with it
      */
-    void releaseClient(Client c) throws InterruptedException {
+    public void releaseClient(Client c) throws InterruptedException {
         boolean removed = m_clients.remove(c);
         assert(removed);
         c.close();
@@ -493,7 +493,7 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    static void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
+    static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
             throws IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, new long[][] {{modifiedTupleCount}});
@@ -521,7 +521,7 @@ public class RegressionSuite extends TestCase {
         validateTableOfScalarLongs(vt, expected);
     }
 
-    static void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
+    static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
             throws IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -569,7 +569,8 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    void validateRowCount(Client client, String query, int expected) throws IOException, ProcCallException {
+    protected void validateRowCount(Client client, String query, int expected)
+            throws IOException, ProcCallException {
         VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
         int actual = result.getRowCount();
         assertEquals("Wrong row count from query '" + query + "'", expected, actual);
@@ -689,7 +690,7 @@ public class RegressionSuite extends TestCase {
     }
 
 
-    static void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
+    static protected void validateTableColumnOfScalarVarbinary(Client client, String sql, String[] expected)
             throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarVarbinary(vt, 0, expected);
@@ -712,7 +713,7 @@ public class RegressionSuite extends TestCase {
           }
     }
 
-    static void validateTableColumnOfScalarFloat(Client client, String sql, double[] expected)
+    static protected void validateTableColumnOfScalarFloat(Client client, String sql, double[] expected)
             throws IOException, ProcCallException {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableColumnOfScalarFloat(vt, 0, expected);
@@ -1044,8 +1045,8 @@ public class RegressionSuite extends TestCase {
                     assertEquals(fullMsg, expectedValue, actualValue);
                 }
                 else {
-                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
-                                                         Math.abs(expectedValue - actualValue), epsilon);
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e: expected %f, got %f",
+                            Math.abs(expectedValue - actualValue), epsilon, expectedValue, actualValue);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
             } else if (expectedObj instanceof BigDecimal) {

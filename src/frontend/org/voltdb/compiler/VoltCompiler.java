@@ -1414,7 +1414,7 @@ public class VoltCompiler {
             }
             // This is used to enforce default connectors assigned to streams through the Java Property
             // for streams that don't have the Export To Target clause
-            if (TableType.isStreamViewOnly(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
+            if (TableType.isConnectorLessStream(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
                 tableref.setTabletype(TableType.STREAM.get());
             }
         }
@@ -1429,7 +1429,7 @@ public class VoltCompiler {
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
-        if (tableref.getIsreplicated() && !TableType.isPersistentMigrate(tableref.getTabletype())) {
+        if (tableref.getIsreplicated() && !TableType.needsShadowStream(tableref.getTabletype())) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)
             tableref.setIsreplicated(false);

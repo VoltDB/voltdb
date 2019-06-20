@@ -150,7 +150,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // connection IDs used by internal adapters
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
-    public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    public static final long ELASTIC_COORDINATOR_CID    = Long.MIN_VALUE + 3;
     // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
     // public static final long UNUSED_CID              = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
@@ -1078,7 +1078,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
@@ -1103,7 +1103,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public boolean createTransaction(
+    public CreateTransactionResult createTransaction(
             final long connectionId,
             final long txnId,
             final long uniqueId,
@@ -2018,9 +2018,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendEOLMessage(int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
-        m_mailbox.send(initiatorHSId, message);
+        final Long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
+        if (initiatorHSId == null) {
+            log.warn("ClientInterface.sendEOLMessage: Master does not exist for partition: " + partitionId);
+        } else {
+            Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
+            m_mailbox.send(initiatorHSId, message);
+        }
     }
 
     public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
@@ -2166,7 +2170,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                     final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                     m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                            () -> startMigratePartitionLeader(message.isForStopNode()),
+                            () -> {
+                                try {
+                                    startMigratePartitionLeader(message.isForStopNode());
+                                } catch (Exception e) {
+                                    tmLog.error("Migrate partition leader encountered unexpected error", e);
+                                } catch (Throwable t) {
+                                    VoltDB.crashLocalVoltDB("Migrate partition leader encountered unexpected error",
+                                            true, t);
+                                }
+                            },
                             delay, interval, TimeUnit.SECONDS);
                 }
                 hostLog.info("MigratePartitionLeader task is started.");
@@ -2292,14 +2305,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new IOException("failure simulation");
             }
             synchronized (m_executeTaskAdpater) {
-                if (!createTransaction(m_executeTaskAdpater.connectionId(),
+                if (createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
                         procedureConfig.getReadonly(),
                         procedureConfig.getSinglepartition(),
                         procedureConfig.getEverysite(),
                         partitionId,
                         spi.getSerializedSize(),
-                        System.nanoTime())) {
+                        System.nanoTime()) != CreateTransactionResult.SUCCESS) {
                     tmLog.warn(String.format("Failed to start transaction for migration of partition %d to host %d",
                             partitionId, targetHostId));
                     notifyPartitionMigrationStatus(partitionId, targetHSId, true);
@@ -2340,7 +2353,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 } catch (InterruptedException ignoreIt) {
                 }
                 remainingWaitTime -= waitingInterval;
-                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                Long hsId = m_cartographer.getHSIdForMaster(partitionId);
+                if (hsId == null) {
+                    log.warn("ClientInterface.startMigratePartitionLeader: Master does not exist for partition: "
+                            + partitionId);
+                    break;
+                }
+                if (CoreUtils.getHostIdFromHSId(hsId) == targetHostId) {
                     migrationComplete = true;
                     break;
                 }

@@ -52,9 +52,10 @@ public interface RepairAlgo
     public static class RepairResult
     {
         public final long m_txnId;
-
-        RepairResult(long txnId) {
+        public final long m_repairTruncationHandle;
+        RepairResult(long txnId, long repairTruncationHandle) {
             m_txnId = txnId;
+            m_repairTruncationHandle = repairTruncationHandle;
         }
     }
 

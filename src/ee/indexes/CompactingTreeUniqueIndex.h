@@ -47,7 +47,7 @@
 #define COMPACTINGTREEUNIQUEINDEX_H_
 
 #include <iostream>
-#include <cassert>
+#include <common/debuglog.h>
 
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
@@ -94,7 +94,7 @@ class CompactingTreeUniqueIndex : public TableIndex
      */
     bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
-        assert(originalTuple.address() != destinationTuple.address());
+        vassert(originalTuple.address() != destinationTuple.address());
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
@@ -190,7 +190,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     // only be called after moveToGreaterThanKey() for LTE case
     void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -208,7 +208,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     void moveToPriorEntry(IndexCursor& cursor) const
     {
-        assert(cursor.m_forward);
+        vassert(cursor.m_forward);
         cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 

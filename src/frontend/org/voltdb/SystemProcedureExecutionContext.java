@@ -59,6 +59,8 @@ public interface SystemProcedureExecutionContext {
 
     public int getCatalogVersion();
 
+    public long getGenerationId();
+
     public byte[] getCatalogHash();
 
     public byte[] getDeploymentHash();

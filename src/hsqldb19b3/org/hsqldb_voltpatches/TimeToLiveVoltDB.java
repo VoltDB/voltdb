@@ -38,15 +38,14 @@ public class TimeToLiveVoltDB {
     final ColumnSchema ttlColumn;
     final int batchSize;
     final int maxFrequency;
-    final String migrationTarget;
+
     public TimeToLiveVoltDB(int value, String unit, ColumnSchema column,
-            int batchSize, int maxFrequency, String migrationTarget) {
+            int batchSize, int maxFrequency) {
         ttlValue = value;
         ttlUnit = unit;
         ttlColumn = column;
         this.batchSize = batchSize;
         this.maxFrequency = maxFrequency;
-        this.migrationTarget = migrationTarget;
     }
 
     @Override
@@ -60,12 +59,7 @@ public class TimeToLiveVoltDB {
                 return false;
             }
 
-            if (ttl.migrationTarget != null && migrationTarget == null) {
-                return true;
-            }
-            if (ttl.migrationTarget != null && ttl.migrationTarget.equals(migrationTarget)){
-                return true;
-            }
+            return true;
         }
         return false;
     }

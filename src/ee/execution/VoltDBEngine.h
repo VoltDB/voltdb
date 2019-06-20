@@ -63,7 +63,7 @@
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <map>
 #include <unordered_map>
 #include <string>
@@ -168,6 +168,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Table* getCatalogTable(std::string const& name) const;
 
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
+
+        static int getDRHiddenColumnSize() { return s_drHiddenColumnSize; }
 
         StreamedTable* getPartitionedDRConflictStreamedTable() const {
             return m_drPartitionedConflictStreamedTable;
@@ -437,7 +439,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
 
-                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
+                vassert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
@@ -491,15 +493,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Perform an action on behalf of Export.
          *
-         * @param if syncAction is true, the stream offset being set for a table
-         * @param the reference to the USO of the next row inserted in the stream
-         * @param the reference to the sequenceNumber of the next inserted row
-         * @param the name of the stream we want to update the state for
+         * @param syncAction if syncAction is true, the stream offset being set for a table
+         * @param ackOffset the reference to the USO of the next row inserted in the stream
+         * @param seqNo the reference to the sequenceNumber of the next inserted row
+         * @param generationIdCreated the reference to the initial creation generation ID of the export stream
+         * @param streamName the name of the stream we want to update the state for
          * @return the universal offset for any poll results
          * (results returned separately via QueryResults buffer)
          */
         int64_t exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo,
-                             std::string streamName);
+                             int64_t generationIdCreated, std::string streamName);
 
         /**
          * Complete the deletion of the Migrated Table rows.
@@ -509,14 +512,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * @param uniqueId The uniqueId of the currently executing stored procedure
          * @param mTableName The name of the table that the deletes should be applied to
          * @param deletableTxnId The transactionId of the last row that can be deleted
-         * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
          * @param undoToken Commit/Rollback token for this delete call
-         * @return number of rows to be deleted
+         * @return true if more rows to be deleted
          */
-        int32_t deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
-                std::string tableName, int64_t deletableTxnId, int32_t maxRowCount, int64_t undoToken);
+        bool deleteMigratedRows(int64_t txnId, int64_t spHandle, int64_t uniqueId,
+                std::string tableName, int64_t deletableTxnId, int64_t undoToken);
 
-        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, std::string streamName);
+        void getUSOForExportTable(size_t& ackOffset, int64_t& seqNo, int64_t &genId, std::string streamName);
 
         /**
          * Retrieve a hash code for the specified table
@@ -567,6 +569,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         virtual ExportTupleStream** getOldestExportStreamWithPendingRowsForAssignment() {
             return &m_oldestExportStreamWithPendingRows;
         }
+
+        void disableExternalStreams();
+
+        bool externalStreamsEnabled();
 
     protected:
         void setHashinator(TheHashinator* hashinator);
@@ -837,6 +843,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
+
+        static int s_drHiddenColumnSize;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {

@@ -63,6 +63,7 @@ BANNER("Configuring the VoltDB Execution Engine Runtime."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
        "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
+       "VOLT_TRACE_ALLOCATIONS: ${VOLT_TRACE_ALLOCATIONS}"
        "VOLT_TIMER_ENABLED:     ${VOLT_TIMER_ENABLED}"
    )
 
@@ -130,45 +131,47 @@ SET (VOLTDB_SRC
   catalog/statement.cpp
   catalog/table.cpp
   catalog/tableref.cpp
-  common/Pool.cpp
-  common/StackTrace.cpp
   common/ExecuteWithMpMemory.cpp
-  common/executorcontext.cpp
   common/FatalException.cpp
   common/InterruptException.cpp
   common/LargeTempTableBlockCache.cpp
   common/MiscUtil.cpp
   common/NValue.cpp
-  common/RecoveryProtoMessageBuilder.cpp
+  common/PlannerDomValue.cpp
+  common/Pool.cpp
   common/RecoveryProtoMessage.cpp
+  common/RecoveryProtoMessageBuilder.cpp
+  common/SQLException.cpp
   common/SegvException.cpp
   common/SerializableEEException.cpp
-  common/serializeio.cpp
-  common/SQLException.cpp
+  common/StackTrace.cpp
   common/StreamPredicateList.cpp
   common/StringRef.cpp
   common/SynchronizedThreadLock.cpp
-  common/tabletuple.cpp
   common/ThreadLocalPool.cpp
   common/Topend.cpp
   common/TupleOutputStream.cpp
   common/TupleOutputStreamProcessor.cpp
   common/TupleSchema.cpp
-  common/types.cpp
   common/UndoLog.cpp
-  common/ValueFactory.cpp
   common/UndoReleaseAction.cpp
+  common/ValueFactory.cpp
+  common/debuglog.cpp
+  common/executorcontext.cpp
+  common/serializeio.cpp
+  common/tabletuple.cpp
+  common/types.cpp
   execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp
   execution/ProgressMonitorProxy.cpp
   execution/VoltDBEngine.cpp
+  executors/OptimizedProjector.cpp
   executors/abstractexecutor.cpp
   executors/abstractjoinexecutor.cpp
   executors/aggregateexecutor.cpp
   executors/commontableexecutor.cpp
   executors/deleteexecutor.cpp
-  executors/migrateexecutor.cpp
   executors/executorfactory.cpp
   executors/executorutil.cpp
   executors/indexcountexecutor.cpp
@@ -180,9 +183,9 @@ SET (VOLTDB_SRC
   executors/materializeexecutor.cpp
   executors/mergereceiveexecutor.cpp
   executors/mergejoinexecutor.cpp
+  executors/migrateexecutor.cpp
   executors/nestloopexecutor.cpp
   executors/nestloopindexexecutor.cpp
-  executors/OptimizedProjector.cpp
   executors/orderbyexecutor.cpp
   executors/projectionexecutor.cpp
   executors/receiveexecutor.cpp
@@ -209,6 +212,7 @@ SET (VOLTDB_SRC
   indexes/tableindexfactory.cpp
   logging/JNILogProxy.cpp
   logging/LogManager.cpp
+  plannodes/SchemaColumn.cpp
   plannodes/abstractjoinnode.cpp
   plannodes/abstractoperationnode.cpp
   plannodes/abstractplannode.cpp
@@ -217,7 +221,6 @@ SET (VOLTDB_SRC
   plannodes/aggregatenode.cpp
   plannodes/commontablenode.cpp
   plannodes/deletenode.cpp
-  plannodes/migratenode.cpp
   plannodes/indexcountnode.cpp
   plannodes/indexscannode.cpp
   plannodes/insertnode.cpp
@@ -226,6 +229,7 @@ SET (VOLTDB_SRC
   plannodes/materializenode.cpp
   plannodes/mergejoinnode.cpp
   plannodes/mergereceivenode.cpp
+  plannodes/migratenode.cpp
   plannodes/nestloopindexnode.cpp
   plannodes/nestloopnode.cpp
   plannodes/orderbynode.cpp
@@ -233,7 +237,6 @@ SET (VOLTDB_SRC
   plannodes/plannodeutil.cpp
   plannodes/projectionnode.cpp
   plannodes/receivenode.cpp
-  plannodes/SchemaColumn.cpp
   plannodes/sendnode.cpp
   plannodes/seqscannode.cpp
   plannodes/swaptablesnode.cpp
@@ -248,7 +251,6 @@ SET (VOLTDB_SRC
   storage/BinaryLogSink.cpp
   storage/BinaryLogSinkWrapper.cpp
   storage/ConstraintFailureException.cpp
-  storage/constraintutil.cpp
   storage/CopyOnWriteContext.cpp
   storage/CopyOnWriteIterator.cpp
   storage/DRTableNotFoundException.cpp
@@ -258,29 +260,30 @@ SET (VOLTDB_SRC
   storage/ElasticIndexReadContext.cpp
   storage/ElasticScanner.cpp
   storage/ExportTupleStream.cpp
-  storage/LargeTempTableBlock.cpp
   storage/LargeTempTable.cpp
+  storage/LargeTempTableBlock.cpp
   storage/MaterializedViewHandler.cpp
   storage/MaterializedViewTriggerForInsert.cpp
   storage/MaterializedViewTriggerForWrite.cpp
-  storage/persistenttable.cpp
   storage/PersistentTableStats.cpp
   storage/RecoveryContext.cpp
-  storage/streamedtable.cpp
   storage/StreamedTableStats.cpp
   storage/TableCatalogDelegate.cpp
+  storage/TableStats.cpp
+  storage/TableStreamer.cpp
+  storage/TableStreamerContext.cpp
+  storage/TempTableLimits.cpp
+  storage/TupleBlock.cpp
+  storage/constraintutil.cpp
+  storage/persistenttable.cpp
+  storage/streamedtable.cpp
   storage/table.cpp
   storage/tablefactory.cpp
-  storage/TableStats.cpp
-  storage/TableStreamerContext.cpp
-  storage/TableStreamer.cpp
   storage/tabletuplefilter.cpp
   storage/tableutil.cpp
   storage/temptable.cpp
-  storage/TempTableLimits.cpp
-  storage/TupleBlock.cpp
-  structures/ContiguousAllocator.cpp
   structures/CompactingPool.cpp
+  structures/ContiguousAllocator.cpp
 )
 
 ########################################################################
@@ -292,7 +295,9 @@ SET (VOLTDB_SRC
 SET (VOLTDB_THIRD_PARTY_SRC
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32c.cc
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32ctables.cc
-  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/json_reader.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/json_value.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/json_writer.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/murmur3/MurmurHash3.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/sha1/sha1.cpp
 )
@@ -322,21 +327,13 @@ ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 
-TARGET_INCLUDE_DIRECTORIES(voltdbobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
-  PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
+FOREACH (obj voltdbobjs voltdbjniobjs voltdbipcobjs)
+   TARGET_INCLUDE_DIRECTORIES(${obj}
+     PUBLIC
+     ${CMAKE_SOURCE_DIR}/third_party/cpp
+     ${${PROJECT_NAME}_SOURCE_DIR}
+     ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
+ENDFOREACH()
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
   PUBLIC
   ${CMAKE_SOURCE_DIR}/third_party/cpp
@@ -357,6 +354,7 @@ VOLTDB_ADD_LIBRARY(${VOLTDB_LIBNAME}
   $<TARGET_OBJECTS:third_party_objs>
   )
 
+STRING(TOLOWER ${VOLTDB_BUILD_TYPE} obj_subdir)
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
   -lpcre2-8 -ls2geo -lcrypto

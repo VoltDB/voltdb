@@ -36,6 +36,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -663,8 +664,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long lastCommittedSpHandle,
             long uniqueId,
             long undoQuantumToken,
-            boolean traceOn) throws EEException
-    {
+            boolean traceOn) throws EEException {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_fragmentContext = (undoQuantumToken == Long.MAX_VALUE) ? FragmentContext.RO_BATCH : FragmentContext.RW_BATCH;
@@ -795,14 +795,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long uso, long seqNo, int partitionId, String streamName);
+            ExportSnapshotTuple sequences, int partitionId, String streamName);
 
     /**
      * Execute an Delete of migrated rows in the execution engine.
      */
-    public abstract int deleteMigratedRows(
+    public abstract boolean deleteMigratedRows(
             long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken);
+            String tableName, long deletableTxnId, long undoToken);
 
     /**
      * Get the seqNo and offset for an export table.
@@ -846,13 +846,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
      * @param remoteClusterId          The cluster id of producer cluster
-     * @param remoteTxnUniqueId        The unique id from the source cluster. This is currently passed
-     *                                 in only for MPs
      * @param undoToken                For undo
      * @throws EEException
      */
     public abstract long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException;
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException;
 
     /**
      * Execute an arbitrary non-transactional task that is described by the task id and
@@ -874,13 +872,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract void setViewsEnabled(String viewNames, boolean enabled);
 
+    /**
+     * Use this to disable writing to all streams from EE like export and DR.
+     * Currently used by elastic shrink to stop a site from writing to export and DR streams
+     * once all its data has been migrated and it is ready to be shutdown.
+     * All streams are enabled by default.
+     */
+    public abstract void disableExternalStreams();
+
+    /**
+     * Return the EE state that indicates if external streams are enabled for this Site or not.
+     */
+    public abstract boolean externalStreamsEnabled();
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
      * jni_class instances in the execution engine. From the EE perspective, a single
      * JNI class is better.  So put this here with the backend->frontend api definition.
      */
-
     protected native byte[] nextDependencyTest(int dependencyId);
 
     /**
@@ -1150,6 +1160,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
      * @param mAckOffset The offset being ACKd.
+     * @param seqNo The current export sequence number
+     * @param generationId The timestamp from the most-recently restored snapshot
      * @param mStreamName Name of the stream being acted against
      * @return
      */
@@ -1158,6 +1170,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
+            long generationId,
             byte mStreamName[]);
 
     /**
@@ -1168,15 +1181,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param uniqueId The uniqueId of the currently executing stored procedure
      * @param mTableName The name of the table that the deletes should be applied to.
      * @param deletableTxnId The transactionId of the last row that can be deleted
-     * @param maxRowCount The upper bound on the number of rows that can be deleted (batch size)
      * @param undoToken The token marking the rollback point for this transaction
-     * @return number of rows to be deleted
+     * @return true if more rows to be deleted
      */
-    protected native int nativeDeleteMigratedRows(long pointer,
+    protected native boolean nativeDeleteMigratedRows(long pointer,
             long txnid, long spHandle, long uniqueId,
-            byte mTableName[], long deletableTxnId, int maxRowCount, long undoToken);
+            byte mTableName[], long deletableTxnId, long undoToken);
 
     protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
+
+    /**
+     * @see ExecutionEngine#disableExternalStreams()
+     */
+    protected native void nativeDisableExternalStreams(long pointer);
+
+    /**
+     * @see ExecutionEngine#externalStreamsEnabled()
+     */
+    protected native boolean nativeExternalStreamsEnabled(long pointer);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.

@@ -23,7 +23,7 @@
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
-#include <cassert>
+#include <common/debuglog.h>
 namespace voltdb {
 
 //If you change this constant here change it in Java in the StreamBlockQueue where
@@ -41,14 +41,14 @@ class ExportTupleStream : public voltdb::TupleStreamBase<ExportStreamBlock> {
     friend class StreamBlock;
 
 public:
-    enum Type { INSERT, DELETE };
+    enum STREAM_ROW_TYPE { INVALID, INSERT, DELETE, UPDATE_OLD, UPDATE_NEW, MIGRATE };
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, const std::string &tableName);
 
     virtual ~ExportTupleStream() {
     }
 
-    void setGeneration(int64_t generation);
+    void setGenerationIdCreated(int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -59,9 +59,13 @@ public:
         return m_nextSequenceNumber;
     }
 
+    int64_t getGenerationIdCreated() {
+        return m_generationIdCreated;
+    }
+
     /** Set the total number of bytes used and starting sequence number for new buffer (for rejoin/recover) */
     void setBytesUsed(int64_t seqNo, size_t count) {
-        assert(m_uso == 0);
+        vassert(m_uso == 0);
         m_uso = count;
         // set start and committed sequence numbers of stream block
         m_nextSequenceNumber = seqNo + 1;
@@ -81,7 +85,7 @@ public:
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
-    void pushStreamBuffer(ExportStreamBlock *block, bool sync);
+    void pushStreamBuffer(ExportStreamBlock *block);
     void pushEndOfStream();
 
     /** write a tuple to the stream */
@@ -92,13 +96,13 @@ public:
             int64_t uniqueId,
             const TableTuple &tuple,
             int partitionColumn,
-            ExportTupleStream::Type type);
+            ExportTupleStream::STREAM_ROW_TYPE type);
 
     /** Close Txn and send full buffers with committed data to the top end. */
     void commit(VoltDBEngine* engine, int64_t spHandle, int64_t uniqueId);
     inline void rollbackExportTo(size_t mark, int64_t seqNo) {
         // make the stream of tuples contiguous outside of actual system failures
-        assert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
+        vassert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
         m_nextSequenceNumber = seqNo;
         TupleStreamBase::rollbackBlockTo(mark);
         m_currBlock->truncateExportTo(mark, seqNo);
@@ -108,10 +112,17 @@ public:
     size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
     void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
+    static size_t getExportMetaHeaderSize();
+
     inline void resetFlushLinkages() {
         m_nextFlushStream = NULL;
         m_prevFlushStream = NULL;
     }
+
+    inline void setPrevFlushStream(ExportTupleStream* prevFlushStream) {
+        m_prevFlushStream = prevFlushStream;
+    }
+
     void appendToList(ExportTupleStream** oldest, ExportTupleStream** newest);
     void stitchToNextNode(ExportTupleStream* next);
     void removeFromFlushList(VoltDBEngine* engine, bool moveToTail);
@@ -148,7 +159,8 @@ private:
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    int64_t m_generation;
+    // The creation timestamp of export stream, this value should weather recovers and rejoins
+    int64_t m_generationIdCreated;
     const std::string m_tableName;
 
     int64_t m_nextSequenceNumber;
@@ -163,6 +175,10 @@ private:
     static const uint8_t s_EXPORT_BUFFER_VERSION;
     // meta-data column count
     static const int METADATA_COL_CNT = 6;
+    // partitionColumn(4), columnCount(4)
+    static const int EXPORT_ROW_HEADER_SIZE = 8;
+    // txnId(8), timestamp(8), seqNo(8), artitionId(8), siteId(8), exportOperation(1)
+    static const int EXPORT_BUFFER_METADATA_HEADER_SIZE = 41;
 
     // column names of meta data columns
     static const std::string VOLT_TRANSACTION_ID;

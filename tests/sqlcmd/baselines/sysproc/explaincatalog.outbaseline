@@ -53,6 +53,7 @@ set $PREV signature "EMPLOYEES|vii"
 set $PREV tuplelimit 2147483647
 set $PREV isDRed false
 set $PREV tableType 1
+set $PREV migrationTarget ""
 add /clusters#cluster/databases#database/tables#EMPLOYEES columns EMP_ID
 set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#EMP_ID index 1
 set $PREV type 5

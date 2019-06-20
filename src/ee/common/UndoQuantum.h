@@ -19,7 +19,7 @@
 #define UNDOQUANTUM_H_
 
 #include <stdint.h>
-#include <cassert>
+#include <common/debuglog.h>
 #include <string.h>
 #include <list>
 
@@ -58,7 +58,7 @@ public:
      * undoActions have been performed.
      */
     inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
-        assert(undoAction);
+        vassert(undoAction);
         m_undoActions.push_back(undoAction);
 
         if (interest != NULL && interest->isNewReleaseInterest(m_undoToken)) {
@@ -67,7 +67,7 @@ public:
     }
 
     inline void registerSynchronizedUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
-        assert(undoAction);
+        vassert(undoAction);
         m_undoActions.push_back(undoAction);
 
         if (interest != NULL) {

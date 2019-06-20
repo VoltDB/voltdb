@@ -45,7 +45,9 @@ public class VoltTLSNIOWriteStream extends VoltNIOWriteStream {
 
         final int frameMax = Math.min(CipherExecutor.FRAME_SIZE, m_tlsEncryptAdapter.applicationBufferSize());
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
-        if (oldlist.isEmpty()) return 0;
+        if (oldlist.isEmpty()) {
+            return 0;
+        }
 
         Pair<Integer, Integer> processedWrites = m_tlsEncryptAdapter.encryptBuffers(oldlist, frameMax);
 
@@ -80,14 +82,14 @@ public class VoltTLSNIOWriteStream extends VoltNIOWriteStream {
                 delta += ledger.encryptedBytesDelta;
                 totalWritten += ledger.bytesWritten;
                 m_messagesWritten += ledger.messagesWritten;
-                if (m_tlsEncryptAdapter.getEncryptedMessagesBuffer().isReadable()) {
+                if (m_tlsEncryptAdapter.hasOutstandingData()) {
                     if (!m_hadBackPressure) {
                         backpressureStarted();
                     }
                 }
             } while (ledger.bytesWritten > 0);
         } finally {
-            if (m_tlsEncryptAdapter.getEncryptedMessagesBuffer().numComponents() <= 1
+            if (!m_tlsEncryptAdapter.hasOutstandingData()
                  && m_hadBackPressure
                  && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure
             ) {

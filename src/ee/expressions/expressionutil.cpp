@@ -44,7 +44,6 @@
  */
 
 #include "expressionutil.h"
-
 #include "common/ValueFactory.hpp"
 #include "expressions/expressions.h"
 #include "expressions/functionexpression.h"
@@ -161,7 +160,7 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
             return subqueryComparisonFactory<TupleExtractor, NValueExtractor>(c, l, r, quantifier);
       }
    } else {
-      assert(r_subquery != NULL);
+      vassert(r_subquery != NULL);
       switch (c) {
          case EXPRESSION_TYPE_COMPARE_LIKE:
             return new VectorComparisonExpression<CmpLike, NValueExtractor, TupleExtractor>(
@@ -176,8 +175,8 @@ static AbstractExpression* subqueryComparisonFactory(PlannerDomValue obj,
 }
 
 static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, AbstractExpression *r) {
-    assert (l);
-    assert (r);
+    vassert(l);
+    vassert(r);
     switch (c) {
     case (EXPRESSION_TYPE_COMPARE_EQUAL):
         return new ComparisonExpression<CmpEq>(c, l, r);
@@ -212,8 +211,8 @@ static AbstractExpression* getGeneral(ExpressionType c, AbstractExpression *l, A
 template <typename L, typename R>
 static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
 {
-    assert (l);
-    assert (r);
+    vassert(l);
+    vassert(r);
     switch (c) {
     case (EXPRESSION_TYPE_COMPARE_EQUAL):
         return new InlinedComparisonExpression<CmpEq, L, R>(c, l, r);
@@ -247,7 +246,7 @@ static AbstractExpression* getMoreSpecialized(ExpressionType c, L* l, R* r)
  * comparison helper templates. */
 AbstractExpression* ExpressionUtil::comparisonFactory(
       PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
-    assert(lc);
+    vassert(lc);
 
     // more specialization available?
     ConstantValueExpression *l_const = dynamic_cast<ConstantValueExpression*>(lc);
@@ -379,7 +378,7 @@ static AbstractExpression* parameterValueFactory(
       PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc) {
     // read before ctor - can then instantiate fully init'd obj.
     int param_idx = obj.valueForKey("PARAM_IDX").asInt();
-    assert (param_idx >= 0);
+    vassert(param_idx >= 0);
     return new ParameterValueExpression(param_idx);
 }
 
@@ -629,28 +628,32 @@ boost::shared_array<int> ExpressionUtil::convertIfAllParameterValues(
     return ret;
 }
 
-void ExpressionUtil::extractTupleValuesColumnIdx(
-      const AbstractExpression* expr, std::vector<int> &columnIds) {
-    if (expr == NULL)
-    {
-        return;
-    }
-    if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE)
-    {
-        const TupleValueExpression* tve = dynamic_cast<const TupleValueExpression*>(expr);
-        assert(tve != NULL);
-        columnIds.push_back(tve->getColumnId());
-        return;
-    }
-    // Recurse
-    ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
-    ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+void ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds) {
+   if (expr != nullptr) {
+      if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
+         auto const* tve = dynamic_cast<const TupleValueExpression*>(expr);
+         vassert(tve != NULL);
+         columnIds.emplace_back(tve->getColumnId());
+      } else {
+         ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
+         ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+         for(auto const* e : expr->getArgs()) {
+            ExpressionUtil::extractTupleValuesColumnIdx(e, columnIds);
+         }
+      }
+   }
+}
+
+std::vector<int> ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr) {
+   std::vector<int> columnIds;
+   extractTupleValuesColumnIdx(expr, columnIds);
+   return columnIds;
 }
 
 void ExpressionUtil::loadIndexedExprsFromJson(
       std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring) {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
-    PlannerDomValue expressionsArray = domRoot.rootObject();
+    PlannerDomValue expressionsArray = domRoot();
     for (int i = 0; i < expressionsArray.arrayLen(); i++) {
         PlannerDomValue exprValue = expressionsArray.valueAtIndex(i);
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(exprValue);
@@ -660,7 +663,7 @@ void ExpressionUtil::loadIndexedExprsFromJson(
 
 AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring) {
     PlannerDomRoot domRoot(jsonstring.c_str());
-    return AbstractExpression::buildExpressionTree(domRoot.rootObject());
+    return AbstractExpression::buildExpressionTree(domRoot());
 }
 
 OperatorIsNullExpression* ExpressionUtil::columnIsNull(const int tableIndex, const int valueIndex) {

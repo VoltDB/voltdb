@@ -33,3 +33,11 @@ drop table addable;
 
 drop table dropable;
 
+drop table migratable if exists;
+
+create table migratable migrate to target tar (id int);
+
+select * from migratable where not migrating;
+
+drop table migratable;
+

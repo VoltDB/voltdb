@@ -157,6 +157,11 @@
     <not><isset property="VOLT_POOL_CHECKING"/></not>
 </condition>
 
+<!-- By default, do not do record stack traces for each EE memory pool allocation  -->
+<condition property="VOLT_TRACE_ALLOCATIONS" value="false">
+    <not><isset property="VOLT_TRACE_ALLOCATIONS"/></not>
+</condition>
+
 <!-- By default, do not do execution timings  -->
 <condition property="VOLT_TIMER_ENABLED" value="false">
     <not><isset property="VOLT_TIMER_ENABLED"/></not>
@@ -375,8 +380,8 @@
     <include name='org/voltdb/jdbc/Test*.class' />
     <include name='org/voltdb/jni/TestExecutionEngine.class' />
     <include name='org/voltdb/jni/TestFragmentProgressUpdate.class' />
-    <include name='org/voltdb/join/TestDataMigrationSnapshotPlanner.class' />
-    <include name='org/voltdb/join/TestElasticJoinUtils.class' />
+    <include name='org/voltdb/elastic/TestDataMigrationSnapshotPlanner.class' />
+    <include name='org/voltdb/elastic/TestElasticJoinUtils.class' />
     <include name='org/voltdb/messaging/TestVoltMessageSerialization.class' />
     <include name='org/voltdb/planner/TestAdHocPlans.class' />
     <include name='org/voltdb/planner/TestDeterminism.class' />
@@ -672,7 +677,6 @@ DISTRIBUTION
             <include name="kafka/**"/>
             <include name="lib/**" />
             <include name="draingen" />
-            <include name="kubernetes/**" />
         </fileset>
     </copy>
 
@@ -872,7 +876,7 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so voltdb-${dist.version}.sym'" />
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
@@ -1564,6 +1568,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1577,12 +1582,6 @@ NATIVE EE STUFF
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
-    <!-- GenerateEETests needs the catalog API library. -->
-    <copy todir="${jar.nativelib.dir}">
-        <fileset dir="${base.dir}/lib">
-            <include name="libcatalog-${dist.version}.*"/>
-        </fileset>
-    </copy>
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
@@ -1591,6 +1590,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1610,6 +1610,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1629,6 +1630,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -1649,6 +1651,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--trace-pools='${VOLT_TRACE_ALLOCATIONS}'" />
         <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
@@ -2387,7 +2390,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
+         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes,migration,basic"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">

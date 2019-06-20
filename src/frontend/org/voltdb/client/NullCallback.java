@@ -25,7 +25,6 @@ public final class NullCallback implements ProcedureCallback {
 
     @Override
     public void clientCallback(ClientResponse clientResponse) {
-
     }
 
 }

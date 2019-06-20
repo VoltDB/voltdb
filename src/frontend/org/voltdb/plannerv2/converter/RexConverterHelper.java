@@ -38,10 +38,7 @@ import java.util.List;
 public class RexConverterHelper {
 
     public static AbstractExpression createFunctionExpression(
-            RelDataType relDataType,
-            String funcName,
-            List<AbstractExpression> operands,
-            String impliedArg) {
+            RelDataType relDataType, String funcName, List<AbstractExpression> operands, String impliedArg) {
         int functionId = FunctionSQL.voltGetFunctionId(funcName);
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             functionId = FunctionForVoltDB.getFunctionID(funcName);
@@ -53,11 +50,7 @@ public class RexConverterHelper {
     }
 
     public static AbstractExpression createFunctionExpression(
-            RelDataType relDataType,
-            String funcName,
-            int funcId,
-            List<AbstractExpression> operands,
-            String impliedArg) {
+            RelDataType relDataType, String funcName, int funcId, List<AbstractExpression> operands, String impliedArg) {
         FunctionExpression fe = new FunctionExpression();
         fe.setAttributes(funcName, impliedArg, funcId);
         fe.setArgs(operands);
@@ -66,10 +59,7 @@ public class RexConverterHelper {
     }
 
     public static AbstractExpression createFunctionExpression(
-            VoltType voltType,
-            String funcName,
-            int funcId,
-            List<AbstractExpression> operands,
+            VoltType voltType, String funcName, int funcId, List<AbstractExpression> operands,
             String impliedArg) {
         FunctionExpression fe = new FunctionExpression();
         fe.setAttributes(funcName, impliedArg, funcId);
@@ -79,9 +69,7 @@ public class RexConverterHelper {
     }
 
     public static AbstractExpression createToTimestampFunctionExpression(
-            RelDataType relDataType,
-            ExpressionType intervalOperatorType,
-            List<AbstractExpression> aeOperands) {
+            RelDataType relDataType, ExpressionType intervalOperatorType, List<AbstractExpression> aeOperands) {
         // There must be two operands
         Preconditions.checkArgument(2 == aeOperands.size());
         // One of them is timestamp and another one is interval (BIGINT) in microseconds
@@ -108,11 +96,8 @@ public class RexConverterHelper {
         epochOperands.add(timestamp);
         String impliedArgMicrosecond = "MICROSECOND";
         AbstractExpression sinceEpochExpr = createFunctionExpression(
-                VoltType.BIGINT,
-                "since_epoch",
-                FunctionSQL.voltGetSinceEpochId(impliedArgMicrosecond),
-                epochOperands,
-                impliedArgMicrosecond);
+                VoltType.BIGINT, "since_epoch", FunctionSQL.voltGetSinceEpochId(impliedArgMicrosecond),
+                epochOperands, impliedArgMicrosecond);
 
         // Plus/Minus interval
         AbstractExpression plusExpr = new OperatorExpression(intervalOperatorType, sinceEpochExpr, interval);
@@ -122,11 +107,8 @@ public class RexConverterHelper {
         List<AbstractExpression> timestampOperands = new ArrayList<>();
         timestampOperands.add(plusExpr);
         AbstractExpression timestampExpr = createFunctionExpression(
-                relDataType,
-                "to_timestamp",
-                FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
-                timestampOperands,
-                impliedArgMicrosecond);
+                relDataType, "to_timestamp", FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
+                timestampOperands, impliedArgMicrosecond);
         RexConverter.setType(timestampExpr, relDataType);
 
         return timestampExpr;

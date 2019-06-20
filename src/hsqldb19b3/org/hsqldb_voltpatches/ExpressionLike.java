@@ -205,13 +205,8 @@ public final class ExpressionLike extends ExpressionLogical {
                 || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
 
             likeObject.setIgnoreCase(ignoreCase);
-        } else if (nodes[LEFT].dataType.isBinaryType()
-                   && nodes[RIGHT].dataType.isBinaryType()
-                   && (nodes[ESCAPE] == null
-                       || nodes[ESCAPE].dataType.isBinaryType())) {
-            likeObject.isBinary = true;
-        } else if (false == (nodes[LEFT].dataType.isBooleanType()
-                              && nodes[RIGHT].dataType.isBooleanType())
+        } else if (!(nodes[LEFT].dataType.isBooleanType()
+                && nodes[RIGHT].dataType.isBooleanType())
                               && dataType.isBooleanType()) {
             // If both argument nodes are boolean we have resolved
             // this before.  So, this is ok.  Otherwise, this is not

@@ -91,7 +91,7 @@ class LargeTempTableBlockCache {
         not fetch or pin the block. */
     int64_t getBlockTupleCount(LargeTempTableBlockId blockId) {
         auto it = m_idToBlockMap.find(blockId);
-        assert(it != m_idToBlockMap.end());
+        vassert(it != m_idToBlockMap.end());
         return it->second->get()->activeTupleCount();
     }
 

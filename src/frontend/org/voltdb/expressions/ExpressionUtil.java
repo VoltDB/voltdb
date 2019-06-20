@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -60,6 +61,7 @@ public final class ExpressionUtil {
        put("subtract", ExpressionType.OPERATOR_MINUS);
        put("multiply", ExpressionType.OPERATOR_MULTIPLY);
        put("divide", ExpressionType.OPERATOR_DIVIDE);
+       put("is_null", ExpressionType.OPERATOR_IS_NULL);
     }};
 
     private ExpressionUtil() {}
@@ -277,17 +279,47 @@ public final class ExpressionUtil {
         }
     }
 
-    // A terminal node of an expression is the one that does not have left/right child, nor any parameters;
+    // A terminal node of an expression is the one that does not have left/right child, nor any parameters (null / 0 parameter);
     private static void collectTerminals(AbstractExpression expr, Set<AbstractExpression> accum) {
         if (expr != null) {
             collectTerminals(expr.getLeft(), accum);
             collectTerminals(expr.getRight(), accum);
-            if (expr.getArgs() != null) {
+            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
                 expr.getArgs().forEach(e -> collectTerminals(e, accum));
             } else if (expr.getLeft() == null && expr.getRight() == null) {
                 accum.add(expr);
             }
         }
+    }
+
+    private static boolean containsTerminalParentPairs(AbstractExpression expr, AbstractExpression parent,
+                                                       Predicate<Pair<AbstractExpression, AbstractExpression>> predicate) {
+        if (expr != null) {
+            // if contains in left/right node
+            if (containsTerminalParentPairs(expr.getLeft(), expr, predicate) ||
+                    containsTerminalParentPairs(expr.getRight(), expr, predicate)) {
+                return true;
+            }
+            // if contains in arguments
+            if (expr.getArgs() != null && expr.getArgs().size() > 0) {
+                return expr.getArgs().stream().anyMatch(e -> containsTerminalParentPairs(e, expr, predicate));
+            } else if (expr.getLeft() == null && expr.getRight() == null) { // check leaf node matches
+                return predicate.test(Pair.of(expr, parent));
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Recursively check if any (terminal, terminal's parent) expression pair in the given expression tree
+     * satisfies given predicate.
+     * @param expr      source expression tree
+     * @param predicate predicate to check against (terminal, terminal's parent) expression pairs.
+     * @return true if there exists a (terminal, terminal's parent)  expression pair that satisfies the predicate
+     */
+    public static boolean containsTerminalParentPairs(AbstractExpression expr,
+                                                      Predicate<Pair<AbstractExpression, AbstractExpression>> predicate) {
+        return containsTerminalParentPairs(expr, null, predicate);
     }
 
     /**

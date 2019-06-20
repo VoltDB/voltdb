@@ -51,8 +51,9 @@ public:
         }
         int64_t seqNo;
         size_t streamBytesUsed;
+        int64_t generationId;
         int64_t nextSeqNoFromWrapper = wrapper->getSequenceNumber();
-        streamedTable->getExportStreamPositions(seqNo, streamBytesUsed);
+        streamedTable->getExportStreamPositions(seqNo, streamBytesUsed, generationId);
         // Verify the sequence number.
         ASSERT_EQ(seqNo + 1, nextSeqNoFromWrapper);
     }
@@ -102,7 +103,7 @@ TEST_F(ExportTupleStreamTest, TestExportTableChange) {
     m_engine->releaseUndoToken(2, false);
     checkExportTupleStream(&wrapper, 2);
     // Delete migrate rows
-    m_engine->deleteMigratedRows(3000, 2000, 2000, "A", 2000, 10, 3);
+    m_engine->deleteMigratedRows(3000, 2000, 2000, "A", 2000, 3);
     m_engine->releaseUndoToken(3, false);
     checkExportTupleStream(&wrapper, 2);
 

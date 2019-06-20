@@ -31,6 +31,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB;
@@ -124,6 +125,15 @@ public abstract class CatalogSchemaTools {
                 }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
+                if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
+                    table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
+                }
+                if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
+                    table_sb.append(" EXPORT TO TARGET ");
+                    table_sb.append(streamTarget);
+                    table_sb.append(" ON " + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
+                    table_sb.append(" ");
+                }
             }
             table_sb.append(" (");
         }
@@ -332,11 +342,6 @@ public abstract class CatalogSchemaTools {
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
                 table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
                 table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
-
-                if (ttl.getMigrationtarget() != null && !"".equals(ttl.getMigrationtarget())) {
-                    assert(TableType.isPersistentMigrate(catalog_tbl.getTabletype()));
-                    table_sb.append(" MIGRATE TO TARGET " + ttl.getMigrationtarget() + " ");
-                }
             }
             table_sb.append(";\n");
         }

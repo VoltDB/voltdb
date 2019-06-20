@@ -18,22 +18,21 @@
 package org.voltdb.iv2;
 
 import java.util.AbstractMap;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.function.BiConsumer;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -59,7 +58,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
-import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -97,6 +95,46 @@ public class Cartographer extends StatsSource
 
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
+
+    /**
+     * Retrieve the list of partitions in the system. Since each partition information is being populated individually
+     * asynchronously some partitions may throw exceptions or block when accessing data and other may not.
+     * <p>
+     * The arguments passed to {@code errorHandler} will be the zookeeper path which was being accessed at the time of
+     * the exception and the exception which was thrown.
+     *
+     * @param zk           {@link ZooKeeper} instance to use to retrieve partition information
+     * @param skipMp       If {@code true} the MP partition will not be included in the result
+     * @param errorHandler {@link BiConsumer} that will be invoked when exception is encountered
+     * @return {@link List} of {@link AsyncPartition}s
+     */
+    public static List<AsyncPartition> getPartitionsAsync(ZooKeeper zk, boolean skipMp,
+            BiConsumer<String, Exception> errorHandler) {
+        List<String> partitionDirs = null;
+        try {
+            partitionDirs = zk.getChildren(VoltZK.leaders_initiators, null);
+        } catch (Exception e) {
+            errorHandler.accept(VoltZK.leaders_initiators, e);
+            return null;
+        }
+
+        // Don't fetch the values serially do it asynchronously
+        List<AsyncPartition> partitions = new ArrayList<>(partitionDirs.size());
+        for (String partitionDir : partitionDirs) {
+            try {
+                int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+                if (skipMp && pid == MpInitiator.MP_INIT_PID) {
+                    continue;
+                }
+                partitions.add(new AsyncPartition(pid, partitionDir, zk));
+            } catch (Exception e) {
+                errorHandler.accept(ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir), e);
+                return null;
+            }
+        }
+
+        return partitions;
+    }
 
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
@@ -167,27 +205,6 @@ public class Cartographer extends StatsSource
                     newMasters.add(newMasterInfo);
                     // send the messages indicating promotion from here for each new master
                     sendLeaderChangeNotify(hsid, partitionId, newMasterInfo.m_isMigratePartitionLeaderRequested);
-
-                    // For Export Subsystem, demote the old leaders and promote new leaders
-                    // only target current host
-                    // In the rare case the spMasterCallbacks from MigratePartitionLeaderRequested could be trigger
-                    // before this node has finished init ExportManager.
-                    // This could happen for a previous sp leader Migration  on a fresh rejoined node.
-                    // Since this node would not be export master nor should be promoted from previous migration event,
-                    // we can ignore this sp leader change for export.
-                    if (newMasterInfo.m_isMigratePartitionLeaderRequested && ExportManager.instance() != null) {
-                        if (isHostIdLocal(hostId)) {
-                            // this is a host contain newly promoted partition
-                            // inform the export manager to prepare mastership promotion
-                            // Cartographer is initialized before ExportManager, ignore callbacks
-                            // before export is initialized
-                            ExportManager.instance().prepareAcceptMastership(partitionId);
-                        } else {
-                            // this host *could* contain old master
-                            // inform the export manager to prepare mastership migration (drain existing PBD and notify new leader)
-                            ExportManager.instance().prepareTransferMastership(partitionId, hostId);
-                        }
-                    }
                 }
             }
 
@@ -304,7 +321,7 @@ public class Cartographer extends StatsSource
     /**
      * Convenience method: Get the HSID of the master for the specified partition ID, SP or MP
      */
-    public long getHSIdForMaster(int partitionId)
+    public Long getHSIdForMaster(int partitionId)
     {
         if (partitionId == MpInitiator.MP_INIT_PID) {
             return getHSIdForMultiPartitionInitiator();
@@ -337,7 +354,7 @@ public class Cartographer extends StatsSource
     /**
      * Get the HSID of the single partition master for the specified partition ID
      */
-    public long getHSIdForSinglePartitionMaster(int partitionId)
+    public Long getHSIdForSinglePartitionMaster(int partitionId)
     {
         return m_iv2Masters.get(partitionId);
     }
@@ -520,7 +537,7 @@ public class Cartographer extends StatsSource
         for (Pair<Integer, ZKUtil.ChildrenCallback> p : callbacks ) {
             final Integer partition = p.getFirst();
             try {
-                List<String> children = p.getSecond().getChildren();
+                List<String> children = p.getSecond().get();
                 List<Long> sites = new ArrayList<Long>();
                 for (String child : children) {
                     sites.add(Long.valueOf(child.split("_")[0]));
@@ -758,51 +775,31 @@ public class Cartographer extends StatsSource
     private String doPartitionsHaveReplicas(int hid, Set<Integer> nodesBeingStopped) {
         hostLog.debug("Cartographer: Reloading partition information.");
         assert (!nodesBeingStopped.contains(hid));
-        List<String> partitionDirs = null;
-        try {
-            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
-        } catch (KeeperException | InterruptedException e) {
-            return "Failed to read ZooKeeper node " + VoltZK.leaders_initiators +": " + e.getMessage();
+
+        String[] error = { null };
+        List<AsyncPartition> partitions = getPartitionsAsync(m_zk, false,
+                (d, e) -> error[0] = "Failed to read ZooKeeper node " + d + ": " + e.getMessage());
+
+        if (error[0] != null) {
+            return error[0];
         }
 
-        //Don't fetch the values serially do it asynchronously
-        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<>();
-        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<>();
-        for (String partitionDir : partitionDirs) {
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
-            try {
-                ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
-                m_zk.getData(dir, false, callback, null);
-                dataCallbacks.offer(callback);
-                ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
-                m_zk.getChildren(dir, false, childrenCallback, null);
-                childrenCallbacks.offer(childrenCallback);
-            } catch (Exception e) {
-                return "Failed to read ZooKeeper node " + dir + ": " + e.getMessage();
-            }
-        }
         //Assume that we are ksafe
-        for (String partitionDir : partitionDirs) {
-            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+        for (AsyncPartition partition : partitions) {
             try {
                 //Dont let anyone die if someone is in INITIALIZING state
-                byte[] partitionState = dataCallbacks.poll().getData();
-                if (partitionState != null && partitionState.length == 1) {
-                    if (partitionState[0] == LeaderElector.INITIALIZING) {
-                        return "StopNode is disallowed in initialization phase";
-                    }
+                if (partition.isInitializing()) {
+                    return "StopNode is disallowed in initialization phase";
                 }
 
-                List<String> replicas = childrenCallbacks.poll().getChildren();
-                //This is here just so callback is polled.
-                if (pid == MpInitiator.MP_INIT_PID) {
+                if (partition.getPid() == MpInitiator.MP_INIT_PID) {
                     continue;
                 }
                 //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
                 final List<Integer> replicaOnStoppingHost = new ArrayList<>();
                 boolean hostHasReplicas = false;
-                for (String replica : replicas) {
+                for (String replica : partition.getReplicas()) {
                     final String split[] = replica.split("/");
                     final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                     final int hostId = CoreUtils.getHostIdFromHSId(hsId);
@@ -814,7 +811,9 @@ public class Cartographer extends StatsSource
                     }
                     replicaHost.add(hostId);
                 }
-                hostLog.debug("Replica Host for Partition " + pid + " " + replicaHost);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Replica Host for Partition " + partition.getPid() + " " + replicaHost);
+                }
                 if (hostHasReplicas && replicaHost.size() <= 1) {
                     return "Cluster doesn't have enough replicas";
                 }
@@ -905,12 +904,14 @@ public class Cartographer extends StatsSource
         final int minMastersPerHost = (getPartitionCount() / hostCount);
 
         // Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        List<Host> hostList = getHostsByPartionMasterCount();
+        if (hostList == null) {
+            return Pair.of(-1, -1);
+        }
 
         // only move SPI from the one with most partition leaders
         // The local ClientInterface will pick it up and start @MigratePartitionLeader
-        Iterator<Host> it = hostList.iterator();
-        Host srcHost = it.next();
+        Host srcHost = hostList.get(0);
 
         // @MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         // If current host does not have the most partition leaders, give it up.
@@ -920,19 +921,19 @@ public class Cartographer extends StatsSource
         }
 
         // The new host is the one with least number of partition leaders and the partition replica
-        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-            Host targetHost = reverseIt.next();
+        for (ListIterator<Host> reverseIt = hostList.listIterator(hostList.size()); reverseIt.hasPrevious();) {
+            Host targetHost = reverseIt.previous();
             int partitionCandidate = findNewHostForPartitionLeader(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
             if (partitionCandidate > -1){
-                return new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+                return Pair.of(partitionCandidate, targetHost.m_hostId);
             }
         }
 
         // indicate that the cluster is balanced.
-        return  new Pair<Integer, Integer> (-1, -1);
+        return Pair.of(-1, -1);
     }
 
-    private LinkedList<Host> getHostsByPartionMasterCount() {
+    private List<Host> getHostsByPartionMasterCount() {
         Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
         if (liveHosts.size() == 1) {
             return null;
@@ -969,7 +970,7 @@ public class Cartographer extends StatsSource
         }
 
         //Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = new LinkedList<Host>(hostsMap.values());
+        List<Host> hostList = new ArrayList<>(hostsMap.values());
         Collections.sort(hostList);
         return hostList;
     }
@@ -1005,33 +1006,38 @@ public class Cartographer extends StatsSource
     public Pair<Integer, Integer> getPartitionLeaderMigrationTargetForStopNode(int localHostId) {
 
         // Sort the hosts by partition leader count, descending
-        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        List<Host> hostList = getHostsByPartionMasterCount();
+        if (hostList == null) {
+            return Pair.of(-1, -1);
+        }
         Host srcHost = null;
         for (Host host : hostList) {
-            if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
-                srcHost = host;
+            if (host.m_hostId == localHostId) {
+                if (!host.m_masterPartitionIDs.isEmpty()) {
+                    srcHost = host;
+                }
                 break;
             }
         }
 
         if (srcHost == null) {
-            return new Pair<Integer, Integer> (-1, -1);
+            return Pair.of(-1, -1);
         }
 
         // The new host is the one with least number of partition leaders and the partition replica
-        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-            Host targetHost = reverseIt.next();
+        for (ListIterator<Host> reverseIt = hostList.listIterator(hostList.size()); reverseIt.hasPrevious();) {
+            Host targetHost = reverseIt.previous();
             if (!targetHost.equals(srcHost)) {
                 for (Integer partition : srcHost.m_masterPartitionIDs) {
                     if (targetHost.m_replicaPartitionIDs.contains(partition)) {
-                        return new Pair<Integer, Integer> (partition, targetHost.m_hostId);
+                        return Pair.of(partition, targetHost.m_hostId);
                     }
                 }
             }
         }
 
         // Indicate that all the partition leaders have been relocated.
-        return new Pair<Integer, Integer> (-1, -1);
+        return Pair.of(-1, -1);
     }
 
     //return the number of masters on a host
@@ -1075,5 +1081,76 @@ public class Cartographer extends StatsSource
             }
         }
         return false;
+    }
+
+    /**
+     * Simple class to retrieve a partition data and replicas through async zookeeper callbacks
+     */
+    public static final class AsyncPartition {
+        private final int m_pid;
+        private final String m_path;
+        private final ZKUtil.ByteArrayCallback m_stateCallback = new ZKUtil.ByteArrayCallback();
+        private final ZKUtil.ChildrenCallback m_childrenCallback = new ZKUtil.ChildrenCallback();
+
+        public AsyncPartition(String partitionDir, ZooKeeper zooKeeper) {
+            this(LeaderElector.getPartitionFromElectionDir(partitionDir), partitionDir, zooKeeper);
+        }
+
+        AsyncPartition(int pid, String partitionDir, ZooKeeper zooKeeper) {
+            m_pid = pid;
+            m_path = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            zooKeeper.getData(m_path, false, m_stateCallback, null);
+            zooKeeper.getChildren(m_path, false, m_childrenCallback, null);
+        }
+
+        /**
+         * @return the pid of the partition
+         */
+        public int getPid() {
+            return m_pid;
+        }
+
+        /**
+         * @return The absolute zookeeper path to the partition
+         */
+        public String getPath() {
+            return m_path;
+        }
+
+        /**
+         * This call blocks until the data is populated by zookeeper or an exception occurs
+         *
+         * @return {@code true} if the state is exactly {@link LeaderElector#INITIALIZING}
+         * @throws InterruptedException If this thread is interrupted while waiting for data
+         * @throws KeeperException      If there was an error retrieving the state from zookeeper
+         */
+        public boolean isInitializing() throws InterruptedException, KeeperException {
+            byte[] state = m_stateCallback.get();
+            return state != null && state.length == 1 && state[0] == LeaderElector.INITIALIZING;
+        }
+
+        /**
+         * This call blocks until the data is populated by zookeeper or an exception occurs
+         *
+         * @return {@code true} if the state is exactly {@link LeaderElector#INITIALIZED}
+         * @throws InterruptedException If this thread is interrupted while waiting for data
+         * @throws KeeperException      If there was an error retrieving the state from zookeeper
+         */
+        public boolean isInitialized() throws InterruptedException, KeeperException {
+            byte[] state = m_stateCallback.get();
+            assert state != null && state.length == 1;
+            return state != null && state.length == 1 && state[0] == LeaderElector.INITIALIZED;
+        }
+
+        /**
+         * This call blocks until the data is populated by zookeeper or an exception occurs
+         *
+         * @return list of replicas for partition
+         * @throws InterruptedException If this thread is interrupted while waiting for data
+         * @throws KeeperException      If there was an error retrieving the state from zookeeper
+         */
+        public List<String> getReplicas() throws InterruptedException, KeeperException {
+            return m_childrenCallback.get();
+        }
     }
 }

@@ -105,13 +105,12 @@ public class PlannerTool {
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
             decoded_cmd = decoded_cmd.trim();
-            if (decoded_cmd.length() == 0) {
+            if (decoded_cmd.isEmpty()) {
                 continue;
             }
             try {
                 m_hsql.runDDLCommand(decoded_cmd);
-            }
-            catch (HSQLParseException e) {
+            } catch (HSQLParseException e) {
                 // need a good error message here
                 throw new RuntimeException("Error creating hsql: " + e.getMessage() + " in DDL statement: " + decoded_cmd);
             }

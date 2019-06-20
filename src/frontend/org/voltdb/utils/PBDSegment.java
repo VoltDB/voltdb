@@ -28,7 +28,7 @@ import java.util.List;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 
-public abstract class PBDSegment {
+public abstract class PBDSegment<M> {
     private static final String IS_FINAL_ATTRIBUTE = "VoltDB.PBDSegment.isFinal";
 
     // Has to be able to hold at least one object (compressed or not)
@@ -99,13 +99,13 @@ public abstract class PBDSegment {
 
     abstract boolean isOpenForReading(String cursorId);
 
-    abstract PBDSegmentReader openForRead(String cursorId) throws IOException;
+    abstract PBDSegmentReader<M> openForRead(String cursorId) throws IOException;
 
     /**
      * Returns the reader opened for the given cursor id. This may return a closed reader if the reader has already
      * finished reading this segment.
      */
-    abstract PBDSegmentReader getReader(String cursorId);
+    abstract PBDSegmentReader<M> getReader(String cursorId);
 
     /**
      * Open and initialize this segment as a new segment
@@ -139,7 +139,7 @@ public abstract class PBDSegment {
     // TODO: javadoc
     abstract int size();
 
-    abstract void writeExtraHeader(DeferredSerialization ds) throws IOException;
+    abstract void writeExtraHeader(M extraHeader) throws IOException;
 
     /**
      * Update the segment to be read only
@@ -169,6 +169,9 @@ public abstract class PBDSegment {
      */
     abstract int scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException;
 
+
+    abstract int validate(BinaryDeque.BinaryDequeValidator<M> validator) throws IOException;
+
     /**
      * Returns whether the file is final
      *
@@ -176,6 +179,8 @@ public abstract class PBDSegment {
      * @return true if file is final, false otherwise
      */
     abstract boolean isFinal();
+
+    abstract M getExtraHeader() throws IOException;
 
     /**
      * If this segment is in a good condition the data will be flushed to disk and the segment will either be closed or

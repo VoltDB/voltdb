@@ -17,12 +17,24 @@
 #include <boost/cstdint.hpp>
 #include <limits>
 
+#ifdef BOOST_MATH_LOG_ROOT_ITERATIONS
+#  define BOOST_MATH_LOGGER_INCLUDE <boost/math/tools/iteration_logger.hpp>
+#  include BOOST_MATH_LOGGER_INCLUDE
+#  undef BOOST_MATH_LOGGER_INCLUDE
+#else
+#  define BOOST_MATH_LOG_COUNT(count)
+#endif
+
 namespace boost{ namespace math{ namespace tools{
 
 template <class T>
 class eps_tolerance
 {
 public:
+   eps_tolerance()
+   {
+      eps = 4 * tools::epsilon<T>();
+   }
    eps_tolerance(unsigned bits)
    {
       BOOST_MATH_STD_USING
@@ -100,7 +112,7 @@ void bracket(F f, T& a, T& b, T c, T& fa, T& fb, T& d, T& fd)
    }
    else if(c >= b - fabs(b) * tol)
    {
-      c = b - fabs(a) * tol;
+      c = b - fabs(b) * tol;
    }
    //
    // OK, lets invoke f(c):
@@ -187,7 +199,7 @@ T quadratic_interpolate(const T& a, const T& b, T const& d,
    // Point d must lie outside of the interval [a,b], it is the third
    // best approximation to the root, after a and b.
    //
-   // Note: this does not guarentee to find a root
+   // Note: this does not guarantee to find a root
    // inside [a, b], so we fall back to a secant step should
    // the result be out of range.
    //
@@ -197,7 +209,7 @@ T quadratic_interpolate(const T& a, const T& b, T const& d,
    T A = safe_div(T(fd - fb), T(d - b), tools::max_value<T>());
    A = safe_div(T(A - B), T(d - a), T(0));
 
-   if(a == 0)
+   if(A == 0)
    {
       // failure to determine coefficients, try a secant step:
       return secant_interpolate(a, b, fa, fb);
@@ -242,7 +254,7 @@ T cubic_interpolate(const T& a, const T& b, const T& d,
    // and are the third and forth best approximations
    // to the root that we have found so far.
    //
-   // Note: this does not guarentee to find a root
+   // Note: this does not guarantee to find a root
    // inside [a, b], so we fall back to quadratic
    // interpolation in case of an erroneous result.
    //
@@ -290,6 +302,12 @@ std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, const T& fax, const
 
    static const char* function = "boost::math::tools::toms748_solve<%1%>";
 
+   //
+   // Sanity check - are we allowed to iterate at all?
+   //
+   if (max_iter == 0)
+      return std::make_pair(ax, bx);
+
    boost::uintmax_t count = max_iter;
    T a, b, fa, fb, c, u, fu, a0, b0, d, fd, e, fe;
    static const T mu = 0.5f;
@@ -298,9 +316,9 @@ std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, const T& fax, const
    a = ax;
    b = bx;
    if(a >= b)
-      policies::raise_domain_error(
+      return boost::math::detail::pair_from_single(policies::raise_domain_error(
          function, 
-         "Parameters a and b out of order: a=%1%", a, pol);
+         "Parameters a and b out of order: a=%1%", a, pol));
    fa = fax;
    fb = fbx;
 
@@ -315,9 +333,9 @@ std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, const T& fax, const
    }
 
    if(boost::math::sign(fa) * boost::math::sign(fb) > 0)
-      policies::raise_domain_error(
+      return boost::math::detail::pair_from_single(policies::raise_domain_error(
          function, 
-         "Parameters a and b do not bracket the root: a=%1%", a, pol);
+         "Parameters a and b do not bracket the root: a=%1%", a, pol));
    // dummy value for fd, e and fe:
    fe = e = fd = 1e5F;
 
@@ -452,6 +470,7 @@ std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, const T& fax, const
    {
       a = b;
    }
+   BOOST_MATH_LOG_COUNT(max_iter)
    return std::make_pair(a, b);
 }
 
@@ -464,6 +483,8 @@ inline std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, const T& fax
 template <class F, class T, class Tol, class Policy>
 inline std::pair<T, T> toms748_solve(F f, const T& ax, const T& bx, Tol tol, boost::uintmax_t& max_iter, const Policy& pol)
 {
+   if (max_iter <= 2)
+      return std::make_pair(ax, bx);
    max_iter -= 2;
    std::pair<T, T> r = toms748_solve(f, ax, bx, f(ax), f(bx), tol, max_iter, pol);
    max_iter += 2;
@@ -493,6 +514,8 @@ std::pair<T, T> bracket_and_solve_root(F f, const T& guess, T factor, bool risin
    //
    boost::uintmax_t count = max_iter - 1;
 
+   int step = 32;
+
    if((fa < 0) == (guess < 0 ? !rising : rising))
    {
       //
@@ -502,13 +525,19 @@ std::pair<T, T> bracket_and_solve_root(F f, const T& guess, T factor, bool risin
       while((boost::math::sign)(fb) == (boost::math::sign)(fa))
       {
          if(count == 0)
-            policies::raise_evaluation_error(function, "Unable to bracket root, last nearest value was %1%", b, pol);
+            return boost::math::detail::pair_from_single(policies::raise_evaluation_error(function, "Unable to bracket root, last nearest value was %1%", b, pol));
          //
-         // Heuristic: every 20 iterations we double the growth factor in case the
-         // initial guess was *really* bad !
+         // Heuristic: normally it's best not to increase the step sizes as we'll just end up
+         // with a really wide range to search for the root.  However, if the initial guess was *really*
+         // bad then we need to speed up the search otherwise we'll take forever if we're orders of
+         // magnitude out.  This happens most often if the guess is a small value (say 1) and the result
+         // we're looking for is close to std::numeric_limits<T>::min().
          //
-         if((max_iter - count) % 20 == 0)
+         if((max_iter - count) % step == 0)
+         {
             factor *= 2;
+            if(step > 1) step /= 2;
+         }
          //
          // Now go ahead and move our guess by "factor":
          //
@@ -536,13 +565,19 @@ std::pair<T, T> bracket_and_solve_root(F f, const T& guess, T factor, bool risin
             return a > 0 ? std::make_pair(T(0), T(a)) : std::make_pair(T(a), T(0)); 
          }
          if(count == 0)
-            policies::raise_evaluation_error(function, "Unable to bracket root, last nearest value was %1%", a, pol);
+            return boost::math::detail::pair_from_single(policies::raise_evaluation_error(function, "Unable to bracket root, last nearest value was %1%", a, pol));
          //
-         // Heuristic: every 20 iterations we double the growth factor in case the
-         // initial guess was *really* bad !
+         // Heuristic: normally it's best not to increase the step sizes as we'll just end up
+         // with a really wide range to search for the root.  However, if the initial guess was *really*
+         // bad then we need to speed up the search otherwise we'll take forever if we're orders of
+         // magnitude out.  This happens most often if the guess is a small value (say 1) and the result
+         // we're looking for is close to std::numeric_limits<T>::min().
          //
-         if((max_iter - count) % 20 == 0)
+         if((max_iter - count) % step == 0)
+         {
             factor *= 2;
+            if(step > 1) step /= 2;
+         }
          //
          // Now go ahead and move are guess by "factor":
          //
@@ -567,6 +602,7 @@ std::pair<T, T> bracket_and_solve_root(F f, const T& guess, T factor, bool risin
       pol);
    max_iter += count;
    BOOST_MATH_INSTRUMENT_CODE("max_iter = " << max_iter << " count = " << count);
+   BOOST_MATH_LOG_COUNT(max_iter)
    return r;
 }
 

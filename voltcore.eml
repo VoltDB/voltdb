@@ -26,8 +26,8 @@
 	<lib name="jfreechart-1.0.13.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jfreechart-1.0.13.jar!/"/>
 	</lib>
-	<lib name="junit-dep-4.10.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-dep-4.10.jar!/"/>
+	<lib name="junit-4.12.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-4.12.jar!/"/>
 	</lib>
 	<lib name="pmd-4.2.5.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/pmd-4.2.5.jar!/"/>

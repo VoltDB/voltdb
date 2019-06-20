@@ -94,7 +94,7 @@ class CoveringCellIndex : public TableIndex {
         , m_tupleEntries(true, TupleKeyComparator(NULL))
         , m_columnIndex(scheme.columnIndices[0])
     {
-        assert(scheme.columnIndices.size() == 1);
+        vassert(scheme.columnIndices.size() == 1);
     }
 
     /**

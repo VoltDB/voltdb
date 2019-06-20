@@ -49,8 +49,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.RegressionSuite;
+import org.voltdb_testprocs.regressionsuites.exportprocs.InsertAddedStream;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -69,7 +71,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     protected static ExportTestExpectedData m_verifier;
     protected static int m_portCount = 5001;
     protected static VoltProjectBuilder project;
-    protected boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
 
     public static class ServerListener extends Thread {
 
@@ -144,6 +145,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             return m_queue.size();
         }
 
+        public void ignoreRow(long rowId) {
+            m_seenIds.remove(rowId);
+            m_data.remove(rowId);
+            m_queue.remove(rowId);
+        }
+
         private class ClientConnectionHandler extends Thread {
             private final Socket m_clientSocket;
             private boolean m_closed = false;
@@ -167,6 +174,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
+
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");
@@ -197,6 +205,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
 
     }
+
 
     /** Shove a table name and pkey in front of row data */
     protected Object[] convertValsToParams(String tableName, final int i, final Object[] rowdata) {
@@ -272,18 +281,24 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             new ProcedureInfo(Update_Export.class,
                     new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
-    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
-            new ProcedureInfo(Loopback.class,
-                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY"), new String[] { "proc" })};
 
-    public static final ProcedureInfo[] PROCEDURES2 = {
+    public static final ProcedureInfo[] ALLOWNULL_PROCEDURES = {
             new ProcedureInfo(Update_Export.class,
                     new ProcedurePartitionData ("ALLOW_NULLS", "PKEY", "1"), new String[]{"proc"})
     };
 
-    public static final ProcedureInfo[] PROCEDURES3 = {
+    public static final ProcedureInfo[] LOOPBACK_PROCEDURES = {
+            new ProcedureInfo(Loopback.class,
+                    new ProcedurePartitionData("LOOPBACK_NO_NULLS", "PKEY"), new String[] { "proc" })};
+
+    public static final ProcedureInfo[] ADDTABLE_PROCEDURES = {
             new ProcedureInfo(InsertAddedTable.class,
                     new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
+    };
+
+    public static final ProcedureInfo[] ADDSTREAM_PROCEDURES = {
+            new ProcedureInfo(InsertAddedStream.class,
+                    new ProcedurePartitionData ("ADDED_STREAM", "PKEY", "1"), new String[]{"proc"})
     };
 
     /**
@@ -504,39 +519,23 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         Properties props = new Properties();
         props.put("procedure", procedure);
         props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(true, ServerExportEnum.CUSTOM, props, streamName);
     }
 
-    public static void wireupExportTableToSocketExport(String tableName) {
-        wireupExportTableToSocketExport(tableName, true);
+    public static void wireupExportTableToSocketExport(String streamName) {
+        wireupExportTableToSocketExport(streamName, true, false);
     }
 
-    public static void wireupExportTableToSocketExport(String tableName, boolean enabled) {
-        String streamName = tableName;
+    public static void wireupExportTableToSocketExport(String streamName, boolean enabled, boolean exportReplicated) {
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
         }
         Properties props = new Properties();
-        m_isExportReplicated = false;
-        props.put("replicated", String.valueOf(m_isExportReplicated));
+        props.put("replicated", String.valueOf(exportReplicated));
         props.put("skipinternals", "false");
         props.put("socket.dest", "localhost:" + m_portForTable.get(streamName));
         props.put("timezone", "GMT");
-        project.addExport(enabled, "custom", props, streamName);
-    }
-
-    public static void wireupExportTableToRejectingExport(String tableName) {
-        String streamName = tableName;
-        //This is done so that when we flip from rejecting to socket export we have ports configured for use.
-        if (!m_portForTable.containsKey(streamName)) {
-            m_portForTable.put(streamName, getNextPort());
-        }
-        Properties props = new Properties();
-        m_isExportReplicated = false;
-        props.put("replicated", String.valueOf(m_isExportReplicated));
-        props.put("skipinternals", "false");
-        props.put("timezone", "GMT");
-        project.addExport(true /* enabled */, "custom", props, streamName);
+        project.addExport(enabled, ServerExportEnum.CUSTOM, props, streamName);
     }
 
     private static Integer getNextPort() {

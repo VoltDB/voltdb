@@ -35,7 +35,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
                                 "Must not ask for object length on sql null object.");
         }
         int32_t length;
-        const char* buf = getObject_withoutNull(&length);
+        const char* buf = getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
@@ -54,7 +54,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
 
 /** implement the 2-argument forced SQL ERROR function (for test and example purposes) */
 template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
     const char* sqlstatecode;
     char msg_format_buffer[1024];
     char state_format_buffer[6];
@@ -79,7 +79,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
         int32_t length;
-        const char* buf = strValue.getObject_withoutNull(&length);
+        const char* buf = strValue.getObject_withoutNull(length);
         std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
@@ -98,11 +98,11 @@ namespace functionexpression {
                : AbstractExpression(EXPRESSION_TYPE_FUNCTION) {
                };
 
-            NValue eval(const TableTuple*, const TableTuple*) const {
+            NValue eval(const TableTuple*, const TableTuple*) const override {
                return NValue::callConstant<F>();
             }
 
-            std::string debugInfo(const std::string &spacer) const {
+            std::string debugInfo(const std::string &spacer) const override {
                std::stringstream buffer;
                buffer << spacer << "ConstantFunctionExpression " << F << std::endl;
                return (buffer.str());
@@ -139,16 +139,20 @@ namespace functionexpression {
             delete m_child;
          }
 
-         virtual bool hasParameter() const {
+         bool hasParameter() const override {
             return m_child->hasParameter();
          }
 
-         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-            assert (m_child);
+         const std::vector<AbstractExpression*> getArgs() const override {
+            return std::vector<AbstractExpression*>(1, m_child);
+         }
+
+         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
+            vassert(m_child);
             return (m_child->eval(tuple1, tuple2)).callUnary<F>();
          }
 
-         std::string debugInfo(const std::string &spacer) const {
+         std::string debugInfo(const std::string &spacer) const override {
             std::stringstream buffer;
             buffer << spacer << "UnaryFunctionExpression " << F << std::endl;
             return (buffer.str());
@@ -170,9 +174,9 @@ namespace functionexpression {
                }
             }
 
-            virtual bool hasParameter() const {
+            virtual bool hasParameter() const override {
                for (size_t i = 0; i < m_args.size(); i++) {
-                  assert(m_args[i]);
+                  vassert(m_args[i]);
                   if (m_args[i]->hasParameter()) {
                      return true;
                   }
@@ -180,7 +184,11 @@ namespace functionexpression {
                return false;
             }
 
-            NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+            const std::vector<AbstractExpression*> getArgs() const override {
+               return m_args;
+            }
+
+            NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
                //TODO: Could make this vector a member, if the memory management implications
                // (of the NValue internal state) were clear -- is there a penalty for longer-lived
                // NValues that outweighs the current per-eval allocation penalty?
@@ -191,7 +199,7 @@ namespace functionexpression {
                return NValue::call<F>(nValue);
             }
 
-            std::string debugInfo(const std::string &spacer) const {
+            std::string debugInfo(const std::string &spacer) const override {
                std::stringstream buffer;
                buffer << spacer << "GeneralFunctionExpression " << F << std::endl;
                return (buffer.str());
@@ -218,9 +226,9 @@ namespace functionexpression {
             }
          }
 
-         virtual bool hasParameter() const {
+         bool hasParameter() const override {
             for (size_t i = 0; i < m_args.size(); i++) {
-               assert(m_args[i]);
+               vassert(m_args[i]);
                if (m_args[i]->hasParameter()) {
                   return true;
                }
@@ -228,7 +236,11 @@ namespace functionexpression {
             return false;
          }
 
-         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+         const std::vector<AbstractExpression*> getArgs() const override {
+            return m_args;
+         }
+
+         NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const override {
             std::vector<NValue> nValue(m_args.size());
             for (int i = 0; i < m_args.size(); ++i) {
                nValue[i] = m_args[i]->eval(tuple1, tuple2);
@@ -236,7 +248,7 @@ namespace functionexpression {
             return m_engine->callJavaUserDefinedFunction(m_functionId, nValue);
          }
 
-         std::string debugInfo(const std::string &spacer) const {
+         std::string debugInfo(const std::string &spacer) const override {
             std::stringstream buffer;
             buffer << spacer << "UserDefinedFunctionExpression (function ID = " << m_functionId << ")" << std::endl;
             return (buffer.str());

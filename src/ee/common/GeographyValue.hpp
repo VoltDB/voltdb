@@ -195,7 +195,7 @@ public:
     ~SimpleOutputSerializer()
     {
         // make sure we consumed everything we expected to.
-        assert(m_buffer + m_size == m_cursor);
+        vassert(m_buffer + m_size == m_cursor);
     }
 
     void writeByte(int8_t byte) {
@@ -230,7 +230,7 @@ private:
 
     template<typename T>
     void writeNative(T val) {
-        assert(m_cursor - m_buffer < m_size);
+        vassert(m_cursor - m_buffer < m_size);
         reinterpret_cast<T*>(m_cursor)[0] = val;
         m_cursor += sizeof(T);
     }
@@ -350,12 +350,12 @@ inline std::string GeographyValue::toString() const {
 }
 
 inline std::string GeographyValue::toWKT() const {
-    assert(!isNull());
+    vassert(!isNull());
 
     Polygon poly;
     poly.initFromGeography(*this);
     int numLoops = poly.num_loops();
-    assert (numLoops > 0);
+    vassert(numLoops > 0);
     GeographyPointValue point;
 
     std::ostringstream oss;
@@ -367,7 +367,7 @@ inline std::string GeographyValue::toWKT() const {
     for (int i = 0; i < numLoops; ++i) {
         const S2Loop *loop = poly.loop(i);
         const int numVertices = loop->num_vertices();
-        assert(numVertices >= 3); // each loop will be composed of at least 3 vertices. This does not include repeated end vertex
+        vassert(numVertices >= 3); // each loop will be composed of at least 3 vertices. This does not include repeated end vertex
         oss << "(";
         // Capture the first point first.  This is always
         // First, even if this is a hole or a shell.
@@ -541,13 +541,13 @@ inline void Loop::initFromBuffer(Deserializer& input, bool doRepairs)
         // in the tuple.  This loop does not
         // own these vertices, so we won't delete
         // them when the loop is reaped.
-        assert (!owns_vertices());
+        vassert(!owns_vertices());
         set_vertices(src);
         set_origin_inside(origin_inside);
         set_depth(thedepth);
         set_rect_bound(bound);
     }
-    assert(depth() >= 0);
+    vassert(depth() >= 0);
 }
 
 template<class Serializer>
@@ -556,7 +556,7 @@ void Loop::saveToBuffer(Serializer& output) const {
     output.writeInt(num_vertices());
     output.writeBinaryString(vertices(), sizeof(*(vertices())) * num_vertices());
     output.writeBool(origin_inside());
-    assert(depth() >= 0);
+    vassert(depth() >= 0);
     output.writeInt(depth());
 
     S2LatLngRect bound = GetRectBound();
@@ -613,7 +613,7 @@ inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
         copyBoundViaSerializers(output, input);
     }
     else {
-        assert (version == INCOMPLETE_ENCODING_FROM_JAVA);
+        vassert(version == INCOMPLETE_ENCODING_FROM_JAVA);
 
         // This is a serialized polygon from Java, which won't have
         // proper bounding boxes defined.  Grab the vertices, build

@@ -61,7 +61,7 @@ struct default_deleter
 { 
     default_deleter() { }
     template<typename TT>
-    default_deleter(default_deleter<TT> tt) { }
+    default_deleter(default_deleter<TT>) { }
 };
 
 } } } // End namespaces ptr_container_detail, move_ptrs, boost.

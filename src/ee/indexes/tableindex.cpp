@@ -183,17 +183,18 @@ void TableIndex::printReport()
     std::cout << m_updates << std::endl;
 }
 
-bool TableIndex::equals(const TableIndex *other) const
-{
+bool TableIndex::equals(const TableIndex *other) const {
     //TODO Do something useful here!
     return true;
 }
 
-void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
-{
+void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple) {
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Do not add it.
         return;
+    }
+    for(auto const* expr : getIndexedExpressions()) {
+       expr->eval(tuple, nullptr);
     }
     addEntryDo(tuple, conflictTuple);
 }
@@ -209,7 +210,7 @@ bool TableIndex::deleteEntry(const TableTuple *tuple)
 
 bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
 {
-    assert(originalTuple.address() != destinationTuple.address());
+    vassert(originalTuple.address() != destinationTuple.address());
 
     if (isPartialIndex()) {
         const AbstractExpression* predicate = getPredicate();
@@ -227,7 +228,7 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
             return deleteEntryDo(&originalTuple);
         } else {
             // both tuples pass the predicate.
-            assert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
+            vassert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
             return replaceEntryNoKeyChangeDo(destinationTuple, originalTuple);
         }
     } else {
@@ -235,10 +236,8 @@ bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, con
     }
 }
 
-bool TableIndex::exists(const TableTuple *persistentTuple) const
-{
-    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue())
-    {
+bool TableIndex::exists(const TableTuple *persistentTuple) const {
+    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue()) {
         // Tuple fails the predicate.
         return false;
     }
@@ -257,9 +256,10 @@ bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rh
             // either existing tuple needs to be deleted or the new one added from/to the index
             return true;
         } else {
-            assert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
+            vassert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
             return checkForIndexChangeDo(lhs, rhs);
         }
     }
     return checkForIndexChangeDo(lhs, rhs);
 }
+

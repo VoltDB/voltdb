@@ -39,7 +39,7 @@
 #include <utility>
 #include <math.h>
 #include <deque>
-#include <cassert>
+#include <common/debuglog.h>
 namespace voltdb {
 
 class Topend;
@@ -90,7 +90,7 @@ public:
 
     virtual void extendBufferChain(size_t minLength) = 0;
     void commonExtendBufferChain(size_t blockSize, size_t startUso);
-    virtual void pushStreamBuffer(SB *block, bool sync) = 0;
+    virtual void pushStreamBuffer(SB *block) = 0;
     void pushPendingBlocks();
     void discardBlock(SB *sb);
 
@@ -169,7 +169,7 @@ TupleStreamBase<SB>::TupleStreamBase(size_t defaultBufferSize,
 template <class SB>
 void TupleStreamBase<SB>::setDefaultCapacityForTest(size_t capacity)
 {
-    assert (capacity > 0);
+    vassert(capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {
@@ -217,7 +217,7 @@ void TupleStreamBase<SB>::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            pushStreamBuffer(block, false);
+            pushStreamBuffer(block);
             delete block;
             m_pendingBlocks.pop_front();
         }

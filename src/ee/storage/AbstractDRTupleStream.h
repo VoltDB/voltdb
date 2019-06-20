@@ -53,7 +53,7 @@ public:
 
     virtual ~AbstractDRTupleStream() {}
 
-    void pushStreamBuffer(DrStreamBlock *block, bool sync);
+    void pushStreamBuffer(DrStreamBlock *block);
 
     /** truncate stream back to mark (only virtual for Mock override) */
     inline void rollbackDrTo(size_t mark, size_t drRowCost)
@@ -71,11 +71,11 @@ public:
             m_txnRowCount -= drRowCost;
         } else {
             // convenience to let us just throw away everything at once
-            assert(drRowCost == SIZE_MAX);
+            vassert(drRowCost == SIZE_MAX);
             m_txnRowCount = 0;
         }
         if (mark == m_committedUso) {
-            assert(m_txnRowCount == 0);
+            vassert(m_txnRowCount == 0);
             m_openSequenceNumber = m_committedSequenceNumber;
             m_opened = false;
         }

@@ -16,6 +16,7 @@
 #  pragma once
 #endif
 
+#include <boost/math/special_functions/math_fwd.hpp>
 #include <boost/config/no_tr1/cmath.hpp>
 #include <boost/math/special_functions/erf.hpp>
 #include <boost/math/special_functions/expm1.hpp>
@@ -25,6 +26,21 @@
 #include <boost/math/tools/big_constant.hpp>
 
 #include <stdexcept>
+
+#ifdef BOOST_MSVC
+#pragma warning(push)
+#pragma warning(disable:4127)
+#endif
+
+#if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
+//
+// This is the only way we can avoid
+// warning: non-standard suffix on floating constant [-Wpedantic]
+// when building with -Wall -pedantic.  Neither __extension__
+// nor #pragma dianostic ignored work :(
+//
+#pragma GCC system_header
+#endif
 
 namespace boost
 {
@@ -55,9 +71,9 @@ namespace boost
          inline unsigned short owens_t_compute_code(const RealType h, const RealType a)
          {
             static const RealType hrange[] =
-            {0.02, 0.06, 0.09, 0.125, 0.26, 0.4,  0.6,  1.6,  1.7,  2.33,  2.4,  3.36, 3.4,  4.8};
+            { 0.02f, 0.06f, 0.09f, 0.125f, 0.26f, 0.4f,  0.6f,  1.6f,  1.7f,  2.33f,  2.4f,  3.36f, 3.4f,  4.8f };
 
-            static const RealType arange[] = {0.025, 0.09, 0.15, 0.36, 0.5, 0.9, 0.99999};
+            static const RealType arange[] = { 0.025f, 0.09f, 0.15f, 0.36f, 0.5f, 0.9f, 0.99999f };
             /*
             original select array from paper:
             1, 1, 2,13,13,13,13,13,13,13,13,16,16,16, 9
@@ -144,8 +160,8 @@ namespace boost
          }
 
          // compute the value of Owen's T function with method T1 from the reference paper
-         template<typename RealType>
-         inline RealType owens_t_T1(const RealType h, const RealType a, const unsigned short m)
+         template<typename RealType, typename Policy>
+         inline RealType owens_t_T1(const RealType h, const RealType a, const unsigned short m, const Policy& pol)
          {
             BOOST_MATH_STD_USING
             using namespace boost::math::constants;
@@ -157,7 +173,7 @@ namespace boost
             unsigned short j=1;
             RealType jj = 1;
             RealType aj = a * one_div_two_pi<RealType>();
-            RealType dj = expm1( hs );
+            RealType dj = boost::math::expm1( hs, pol);
             RealType gj = hs*dhs;
 
             RealType val = atan( a ) * one_div_two_pi<RealType>();
@@ -223,17 +239,17 @@ namespace boost
 
             static const RealType c2[] =
             {
-               0.99999999999999987510,
-               -0.99999999999988796462,      0.99999999998290743652,
-               -0.99999999896282500134,      0.99999996660459362918,
-               -0.99999933986272476760,      0.99999125611136965852,
-               -0.99991777624463387686,      0.99942835555870132569,
-               -0.99697311720723000295,      0.98751448037275303682,
-               -0.95915857980572882813,      0.89246305511006708555,
-               -0.76893425990463999675,      0.58893528468484693250,
-               -0.38380345160440256652,      0.20317601701045299653,
-               -0.82813631607004984866E-01,  0.24167984735759576523E-01,
-               -0.44676566663971825242E-02,  0.39141169402373836468E-03
+               static_cast<RealType>(0.99999999999999987510),
+               static_cast<RealType>(-0.99999999999988796462),      static_cast<RealType>(0.99999999998290743652),
+               static_cast<RealType>(-0.99999999896282500134),      static_cast<RealType>(0.99999996660459362918),
+               static_cast<RealType>(-0.99999933986272476760),      static_cast<RealType>(0.99999125611136965852),
+               static_cast<RealType>(-0.99991777624463387686),      static_cast<RealType>(0.99942835555870132569),
+               static_cast<RealType>(-0.99697311720723000295),      static_cast<RealType>(0.98751448037275303682),
+               static_cast<RealType>(-0.95915857980572882813),      static_cast<RealType>(0.89246305511006708555),
+               static_cast<RealType>(-0.76893425990463999675),      static_cast<RealType>(0.58893528468484693250),
+               static_cast<RealType>(-0.38380345160440256652),      static_cast<RealType>(0.20317601701045299653),
+               static_cast<RealType>(-0.82813631607004984866E-01),  static_cast<RealType>(0.24167984735759576523E-01),
+               static_cast<RealType>(-0.44676566663971825242E-02),  static_cast<RealType>(0.39141169402373836468E-03)
             };
 
             const RealType as = a*a;
@@ -275,37 +291,37 @@ namespace boost
 
           static const RealType c2[] =
           {
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999999999999999729978162447266851932041876728736094298092917625009873),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.99999999999999999999467056379678391810626533251885323416799874878563998732905968),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999999999824849349313270659391127814689133077036298754586814091034842536),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999999999997703859616213643405880166422891953033591551179153879839440241685),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999998394883415238173334565554173013941245103172035286759201504179038147),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999999993063616095509371081203145247992197457263066869044528823599399470977),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999999999797336340409464429599229870590160411238245275855903767652432017766116267),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.999999999574958412069046680119051639753412378037565521359444170241346845522403274),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999999933226234193375324943920160947158239076786103108097456617750134812033362048),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999188923242461073033481053037468263536806742737922476636768006622772762168467),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999992195143483674402853783549420883055129680082932629160081128947764415749728967),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.999993935137206712830997921913316971472227199741857386575097250553105958772041501),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99996135597690552745362392866517133091672395614263398912807169603795088421057688716),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.99979556366513946026406788969630293820987757758641211293079784585126692672425362469),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.999092789629617100153486251423850590051366661947344315423226082520411961968929483),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.996593837411918202119308620432614600338157335862888580671450938858935084316004769854),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.98910017138386127038463510314625339359073956513420458166238478926511821146316469589567),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.970078558040693314521331982203762771512160168582494513347846407314584943870399016019),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.92911438683263187495758525500033707204091967947532160289872782771388170647150321633673),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.8542058695956156057286980736842905011429254735181323743367879525470479126968822863),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.73796526033030091233118357742803709382964420335559408722681794195743240930748630755),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.58523469882837394570128599003785154144164680587615878645171632791404210655891158),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.415997776145676306165661663581868460503874205343014196580122174949645271353372263),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.2588210875241943574388730510317252236407805082485246378222935376279663808416534365),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.1375535825163892648504646951500265585055789019410617565727090346559210218472356689),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.0607952766325955730493900985022020434830339794955745989150270485056436844239206648),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.0216337683299871528059836483840390514275488679530797294557060229266785853764115),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.00593405693455186729876995814181203900550014220428843483927218267309209471516256),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.0011743414818332946510474576182739210553333860106811865963485870668929503649964142),
-            BOOST_MATH_BIG_CONSTANT(RealType, 260, -1.489155613350368934073453260689881330166342484405529981510694514036264969925132e-4),
-              BOOST_MATH_BIG_CONSTANT(RealType, 260, 9.072354320794357587710929507988814669454281514268844884841547607134260303118208e-6)
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999999999999999729978162447266851932041876728736094298092917625009873),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.99999999999999999999467056379678391810626533251885323416799874878563998732905968),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999999999824849349313270659391127814689133077036298754586814091034842536),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999999999997703859616213643405880166422891953033591551179153879839440241685),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99999999999998394883415238173334565554173013941245103172035286759201504179038147),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999999993063616095509371081203145247992197457263066869044528823599399470977),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999999999797336340409464429599229870590160411238245275855903767652432017766116267),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.999999999574958412069046680119051639753412378037565521359444170241346845522403274),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999999933226234193375324943920160947158239076786103108097456617750134812033362048),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.9999999188923242461073033481053037468263536806742737922476636768006622772762168467),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.9999992195143483674402853783549420883055129680082932629160081128947764415749728967),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.999993935137206712830997921913316971472227199741857386575097250553105958772041501),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.99996135597690552745362392866517133091672395614263398912807169603795088421057688716),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.99979556366513946026406788969630293820987757758641211293079784585126692672425362469),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.999092789629617100153486251423850590051366661947344315423226082520411961968929483),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.996593837411918202119308620432614600338157335862888580671450938858935084316004769854),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.98910017138386127038463510314625339359073956513420458166238478926511821146316469589567),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.970078558040693314521331982203762771512160168582494513347846407314584943870399016019),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.92911438683263187495758525500033707204091967947532160289872782771388170647150321633673),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.8542058695956156057286980736842905011429254735181323743367879525470479126968822863),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.73796526033030091233118357742803709382964420335559408722681794195743240930748630755),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.58523469882837394570128599003785154144164680587615878645171632791404210655891158),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.415997776145676306165661663581868460503874205343014196580122174949645271353372263),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.2588210875241943574388730510317252236407805082485246378222935376279663808416534365),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.1375535825163892648504646951500265585055789019410617565727090346559210218472356689),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.0607952766325955730493900985022020434830339794955745989150270485056436844239206648),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.0216337683299871528059836483840390514275488679530797294557060229266785853764115),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -0.00593405693455186729876995814181203900550014220428843483927218267309209471516256),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 0.0011743414818332946510474576182739210553333860106811865963485870668929503649964142),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, -1.489155613350368934073453260689881330166342484405529981510694514036264969925132e-4),
+             BOOST_MATH_BIG_CONSTANT(RealType, 260, 9.072354320794357587710929507988814669454281514268844884841547607134260303118208e-6)
           };
 
           const RealType as = a*a;
@@ -396,20 +412,22 @@ namespace boost
              */
 
             const unsigned short m = 13;
-            static const RealType pts[] = {0.35082039676451715489E-02,
-               0.31279042338030753740E-01,  0.85266826283219451090E-01,
-               0.16245071730812277011,      0.25851196049125434828,
-               0.36807553840697533536,      0.48501092905604697475,
-               0.60277514152618576821,      0.71477884217753226516,
-               0.81475510988760098605,      0.89711029755948965867,
-               0.95723808085944261843,      0.99178832974629703586};
-            static const RealType wts[] = { 0.18831438115323502887E-01,
-               0.18567086243977649478E-01,  0.18042093461223385584E-01,
-               0.17263829606398753364E-01,  0.16243219975989856730E-01,
-               0.14994592034116704829E-01,  0.13535474469662088392E-01,
-               0.11886351605820165233E-01,  0.10070377242777431897E-01,
-               0.81130545742299586629E-02,  0.60419009528470238773E-02,
-               0.38862217010742057883E-02,  0.16793031084546090448E-02};
+            static const RealType pts[] = {
+               static_cast<RealType>(0.35082039676451715489E-02),
+               static_cast<RealType>(0.31279042338030753740E-01),  static_cast<RealType>(0.85266826283219451090E-01),
+               static_cast<RealType>(0.16245071730812277011),      static_cast<RealType>(0.25851196049125434828),
+               static_cast<RealType>(0.36807553840697533536),      static_cast<RealType>(0.48501092905604697475),
+               static_cast<RealType>(0.60277514152618576821),      static_cast<RealType>(0.71477884217753226516),
+               static_cast<RealType>(0.81475510988760098605),      static_cast<RealType>(0.89711029755948965867),
+               static_cast<RealType>(0.95723808085944261843),      static_cast<RealType>(0.99178832974629703586) };
+            static const RealType wts[] = { 
+               static_cast<RealType>(0.18831438115323502887E-01),
+               static_cast<RealType>(0.18567086243977649478E-01),  static_cast<RealType>(0.18042093461223385584E-01),
+               static_cast<RealType>(0.17263829606398753364E-01),  static_cast<RealType>(0.16243219975989856730E-01),
+               static_cast<RealType>(0.14994592034116704829E-01),  static_cast<RealType>(0.13535474469662088392E-01),
+               static_cast<RealType>(0.11886351605820165233E-01),  static_cast<RealType>(0.10070377242777431897E-01),
+               static_cast<RealType>(0.81130545742299586629E-02),  static_cast<RealType>(0.60419009528470238773E-02),
+               static_cast<RealType>(0.38862217010742057883E-02),  static_cast<RealType>(0.16793031084546090448E-02) };
 
             const RealType as = a*a;
             const RealType hs = -h*h*boost::math::constants::half<RealType>();
@@ -569,14 +587,18 @@ namespace boost
             // when the last accelerated term was small enough...
             //
             int n;
+#ifndef BOOST_NO_EXCEPTIONS
             try
             {
+#endif
                n = itrunc(T(tools::log_max_value<T>() / 6));
+#ifndef BOOST_NO_EXCEPTIONS
             }
             catch(...)
             {
                n = (std::numeric_limits<int>::max)();
             }
+#endif
             n = (std::min)(n, 1500);
             T d = pow(3 + sqrt(T(8)), n);
             d = (d + 1 / d) / 2;
@@ -683,14 +705,18 @@ namespace boost
             // when the last accelerated term was small enough...
             //
             int n;
+#ifndef BOOST_NO_EXCEPTIONS
             try
             {
+#endif
                n = itrunc(RealType(tools::log_max_value<RealType>() / 6));
+#ifndef BOOST_NO_EXCEPTIONS
             }
             catch(...)
             {
                n = (std::numeric_limits<int>::max)();
             }
+#endif
             n = (std::min)(n, 1500);
             RealType d = pow(3 + sqrt(RealType(8)), n);
             d = (d + 1 / d) / 2;
@@ -795,7 +821,7 @@ namespace boost
             switch( meth[icode] )
             {
             case 1: // T1
-               val = owens_t_T1(h,a,m);
+               val = owens_t_T1(h,a,m,pol);
                break;
             case 2: // T2
                typedef typename policies::precision<RealType, Policy>::type precision_type;
@@ -852,25 +878,33 @@ namespace boost
             bool have_t1(false), have_t2(false);
             if(ah < 3)
             {
+#ifndef BOOST_NO_EXCEPTIONS
                try
                {
+#endif
                   have_t1 = true;
                   p1 = owens_t_T1_accelerated(h, a, forwarding_policy());
                   if(p1.second < target_precision)
                      return p1.first;
+#ifndef BOOST_NO_EXCEPTIONS
                }
                catch(const boost::math::evaluation_error&){}  // T1 may fail and throw, that's OK
+#endif
             }
             if(ah > 1)
             {
+#ifndef BOOST_NO_EXCEPTIONS
                try
                {
+#endif
                   have_t2 = true;
                   p2 = owens_t_T2_accelerated(h, a, ah, forwarding_policy());
                   if(p2.second < target_precision)
                      return p2.first;
+#ifndef BOOST_NO_EXCEPTIONS
                }
                catch(const boost::math::evaluation_error&){}  // T2 may fail and throw, that's OK
+#endif
             }
             //
             // If we haven't tried T1 yet, do it now - sometimes it succeeds and the number of iterations
@@ -878,14 +912,18 @@ namespace boost
             //
             if(!have_t1)
             {
+#ifndef BOOST_NO_EXCEPTIONS
                try
                {
+#endif
                   have_t1 = true;
                   p1 = owens_t_T1_accelerated(h, a, forwarding_policy());
                   if(p1.second < target_precision)
                      return p1.first;
+#ifndef BOOST_NO_EXCEPTIONS
                }
                catch(const boost::math::evaluation_error&){}  // T1 may fail and throw, that's OK
+#endif
             }
             //
             // If we haven't tried T2 yet, do it now - sometimes it succeeds and the number of iterations
@@ -893,24 +931,32 @@ namespace boost
             //
             if(!have_t2)
             {
+#ifndef BOOST_NO_EXCEPTIONS
                try
                {
+#endif
                   have_t2 = true;
                   p2 = owens_t_T2_accelerated(h, a, ah, forwarding_policy());
                   if(p2.second < target_precision)
                      return p2.first;
+#ifndef BOOST_NO_EXCEPTIONS
                }
                catch(const boost::math::evaluation_error&){}  // T2 may fail and throw, that's OK
+#endif
             }
             //
             // OK, nothing left to do but try the most expensive option which is T4,
             // this is often slow to converge, but when it does converge it tends to
             // be accurate:
+#ifndef BOOST_NO_EXCEPTIONS
             try
             {
+#endif
                return T4_mp(h, a, pol);
+#ifndef BOOST_NO_EXCEPTIONS
             }
             catch(const boost::math::evaluation_error&){}  // T4 may fail and throw, that's OK
+#endif
             //
             // Now look back at the results from T1 and T2 and see if either gave better
             // results than we could get from the 64-bit precision versions.
@@ -1056,6 +1102,10 @@ namespace boost
 
    } // namespace math
 } // namespace boost
+
+#ifdef BOOST_MSVC
+#pragma warning(pop)
+#endif
 
 #endif
 // EOF

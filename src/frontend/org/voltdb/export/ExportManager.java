@@ -42,6 +42,7 @@ import org.voltdb.ExportStatsBase;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SimpleClientResponseAdapter;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
@@ -51,6 +52,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
@@ -100,37 +102,6 @@ public class ExportManager
      * Master sends RELEASE_BUFFER to all its replicas to discard buffer.
      */
     public static final byte RELEASE_BUFFER = 1;
-
-    /**
-     * Master sends GIVE_MASTERSHIP to one replica to transfer leadership.
-     */
-    public static final byte GIVE_MASTERSHIP = 2;
-
-    /**
-     * Master sends GAP_QUERY to all nodes to know: can you cover the next sequence number?
-     *
-     * This is called when master hits gap in the stream.
-     */
-    public static final byte GAP_QUERY = 3;
-
-    /**
-     * Node that receives GAP_QUERY sends back QUERY_RESPONSE with the information that whether
-     * it has data for the next sequence number.
-     */
-    public static final byte QUERY_RESPONSE = 4;
-
-    /**
-     * Data sources under new SPI or SPI who receives failed host notification
-     * sends TASK_MASTERSHIP to all nodes to ask master to transfer leadership back.
-     * If master doesn't exist promote itself to be master.
-     */
-    public static final byte TAKE_MASTERSHIP = 5;
-
-    /**
-     * Node that receives TAKE_MASTERSHIP sends back TAKE_MASTERSHIP_RESPONSE to indicate
-     * it's not master.
-     */
-    public static final byte TAKE_MASTERSHIP_RESPONSE = 6;
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -242,11 +213,14 @@ public class ExportManager
 
     /**
      * Construct ExportManager using catalog.
+     *
+     * NOTE: this synchronizes on the ExportManager class, but everyone else
+     * synchronizes on the instance.
+     *
      * @param myHostId
      * @param catalogContext
      * @throws ExportManager.SetupException
      */
-    // FIXME - this synchronizes on the ExportManager class, but everyone else synchronizes on the instance.
     public static synchronized void initialize(
             int myHostId,
             CatalogContext catalogContext,
@@ -271,51 +245,16 @@ public class ExportManager
 
     /**
      * Indicate to associated {@link ExportGeneration}s to become
-     * masters for the given partition id
+     * leaders for the given partition id
      * @param partitionId
      */
-    synchronized public void takeMastership(int partitionId) {
+    synchronized public void becomeLeader(int partitionId) {
         m_masterOfPartitions.add(partitionId);
         ExportGeneration generation = m_generation.get();
         if (generation == null) {
             return;
         }
-        generation.takeMastership(partitionId);
-    }
-
-    /**
-     * Indicate local partition became the SPI Leader
-     * still waiting for old leader (ack) to trigger take over mastership
-     * @param partitionId
-     */
-    synchronized public void prepareAcceptMastership(int partitionId) {
-        // can't acquire mastership twice for the same partition id
-        if (!m_masterOfPartitions.add(partitionId)) {
-            return;
-        }
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export streams on local partition " + partitionId + " will become master.");
-        }
-    }
-
-    /**
-     * Indicate to associated {@link ExportGeneration}s to
-     * prepare give up mastership for the given partition id to hostId
-     * @param partitionId
-     */
-    synchronized public void prepareTransferMastership(int partitionId, int hostId) {
-        // remove mastership for partition id, so when failure happen during the mastership transfer
-        // this node can be elected as new master again.
-        m_masterOfPartitions.remove(partitionId);
-
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export stream masters on " + partitionId + " are going to migrate away");
-        }
-        ExportGeneration generation = m_generation.get();
-        if (generation == null) {
-            return;
-        }
-        generation.prepareTransferMastership(partitionId, hostId);
+        generation.becomeLeader(partitionId);
     }
 
     /**
@@ -379,7 +318,7 @@ public class ExportManager
 
     }
 
-    public synchronized void startPolling(CatalogContext catalogContext) {
+    public synchronized void startPolling(CatalogContext catalogContext, StreamStartAction action) {
         m_startPolling = true;
 
         CatalogMap<Connector> connectors = CatalogUtil.getConnectors(catalogContext);
@@ -391,7 +330,18 @@ public class ExportManager
         ExportDataProcessor processor = m_processor.get();
         Preconditions.checkState(processor != null, "guest processor is not set");
 
+        // Notify export datasources to check the *generation* of export buffers,
+        // delete buffers older than current generation number or generation number
+        // from snapshot. This must be done before the processor starts polling.
+        cleanupStaleBuffers(action);
+
         processor.startPolling();
+    }
+
+    private void cleanupStaleBuffers(StreamStartAction action) {
+        if (m_generation.get() != null) {
+            m_generation.get().cleanupStaleBuffers(action);
+        }
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
@@ -504,6 +454,11 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         if (!requiresNewExportGeneration) {
+            // Even for catalog update doesn't affect export, genId still need to pass to EDS.
+            // Because each ACK message is associated with a genId.
+            if (m_generation.get() != null) {
+                m_generation.get().updateGenerationId(catalogContext.m_genId);
+            }
             exportLog.info("No stream related changes in update catalog.");
             return;
         }
@@ -541,7 +496,7 @@ public class ExportManager
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 generation.initializeGenerationFromCatalog(catalogContext,
-                        connectors, newProcessor, m_hostId, localPartitionsToSites);
+                        connectors, newProcessor, m_hostId, localPartitionsToSites, true);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -552,17 +507,17 @@ public class ExportManager
                 newProcessor.readyForData();
 
                 /*
-                 * When it isn't startup, it is necessary to kick things off with the mastership
+                 * When it isn't startup, it is necessary to kick things off with the leadership
                  * settings that already exist
                  *
                  * This strategy is the one that piggy backs on
-                 * regular partition mastership distribution to determine
+                 * regular partition leadership distribution to determine
                  * who will process export data for different partitions.
-                 * We stashed away all the ones we have mastership of
+                 * We stashed away all the ones we have leadership of
                  * in m_masterOfPartitions
                  */
                 for (Integer partitionId: m_masterOfPartitions) {
-                    generation.acceptMastership(partitionId);
+                    generation.becomeLeader(partitionId);
                 }
             }
             catch (final ClassNotFoundException e) {
@@ -595,7 +550,7 @@ public class ExportManager
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Processor shutdown completed, install new export processor");
         }
-        generation.unacceptMastership();
+        generation.onProcessorShutdown();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Existing export datasources unassigned.");
         }
@@ -603,7 +558,7 @@ public class ExportManager
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, newProcessor,
-                    m_hostId, partitions);
+                    m_hostId, partitions, true);
             for (Pair<Integer, Integer> partition : partitions) {
                 generation.updateAckMailboxes(partition.getFirst(), null);
             }
@@ -619,14 +574,16 @@ public class ExportManager
         }
 
         for (int partitionId : m_masterOfPartitions) {
-            generation.acceptMastership(partitionId);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Set mastership on partition " + partitionId);
+            }
+            generation.becomeLeader(partitionId);
         }
     }
 
     private  ExportDataProcessor getNewProcessorWithProcessConfigSet(Map<String, Pair<Properties, Set<String>>> config) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Class<?> loaderClass = Class.forName(m_loaderClass);
         ExportDataProcessor newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-        newProcessor.addLogger(exportLog);
         newProcessor.setProcessorConfig(config);
         return newProcessor;
     }
@@ -680,10 +637,8 @@ public class ExportManager
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
-            long genId,
             long bufferPtr,
-            ByteBuffer buffer,
-            boolean sync) {
+            ByteBuffer buffer) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -697,7 +652,7 @@ public class ExportManager
             }
             generation.pushExportBuffer(partitionId, tableName,
                     startSequenceNumber, committedSequenceNumber,
-                    (int)tupleCount, uniqueId, genId, buffer, sync);
+                    (int)tupleCount, uniqueId, buffer);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
@@ -705,26 +660,26 @@ public class ExportManager
     }
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, boolean isRejoin,
-                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                StreamStartAction action,
+                                                Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
             generation.updateInitialExportStateToSeqNo(partitionId, signature,
-                                                       isRecover, isRejoin,
+                                                       action,
                                                        sequenceNumberPerPartition, isLowestSite);
         }
     }
 
-    public static synchronized void sync(final boolean nofsync) {
+    public static synchronized void sync() {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
         ExportGeneration generation = instance().m_generation.get();
         if (generation != null) {
-            generation.sync(nofsync);
+            generation.sync();
         }
     }
 
@@ -745,8 +700,8 @@ public class ExportManager
         m_ci.bindAdapter(m_adapter, null);
     }
 
-    public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb) {
+    public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb) {
         m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
-                "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId, batchSize});
+                "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
     }
 }

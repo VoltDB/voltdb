@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLESTATS_H_
-#define TABLESTATS_H_
+#pragma once
 
 #include "stats/StatsSource.h"
 
@@ -40,10 +39,8 @@ public:
      * Static method to generate the remaining schema information for
      * the tables which contain persistent table stats.
      */
-    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types,
-                                         std::vector<int32_t>& columnLengths,
-                                         std::vector<bool>& allowNull,
-                                         std::vector<bool>& inBytes);
+    static void populateTableStatsSchema(std::vector<voltdb::ValueType>& types, std::vector<int32_t>& columnLengths,
+            std::vector<bool>& allowNull, std::vector<bool>& inBytes);
 
     /**
      * Return an empty TableStats table
@@ -60,7 +57,7 @@ public:
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
      */
-    void configure(std::string name);
+    void configure(std::string const& name);
 
 protected:
 
@@ -101,4 +98,3 @@ private:
 
 }
 
-#endif /* TABLESTATS_H_ */

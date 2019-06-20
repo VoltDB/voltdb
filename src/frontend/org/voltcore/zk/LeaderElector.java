@@ -19,13 +19,11 @@ package org.voltcore.zk;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -34,10 +32,15 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
-
+/**
+ * Uses an ephemeral sequential node under a given zookeeper node and check if this instance has the lowest sequence id
+ *
+ * For details about the leader election algorithm,
+ * <a href="https://zookeeper.apache.org/doc/current/recipes.html#sc_leaderElection" >Zookeeper Leader Election</a>
+ *
+ */
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
     // then it's changed to INITIALIZED.
@@ -50,89 +53,39 @@ public class LeaderElector {
     private final byte[] data;
     private final LeaderNoticeHandler cb;
     private String node = null;
-    private Set<String> knownChildren = null;
 
-    private volatile String leader = null;
     private volatile boolean isLeader = false;
     private final ExecutorService es;
-    private final AtomicBoolean m_done = new AtomicBoolean(false);
+    private volatile boolean m_shutdown = false;
 
     private final Runnable electionEventHandler = new Runnable() {
         @Override
         public void run() {
             try {
-                leader = watchNextLowerNode();
-            } catch (KeeperException.SessionExpiredException e) {
+                isLeader = watchNextLowerNode();
+            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 e.printStackTrace();
-            } catch (KeeperException.ConnectionLossException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdoown without the elector being
-                // shutdown; ignore.
-                e.printStackTrace();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (Exception e) {
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Unexepected failure in LeaderElector.", true, e);
+                VoltDB.crashLocalVoltDB("Unexepected failure in LeaderElector.", true, e);
             }
 
-            if (node != null && node.equals(leader)) {
-                // become the leader
-                isLeader = true;
-                if (cb != null) {
-                    cb.becomeLeader();
-                }
+            if (isLeader && cb != null) {
+                cb.becomeLeader();
             }
         }
     };
-
-    private final Runnable childrenEventHandler = new Runnable() {
-        @Override
-        public void run() {
-            try {
-                checkForChildChanges();
-            } catch (KeeperException.SessionExpiredException e) {
-                // lost the full connection. some test cases do this...
-                // means zk shutdown without the elector being shutdown.
-                // ignore.
-                e.printStackTrace();
-            } catch (KeeperException.ConnectionLossException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdoown without the elector being
-                // shutdown; ignore.
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Unexepected failure in LeaderElector.", true, e);
-            }
-        }
-    };
-
-    private class ChildrenWatcher implements Watcher {
-
-        @Override
-        public void process(WatchedEvent event) {
-            try {
-                if (!m_done.get()) {
-                    es.submit(childrenEventHandler);
-                }
-            } catch (RejectedExecutionException e) {
-            }
-        }
-    }
-    private final ChildrenWatcher childWatcher = new ChildrenWatcher();
 
     private class ElectionWatcher implements Watcher {
 
         @Override
         public void process(final WatchedEvent event) {
             try {
-                if (!m_done.get()) {
+                if (!m_shutdown) {
                     es.submit(electionEventHandler);
                 }
             } catch (RejectedExecutionException e) {
@@ -183,40 +136,40 @@ public class LeaderElector {
     }
 
     /**
-     * Start leader election.
-     *
-     * Creates an ephemeral sequential node under the given directory and check
-     * if we are the first one who created it.
-     *
-     * For details about the leader election algorithm, @see <a href=
-     * "http://zookeeper.apache.org/doc/trunk/recipes.html#sc_leaderElection"
-     * >Zookeeper Leader Election</a>
+     * Start participation in a leader election.
      *
      * @param block true for blocking operation, false for nonblocking
      * @throws Exception
      */
     public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
     {
-        node = createParticipantNode(zk, dir, prefix, data);
-        Future<?> task = es.submit(electionEventHandler);
+        Future<?> task = start();
         if (block) {
             task.get();
         }
-        //Only do the extra work for watching children if a callback is registered
-        if (cb != null) {
-            task = es.submit(childrenEventHandler);
-            if (block) {
-                task.get();
-            }
+    }
+
+    public int getLeaderId() {
+        if (node == null) {
+            throw new IllegalStateException("LeaderElector must be started");
         }
+        return Integer.parseInt(node.substring(node.lastIndexOf('_') + 1));
+    }
+
+    /**
+     * Start participation in a leader election.
+     *
+     * @return {@link Future} which is completed after the leader election has been performed
+     * @throws KeeperException      If there is an error creating election nodes
+     * @throws InterruptedException If this thread was interrupted
+     */
+    public Future<?> start() throws KeeperException, InterruptedException {
+        node = createParticipantNode(zk, dir, prefix, data);
+        return es.submit(electionEventHandler);
     }
 
     public boolean isLeader() {
         return isLeader;
-    }
-
-    public String getNode() {
-        return node;
     }
 
     /**
@@ -226,19 +179,18 @@ public class LeaderElector {
      * @throws KeeperException
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
-        m_done.set(true);
+        m_shutdown = true;
         es.shutdown();
         es.awaitTermination(365, TimeUnit.DAYS);
     }
 
     /**
-     * Set a watch on the node that comes before the specified node in the
-     * directory.
-
-     * @return The lowest sequential node
+     * Set a watch on the node that comes before the specified node in the directory.
+     *
+     * @return {@code true} if this node is the lowest node and therefore leader
      * @throws Exception
      */
-    private String watchNextLowerNode() throws KeeperException, InterruptedException {
+    private boolean watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a electionWatcher on the previous node if it exists, otherwise the
@@ -259,51 +211,15 @@ public class LeaderElector {
         assert (me != null);
         //Back on me
         iter.previous();
-        String lowest = null;
         //Until we have previous nodes and we set a watch on previous node.
         while (iter.hasPrevious()) {
             //Proess my lower nodes and put a watch on whats live
             String previous = ZKUtil.joinZKPath(dir, iter.previous());
             if (zk.exists(previous, electionWatcher) != null) {
-                lowest = previous;
-                break;
+                return false;
             }
         }
-        //If we could not watch any lower node we are lowest and must become leader.
-        if (lowest == null) {
-            return node;
-        }
-        return lowest;
-    }
-
-
-    /*
-     * Check for a change in present nodes
-     */
-    private void checkForChildChanges() throws KeeperException, InterruptedException {
-        /*
-         * Iterate through the sorted list of children and find the given node,
-         * then setup a electionWatcher on the previous node if it exists, otherwise the
-         * previous of the previous...until we reach the beginning, then we are
-         * the lowest node.
-         */
-        Set<String> children = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
-
-        boolean topologyChange = false;
-        boolean removed = false;
-        boolean added = false;
-        if (knownChildren != null) {
-            if (!knownChildren.equals(children)) {
-                removed = !Sets.difference(knownChildren, children).isEmpty();
-                added = !Sets.difference(children, knownChildren).isEmpty();
-                topologyChange = true;
-            }
-        }
-        knownChildren = children;
-
-        if (topologyChange && cb != null) {
-            cb.noticedTopologyChange(added, removed);
-        }
+        return true;
     }
 
     public static String electionDirForPartition(String path, int partition) {

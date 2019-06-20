@@ -25,9 +25,9 @@
  */
 class DRTableNotFoundException : public voltdb::SerializableEEException {
 public:
-    DRTableNotFoundException(int64_t hash, std::string message);
+    DRTableNotFoundException(int64_t hash, std::string const& message);
 
-    virtual const std::string message() const;
+    virtual std::string message() const;
     virtual ~DRTableNotFoundException() throw() { };
 
 protected:

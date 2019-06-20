@@ -180,6 +180,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // Only used by SpScheduler.updateReplicas during a SnapshotSave
     long m_lastSpUniqueId;
 
+    int m_maxResponseSize = Integer.MAX_VALUE;
+
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
     }
@@ -262,6 +264,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
         m_lastSpUniqueId = ftask.m_lastSpUniqueId;
+        m_maxResponseSize = ftask.m_maxResponseSize;
         assert(selfCheck());
     }
 
@@ -427,6 +430,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_batchTimeout = batchTimeout;
     }
 
+    @Override
     public long getLastSpUniqueId() {
         return m_lastSpUniqueId;
     }
@@ -646,7 +650,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8 + 8;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8 + 8 + 4;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
@@ -754,9 +758,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.limit(buf.position());
     }
 
-    /**
-     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
-     */
     void flattenToSubMessageBuffer(ByteBuffer buf) throws IOException
     {
         // See Serialization Format comment above getSerializedSize().
@@ -808,6 +809,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.putLong(m_restartTimestamp);
 
         buf.putLong(m_lastSpUniqueId);
+        buf.putInt(m_maxResponseSize);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
@@ -914,9 +916,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(buf.capacity() == buf.position());
     }
 
-    /**
-     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
-     */
     void initFromSubMessageBuffer(ByteBuffer buf) throws IOException
     {
         // See Serialization Format comment above getSerializedSize().
@@ -946,6 +945,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // timestamp for restarted transaction
         m_restartTimestamp = buf.getLong();
         m_lastSpUniqueId = buf.getLong();
+        m_maxResponseSize = buf.getInt();
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1075,6 +1075,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("FRAGMENT TASK: FragmentIndex: ").append(m_currentBatchIndex);
+    }
+
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
@@ -1170,5 +1175,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public long getTimestamp() {
         return m_restartTimestamp;
+    }
+
+    public void setMaxResponseSize(int maxResponseSize) {
+        assert maxResponseSize > 0;
+        m_maxResponseSize = maxResponseSize;
+    }
+
+    public int getMaxResponseSize() {
+        return m_maxResponseSize;
     }
 }

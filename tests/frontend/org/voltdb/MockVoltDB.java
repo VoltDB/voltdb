@@ -59,6 +59,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
@@ -789,6 +790,22 @@ public class MockVoltDB implements VoltDBInterface
             public boolean secondaryInitialization() {
                 return true;
             }
+
+            @Override
+            public String getSignature() {
+                return null;
+            }
+
+            @Override
+            public String getLicenseType() {
+                return null;
+            }
+
+            @Override
+            public boolean isUnrestricted()
+            {
+                return false;
+            }
         };
     }
 
@@ -891,4 +908,14 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public boolean isJoining() {return false;}
+
+    @Override
+    public ElasticService getElasticService() {
+        return null;
+    }
+
+    @Override
+    public boolean isClusterComplete() {
+        return true;
+    }
 }

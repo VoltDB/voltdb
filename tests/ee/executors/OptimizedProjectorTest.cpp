@@ -150,17 +150,10 @@ static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeA
     voltdb::Table* tbl = NULL;
     if (tableType == PERSISTENT) {
         char signature[20];
-        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID,
-                                                       tableName,
-                                                       schema,
-                                                       names,
-                                                       signature);
+        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID, tableName.c_str(), schema, names, signature);
     }
     else {
-        tbl = voltdb::TableFactory::buildTempTable(tableName,
-                                                   schema,
-                                                   names,
-                                                   NULL);
+        tbl = voltdb::TableFactory::buildTempTable(tableName, schema, names, NULL);
     }
 
     return tbl;

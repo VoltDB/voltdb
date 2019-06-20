@@ -21,13 +21,10 @@
 #include "storage/tablefactory.h"
 
 namespace voltdb {
-    static Table* copyTable(const std::string &name, Table* template_table, char *signature)
-    {
-        Table* t = TableFactory::getPersistentTable(0,
-                                                    name,
-                                                    TupleSchema::createTupleSchema(template_table->schema()),
-                                                    template_table->getColumnNames(),
-                                                    signature);
+    static Table* copyTable(const std::string &name, Table* template_table, char *signature) {
+        Table* t = TableFactory::getPersistentTable(0, name.c_str(),
+                TupleSchema::createTupleSchema(template_table->schema()),
+                template_table->getColumnNames(), signature);
         TableTuple tuple(template_table->schema());
         TableIterator iterator = template_table->iterator();
         while (iterator.next(tuple)) {
@@ -70,13 +67,12 @@ namespace voltdb {
     }
 
     void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature,
-            ExportStreamBlock *block, bool sync, int64_t generationId) {
-        if (sync && !block) {
+            ExportStreamBlock *block) {
+        if (!block) {
             return;
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        generationIds.push(generationId);
         exportBlocks.push_back(boost::shared_ptr<ExportStreamBlock>(new ExportStreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;

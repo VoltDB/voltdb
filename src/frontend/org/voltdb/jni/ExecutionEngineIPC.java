@@ -34,6 +34,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -44,7 +45,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.DeterminismHash;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -52,7 +52,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -134,7 +133,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , ApplyBinaryLog(29)
         , ShutDown(30)
         , SetViewsEnabled(31)
-        , DeleteMigratedRows(32);
+        , DeleteMigratedRows(32)
+        , DisableExternalStreams(33)
+        , ExternalStreamsEnabled(34);
 
         Commands(final int id) {
             m_id = id;
@@ -431,7 +432,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // start sequence number - 8 bytes
                     // tupleCount - 8 bytes
                     // uniqueId - 8 bytes
-                    // sync - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
                     int partitionId = getBytes(4).getInt();
@@ -443,8 +443,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
-                    boolean sync = getBytes(1).get() == 1 ? true : false;
-                    long genId = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             partitionId,
@@ -453,10 +451,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             committedSequenceNumber,
                             tupleCount,
                             uniqueId,
-                            genId,
                             0,
-                            length == 0 ? null : getBytes(length),
-                            sync);
+                            length == 0 ? null : getBytes(length));
                 }
                 else if (status == kErrorCode_pushEndOfStream) {
                     ByteBuffer header = ByteBuffer.allocate(8);
@@ -1553,14 +1549,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
-            long uso, long seqNo, int partitionId, String mStreamName) {
+    public void exportAction(boolean syncAction, ExportSnapshotTuple sequences,
+            int partitionId, String mStreamName) {
         try {
             m_data.clear();
             m_data.putInt(Commands.ExportAction.m_id);
             m_data.putInt(syncAction ? 1 : 0);
-            m_data.putLong(uso);
-            m_data.putLong(seqNo);
+            m_data.putLong(sequences.getAckOffset());
+            m_data.putLong(sequences.getSequenceNumber());
+            m_data.putLong(sequences.getGenerationId());
             if (mStreamName == null) {
                 m_data.putInt(-1);
             } else {
@@ -1578,7 +1575,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long result_offset = results.getLong();
             if (result_offset < 0) {
                 System.out.println("exportAction failed!  syncAction: " + syncAction + ", Uso: " +
-                    uso + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    sequences.getAckOffset() + ", seqNo: " + sequences.getSequenceNumber() +
+                    ", generationId: " + sequences.getGenerationId() +
+                    ", partitionId: " + partitionId +
                     ", streamName: " + mStreamName);
             }
         } catch (final IOException e) {
@@ -1587,8 +1586,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int deleteMigratedRows(long txnid, long spHandle, long uniqueId,
-            String tableName, long deletableTxnId, int maxRowCount, long undoToken) {
+    public boolean deleteMigratedRows(long txnid, long spHandle, long uniqueId,
+            String tableName, long deletableTxnId, long undoToken) {
         try {
             m_data.clear();
             m_data.putInt(Commands.DeleteMigratedRows.m_id);
@@ -1597,7 +1596,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(uniqueId);
             m_data.putLong(deletableTxnId);
             m_data.putLong(undoToken);
-            m_data.putInt(maxRowCount);
             m_data.putInt(tableName.getBytes("UTF-8").length);
             m_data.put(tableName.getBytes("UTF-8"));
             m_data.flip();
@@ -1608,7 +1606,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_connection.m_socketChannel.read(results);
             }
             results.flip();
-            return results.get();
+
+            return (results.getInt() == 1);
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
@@ -1740,7 +1739,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
-            long uniqueId, int remoteClusterId, long remoteTxnUniqueId, long undoToken) throws EEException {
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
         m_data.clear();
         m_data.putInt(Commands.ApplyBinaryLog.m_id);
         m_data.putLong(txnId);
@@ -1748,7 +1747,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putInt(remoteClusterId);
-        m_data.putLong(remoteTxnUniqueId);
         m_data.putLong(undoToken);
         m_data.put(logs.array());
 
@@ -1823,9 +1821,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             return  retval.array();
         } catch (IOException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
-        throw new RuntimeException("Failed to executeTask in IPC client");
     }
 
     @Override
@@ -1880,6 +1877,35 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_connection.write();
         } catch (final IOException e) {
             System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public void disableExternalStreams() {
+        System.out.println("Disabling all external streams in EE");
+        m_data.clear();
+        m_data.putInt(Commands.DisableExternalStreams.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public boolean externalStreamsEnabled() {
+        m_data.clear();
+        m_data.putInt(Commands.ExternalStreamsEnabled.m_id);
+        m_data.flip();
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+            return m_connection.readByte() == 1 ? true : false;
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException();
         }
     }

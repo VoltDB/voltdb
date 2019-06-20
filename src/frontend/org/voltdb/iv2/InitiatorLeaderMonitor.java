@@ -178,9 +178,7 @@ public class InitiatorLeaderMonitor {
 
     private void processInitiatorLeader(int partition, ChildrenCallback cb)
     throws KeeperException, InterruptedException {
-        Object[] result = cb.get();
-        @SuppressWarnings("unchecked")
-        List<String> children = (List<String>) result[3];
+        List<String> children = cb.get();
         if (!children.isEmpty()) {
             Collections.sort(children);
             String leader = children.get(0);

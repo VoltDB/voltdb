@@ -6,7 +6,7 @@
  * Boost Software License, Version 1.0. (See accompanying
  * file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
  * Author: Jeff Garland, Bart Garst
- * $Date: 2012-10-10 12:05:03 -0700 (Wed, 10 Oct 2012) $
+ * $Date$
  */
 
 #include <cstdlib> //for MCW 7.2 std::abs(long long)
@@ -54,7 +54,7 @@ namespace posix_time {
   //! Base time duration type
   /*! \ingroup time_basics
    */
-  class time_duration :
+  class BOOST_SYMBOL_VISIBLE time_duration :
     public date_time::time_duration<time_duration, time_res_traits>
   {
   public:
@@ -134,7 +134,7 @@ namespace posix_time {
     }
   };
 
-  class posix_time_system_config
+  class BOOST_SYMBOL_VISIBLE posix_time_system_config
   {
    public:
     typedef simple_time_rep time_rep_type;

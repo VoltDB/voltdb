@@ -78,7 +78,7 @@ public:
         bool handled = false;
         // If any stream handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             handled = streamPtr->m_context->notifyTupleInsert(tuple) || handled;
         }
         return handled;
@@ -92,7 +92,7 @@ public:
         bool handled = false;
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
         }
         return handled;
@@ -106,7 +106,7 @@ public:
         bool freeable = true;
         // Any active stream can reject freeing the tuple.
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             freeable = streamPtr->m_context->notifyTupleDelete(tuple) && freeable;
         }
         return freeable;
@@ -117,7 +117,7 @@ public:
      */
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             streamPtr->m_context->notifyBlockWasCompactedAway(block);
         }
     }
@@ -128,7 +128,7 @@ public:
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
         }
     }
@@ -146,7 +146,7 @@ public:
     virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) {
         boost::shared_ptr<TableStreamerContext> context;
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
-            assert(streamPtr != NULL);
+            vassert(streamPtr != NULL);
             if (streamPtr->m_streamType == streamType) {
                 context = streamPtr->m_context;
                 break;

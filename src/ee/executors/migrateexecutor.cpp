@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
 
@@ -67,15 +67,15 @@ bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init Migrate Executor");
 
     m_node = dynamic_cast<MigratePlanNode*>(abstract_node);
-    assert(m_node);
-    assert(m_node->getInputTableCount() == 1);
+    vassert(m_node);
+    vassert(m_node->getInputTableCount() == 1);
     // input table should be temptable
     m_inputTable = dynamic_cast<AbstractTempTable*>(m_node->getInputTable());
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     // target table should be persistenttable
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     setDMLCountOutputTable(executorVector.limits());
 
@@ -96,10 +96,10 @@ bool MigrateExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool MigrateExecutor::p_execute(const NValueArray &params) {
-    assert(m_inputTable);
+    vassert(m_inputTable);
 
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    vassert(targetTable);
 
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
@@ -107,9 +107,8 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
     int64_t migrated_tuples = 0;
-
     {
-        assert(m_replicatedTableOperation == targetTable->isReplicatedTable());
+        vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
@@ -120,12 +119,11 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             BOOST_FOREACH(TableIndex *index, allIndexes) {
                 if (index->isMigratingIndex()) {
                     indexesToUpdate.push_back(index);
-                    VOLT_DEBUG("MigrateExecutor: updating migrating index.");
                 }
             }
 
-            assert(m_inputTuple.columnCount() == m_inputTable->columnCount());
-            assert(targetTuple.columnCount() == targetTable->columnCount());
+            vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
+            vassert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
             while (input_iterator.next(m_inputTuple)) {
                 // The first column in the input table will be the address of a
@@ -133,11 +131,12 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 void *target_address = m_inputTuple.getNValue(0).castAsAddress();
                 targetTuple.move(target_address);
 
-                assert(targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull());
-                TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
-                targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                if (targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
+                    TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
+                    targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
                                                                 indexesToUpdate, true, false, true);
-                migrated_tuples++;
+                    migrated_tuples++;
+                }
             }
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;

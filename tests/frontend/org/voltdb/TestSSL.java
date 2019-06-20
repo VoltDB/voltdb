@@ -23,6 +23,10 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -37,12 +41,11 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.TestCase;
-
-public class TestSSL extends TestCase {
+public class TestSSL extends JUnit4LocalClusterTest {
 
     private LocalCluster m_cluster;
     private ServerThread m_server;
@@ -72,7 +75,6 @@ public class TestSSL extends TestCase {
         return builder;
     }
 
-    @Override
     @After
     public void tearDown() throws Exception {
         if (m_admin != null) {
@@ -257,7 +259,7 @@ public class TestSSL extends TestCase {
         m_cluster.killSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration(m_cluster.portGenerator);
+        VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
         config.m_startAction = m_cluster.isNewCli() ? StartAction.PROBE : StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("sslRejoin.jar");
         if (m_cluster.isNewCli()) {

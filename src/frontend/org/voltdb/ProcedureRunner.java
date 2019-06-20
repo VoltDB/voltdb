@@ -36,6 +36,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -50,11 +51,8 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.MpTransactionState;
@@ -1198,81 +1196,35 @@ public class ProcedureRunner {
                                                       byte appStatus,
                                                       String appStatusString,
                                                       NonVoltDBBackend nonVoltDBBackend,
-                                                      Throwable eIn) {
-        // use local var to avoid warnings about reassigning method argument
-        Throwable e = eIn;
+                                                      Throwable e) {
         boolean expected_failure = true;
-        boolean hideStackTrace = false;
-        StackTraceElement[] stack = e.getStackTrace();
-        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
-        for (StackTraceElement ste : stack) {
-            if (isProcedureStackTraceElement(procedureName, ste)) {
-                matches.add(ste);
-            }
-        }
 
         byte status = ClientResponse.UNEXPECTED_FAILURE;
         StringBuilder msg = new StringBuilder();
 
-        if (e.getClass() == VoltAbortException.class) {
-            status = ClientResponse.USER_ABORT;
-            msg.append("USER ABORT\n");
-        } else if (e.getClass() == org.voltdb.exceptions.ConstraintFailureException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("CONSTRAINT VIOLATION\n");
-        } else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("SQL ERROR\n");
-        }
-        // Interrupt exception will be thrown when the procedure is killed by a user
-        // or by a timeout in the middle of executing.
-        else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
-            status = ClientResponse.GRACEFUL_FAILURE;
-            msg.append("Transaction Interrupted\n");
+        if (e instanceof VoltAbortException) {
+            VoltAbortException voltAbort = (VoltAbortException) e;
+            status = voltAbort.getClientResponseStatus();
+            msg.append(voltAbort.getShortStatusString());
         } else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
             String backendType = "HSQL";
             if (nonVoltDBBackend instanceof PostgreSQLBackend) {
                 backendType = "PostgreSQL";
             }
             msg.append(backendType);
-            msg.append("-BACKEND ERROR\n");
+            msg.append("-BACKEND ERROR");
             if (e.getCause() != null) {
                 e = e.getCause();
             }
-        } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
-            if (te.isMisrouted()) {
-                status = ClientResponse.TXN_MISROUTED;
-                msg.append("TRANSACTION MISROUTED\n");
-            } else {
-                status = ClientResponse.TXN_RESTART;
-                msg.append("TRANSACTION RESTART\n");
-            }
-        } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
-            msg.append("Transaction Interrupted\n");
-        }
-        // SpecifiedException means the dev wants control over status and
-        // message
-        else if (e.getClass() == SpecifiedException.class) {
-            SpecifiedException se = (SpecifiedException) e;
-            status = se.getStatus();
-            expected_failure = true;
-            hideStackTrace = true;
-        } else if (e.getClass() == MispartitionedException.class) {
-            status = ClientResponse.TXN_MISPARTITIONED;
-            msg.append("TRANSACTION MISPARTITIONED\n");
-        } else if (e.getClass() == DRTableNotFoundException.class) {
-            status = ClientResponse.DR_TABLE_HASH_NOT_FOUND;
-            msg.append("TABLE NOT FOUND FOR REMOTE TABLE HASH\n");
         } else {
-            msg.append("UNEXPECTED FAILURE:\n");
+            msg.append("UNEXPECTED FAILURE:");
             expected_failure = false;
         }
 
         // ensure the message is returned if we're not going to hit the verbose
         // condition below
-        if (expected_failure || hideStackTrace) {
-            msg.append("  ").append(e.getMessage());
+        if (expected_failure) {
+            msg.append(" ").append(e.getMessage());
             if (e instanceof org.voltdb.exceptions.InterruptException && readOnly) {
                 int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
                 if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
@@ -1291,28 +1243,23 @@ public class ProcedureRunner {
             }
         }
 
-        // Rarely hide the stack trace.
-        // Right now, just for SpecifiedException, which is usually from
-        // sysprocs where the error is totally
-        // known and not helpful to the user.
-        if (!hideStackTrace) {
-            // If the error is something we know can happen as part of normal
-            // operation,
-            // reduce the verbosity.
-            // Otherwise, generate more output for debuggability
-            if (expected_failure) {
-                for (StackTraceElement ste : matches) {
+        // If the error is something we know can happen as part of normal operation,
+        // reduce the verbosity.
+        // Otherwise, generate more output for debuggability
+        if (expected_failure) {
+            for (StackTraceElement ste : e.getStackTrace()) {
+                if (isProcedureStackTraceElement(procedureName, ste)) {
                     msg.append("\n    at ");
                     msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
                     msg.append("(").append(ste.getFileName()).append(":");
                     msg.append(ste.getLineNumber()).append(")");
                 }
-            } else {
-                Writer result = new StringWriter();
-                PrintWriter pw = new PrintWriter(result);
-                e.printStackTrace(pw);
-                msg.append("  ").append(result.toString());
             }
+        } else {
+            Writer result = new StringWriter();
+            PrintWriter pw = new PrintWriter(result);
+            e.printStackTrace(pw);
+            msg.append(" ").append(result.toString());
         }
 
         return getErrorResponse(status, appStatus, appStatusString, msg.toString(),
@@ -1327,11 +1274,9 @@ public class ProcedureRunner {
                 appStatusString,
                 new VoltTable[0],
                 "VOLTDB ERROR: " + msg);
-       if (status == ClientResponse.TXN_MISPARTITIONED) {
-           response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
-       } else if (status == ClientResponse.DR_TABLE_HASH_NOT_FOUND) {
-           ((DRTableNotFoundException) e).setClientResponseResults(response);
-       }
+        if (e != null) {
+            e.setClientResponseResults(response);
+        }
 
        return response;
     }
@@ -1430,7 +1375,7 @@ public class ProcedureRunner {
         final VoltTable[] m_results;
 
         BatchState(int batchSize, MpTransactionState txnState, long siteId, boolean finalTask, String procedureName,
-                byte[] procToLoad, boolean perFragmentStatsRecording) {
+                byte[] procToLoad, boolean perFragmentStatsRecording, int maxMpResponseSize) {
             m_batchSize = batchSize;
             m_txnState = txnState;
 
@@ -1453,6 +1398,8 @@ public class ProcedureRunner {
             m_distributedTask.setProcNameToLoad(procToLoad);
             m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
+
+            m_distributedTask.setMaxResponseSize(maxMpResponseSize);
         }
 
         /*
@@ -1508,8 +1455,10 @@ public class ProcedureRunner {
     VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
         MpTransactionState txnState = (MpTransactionState)m_txnState;
         assert(txnState != null);
+        long perPartitionMaxResponse = m_site.getMaxTotalMpResponseSize() / txnState.getMasterHSIDs().size();
         BatchState state = new BatchState(batch.size(), txnState, m_site.getCorrespondingSiteId(), finalTask,
-                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts());
+                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts(),
+                (int) Math.min(perPartitionMaxResponse, VoltPort.MAX_MESSAGE_LENGTH - 1024));
 
         // iterate over all sql in the batch, filling out the above data
         // structures

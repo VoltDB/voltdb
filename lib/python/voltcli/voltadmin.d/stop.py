@@ -94,7 +94,7 @@ def stop(runner):
                 if not proex.isTimeout:
                     raise
                 runner.info(proex.message)
-                runner.info('This may be caused by a disabled export target; the node shutdown process will proceed.')
+                runner.info('This may be caused by an export target either disabled or removed from the configuration. No action is required; the stop node process will proceed.')
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
              runner.error(proex.message)

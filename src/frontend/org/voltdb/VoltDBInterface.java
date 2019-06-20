@@ -28,6 +28,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Largequeryswap;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
@@ -72,6 +73,8 @@ public interface VoltDBInterface
     public String getLargeQuerySwapPath();
 
     public boolean isBare();
+    public boolean isClusterComplete();
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.
@@ -342,4 +345,6 @@ public interface VoltDBInterface
      * @return true if current node is joining and haven't finished the snapshot
      */
     public boolean isJoining();
+
+    public ElasticService getElasticService();
 }

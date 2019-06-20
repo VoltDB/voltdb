@@ -27,8 +27,8 @@ volatile int tupleBlocksAllocated = 0;
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_storage(NULL),
         m_references(0),
-        m_tupleLength(table->m_tupleLength),
-        m_tuplesPerBlock(table->m_tuplesPerBlock),
+        m_tupleLength(table->getTupleLength()),
+        m_tuplesPerBlock(table->getTuplesPerBlock()),
         m_activeTuples(0),
         m_nextFreeTuple(0),
         m_lastCompactionOffset(0),
@@ -43,7 +43,7 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         throwFatalException("Failed mmap");
     }
 #else
-    m_storage = new char[table->m_tableAllocationSize];
+    m_storage = new char[table->getTableAllocationSize()];
 #endif
     tupleBlocksAllocated++;
 }
@@ -61,7 +61,7 @@ TupleBlock::~TupleBlock() {
 }
 
 std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {
-    assert(source != this);
+    vassert(source != this);
     /*
       std::cout << "Attempting to merge " << static_cast<void*> (this)
                 << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())
@@ -92,7 +92,7 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
            //The block isn't empty, but there are no more active tuples.
            //Some of the tuples that make it register as not empty must have been
            //pending delete and those aren't mergable
-            assert(sourceTuplesPendingDeleteOnUndoRelease);
+            vassert(sourceTuplesPendingDeleteOnUndoRelease);
             break;
         }
 

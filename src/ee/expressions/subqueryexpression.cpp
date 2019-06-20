@@ -38,7 +38,7 @@ SubqueryExpression::SubqueryExpression(
             m_tveParams(tveParams)
 {
     VOLT_TRACE("SubqueryExpression %d", subqueryId);
-    assert(m_paramIdxs.size() == m_tveParams.size());
+    vassert(m_paramIdxs.size() == m_tveParams.size());
 }
 
 SubqueryExpression::~SubqueryExpression() {
@@ -80,7 +80,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
     // Note the other (non-tve) parameter values and check if they've changed since the last invocation.
     if (hasPriorResult) {
         std::vector<NValue>& lastParams = context->accessLastParams();
-        assert(lastParams.size() == m_otherParamIdxs.size());
+        vassert(lastParams.size() == m_otherParamIdxs.size());
         for (size_t i = 0; i < lastParams.size(); ++i) {
             const NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
             if (lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL) {

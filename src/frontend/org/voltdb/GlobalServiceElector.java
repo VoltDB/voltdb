@@ -98,13 +98,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
         }
     }
 
-    @Override
-    public void noticedTopologyChange(boolean added, boolean removed) {
-    }
-
-    int getLeaderElectorNode() {
-        String path = m_leaderElector.getNode();
-        // last ten characters are numeric
-        return Integer.valueOf(path.substring(path.length() - 10));
+    public int getLeaderId() {
+        return m_leaderElector.getLeaderId();
     }
 }

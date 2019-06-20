@@ -411,8 +411,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                         "VCHAR_JSON        VARCHAR(100) DEFAULT 'foo' NOT NULL," +
                         "BIG     BIGINT   DEFAULT 0,\n" +
                         ");\n" +
-                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));" +
-                        "CREATE TABLE T_ENG_12024 (a INT, b INT, c VARCHAR(10));";
+                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));";
         try {
             createSchema(config, ddl, 2, 1, 0);
             startSystem(config);
@@ -547,6 +546,74 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                 teardownSystem();
             } catch (Exception e) {
             }
+        }
+    }
+
+    @Test
+    public void testENG15742() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE R21 (\n" +
+                "VB VARBINARY NOT NULL\n" +
+                ");\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            // we don't allow using VARBINARY type in LIKE/STARTS WITH expression
+            Stream.of(
+                    "CREATE INDEX testIdx ON R21(VB) WHERE x'03' like VB;",
+                    "CREATE INDEX testIdx ON R21(VB) WHERE VB starts with x'03';")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                            fail("We should not allow allow using VARBINARY type in LIKE/STARTS WITH expression");
+                        } catch (ProcCallException pce) {
+                            pce.printStackTrace();
+                            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+                            try {
+                                assertFalse(findIndexInSystemCatalogResults("testIdx"));
+                            } catch (Exception e) {
+                                fail(e.getMessage());
+                            }
+                        } catch (IOException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    @Test
+    public void testENG15734() throws Exception {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                "ID INTEGER,\n" +
+                "FL FLOAT,\n" +
+                "V1 VARCHAR(63),\n" +
+                "V2 VARCHAR(64) DEFAULT '0'" +
+                ");\n" +
+                "CREATE INDEX DIDX4 ON P4(ID) WHERE V2 LIKE UPPER(V1);\n";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(FL) VALUES(6.2);",
+                    "UPDATE P4 SET V1 = V2;",
+                    "TRUNCATE TABLE P4;")
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) {
+                            fail("Query \"" + stmt + "\" should have worked fine");
+                        }
+                    });
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) { }
         }
     }
 }

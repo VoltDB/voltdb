@@ -43,8 +43,8 @@ public class TaskLogImpl implements TaskLog {
             Long.parseLong(System.getProperty("REJOIN_OVERFLOW_LIMIT", "102400"));
 
     private final int m_partitionId;
-    private final BinaryDeque m_buffers;
-    private final BinaryDequeReader m_reader;
+    private final BinaryDeque<?> m_buffers;
+    private final BinaryDequeReader<?> m_reader;
     private RejoinTaskBuffer m_tail = null;
     private RejoinTaskBuffer m_head = null;
     //Not using as a bounded queue
@@ -78,8 +78,8 @@ public class TaskLogImpl implements TaskLog {
 
         m_partitionId = partitionId;
         m_cursorId = "TaskLog-" + partitionId;
-        m_buffers = new PersistentBinaryDeque(
-                Integer.toString(partitionId), null, overflowDir, new VoltLogger("REJOIN"));
+        m_buffers = PersistentBinaryDeque.builder(Integer.toString(partitionId), overflowDir, new VoltLogger("REJOIN"))
+                .build();
         m_reader = m_buffers.openForRead(m_cursorId);
         m_es = CoreUtils.getSingleThreadExecutor("TaskLog partition " + partitionId);
     }

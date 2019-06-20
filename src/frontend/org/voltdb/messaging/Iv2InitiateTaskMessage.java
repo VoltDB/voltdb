@@ -360,4 +360,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         }
         return builder.toString();
     }
+
+    @Override
+    public void toDuplicateCounterString(StringBuilder sb) {
+        sb.append("INITIATE TASK");
+    }
 }
