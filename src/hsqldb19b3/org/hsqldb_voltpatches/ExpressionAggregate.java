@@ -48,6 +48,10 @@ import org.hsqldb_voltpatches.store.ValuePool;
 public class ExpressionAggregate extends Expression {
 
     boolean isDistinctAggregate;
+    // if it's a user-defined aggregate function, we will give it an id and a name
+    private int user_aggregate_id;
+    private String name;
+
 
     ExpressionAggregate(int type, boolean distinct, Expression e) {
 
@@ -322,5 +326,13 @@ public class ExpressionAggregate extends Expression {
         }
 
         return ((SetFunction) currValue).getValue();
+    }
+
+    public int getUserAggregateId() {
+        return user_aggregate_id;
+    }
+
+    public String getName() {
+        return name;
     }
 }

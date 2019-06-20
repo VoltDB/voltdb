@@ -2686,7 +2686,9 @@ public class PlanAssembler {
                     //tve.setUserAggregateId(tempRoot.getUserAggregateId());
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
-                    aggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
+                    if (tempRoot.getUserAggregateId() != null) {
+                        aggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
+                    }
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -2765,7 +2767,9 @@ public class PlanAssembler {
                              * output column of the push-down aggregate node
                              */
                             boolean topDistinctFalse = false;
-                            topAggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
+                            if (tempRoot.getUserAggregateId() != null) {
+                                topAggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
+                            }
                             topAggNode.addAggregate(top_expression_type,
                                     topDistinctFalse, outputColumnIndex, tve);
                         }
