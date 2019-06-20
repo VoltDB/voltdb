@@ -358,6 +358,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    public void addUserDefineAggregateId(String id) {
+        m_userAggregateId.add(Integer.parseInt(id));
+    }
+
     /**
      * Add an aggregate to this plan node.
      * @param aggType
@@ -387,9 +391,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         } else {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add(aggInputExpr.clone());
-        }
-        if (aggInputExpr.getUserAggregateId() != null) {
-            m_userAggregateId.add(Integer.parseInt(aggInputExpr.getUserAggregateId()));
         }
         m_workerOrCoordinator.add("WORKER");
     }

@@ -2665,6 +2665,7 @@ public class PlanAssembler {
                 SchemaColumn schema_col = null;
                 SchemaColumn top_schema_col = null;
                 if (rootExpr instanceof AggregateExpression) {
+                    AggregateExpression tempRoot = (AggregateExpression)rootExpr;
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
 
@@ -2682,10 +2683,10 @@ public class PlanAssembler {
                             "", col.m_alias,
                             rootExpr, outputColumnIndex);
                     tve.setDifferentiator(col.m_differentiator);
-                    tve.setUserAggregateId(rootExpr.getUserAggregateId());
+                    //tve.setUserAggregateId(tempRoot.getUserAggregateId());
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
-                    agg_input_expr.setUserAggregateId(rootExpr.getUserAggregateId());
+                    aggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -2764,6 +2765,7 @@ public class PlanAssembler {
                              * output column of the push-down aggregate node
                              */
                             boolean topDistinctFalse = false;
+                            topAggNode.addUserDefineAggregateId(tempRoot.getUserAggregateId());
                             topAggNode.addAggregate(top_expression_type,
                                     topDistinctFalse, outputColumnIndex, tve);
                         }

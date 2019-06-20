@@ -66,8 +66,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
-    protected String user_aggregate_id;
-    protected String name;
     protected String plan_node_type;
 
     /**
@@ -336,21 +334,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public void setInBytes(boolean inBytes) {
         m_inBytes = inBytes;
     }
-
-    /**
-     * @return user aggregate id
-     */
-    public String getUserAggregateId() {
-        return user_aggregate_id;
-    }
-
-    /**
-     * @param user aggregate id
-     */
-    public void setUserAggregateId(String id) {
-        user_aggregate_id = id;
-    }
-
 
     @Override
     public String toString() {
@@ -630,12 +613,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
         }
         else {
-            if (user_aggregate_id != null) {
+            if (this instanceof AggregateExpression) {
+                AggregateExpression tempExpr = (AggregateExpression) this;
                 if (plan_node_type == "RECEIVE") {
                     stringer.keySymbolValuePair(Members.VALUE_TYPE, "25");
                 }
                 else if (plan_node_type == "SEQSCAN" && m_valueType.getValue() != 25 && m_valueSize != 65537) {
-                    String returnType = FunctionDescriptor.getReturnType(Integer.parseInt(user_aggregate_id)).getNameString();
+                    String returnType = FunctionDescriptor.getReturnType(Integer.parseInt(tempExpr.getUserAggregateId())).getNameString();
                     byte returnValue = VoltType.typeFromString(returnType).getValue();
                     stringer.keySymbolValuePair(Members.VALUE_TYPE, Integer.toString(returnValue));
                 }

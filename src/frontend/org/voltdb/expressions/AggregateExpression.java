@@ -26,6 +26,8 @@ public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
     private boolean m_distinct = false;
+    protected String user_aggregate_id;
+    protected String name;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
@@ -46,6 +48,20 @@ public class AggregateExpression extends AbstractExpression {
 
     public void setDistinct() { m_distinct = true; }
     public boolean isDistinct() { return m_distinct;  }
+
+    /**
+     * @return user aggregate id
+     */
+    public String getUserAggregateId() {
+        return user_aggregate_id;
+    }
+
+    /**
+     * @param user aggregate id
+     */
+    public void setUserAggregateId(String id) {
+        user_aggregate_id = id;
+    }
 
     @Override
     public boolean equals(Object obj) {
