@@ -232,7 +232,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Call user-defined function
         NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
-
+        void bufferHelper(int32_t functionId, const NValue& argument, ValueType type);
+        void checkInfo(UserDefinedFunctionInfo *info, int32_t functionId);
+        void checkReturnCode(int32_t returnCode);
+        bool checkPartitionTable(ExpressionType agg_type);
+        void partitionTableHelper(bool partition_table);
+        NValue resultHelper(int32_t returnCode, bool partition_table, ValueType type);
         void callJavaUserDefinedAggregateStart(int32_t functionId);
         void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument);
         void callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument);
