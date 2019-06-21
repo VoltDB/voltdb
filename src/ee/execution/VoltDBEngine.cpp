@@ -736,7 +736,7 @@ void VoltDBEngine::checkReturnCode(int32_t returnCode) {
     }
 }
 
-bool VoltDBEngine::checkPartitionTable(ExpressionType agg_type) {
+bool VoltDBEngine::isForPartitionTable(ExpressionType agg_type) {
     // if agg_type is EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER, it means that the table
     // is partitioned and there are workers and a coordinator.
     bool partition_table = false;
@@ -748,9 +748,9 @@ bool VoltDBEngine::checkPartitionTable(ExpressionType agg_type) {
 
 void VoltDBEngine::partitionTableHelper(bool partition_table) {
     if (partition_table) {
-        m_udfOutput.writeInt(1);
+        m_udfOutput.writeBool(1);
     } else {
-        m_udfOutput.writeInt(0);
+        m_udfOutput.writeBool(0);
     }
 }
 
@@ -808,7 +808,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
-    bool partition_table = checkPartitionTable(agg_type);
+    bool partition_table = isForPartitionTable(agg_type);
     bufferHelper(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
     partitionTableHelper(partition_table);

@@ -1016,7 +1016,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
         int functionId = m_udfBuffer.getInt();
         UserDefinedAggregateFunctionRunner udafRunner = m_functionManager.getAggregateFunctionRunnerById(functionId);
-        int num_of_coordinator = m_udfBuffer.getInt();
+        // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
+        boolean isForPartitionTable = (m_udfBuffer.get() != 0);
         Throwable throwable = null;
         Object returnValue = null;
         VoltType returnType = null;
@@ -1024,7 +1025,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             assert(udafRunner != null);
             // if there is a coordinator, we serialized the object to a byte array
             // and the return type for a worker is a varbinary
-            if (num_of_coordinator == 1) {
+            if (isForPartitionTable) {
                 Object worker_instance = udafRunner.getFunctionInstance();
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 ObjectOutput out = null;
