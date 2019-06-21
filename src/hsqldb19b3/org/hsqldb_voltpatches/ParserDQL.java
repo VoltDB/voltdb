@@ -1623,13 +1623,13 @@ public class ParserDQL extends ParserBase {
     private Expression readAggregate() {
 
         int        tokenT = token.tokenType;
-        String     udaf   = token.tokenString;
+        String     func_name = token.tokenString;
         Expression aggExpr;
 
         read();
         readThis(Tokens.OPENBRACKET);
 
-        aggExpr = readAggregateExpression(tokenT, udaf);
+        aggExpr = readAggregateExpression(tokenT, func_name);
 
         readThis(Tokens.CLOSEBRACKET);
         if (token.tokenType == Tokens.OVER) {
@@ -1646,7 +1646,7 @@ public class ParserDQL extends ParserBase {
         return aggExpr;
     }
 
-    private ExpressionAggregate readAggregateExpression(int tokenT, String udaf) {
+    private ExpressionAggregate readAggregateExpression(int tokenT, String func_name) {
 
         int     type     = ParserDQL.getExpressionType(tokenT);
         boolean distinct = false;
@@ -1710,8 +1710,8 @@ public class ParserDQL extends ParserBase {
                 break;
 
             case OpTypes.USER_DEFINE_AGGREGATE :
-                int functionid = FunctionForVoltDB.newVoltDBFunctionID(udaf);
-                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid, udaf);
+                int functionid = FunctionForVoltDB.newVoltDBFunctionID(func_name);
+                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid, func_name);
                 return aggregateExp;
 
             default :
@@ -2154,7 +2154,7 @@ public class ParserDQL extends ParserBase {
             default :
                 if (isCoreReservedKey()) {
                     throw unexpectedToken();
-                } else if (FunctionForVoltDB.newVoltDBFunction(token.tokenString) != null && FunctionForVoltDB.getSora() == 'a') {
+                } else if (FunctionForVoltDB.newVoltDBFunction(token.tokenString) != null && FunctionForVoltDB.isUserDefineAggregate(token.tokenString)) {
                     return readAggregate();
                 }
         }

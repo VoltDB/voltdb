@@ -75,15 +75,15 @@ public:
         //kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats (DEPRECATED)
         kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
         kErrorCode_callJavaUserDefinedFunction = 107,  // Notify the frontend to call a Java user-defined function.
-        kErrorCode_callJavaUserDefinedAggregateStart = 108,  // Notify the frontend to call a Java user-defined aggregate function start method.
-        kErrorCode_callJavaUserDefinedAggregateAssemble = 109,  // Notify the frontend to call a Java user-defined aggregate function assemble method.
-        kErrorCode_callJavaUserDefinedAggregateCombine = 110,  // Notify the frontend to call a Java user-defined aggregate function combine method.
-        kErrorCode_callJavaUserDefinedAggregateWorkerEnd = 111,  // Notify the frontend to call a Java user-defined aggregate function worker end method.
-        kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd = 112,  // Notify the frontend to call a Java user-defined aggregate function coordinator end method.
-        kErrorCode_needPlan = 113,                     // fetch a plan from java for a fragment
-        kErrorCode_progressUpdate = 114,               // Update Java on execution progress
-        kErrorCode_decodeBase64AndDecompress = 115,    // Decode base64, compressed data
-        kErrorCode_pushEndOfStream = 116               // Push EOF for dropped stream.
+        kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111,               // Update Java on execution progress
+        kErrorCode_decodeBase64AndDecompress = 112,    // Decode base64, compressed data
+        kErrorCode_pushEndOfStream = 113,              // Push EOF for dropped stream.
+        kErrorCode_callJavaUserDefinedAggregateStart = 114,  // Notify the frontend to call a Java user-defined aggregate function start method.
+        kErrorCode_callJavaUserDefinedAggregateAssemble = 115,  // Notify the frontend to call a Java user-defined aggregate function assemble method.
+        kErrorCode_callJavaUserDefinedAggregateCombine = 116,  // Notify the frontend to call a Java user-defined aggregate function combine method.
+        kErrorCode_callJavaUserDefinedAggregateWorkerEnd = 117,  // Notify the frontend to call a Java user-defined aggregate function worker end method.
+        kErrorCode_callJavaUserDefinedAggregateCoordinatorEnd = 118  // Notify the frontend to call a Java user-defined aggregate function coordinator end method.
     };
 
     VoltDBIPC(int fd);

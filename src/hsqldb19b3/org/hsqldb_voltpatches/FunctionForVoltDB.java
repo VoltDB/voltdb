@@ -560,6 +560,14 @@ public class FunctionForVoltDB extends FunctionSQL {
         return FunctionDescriptor.fn_by_name(token).getId();
     }
 
+    public static boolean isUserDefineAggregate(String token) {
+        FunctionDescriptor def = FunctionDescriptor.fn_by_name(token);
+        if (def == null) {
+            return false;
+        }
+        return def.getSora() == 'a';
+    }
+
     public FunctionForVoltDB(FunctionDescriptor fn) {
         super();
         m_def     = fn;
@@ -568,11 +576,6 @@ public class FunctionForVoltDB extends FunctionSQL {
         parseList = m_def.getParamParseList();
         parseListAlt = m_def.getParamParseListAlt();
         parameterArg = m_def.getTypeParameter();
-        sora = m_def.getSora();
-    }
-
-    public static char getSora() {
-        return sora;
     }
 
     @Override

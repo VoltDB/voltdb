@@ -75,12 +75,10 @@ public class DropAggregateFunction extends StatementProcessor {
         }
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         boolean ifExists = statementMatcher.group(2) != null;
-        if ( ! removeUDAFInSchema(functionName)) {
-            if ( ! ifExists ) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Function name \"%s\" in DROP AGGREGATE FUNCTION statement does not exist.",
-                        functionName));
-            }
+        if (!removeUDAFInSchema(functionName) && !ifExists) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                "Function name \"%s\" in DROP AGGREGATE FUNCTION statement does not exist.",
+                functionName));
         }
         FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
         return true;

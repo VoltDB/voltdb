@@ -35,12 +35,12 @@ import org.voltdb.types.TimestampType;
  * This is the base class for CreateFunctionFromMethod and CreateAggregateFunctionFromClass
  */
 public abstract class CreateFunction extends StatementProcessor {
-	
-	public CreateFunction(DDLCompiler ddlCompiler) {
-		super(ddlCompiler);
-	}
 
-	protected static VoltLogger m_logger = new VoltLogger("UDF");
+    public CreateFunction(DDLCompiler ddlCompiler) {
+        super(ddlCompiler);
+    }
+
+    protected static VoltLogger m_logger = new VoltLogger("UDF");
 
     static int ID_NOT_DEFINED = -1;
     static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
