@@ -356,7 +356,7 @@ struct IntsKey
 template <std::size_t keySize>
 struct IntsComparator
 {
-    IntsComparator(const TupleSchema *unused_keySchema) {}
+    IntsComparator(const TupleSchema *unused_keySchema) : m_keySchema(unused_keySchema) {}
 
     inline int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         // lexographical compare could be faster for fixed N
@@ -380,6 +380,9 @@ struct IntsComparator
     const IntsComparator * getNullAsMaxComparator() const {
         return this;
     }
+
+protected:
+    const TupleSchema *m_keySchema;
 };
 
 /**
@@ -642,7 +645,8 @@ struct GenericComparator
         return std::unique_ptr<GenericNullAsMaxComparator<keySize>>(
                 new GenericNullAsMaxComparator<keySize>(m_keySchema));
     }
-private:
+
+protected:
     const TupleSchema *m_keySchema;
 };
 
@@ -845,7 +849,7 @@ struct TupleKeyComparator
                 new TupleKeyNullAsMaxComparator(m_keySchema));
     }
 
-private:
+protected:
     const TupleSchema *m_keySchema;
 };
 
@@ -859,11 +863,13 @@ static inline int comparePointer(const void *lhs, const void *rhs) {
 }
 
 template <typename KeyType> struct ComparatorWithPointer;
+template <typename KeyType> struct NullAsMaxComparatorWithPointer;
 
 template <typename KeyType>
 struct KeyWithPointer : public KeyType {
     typedef ComparatorWithPointer<KeyType> KeyComparator;
     friend struct ComparatorWithPointer<KeyType>;
+    friend struct NullAsMaxComparatorWithPointer<KeyType>;
 
     KeyWithPointer() : KeyType(), m_keyTuple(NULL) {}
 
@@ -894,6 +900,7 @@ template <>
 struct KeyWithPointer<TupleKey> : public TupleKey {
     typedef ComparatorWithPointer<TupleKey> KeyComparator;
     friend struct ComparatorWithPointer<TupleKey>;
+    friend struct NullAsMaxComparatorWithPointer<TupleKey>;
 
     KeyWithPointer() : TupleKey() {}
 
@@ -914,6 +921,22 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
 };
 
 template <typename KeyType>
+struct NullAsMaxComparatorWithPointer : public KeyType::KeyComparator {
+    NullAsMaxComparatorWithPointer(const TupleSchema *keySchema)
+            : KeyType::KeyComparator(keySchema) {}
+
+    int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
+        int rv = (*KeyType::KeyComparator::getNullAsMaxComparator())(lhs, rhs);
+        return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
+    }
+
+    // Do a comparison, but don't compare pointers to tuple storage.
+    int compareWithoutPointer(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
+        return (*KeyType::KeyComparator::getNullAsMaxComparator())(lhs, rhs);
+    }
+};
+
+template <typename KeyType>
 struct ComparatorWithPointer : public KeyType::KeyComparator {
     ComparatorWithPointer(const TupleSchema *keySchema)
         : KeyType::KeyComparator(keySchema) {}
@@ -927,6 +950,12 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
     int compareWithoutPointer(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
         return KeyType::KeyComparator::operator()(lhs, rhs);
     }
+
+    const std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>> getNullAsMaxComparator() const {
+        return std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>>(
+                new NullAsMaxComparatorWithPointer<KeyType>(m_keySchema));
+    }
+
 };
 
 // overload template
