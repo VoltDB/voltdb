@@ -44,7 +44,7 @@ def status(runner):
 def update(runner):
     procedureCaller(runner, Option.UPDATE)
 
-def procedureCaller(runner, type):
+def procedureCaller(runner, option):
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
                                 ['OVERVIEW'])
@@ -70,14 +70,14 @@ def procedureCaller(runner, type):
 
 
     result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [type, '', ','.join(runner.opts.skip_requirements)]).table(0)
+                              [option, '', ','.join(runner.opts.skip_requirements)]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
-    if message.find("host ids:"):
-        host_names = ','.join([hosts.hosts_by_id.get(int(id)).hostname for id in re.search('host ids: \[(.+?)\]', message).group(1).split(',')])
-        if type == Option.TEST:
+    if option in (Option.TEST, Option.START) and "host ids:" in message:
+        host_names = ', '.join([hosts.hosts_by_id.get(int(id)).hostname for id in re.search('host ids: \[(.+?)\]', message).group(1).split(',')])
+        if option == Option.TEST:
             message = "Hosts will be removed: [" + host_names + "], " + message
-        if type == Option.START:
+        elif option == Option.START:
             message = "Starting cluster resize: Removing hosts: [" + host_names + "], " + message
     if status == 0:
         runner.info(message)
@@ -105,3 +105,4 @@ def procedureCaller(runner, type):
 
 def resize(runner):
     runner.go()
+
