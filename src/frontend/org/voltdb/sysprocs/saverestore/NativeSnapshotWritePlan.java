@@ -316,7 +316,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     tbl,
                     txnId,
                     timestamp);
-        } else if (TableType.isPersistentMigrate(table.getTabletype())) {
+        } else if (TableType.needsShadowStream(table.getTabletype())) {
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
