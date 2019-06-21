@@ -953,7 +953,7 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 
     const std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>> getNullAsMaxComparator() const {
         return std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>>(
-                new NullAsMaxComparatorWithPointer<KeyType>(m_keySchema));
+                new NullAsMaxComparatorWithPointer<KeyType>(this->m_keySchema));
     }
 
 };
