@@ -5,6 +5,8 @@ DROP PROCEDURE Results                         IF EXISTS;
 DROP PROCEDURE Vote                            IF EXISTS;
 DROP PROCEDURE ContestantWinningStates         IF EXISTS;
 DROP PROCEDURE GetStateHeatmap                 IF EXISTS;
+DROP PROCEDURE DistinctCount                   IF EXISTS;
+
 DROP VIEW  v_votes_by_phone_number             IF EXISTS;
 DROP VIEW  v_votes_by_contestant_number        IF EXISTS;
 DROP VIEW  v_votes_by_contestant_number_state  IF EXISTS;
@@ -96,5 +98,6 @@ CREATE PROCEDURE FROM CLASS voter.Results;
 CREATE PROCEDURE PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.Vote;
 CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;
+CREATE PROCEDURE FROM CLASS voter.DistinctCount;
 
 END_OF_2ND_BATCH
