@@ -66,7 +66,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
-    protected String plan_node_type;
 
     /**
      * We set this to non-null iff the expression has a non-deterministic
@@ -148,10 +147,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         this(type);
         m_left = left;
         m_right = right;
-    }
-
-    public void setPlanNodeType(String s) {
-        plan_node_type = s;
     }
 
     public void validate() throws Exception {

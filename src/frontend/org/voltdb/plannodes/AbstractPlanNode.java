@@ -1092,7 +1092,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         stringer.keySymbolValuePair(Members.ID.name(), m_id);
         String planNodeType = getPlanNodeType().toString();
         stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), planNodeType);
-        m_outputSchema.getColumn(0).getExpression().setPlanNodeType(planNodeType);
         if (m_inlineNodes.size() > 0) {
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
             int i = 0;
