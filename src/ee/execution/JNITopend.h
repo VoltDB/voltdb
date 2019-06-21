@@ -73,6 +73,7 @@ public:
 
     bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
+    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name);
     int32_t callJavaUserDefinedFunction();
     int32_t callJavaUserDefinedAggregateStart();
     int32_t callJavaUserDefinedAggregateAssemble();

@@ -66,6 +66,16 @@ class JNILocalFrameBarrier {
     }
 };
 
+void JNITopend::initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name) {
+    method = m_jniEnv->GetMethodID(
+        jniClass, name, "()I");
+    if (method == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(false);
+        throw std::exception();
+    }
+}
+
 JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller) {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
@@ -88,54 +98,17 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedFunction", "()I");
-    if (m_callJavaUserDefinedFunctionMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        vassert(m_callJavaUserDefinedFunctionMID != 0);
-        throw std::exception();
-    }
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedFunctionMID, "callJavaUserDefinedFunction");
 
-    m_callJavaUserDefinedAggregateStartMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedAggregateStart", "()I");
-    if (m_callJavaUserDefinedAggregateStartMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedAggregateStartMID != 0);
-        throw std::exception();
-    }
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedAggregateStartMID, "callJavaUserDefinedAggregateStart");
 
-    m_callJavaUserDefinedAggregateAssembleMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedAggregateAssemble", "()I");
-    if (m_callJavaUserDefinedAggregateAssembleMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedAggregateAssembleMID != 0);
-        throw std::exception();
-    }
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedAggregateAssembleMID, "callJavaUserDefinedAggregateAssemble");
 
-    m_callJavaUserDefinedAggregateCombineMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedAggregateCombine", "()I");
-    if (m_callJavaUserDefinedAggregateCombineMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedAggregateCombineMID != 0);
-        throw std::exception();
-    }
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedAggregateCombineMID, "callJavaUserDefinedAggregateCombine");
 
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedAggregateWorkerEndMID, "callJavaUserDefinedAggregateWorkerEnd");
 
-    m_callJavaUserDefinedAggregateWorkerEndMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedAggregateWorkerEnd", "()I");
-    if (m_callJavaUserDefinedAggregateWorkerEndMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedAggregateWorkerEndMID != 0);
-        throw std::exception();
-    }
-
-    m_callJavaUserDefinedAggregateCoordinatorEndMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedAggregateCoordinatorEnd", "()I");
-    if (m_callJavaUserDefinedAggregateCoordinatorEndMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedAggregateCoordinatorEndMID != 0);
-        throw std::exception();
-    }
+    initJavaUserDefinedMethod(jniClass, m_callJavaUserDefinedAggregateCoordinatorEndMID, "callJavaUserDefinedAggregateCoordinatorEnd");
 
     m_resizeUDFBufferMID = m_jniEnv->GetMethodID(
             jniClass, "resizeUDFBuffer", "(I)V");
