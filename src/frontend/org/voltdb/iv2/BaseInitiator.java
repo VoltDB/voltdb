@@ -187,7 +187,7 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
         if (m_siteThread != null) {
             try {
                 if (m_executionSite != null) {
-                    m_executionSite.m_pendingTasks.offer(Scheduler.m_nullTask);
+                    m_executionSite.m_pendingSiteTasks.offer(Scheduler.m_nullTask);
                 }
                 m_siteThread.join();
             } catch (InterruptedException e) {

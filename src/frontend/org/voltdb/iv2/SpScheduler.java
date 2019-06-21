@@ -1829,8 +1829,4 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // flush all RO transactions out of backlog
         m_pendingTasks.removeMPReadTransactions();
     }
-
-    public TransactionTaskQueue getPendingTasks() {
-        return m_pendingTasks;
-    }
 }

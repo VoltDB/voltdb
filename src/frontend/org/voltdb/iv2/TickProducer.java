@@ -33,7 +33,6 @@ import org.voltdb.rejoin.TaskLog;
 public class TickProducer extends SiteTasker implements Runnable
 {
     private final SiteTaskerQueue m_taskQueue;
-    private final TransactionTaskQueue m_pendingTasks;
     private final long m_procedureLogThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
@@ -46,7 +45,7 @@ public class TickProducer extends SiteTasker implements Runnable
             + "-- over %d seconds -- and blocking the queue for site %d (%s) "
             + "No other jobs will be executed until that process completes.";
 
-    public TickProducer(SiteTaskerQueue taskQueue, long siteId, TransactionTaskQueue pendingTasks)
+    public TickProducer(SiteTaskerQueue taskQueue, long siteId)
     {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
@@ -60,7 +59,6 @@ public class TickProducer extends SiteTasker implements Runnable
                                 .getProcedure()
                                 .getLoginfo();
         m_siteId = siteId;
-        m_pendingTasks = pendingTasks;
     }
 
     // start schedules a 1 second tick.
@@ -95,7 +93,7 @@ public class TickProducer extends SiteTasker implements Runnable
             if (m_logger.isDebugEnabled()) {
                 String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, "Site:" + CoreUtils.hsIdToString(m_siteId) + " " + m_pendingTasks.toString());
+                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, "Site:" + CoreUtils.hsIdToString(m_siteId) + " " + m_taskQueue.toString());
             } else {
                 m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
             }

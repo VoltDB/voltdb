@@ -151,7 +151,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final int m_siteIndex = siteIndexCounter.getAndIncrement();
 
     // Manages pending tasks.
-    final SiteTaskerQueue m_pendingTasks;
+    final SiteTaskerQueue m_pendingSiteTasks;
 
     /*
      * There is really no legitimate reason to touch the initiator mailbox from the site,
@@ -625,7 +625,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /** Create a new execution site and the corresponding EE */
     public Site(
-            SiteTaskerQueue scheduler,
+            SiteTaskerQueue pendingSiteTasks,
             long siteId,
             BackendTarget backend,
             CatalogContext context,
@@ -645,7 +645,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_partitionId = partitionId;
         m_numberOfPartitions = numPartitions;
-        m_pendingTasks = scheduler;
+        m_pendingSiteTasks = pendingSiteTasks;
         m_backend = backend;
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
@@ -721,7 +721,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         m_ee.loadFunctions(m_context);
 
-        m_snapshotter = new SnapshotSiteProcessor(m_pendingTasks,
+        m_snapshotter = new SnapshotSiteProcessor(m_pendingSiteTasks,
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override
@@ -843,7 +843,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             while (m_shouldContinue) {
                 if (m_rejoinState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
-                    SiteTasker task = m_pendingTasks.take();
+                    SiteTasker task = m_pendingSiteTasks.take();
                     if (task instanceof TransactionTask) {
                         m_currentTxnId = ((TransactionTask)task).getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
@@ -852,7 +852,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_pendingTasks.peek();
+                    SiteTasker task = m_pendingSiteTasks.peek();
                     boolean didWork = false;
                     if (task != null) {
                         didWork = true;
@@ -868,7 +868,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // remove the task from the scheduler and give it to task log.
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
                         if (m_rejoinState != kStateRunning) {
-                            m_pendingTasks.poll();
+                            m_pendingSiteTasks.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
                     } else {
@@ -879,7 +879,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         Thread.yield();
                     }
                 } else {
-                    SiteTasker task = m_pendingTasks.take();
+                    SiteTasker task = m_pendingSiteTasks.take();
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 }
             }
