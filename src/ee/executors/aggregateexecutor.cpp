@@ -491,9 +491,9 @@ public:
 class UserDefineAgg : public Agg {
     public:
     UserDefineAgg(int id, std::string worc_in, ExpressionType agg_type_in)
-        : functionId(id), worc(worc_in), agg_type(agg_type_in)
+        : functionId(id), worc(worc_in), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine())
     {
-        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
+        engine->callJavaUserDefinedAggregateStart(functionId);
     }
 
     virtual void advance(const NValue& val)
@@ -503,11 +503,11 @@ class UserDefineAgg : public Agg {
         }
         // if this is a worker, it will accumulate the data of its columns
         if (worc == "WORKER") {
-            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateAssemble(functionId, val);
+            engine->callJavaUserDefinedAggregateAssemble(functionId, val);
         }
         // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
         else {
-            ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCombine(functionId, val);
+            engine->callJavaUserDefinedAggregateCombine(functionId, val);
         }
     }
 
@@ -515,24 +515,25 @@ class UserDefineAgg : public Agg {
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
         if (worc == "WORKER") {
-            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type);
+            return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
         else {
-            return ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
+            return engine->callJavaUserDefinedAggregateCoordinatorEnd(functionId);
         }
     }
 
     virtual void resetAgg()
     {
-        ExecutorContext::getExecutorContext()->getEngine()->callJavaUserDefinedAggregateStart(functionId);
+        engine->callJavaUserDefinedAggregateStart(functionId);
     }
 
 private:
-    //Pool* m_memoryPool;
     int functionId;
+    // worker or coordinator
     std::string worc;
     ExpressionType agg_type;
+    VoltDBEngine* engine;
 };
 
 /*
