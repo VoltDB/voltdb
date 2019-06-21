@@ -689,7 +689,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::bufferHelper(int32_t functionId, const NValue& argument, ValueType type) {
+void VoltDBEngine::serializeToBuffer(int32_t functionId, const NValue& argument, ValueType type) {
     // Estimate the size of the buffer we need. We will put:
     //   * size of the buffer (function ID + parameters)
     //   * function ID (int32_t)
@@ -729,10 +729,10 @@ void VoltDBEngine::checkInfo(UserDefinedFunctionInfo *info, int32_t functionId) 
     }
 }
 
-void VoltDBEngine::checkReturnCode(int32_t returnCode) {
+void VoltDBEngine::checkReturnCode(int32_t returnCode, std::string name) {
     if (returnCode != 0) {
         throw SQLException(SQLException::volt_user_defined_function_error,
-            "callJavaUserDefinedAggregateStart failed");
+            name + " failed");
     }
 }
 
@@ -777,31 +777,31 @@ NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, Valu
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    bufferHelper(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart();
-    checkReturnCode(returnCode);
+    checkReturnCode(returnCode, "callJavaUserDefinedAggregateStart");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    bufferHelper(functionId, argument, info->paramTypes.front());
+    serializeToBuffer(functionId, argument, info->paramTypes.front());
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
-    checkReturnCode(returnCode);
+    checkReturnCode(returnCode, "callJavaUserDefinedAggregateAssemble");
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    bufferHelper(functionId, argument, VALUE_TYPE_VARBINARY);
+    serializeToBuffer(functionId, argument, VALUE_TYPE_VARBINARY);
     // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
-    checkReturnCode(returnCode);
+    checkReturnCode(returnCode, "callJavaUserDefinedAggregateCombine");
 }
 
 NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, ExpressionType agg_type) {
@@ -809,7 +809,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     checkInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
     bool partition_table = isForPartitionTable(agg_type);
-    bufferHelper(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
     partitionTableHelper(partition_table);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
@@ -821,7 +821,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    bufferHelper(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
