@@ -490,8 +490,8 @@ public:
 
 class UserDefineAgg : public Agg {
     public:
-    UserDefineAgg(int id, std::string worc_in, ExpressionType agg_type_in)
-        : functionId(id), worc(worc_in), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine())
+    UserDefineAgg(int id, bool is_worker, ExpressionType agg_type_in)
+        : functionId(id), isWorker(is_worker), agg_type(agg_type_in), engine(ExecutorContext::getExecutorContext()->getEngine())
     {
         engine->callJavaUserDefinedAggregateStart(functionId);
     }
@@ -502,7 +502,7 @@ class UserDefineAgg : public Agg {
             return;
         }
         // if this is a worker, it will accumulate the data of its columns
-        if (worc == "WORKER") {
+        if (isWorker) {
             engine->callJavaUserDefinedAggregateAssemble(functionId, val);
         }
         // if this is a coordinator, it will deserialize workers' byte arrays to java objects and merge them together
@@ -514,7 +514,7 @@ class UserDefineAgg : public Agg {
     virtual NValue finalize(ValueType type)
     {
         // if this is a worker, it will serialize its output and send it to the coordinator.
-        if (worc == "WORKER") {
+        if (isWorker) {
             return engine->callJavaUserDefinedAggregateWorkerEnd(functionId, agg_type);
         }
         // if this is a coordinator, it will deserialize the output from the workers and merge them with its own output. Finally return the ultimate response.
@@ -531,7 +531,7 @@ class UserDefineAgg : public Agg {
 private:
     int functionId;
     // worker or coordinator
-    std::string worc;
+    bool isWorker;
     ExpressionType agg_type;
     VoltDBEngine* engine;
 };
@@ -540,7 +540,7 @@ private:
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, std::string worc)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, std::string worker_or_coordinator)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -572,7 +572,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
-        return new (memoryPool) UserDefineAgg(agg_id, worc, agg_type);
+        return new (memoryPool) UserDefineAgg(agg_id, worker_or_coordinator == "WORKER", agg_type);
     default:
         {
             char message[128];
