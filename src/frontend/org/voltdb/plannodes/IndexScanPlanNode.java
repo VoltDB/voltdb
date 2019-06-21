@@ -160,6 +160,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     }
 
     public void setSkipNullPredicate() {
+        setSkipNullPredicateCalcite(0);
+    }
+
+    /**
+     * Calcite needs to know an index of the table associated with this scan to set
+     * it properly for the SkipNullPredicate. Volt planner is capable of resolving table index
+     * using persistent table schema but in case of Calcite, this schema is unavalable and
+     * the index must be passed in as a parameter.
+     *
+     * @param tableIdx- 1 if a scan is an inner scan of the NJIJ. 0 otherwise.
+     */
+    public void setSkipNullPredicateCalcite(int tableIdx) {
+
         // prepare position of non null key
         if (m_lookupType == IndexLookupType.EQ || isReverseScan()) {
             m_skip_null_predicate = null;
@@ -178,12 +191,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
             nullExprIndex = searchKeySize - 1;
         }
 
-        setSkipNullPredicate(nullExprIndex);
+        m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
+                                                       tableIdx, m_searchkeyExpressions, m_compareNotDistinct);
     }
 
     public void setSkipNullPredicate(int nullExprIndex) {
-        assert(nullExprIndex >= 0);
-
         m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
                                                         m_searchkeyExpressions, m_compareNotDistinct);
     }
@@ -191,6 +203,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     public static AbstractExpression buildSkipNullPredicate(
             int nullExprIndex, Index catalogIndex, StmtTableScan tableScan,
             List<AbstractExpression> searchkeyExpressions, List<Boolean> compareNotDistinct) {
+        return buildSkipNullPredicate(nullExprIndex, catalogIndex, tableScan, 0, searchkeyExpressions, compareNotDistinct);
+    }
+
+    private static AbstractExpression buildSkipNullPredicate(
+            int nullExprIndex, Index catalogIndex, StmtTableScan tableScan, int tableIdx,
+            List<AbstractExpression> searchkeyExpressions, List<Boolean> compareNotDistinct) {
+        assert(nullExprIndex >= 0);
 
         String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -205,7 +224,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
                 TupleValueExpression tve = new TupleValueExpression(
                         tableScan.getTableName(), tableScan.getTableAlias(),
                         col, col.getIndex());
-
+                tve.setTableIndex(tableIdx);
                 indexedExprs.add(tve);
             }
         } else {

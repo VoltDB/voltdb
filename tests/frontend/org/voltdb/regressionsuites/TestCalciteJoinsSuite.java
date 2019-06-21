@@ -27,9 +27,9 @@ import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestMergeJoinsSuite extends RegressionSuite {
+public class TestCalciteJoinsSuite extends RegressionSuite {
 
-    public TestMergeJoinsSuite(String name) {
+    public TestCalciteJoinsSuite(String name) {
         super(name);
     }
 
@@ -45,6 +45,14 @@ public class TestMergeJoinsSuite extends RegressionSuite {
         subtestNonEmptyTablesMergeJoin(client);
         truncateTables(client, TABLES);
         subtestCompoundIndexMergeJoin(client);
+    }
+
+    public void testNLIJs() throws Exception {
+        Client client = getClient();
+        truncateTables(client, TABLES);
+        subtestEmptyTablesNLIJ(client);
+        truncateTables(client, TABLES);
+        subtestNonEmptyTablesNLIJJoin(client);
     }
 
     private void subtestEmptyTablesMergeJoin(Client client) throws Exception {
@@ -92,19 +100,6 @@ public class TestMergeJoinsSuite extends RegressionSuite {
             {4,6,5,4},
             {4,7,5,4}
             });
-
-        // Calcite combines JOIN and WHERE expressions into a single one that is not an equivalence one.
-        query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R3 INNER JOIN R4 " +
-                "ON R3.A = R4.G where R3.C > R4.A;";
-
-        // TODO Calcite read uncomment
-        //checkQueryPlan(client, query,"MERGE INNER JOIN");
-
-        validateTableOfLongs(client, query, new long[][]{
-            {2,3,2,2},
-            {4,6,5,4},
-            {4,7,5,4}
-        });
     }
 
     private void subtestCompoundIndexMergeJoin(Client client) throws Exception {
@@ -133,8 +128,52 @@ public class TestMergeJoinsSuite extends RegressionSuite {
         });
     }
 
+    private void subtestEmptyTablesNLIJ(Client client) throws Exception {
+        String query = "SELECT R3.C, R4.G FROM R3 INNER JOIN R4 ON R3.C = R4.G ;";
+
+        // Both table are empty
+        checkQueryPlan(client, query,"NESTLOOP INDEX INNER JOIN");
+        validateRowCount(client, query, 0);
+
+        // One table is empty
+        client.callProcedure("R3.INSERT", 1, 1);
+        validateRowCount(client, query, 0);
+    }
+
+    private void subtestNonEmptyTablesNLIJJoin(Client client) throws Exception {
+        String query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R3 INNER JOIN R4 " +
+              "ON R3.A = R4.G ORDER BY 1,2,3,4;";
+        client.callProcedure("R3.INSERT", 1, 1); // No matches
+        client.callProcedure("R3.INSERT", 2, 2); // 3 matches
+        client.callProcedure("R3.INSERT", 2, 3); // 3 matches
+        client.callProcedure("R3.INSERT", 3, 4); // No matches
+        client.callProcedure("R3.INSERT", 4, 5); // 1 match
+        client.callProcedure("R3.INSERT", 4, 6); // 1 match
+        client.callProcedure("R3.INSERT", 4, 7); // 1 match
+
+        client.callProcedure("R4.INSERT", 1, 10);
+        client.callProcedure("R4.INSERT", 2, 2);
+        client.callProcedure("R4.INSERT", 3, 2);
+        client.callProcedure("R4.INSERT", 4, 2);
+        client.callProcedure("R4.INSERT", 5, 4);
+        client.callProcedure("R4.INSERT", 6, 6);
+
+        // Calcite combines JOIN and WHERE expressions into a single one that is not an equivalence one.
+        // NLIJ instead of a possible MJ
+        query = "SELECT R3.A, R3.C, R4.A, R4.G FROM R3 INNER JOIN R4 " +
+                "ON R3.A = R4.G where R3.C > R4.A order by 1, 2, 3, 4;";
+
+        checkQueryPlan(client, query,"NESTLOOP INDEX INNER JOIN");
+
+        validateTableOfLongs(client, query, new long[][]{
+            {2,3,2,2},
+            {4,6,5,4},
+            {4,7,5,4}
+        });
+    }
+
     static public junit.framework.Test suite() {
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMergeJoinsSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCalciteJoinsSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestJoinsSuite.class.getResource("testjoins-ddl.sql"));
 

@@ -264,10 +264,11 @@ public abstract class SubPlanAssembler {
      *
      * @param scanNode Initial index scan plan.
      * @param path The access path to access the data in the table (index/scan/etc).
+     * @param tableIdx - 1 if a scan is an inner scan of the NJIJ. 0 otherwise.
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path) {
+    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path, int tableIdx) {
         AbstractPlanNode resultNode = scanNode;
         // set sortDirection here because it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -316,7 +317,7 @@ public abstract class SubPlanAssembler {
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(ExpressionType.CONJUNCTION_AND, path.initialExpr));
-        scanNode.setSkipNullPredicate();
+        scanNode.setSkipNullPredicateCalcite(tableIdx);
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         IndexUseForOrderBy indexUse = scanNode.indexUse();
         indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);

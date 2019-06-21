@@ -41,7 +41,6 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MergeJoinPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.JoinType;
-import org.voltdb.types.PlanNodeType;
 
 import com.google.common.collect.ImmutableList;
 import com.google_voltpatches.common.base.Preconditions;
@@ -144,6 +143,9 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         Preconditions.checkNotNull(node, "Plan node is null");
         // An inner node has to be an index scan
         assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        // Since it's going to be inlined and MJ executor will be iterating directly over
+        // its persistent table all the expression references must be resolved
+        // in context of the persistent table
         VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
         RexProgram innerProgram = innerIndexScan.getProgram();
         NodeSchema innerSchema = RexConverter.convertToVoltDBNodeSchema(innerProgram, 1);
@@ -151,6 +153,8 @@ public class VoltPhysicalMergeJoin extends VoltPhysicalJoin {
         // Outer node
         NodeSchema outerSchema;
         if (getInput(0) instanceof VoltPhysicalTableIndexScan) {
+            // If the outer node is an index scan all the refernces must be resolved
+            // using the persistent table similar to the inner node
             VoltPhysicalTableIndexScan outerIndexScan = (VoltPhysicalTableIndexScan) getInput(0);
             RexProgram outerProgram = outerIndexScan.getProgram();
             outerSchema = RexConverter.convertToVoltDBNodeSchema(outerProgram, 0);

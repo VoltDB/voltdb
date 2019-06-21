@@ -30,17 +30,22 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.JoinType;
 
 import com.google.common.collect.ImmutableList;
@@ -102,9 +107,14 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         nlipn.setJoinType(JoinType.INNER);
         // Set children
         nlipn.addAndLinkChild(inputRelNodeToPlanNode(this, 0));
-        final AbstractPlanNode rhn = inputRelNodeToPlanNode(this, 1);
-        assert(rhn instanceof IndexScanPlanNode);
-        nlipn.addInlinePlanNode(rhn);
+        // Set inner node table index to "1" prior to its conversion to AbstractPlanNode
+        // The table index will be propagated to the inlined index scan's SkippNullPredicate.
+        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        ((VoltPhysicalTableIndexScan) getInput(1)).setTableIdx(1);
+        final AbstractPlanNode innerNode = inputRelNodeToPlanNode(this, 1);
+        assert(innerNode instanceof IndexScanPlanNode);
+        IndexScanPlanNode innerIndexScan = (IndexScanPlanNode) innerNode;
+        nlipn.addInlinePlanNode(innerIndexScan);
 
         // We don't need to set the join predicate explicitly here because it will be
         // an index and/or filter expressions for the inline index scan
@@ -112,7 +122,7 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         // and their indexes have to be set to 1 because its an inner table
         // All other index scan expressions are part of a join expressions and should already have
         // the correct TVE index set
-        final AbstractExpression postPredicate = ((IndexScanPlanNode) rhn).getPredicate();
+        final AbstractExpression postPredicate = innerIndexScan.getPredicate();
         if (postPredicate != null) {
             postPredicate.findAllSubexpressionsOfClass(TupleValueExpression.class)
                     .forEach(expr -> ((TupleValueExpression) expr).setTableIndex(1));
@@ -120,7 +130,31 @@ public class VoltPhysicalNestLoopIndexJoin extends VoltPhysicalJoin {
         // Inline LIMIT / OFFSET
         addLimitOffset(nlipn);
         // Set output schema
-        return setOutputSchema(nlipn);
+        setOutputSchema(nlipn);
+
+        return nlipn;
+    }
+
+    @Override
+    protected AbstractPlanNode setOutputSchema(AbstractJoinPlanNode node) {
+        Preconditions.checkNotNull(node, "Plan node is null");
+        // An inner node has to be an index scan
+        // Since it's going to be inlined and NLIJ executor will be iterating directly over
+        // its persistent table all the expression references must be resolved
+        // in context of the persistent table
+        assert(getInput(1) instanceof VoltPhysicalTableIndexScan);
+        VoltPhysicalTableIndexScan innerIndexScan = (VoltPhysicalTableIndexScan) getInput(1);
+        RexProgram innerProgram = innerIndexScan.getProgram();
+        NodeSchema innerSchema = RexConverter.convertToVoltDBNodeSchema(innerProgram, 1);
+        // Join with the outer schema.
+        RelDataType outerRowType = getInput(0).getRowType();
+        NodeSchema outerSchema = RexConverter.convertToVoltDBNodeSchema(outerRowType, 0);
+        final NodeSchema joinSchema = outerSchema.join(innerSchema);
+        node.setOutputSchemaPreInlineAgg(joinSchema);
+        node.setOutputSchema(joinSchema);
+        node.setHaveSignificantOutputSchema(true);
+
+        return node;
     }
 
     @Override
