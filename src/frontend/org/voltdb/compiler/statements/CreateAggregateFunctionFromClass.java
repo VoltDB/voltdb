@@ -93,15 +93,17 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
         // find the four(start, assemble, combine, end) functions in the class
         Method assembleMethod = null;
         Method endMethod = null;
-        boolean start = false, assemble = false, combine = false, end = false;
+        boolean start = false, combine = false;
+        String funcName;
+        boolean found;
         for (final Method m : funcClass.getDeclaredMethods()) {
             // if this function is not one the the four, skip
-            String funcName = m.getName();
+            funcName = m.getName();
             if (!funcName.equals("start") && !funcName.equals("assemble")
                 && !funcName.equals("combine") && !funcName.equals("end")) {
                 continue;
             }
-            boolean found = true;
+            found = true;
             StringBuilder warningMessage = new StringBuilder("function " + funcName + " is ");
             if (!Modifier.isPublic(m.getModifiers())) {
                 warningMessage.append("non-public ");
@@ -137,11 +139,10 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         break;
                     
                     case "assemble":
-                        if (assemble) {
+                        if (assembleMethod != null) {
                             String msg = "Class " + shortName + " has multiple methods named assemble";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        assemble = true;
                         assembleMethod = m;
                         break;
                     
@@ -154,11 +155,10 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
                         break;
                     
                     case "end":
-                        if (end) {
+                        if (endMethod != null) {
                             String msg = "Class " + shortName + " has multiple methods named end";
                             throw m_compiler.new VoltCompilerException(msg);
                         }
-                        end = true;
                         endMethod = m;
                         break;
                 }
@@ -168,7 +168,7 @@ public class CreateAggregateFunctionFromClass extends CreateFunction {
             }
         }
         // check if all four functions appear in the class
-        if (!(start && assemble && combine && end)) {
+        if (!(start && (assembleMethod != null) && combine && (endMethod != null))) {
             String msg = "Cannot find all four functions for the class " + shortName +
                 " for user-defined aggregate function " + functionName;
             throw m_compiler.new VoltCompilerException(msg);
