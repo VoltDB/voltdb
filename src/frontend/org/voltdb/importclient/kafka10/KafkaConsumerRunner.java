@@ -48,8 +48,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.DurableTracker;
-import org.voltdb.importclient.kafka.util.KafkaConstants;
 import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
 import org.voltdb.importclient.kafka.util.KafkaUtils;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importclient.kafka.util.ProcedureInvocationCallback;
@@ -101,7 +101,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 if (partitions.isEmpty()) {
                     return;
                 }
-                LOGGER.info("Consumer group " + m_config.getGroupId() + " drops topic/partitions:" + partitions);
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Consumer group " + m_config.getGroupId() + " drops topic/partitions:" + partitions);
+                }
 
                 //This method is called before a rebalance operation starts and after the consumer stops fetching data.
                 //So commit offsets for the partitions before they are revoked
@@ -125,7 +127,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                LOGGER.info("Consumer group " + m_config.getGroupId() + " is assigned with topic/partition" + partitions);
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Consumer group " + m_config.getGroupId() + " is assigned with topic/partition" + partitions);
+                }
             }
         });
     }
@@ -180,12 +184,16 @@ public abstract class KafkaConsumerRunner implements Runnable {
         if (m_consumer == null) {
             return;
         }
-        LOGGER.info("Shutdown Kafka consumer for group " + m_config.getGroupId());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Shutdown Kafka consumer for group " + m_config.getGroupId());
+        }
         m_done.set(true);
         try {
             m_consumer.wakeup();
         }  catch (Exception e) {
-            LOGGER.warn("Kafka wakeup interuption while cleaning up Kafka consumer:" + e.getMessage());
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Kafka wakeup interruption while cleaning up Kafka consumer:" + e.getMessage());
+            }
         }
     }
 
@@ -193,7 +201,9 @@ public abstract class KafkaConsumerRunner implements Runnable {
 
     @Override
     public void run() {
-        LOGGER.info("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Starting Kafka consumer for group:" + m_config.getGroupId() + " topics:" + m_config.getTopics());
+        }
         List<TopicPartition> seekList = new ArrayList<>();
         Map<TopicPartition, AtomicLong> submitCounts = new HashMap<>();
         CSVParser csvParser = new CSVParser();
@@ -345,10 +355,12 @@ public abstract class KafkaConsumerRunner implements Runnable {
         }
 
         m_done.set(true);
-        StringBuilder builder = new StringBuilder("Import detail for group " + m_config.getGroupId());
-        builder.append(" \n         Submitted Counts:" + m_workTrackers);
-        builder.append(" \n         Committed Offsets: " + m_lastCommittedOffSets.get());
-        LOGGER.info(builder.toString());
+        if (LOGGER.isDebugEnabled()) {
+            StringBuilder builder = new StringBuilder("Import detail for group " + m_config.getGroupId());
+            builder.append(" \n         Submitted Counts:" + m_workTrackers);
+            builder.append(" \n         Committed Offsets: " + m_lastCommittedOffSets.get());
+            LOGGER.debug(builder.toString());
+        }
     }
 
     //Move offsets to correct positions for next poll
