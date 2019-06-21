@@ -124,14 +124,10 @@ public class ExportCoordinator {
                             Integer newLeaderHostId = initialState.getInt();
                             m_leaderHostId = newLeaderHostId;
 
-                            StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
-                                    .append(m_leaderHostId)
-                                    .append(isPartitionLeader() ? " (localHost) " : " ")
-                                    .append("is the leader at initial state");
                             if (isPartitionLeader()) {
-                                exportLog.info(sb.toString());
+                                exportLog.info(getLeaderMessageAtInitialState());
                             } else if (exportLog.isDebugEnabled()) {
-                                exportLog.debug(sb.toString());
+                                exportLog.debug(getLeaderMessageAtInitialState());
                             }
                             setCoordinatorInitialized();
                             invokeNext();
@@ -149,6 +145,14 @@ public class ExportCoordinator {
             } catch (Exception e) {
                 exportLog.error("Failed to handle initial state: " + e);
             }
+        }
+
+        private String getLeaderMessageAtInitialState() {
+            StringBuilder sb = new StringBuilder("Initialized export coordinator: host ")
+                    .append(m_leaderHostId)
+                    .append(isPartitionLeader() ? " (localHost) " : " ")
+                    .append("is the leader at initial state");
+            return sb.toString();
         }
 
         @Override
@@ -345,14 +349,10 @@ public class ExportCoordinator {
                             }
                             m_leaderHostId = newLeaderHostId;
 
-                            StringBuilder sb = new StringBuilder("Host ")
-                                    .append(m_leaderHostId)
-                                    .append(isPartitionLeader() ? " (localHost) " : " ")
-                                    .append("is the new leader");
                             if (isPartitionLeader()) {
-                                exportLog.info(sb.toString());
+                                exportLog.info(getNewLeaderMessage());
                             } else if (exportLog.isDebugEnabled()) {
-                                exportLog.debug(sb.toString());
+                                exportLog.debug(getNewLeaderMessage());
                             }
 
                             // If leader and maps empty request ExportSequenceNumberTracker from all nodes.
@@ -381,6 +381,14 @@ public class ExportCoordinator {
             } catch (Exception e) {
                 exportLog.error("Failed to handle state resolution: " + e);
             }
+        }
+
+        private String getNewLeaderMessage() {
+            StringBuilder sb = new StringBuilder("Host ")
+                    .append(m_leaderHostId)
+                    .append(isPartitionLeader() ? " (localHost) " : " ")
+                    .append("is the new leader");
+            return sb.toString();
         }
 
         @Override
