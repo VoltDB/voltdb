@@ -429,9 +429,6 @@ CompactingMap<KeyValuePair, Compare, hasRank>::upperBoundNullAsMax(const Key &ke
     setPointerValue(tmpKey, MAXPOINTER);
     TreeNode *x = m_root;
     TreeNode *y = const_cast<TreeNode *>(&NIL);
-    std::cout<<typeid(tmpKey).name() << std::endl;
-    std::cout<<typeid(m_comper).name() << std::endl;
-    std::cout<<typeid(m_comper.getNullAsMaxComparator()).name() << std::endl;
     while (x != &NIL) {
         int cmp = (*m_comper.getNullAsMaxComparator())(x->key(), tmpKey);
         if (cmp <= 0) {
