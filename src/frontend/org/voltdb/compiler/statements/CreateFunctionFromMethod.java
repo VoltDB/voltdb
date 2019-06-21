@@ -195,7 +195,7 @@ public class CreateFunctionFromMethod extends CreateFunction {
         // may revive a saved user defined function, and that nothing is put into the
         // catalog here.
         //
-        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes, 's');
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes, false);
         funcXML.attributes.put("functionid", String.valueOf(functionId));
 
         m_logger.debug(String.format("Added XML for function \"%s\"", functionName));

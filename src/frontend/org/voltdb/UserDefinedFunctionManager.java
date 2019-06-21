@@ -189,7 +189,7 @@ public class UserDefinedFunctionManager {
             // We register the token again when initializing the user-defined function manager because
             // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
             // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, 'a');
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, true);
         }
         
         private void initFunctionInstance(Class<?> funcClass) {
@@ -452,7 +452,7 @@ public class UserDefinedFunctionManager {
             // We register the token again when initializing the user-defined function manager because
             // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
             // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, 's');
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes, false);
         }
 
         private void initFunctionMethod(String methodName) {
