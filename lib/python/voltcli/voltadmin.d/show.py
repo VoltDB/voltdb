@@ -18,10 +18,17 @@ def show_snapshots(runner):
     response = runner.call_proc('@SnapshotStatus', [], [])
     print response.table(0).format_table(caption = 'Snapshot Status')
 
+def show_license(runner):
+	response = runner.call_proc('@SystemInformation',
+                                [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                ['LICENSE'])
+	print response.table(0).format_table(caption = 'License Information')
+
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Display information about a live database.',
-    modifiers = VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.')
+	modifiers = [VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.'), 
+				VOLT.Modifier('license', show_license, 'Display license information.')]
 )
 def show(runner):
     runner.go()
