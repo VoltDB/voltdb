@@ -17,6 +17,8 @@
 
 package org.voltdb.sysprocs;
 
+import static org.voltdb.ExtensibleSnapshotDigestData.DR_TUPLE_STREAM_STATE_INFO;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -1753,8 +1755,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         }
                     }
                 }
-                if (digest.has("drTupleStreamStateInfo")) {
-                    JSONObject stateInfo = digest.getJSONObject("drTupleStreamStateInfo");
+                if (digest.has(DR_TUPLE_STREAM_STATE_INFO)) {
+                    JSONObject stateInfo = digest.getJSONObject(DR_TUPLE_STREAM_STATE_INFO);
                     Iterator<String> keys = stateInfo.keys();
                     while (keys.hasNext()) {
                         String partitionIdString = keys.next();

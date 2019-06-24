@@ -219,8 +219,9 @@ public class SnapshotSiteProcessor {
         SiteProcedureConnection spc = context.getSiteProcedureConnection();
 
         for (Table t : database.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(database, t))
+            if (!CatalogUtil.isTableExportOnly(database, t)) {
                 continue;
+            }
 
             Map<Integer, ExportSnapshotTuple> sequenceNumbers = s_exportSequenceNumbers.get(t.getTypeName());
             if (sequenceNumbers == null) {
@@ -530,7 +531,9 @@ public class SnapshotSiteProcessor {
             if (desired > available) {
                 return null;
             }
-            if (m_availableSnapshotBuffers.compareAndSet(available, available - desired)) break;
+            if (m_availableSnapshotBuffers.compareAndSet(available, available - desired)) {
+                break;
+            }
         }
 
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());

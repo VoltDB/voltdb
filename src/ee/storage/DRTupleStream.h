@@ -103,10 +103,6 @@ public:
                                    long startSequenceNumber,
                                    char *out);
 
-    void setDrProtocolVersion(uint8_t drProtocolVersion) {
-            m_drProtocolVersion = drProtocolVersion;
-    }
-
     const uint64_t getOpenUniqueIdForTest() const {
         return m_openUniqueId;
     }
