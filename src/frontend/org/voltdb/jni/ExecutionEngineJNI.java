@@ -861,7 +861,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return m_functionManager.getAggregateFunctionRunnerById(functionId);
     }
 
-    private void dealWithUnsuccessfulExecution(Throwable throwable) {
+    private void handleUDAFError(Throwable throwable) {
         // Getting here means the execution was not successful.
         try {
             assert(throwable != null);
@@ -901,9 +901,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    class udfObjectInputStream extends ObjectInputStream {
+    class UDAFObjectInputStream extends ObjectInputStream {
 
-        public udfObjectInputStream(InputStream in) throws IOException {
+        public UDAFObjectInputStream(InputStream in) throws IOException {
             super(in);
         }
 
@@ -922,7 +922,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateStart() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        Throwable throwable = null;
         try {
             assert(udafRunner != null);
             // Call the user-defined function start method
@@ -934,18 +933,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (InvocationTargetException ex1) {
             // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
             // We need to get its cause and throw that to the user.
-            throwable = ex1.getCause();
+            handleUDAFError(ex1.getCause());
         }
         catch (Throwable ex2) {
-            throwable = ex2;
+            handleUDAFError(ex2);
         }
-        dealWithUnsuccessfulExecution(throwable);
         return -1;
     }
 
     public int callJavaUserDefinedAggregateAssemble() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        Throwable throwable = null;
         try {
             assert(udafRunner != null);
             // Call the user-defined function assemble method.
@@ -956,18 +953,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (InvocationTargetException ex1) {
             // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
             // We need to get its cause and throw that to the user.
-            throwable = ex1.getCause();
+            handleUDAFError(ex1.getCause());
         }
         catch (Throwable ex2) {
-            throwable = ex2;
+            handleUDAFError(ex2);
         }
-        dealWithUnsuccessfulExecution(throwable);
         return -1;
     }
 
     public int callJavaUserDefinedAggregateCombine() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        Throwable throwable = null;
         Object worker_object = null;
         try {
             assert(udafRunner != null);
@@ -977,7 +972,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             ByteArrayInputStream bis = new ByteArrayInputStream(worker_byte_array);
             ObjectInput in = null;
             try {
-                in = new udfObjectInputStream(bis);
+                in = new UDAFObjectInputStream(bis);
                 worker_object = in.readObject();
             } finally {
                 try {
@@ -996,12 +991,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (InvocationTargetException ex1) {
             // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
             // We need to get its cause and throw that to the user.
-            throwable = ex1.getCause();
+            handleUDAFError(ex1.getCause());
         }
         catch (Throwable ex2) {
-            throwable = ex2;
+            handleUDAFError(ex2);
         }
-        dealWithUnsuccessfulExecution(throwable);
         return -1;
     }
 
@@ -1009,7 +1003,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
         // get the boolean value from the buffer that indicates whether this is for a partition table or a repicated table
         boolean isForPartitionTable = (m_udfBuffer.get() != 0);
-        Throwable throwable = null;
         Object returnValue = null;
         VoltType returnType = null;
         try {
@@ -1046,16 +1039,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // Return zero status code for a successful execution.
             return 0;
         }
-        catch (Throwable ex2) {
-            throwable = ex2;
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
         }
-        dealWithUnsuccessfulExecution(throwable);
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
         return -1;
     }
 
     public int callJavaUserDefinedAggregateCoordinatorEnd() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        Throwable throwable = null;
         Object returnValue = null;
         try {
             assert(udafRunner != null);
@@ -1068,15 +1064,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // Return zero status code for a successful execution.
             return 0;
         }
-         catch (InvocationTargetException ex1) {
-             // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
-             // We need to get its cause and throw that to the user.
-             throwable = ex1.getCause();
-         }
-        catch (Throwable ex2) {
-            throwable = ex2;
+        catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
+            handleUDAFError(ex1.getCause());
         }
-        dealWithUnsuccessfulExecution(throwable);
+        catch (Throwable ex2) {
+            handleUDAFError(ex2);
+        }
         return -1;
     }
 
