@@ -35,6 +35,11 @@ import org.voltdb.parser.SQLLexer;
  */
 public class AdHocSpForTest extends AdHocNTBase {
     @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
+
+    @Override
     protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         return runUsingLegacy(params);
     }

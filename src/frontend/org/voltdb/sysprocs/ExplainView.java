@@ -33,6 +33,11 @@ import org.voltdb.parser.SQLLexer;
 public class ExplainView extends AdHocNTExplain {
 
     @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
+
+    @Override
     protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
         throw new PlanningErrorException("Unsupported operation");
     }

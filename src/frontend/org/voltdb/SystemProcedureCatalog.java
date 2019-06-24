@@ -136,7 +136,7 @@ public class SystemProcedureCatalog {
 
     static {
         // special-case replica acceptability by DR version
-        ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
+        final ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",
                 new Config("org.voltdb.sysprocs.AdHoc_RW_MP",
                         false, false, false, 0, VoltType.INVALID,

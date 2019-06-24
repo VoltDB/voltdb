@@ -134,10 +134,8 @@ public class NonDdlBatchPlanner {
         final PlannerTool ptool = m_catalogContext.m_ptool;
         assert(ptool != null);
         try {
-            //ptool.planSql(task.getSQL(), )
             return ptool.planSqlCalcite(task);
-        } catch (PlannerFallbackException ex) {
-            // Let go the PlannerFallbackException so we can fall back to the legacy planner.
+        } catch (PlannerFallbackException ex) { // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
         } catch (Exception ex) {
             Throwable cause = ex.getCause();

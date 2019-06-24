@@ -28,14 +28,21 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 public class AdHoc extends AdHocNTBase {
+
+    @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
 
     /**
      * Run an AdHoc query batch through Calcite parser and planner. If there is
@@ -51,7 +58,7 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     @Override
-    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException {
         // TRAIL [Calcite-AdHoc-DQL/DML:0] AdHoc.run()
         // TRAIL [Calcite-AdHoc-DDL:0] AdHoc.run()
         /**
@@ -62,12 +69,12 @@ public class AdHoc extends AdHocNTBase {
          * eliminated. They both need to be re-designed in the new Calcite
          * framework.
          */
-        SqlBatch batch;
         try { // We do not need to worry about the ParameterSet;
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-            batch = SqlBatch.from(params, m_context, ExplainMode.NONE);
-            return batch.execute();
-        } catch (Exception ex) {        // For now, let's just fail the batch if any error happens.
+            return SqlBatch.from(params, m_context, ExplainMode.NONE).execute();
+        } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+            throw ex;
+        } catch (Exception ex) {        // For any other non-calcite related exceptions, fail the batch.
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
         }
     }
@@ -153,11 +160,8 @@ public class AdHoc extends AdHocNTBase {
             } else {
                 logCatalogUpdateInvocation("@AdHoc");
                 return updateApplication("@AdHoc", null, /* operationBytes */
-                        null, /* operationString */
-                        sqlStatements.toArray(new String[0]), /* adhocDDLStmts */
-                        sqlNodes, null, /* replayHashOverride */
-                        false, /* isPromotion */
-                        true); /* useAdhocDDL */
+                        null, sqlStatements.toArray(new String[0]), /* adhocDDLStmts */
+                        sqlNodes, null, false, true);
             }
         }
     }

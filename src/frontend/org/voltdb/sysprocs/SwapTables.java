@@ -42,6 +42,11 @@ import org.voltdb.utils.CatalogUtil;
 public class SwapTables extends AdHocNTBase {
 
     @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
+
+    @Override
     protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         return runUsingLegacy(params);
     }

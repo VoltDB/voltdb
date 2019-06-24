@@ -70,7 +70,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     protected final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
-    private boolean m_usingCalcite = false;
+    private boolean m_usingCalcite = true; // TODO: do we need to control this switch for testing purpose?
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
     boolean m_isConfiguredForNonVoltDBBackend =
@@ -82,16 +82,21 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         m_usingCalcite = usingCalcite;
     }
 
-    boolean isUsingCalcite() {
-        return m_usingCalcite;
-    }
-
     abstract protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException;
     abstract protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params);
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        try {
-            return m_usingCalcite ? runUsingCalcite(params) : runUsingLegacy(params);
-        } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+    // NOTE!!! Because we use reflection to find the run method of each concrete AdHocNTBase class, each of those
+    // concrete methods must declare and implement then run() method. If we simply using the default run() method,
+    // then the reflection would not find it. Each overriding run() method that matches this signature can safely just
+    // call runInternal() method.
+    abstract public CompletableFuture<ClientResponse> run(ParameterSet params);
+    protected CompletableFuture<ClientResponse> runInternal(ParameterSet params) {
+        if (m_usingCalcite) {
+            try {
+                return runUsingCalcite(params);
+            } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+                return runUsingLegacy(params);
+            }
+        } else {
             return runUsingLegacy(params);
         }
     }

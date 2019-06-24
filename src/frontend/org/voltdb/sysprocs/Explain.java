@@ -34,6 +34,11 @@ public class Explain extends AdHocNTExplain {
     private AdHocNTBaseContext m_context = new AdHocNTBaseContext();
 
     @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
+
+    @Override
     public CompletableFuture<ClientResponse> run(String sql) {
         throw new PlanningErrorException("Unsupported operation");
     }
