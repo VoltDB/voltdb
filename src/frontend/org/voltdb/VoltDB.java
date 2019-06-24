@@ -853,6 +853,15 @@ public class VoltDB {
                     m_pathToCatalog = catalogFH.getAbsolutePath();
                     return;
                 }
+                case LICENSE: {
+                    File licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
+                    if (!licFH.exists()) {
+                        System.out.println("FATAL: License file not found.");
+                        referToDocAndExit();
+                    }
+                    m_pathToLicense = licFH.getAbsolutePath();
+                    return;
+                }
             }
         }
 

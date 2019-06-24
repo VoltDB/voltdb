@@ -18,14 +18,16 @@ import sys, os, subprocess
 from voltcli import utility
 
 dir_spec_help = ('Specifies the root directory for the database. The default is the current working directory.')
-get_resource_help = ('Supported configuration resources for get command are \'classes\', \'deployment\' and \'schema\'.\r\n'
+get_resource_help = ('Supported configuration resources for get command are \'classes\', \'deployment\', \'schema\', and \'license\'.\r\n'
                      '           classes    - gets procedure classes of current node\n'
                      '           deployment - gets deployment configuration of current node\n'
-                     '           schema     - gets schema of current node\n')
+                     '           schema     - gets schema of current node\n'
+                     '           license     - gets license of current node\n')						 
 output_help = ('Specifies the path and file name for the output file. Defaults are: '
                'Deployment - deployment.xml;\r\n'
                'Schema - schema.sql;\r\n'
-               'Classes - procedures.jar')
+               'Classes - procedures.jar'
+               'License - license.xml')
 
 @VOLT.Command(
     description = 'Write the selected database resource (deployment or schema) to a file.',
@@ -42,10 +44,10 @@ output_help = ('Specifies the path and file name for the output file. Defaults a
 def get(runner):
     runner.args.extend(['get'])
 
-    if runner.opts.resource in ('deployment', 'schema', 'classes'):
+    if runner.opts.resource in ('deployment', 'schema', 'classes', 'license'):
         runner.args.extend([runner.opts.resource])
     else:
-        utility.abort('Invalid argument \'%s\' for Get command. Valid arguments are deployment, schema and classes' % runner.opts.resource)
+        utility.abort('Invalid argument \'%s\' for Get command. Valid arguments are deployment, schema, classes and license' % runner.opts.resource)
 
     if runner.opts.output:
         runner.args.extend(['file', runner.opts.output])

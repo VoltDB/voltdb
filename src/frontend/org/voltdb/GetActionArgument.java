@@ -23,7 +23,8 @@ public enum GetActionArgument {
 
     DEPLOYMENT("deployment.xml"),
     SCHEMA("schema.sql"),
-    CLASSES("procedures.jar");
+    CLASSES("procedures.jar"),
+    LICENSE("license.xml");
 
     final String m_defaultOutput;
     public String getDefaultOutput() { return m_defaultOutput; }
