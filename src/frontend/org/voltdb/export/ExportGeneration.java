@@ -54,7 +54,6 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -66,7 +65,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
@@ -1003,28 +1001,20 @@ public class ExportGeneration implements Generation {
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         synchronized (m_dataSourcesByPartition) {
-            RealVoltDB volt = (RealVoltDB) VoltDB.instance();
-            for (Iterator<Integer> partitionIt = m_dataSourcesByPartition.keySet().iterator(); partitionIt.hasNext();) {
-                // apply to partition leaders only
-                Integer partition = partitionIt.next();
-                boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
-                if (!isLeader) {
-                    continue;
-                }
-                Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
-                for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
-                    ExportDataSource eds = it.next();
-                    if (!StringUtil.isEmpty(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+            for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
+                Integer partition = partitionDataSourceMap.getKey();
+                for (ExportDataSource source : partitionDataSourceMap.getValue().values()) {
+                    if (!StringUtil.isEmpty(exportSource) && !source.getTableName().equalsIgnoreCase(exportSource)) {
                         continue;
                     }
 
                     // no target match
-                    if (!exportTargets.isEmpty() && !exportTargets.contains(eds.getTarget())) {
+                    if (!exportTargets.isEmpty() && !exportTargets.contains(source.getTarget())) {
                         continue;
                     }
 
-                    if (eds.processStreamControl(operation)) {
-                        results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
+                    if (source.processStreamControl(operation)) {
+                        results.addRow(source.getTableName(), source.getTarget(), partition, "SUCCESS", "");
                     }
                 }
             }

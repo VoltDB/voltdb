@@ -1654,10 +1654,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public synchronized boolean processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
-            if (m_status == StreamStatus.BLOCKED && m_gapTracker.getFirstGap() != null) {
-                long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
-                        "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+            if (m_status == StreamStatus.BLOCKED) {
+                long firstUnpolledSeqNo;
+                if (m_gapTracker.getFirstGap() != null) {
+                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+                } else {
+                    firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
+                    exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
+                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+
+                }
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 clearGap(true);
 
