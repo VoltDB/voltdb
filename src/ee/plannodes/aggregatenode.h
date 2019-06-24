@@ -74,7 +74,7 @@ public:
 
     const std::vector<int> getAggregateIds() const { return m_aggregateIds; }
 
-    const std::vector<std::string> getWorkerOrCoordinator() const { return m_workerOrCoordinator; }
+    const std::vector<bool> getIsWorker() const { return m_workerOrCoordinator; }
 
     const std::vector<bool>& getDistinctAggregates() const { return m_distinctAggregates; }
 
@@ -109,7 +109,7 @@ protected:
 
     std::vector<ExpressionType> m_aggregates;
     std::vector<int> m_aggregateIds;
-    std::vector<std::string> m_workerOrCoordinator;
+    std::vector<bool> m_workerOrCoordinator;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
     OwningExpressionVector m_aggregateInputExpressions;

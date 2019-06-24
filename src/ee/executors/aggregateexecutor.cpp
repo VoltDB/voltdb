@@ -540,7 +540,7 @@ private:
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
-inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, std::string worker_or_coordinator)
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct, int agg_id, bool is_worker)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
@@ -572,7 +572,7 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE:
     case EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER:
-        return new (memoryPool) UserDefineAgg(agg_id, worker_or_coordinator == "WORKER", agg_type);
+        return new (memoryPool) UserDefineAgg(agg_id, is_worker, agg_type);
     default:
         {
             char message[128];
@@ -620,7 +620,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, const ExecutorVector& exec
     m_aggTypes = node->getAggregates();
     m_aggregateIds = node->getAggregateIds();
     m_distinctAggs = node->getDistinctAggregates();
-    m_workerOrCoordinator = node->getWorkerOrCoordinator();
+    m_isWorker = node->getIsWorker();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
@@ -744,7 +744,7 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 {
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_workerOrCoordinator[ii]);
+        aggs[ii] = getAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii], m_aggregateIds[ii], m_isWorker[ii]);
     }
 }
 

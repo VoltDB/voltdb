@@ -108,7 +108,7 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             }
             if (aggregateColumnValue.hasNonNullKey("WORKER_OR_COORDINATOR")) {
                 string worc = aggregateColumnValue.valueForKey("WORKER_OR_COORDINATOR").asStr();
-                m_workerOrCoordinator.push_back(worc);
+                m_workerOrCoordinator.push_back(worc == "WORKER");
             }
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {
