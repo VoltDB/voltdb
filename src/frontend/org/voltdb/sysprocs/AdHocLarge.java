@@ -28,7 +28,13 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
 public class AdHocLarge extends AdHocNTBase {
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        return runUsingLegacy(params);
+    }
+
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");

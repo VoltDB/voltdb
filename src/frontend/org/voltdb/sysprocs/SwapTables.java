@@ -26,10 +26,12 @@ import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -39,30 +41,28 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class SwapTables extends AdHocNTBase {
 
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        return runUsingLegacy(params);
+    }
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
+        throw new PlanningErrorException("Unsupported operation");
+    }
+
     public CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
-        String sql = "@SwapTables " + theTable + " " + otherTable;
-        Object[] userParams = null;
-
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        List<String> sqlStatements = new ArrayList<>(1);
+        final String sql = "@SwapTables " + theTable + " " + otherTable;
+        final Object[] userParams = null;
+        final CatalogContext context = VoltDB.instance().getCatalogContext();
+        final List<String> sqlStatements = new ArrayList<>(1);
         sqlStatements.add(sql);
-
-        Map<String, Table> ttlTables = CatalogUtil.getTimeToLiveTables(context.database);
-        Table ttlTable = ttlTables.get(theTable.toUpperCase());
-        if (ttlTable != null) {
-            if (!StringUtil.isEmpty(ttlTable.getMigrationtarget())) {
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                        String.format("Table %s cannot be swapped since it uses TTL.",theTable));
-            }
+        final Table ttlTable = CatalogUtil.getTimeToLiveTables(context.database).get(theTable.toUpperCase());
+        if (ttlTable != null && !StringUtil.isEmpty(ttlTable.getMigrationtarget())) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    String.format("Table %s cannot be swapped since it uses TTL.",theTable));
+        } else {
+            return runNonDDLAdHoc(context, sqlStatements, true, null, ExplainMode.NONE,
+                    false, true, userParams);
         }
-
-        return runNonDDLAdHoc(context,
-                sqlStatements,
-                true, // infer partitioning...?
-                null, // no partition key
-                ExplainMode.NONE,
-                false, // not a large query
-                true,  // IS swap tables
-                userParams);
     }
 }

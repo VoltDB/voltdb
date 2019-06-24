@@ -34,24 +34,30 @@ import org.voltdb.parser.SQLLexer;
  *
  */
 public class AdHocSpForTest extends AdHocNTBase {
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        return runUsingLegacy(params);
+    }
+
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
         if (params.size() < 2) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     String.format("@AdHocSpForTest expects at least 2 paramters but got %d.", params.size()));
         }
-
-        Object[] paramArray = params.toArray();
-        String sql = (String) paramArray[0];
-        Object userPartitionKey = paramArray[1];
+        final Object[] paramArray = params.toArray();
+        final String sql = (String) paramArray[0];
+        final Object userPartitionKey = paramArray[1];
 
         // get any user params from the end
-        Object[] userParams = null;
+        final Object[] userParams;
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
+        } else {
+            userParams = null;
         }
 
-        List<String> sqlStatements = SQLLexer.splitStatements(sql).getCompletelyParsedStmts();
+        final List<String> sqlStatements = SQLLexer.splitStatements(sql).getCompletelyParsedStmts();
         if (sqlStatements.size() != 1) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
@@ -70,14 +76,7 @@ public class AdHocSpForTest extends AdHocNTBase {
                         "@AdHocSpForTest doesn't support DDL.");
             }
         }
-
-        return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
-                              sqlStatements,
-                              false, // Do not infer partitioning
-                              userPartitionKey,
-                              ExplainMode.NONE,
-                              false, // not a large query
-                              false, // not swap tables
-                              userParams);
+        return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(), sqlStatements, false, userPartitionKey,
+                ExplainMode.NONE, false, false, userParams);
     }
 }

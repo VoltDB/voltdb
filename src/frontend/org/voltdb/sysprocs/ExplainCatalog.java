@@ -25,14 +25,20 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.exceptions.PlanningErrorException;
 
-public class ExplainCatalog extends AdHocNTBase {
+public class ExplainCatalog extends AdHocNTExplain {
 
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+    @Override
+    public CompletableFuture<ClientResponse> run(String sql) {
+        throw new PlanningErrorException("Unsupported operation");
+    }
+
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
         VoltTable[] ret = new VoltTable[] { new VoltTable(new VoltTable.ColumnInfo("CATALOG", VoltType.STRING)) };
         ret[0].addRow(VoltDB.instance().getCatalogContext().catalog.serialize());
-        ClientResponseImpl response =
-                new ClientResponseImpl(ClientResponseImpl.SUCCESS, ret, null);
+        ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS, ret, null);
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
         return fut;

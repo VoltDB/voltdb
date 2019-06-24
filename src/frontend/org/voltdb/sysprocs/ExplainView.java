@@ -21,24 +21,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.CatalogContext;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compilereport.ViewExplainer;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 
 //Go to the catalog and fetch all the "explain plan" strings of the queries in the view.
-public class ExplainView extends AdHocNTBase {
+public class ExplainView extends AdHocNTExplain {
 
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
+        throw new PlanningErrorException("Unsupported operation");
+    }
+
+    @Override
     public CompletableFuture<ClientResponse> run(String fullViewNames) {
-
         CatalogContext context = VoltDB.instance().getCatalogContext();
-
         /*
          * TODO: We don't actually support multiple view names in an ExplainView call,
          * so I THINK that the string is always a single view symbol and all this
@@ -56,8 +57,7 @@ public class ExplainView extends AdHocNTBase {
             // get the view table from the catalog
             Table viewTable = tables.getIgnoreCase(viewName);
             if (viewTable == null) {
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                        "View " + viewName + " does not exist.");
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "View " + viewName + " does not exist.");
             }
 
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",           VoltType.STRING),
@@ -70,18 +70,14 @@ public class ExplainView extends AdHocNTBase {
                 for (String[] row : viewExplanation) {
                     vt[i].addRow(row[0], row[1]);
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, e.getMessage());
             }
         }
 
-        ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                                             null,
-                                                             vt,
-                                                             null);
-
+        final ClientResponseImpl response = new ClientResponseImpl(
+                ClientResponseImpl.SUCCESS, ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                null, vt, null);
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
         return fut;

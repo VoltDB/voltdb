@@ -75,7 +75,6 @@ public class NonDdlBatchPlanner {
         for (final SqlTask task : m_batch) {
             try {
                 final AdHocPlannedStatement result = planTask(task);
-                // System.err.println(result.core.toString().replace("{\"ID\":", "\n{\"ID\":"));
                 if (m_batch.inferPartitioning()) {
                     // The planning tool may have optimized for the single partition case
                     // and generated a partition parameter.
@@ -135,6 +134,7 @@ public class NonDdlBatchPlanner {
         final PlannerTool ptool = m_catalogContext.m_ptool;
         assert(ptool != null);
         try {
+            //ptool.planSql(task.getSQL(), )
             return ptool.planSqlCalcite(task);
         } catch (PlannerFallbackException ex) {
             // Let go the PlannerFallbackException so we can fall back to the legacy planner.

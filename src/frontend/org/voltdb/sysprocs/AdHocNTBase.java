@@ -27,16 +27,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.BackendTarget;
-import org.voltdb.CatalogContext;
+import org.voltdb.*;
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -46,6 +41,7 @@ import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -74,11 +70,31 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     protected final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
+    private boolean m_usingCalcite = false;
+
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
     boolean m_isConfiguredForNonVoltDBBackend =
         m_backendTargetType == BackendTarget.HSQLDB_BACKEND ||
         m_backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
         m_backendTargetType == BackendTarget.POSTGIS_BACKEND;
+
+    protected void setUsingCalcite(boolean usingCalcite) {
+        m_usingCalcite = usingCalcite;
+    }
+
+    boolean isUsingCalcite() {
+        return m_usingCalcite;
+    }
+
+    abstract protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException;
+    abstract protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params);
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        try {
+            return m_usingCalcite ? runUsingCalcite(params) : runUsingLegacy(params);
+        } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+            return runUsingLegacy(params);
+        }
+    }
 
     /**
      * Log ad hoc batch info
@@ -185,12 +201,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         try {
-            return ptool.planSql(sqlStatement,
-                                 partitioning,
-                                 explainMode != ExplainMode.NONE,
-                                 userParamSet,
-                                 isSwapTables,
-                                 isLargeQuery);
+            return ptool.planSql(sqlStatement, partitioning, explainMode != ExplainMode.NONE,
+                    userParamSet, isSwapTables, isLargeQuery);
         } catch (Exception e) {
             throw new PlanningErrorException(e.getMessage());
         } catch (StackOverflowError error) {
@@ -260,14 +272,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         for (final String sqlStatement : sqlStatements) {
             try {
-                AdHocPlannedStatement result = compileAdHocSQL(context.m_ptool,
-                                                               sqlStatement,
-                                                               inferSP,
-                                                               userPartitionKey,
-                                                               explainMode,
-                                                               isLargeQuery,
-                                                               isSwapTables,
-                                                               userParamSet);
+                AdHocPlannedStatement result = compileAdHocSQL(
+                        context.m_ptool, sqlStatement, inferSP, userPartitionKey, explainMode, isLargeQuery,
+                        isSwapTables, userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
