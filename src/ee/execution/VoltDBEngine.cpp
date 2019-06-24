@@ -736,14 +736,6 @@ void VoltDBEngine::checkReturnCode(int32_t returnCode, std::string name) {
     }
 }
 
-void VoltDBEngine::partitionTableHelper(bool partition_table) {
-    if (partition_table) {
-        m_udfOutput.writeBool(1);
-    } else {
-        m_udfOutput.writeBool(0);
-    }
-}
-
 NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, ValueType type) {
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     if (returnCode == 0) {
@@ -801,7 +793,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     bool partition_table = agg_type == EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER ? true : false;
     serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
-    partitionTableHelper(partition_table);
+    m_udfOutput.writeBool(partition_table);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateWorkerEnd();

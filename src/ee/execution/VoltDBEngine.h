@@ -235,7 +235,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void serializeToBuffer(int32_t functionId, const NValue& argument, ValueType type);
         void checkInfo(UserDefinedFunctionInfo *info, int32_t functionId);
         void checkReturnCode(int32_t returnCode, std::string name);
-        void partitionTableHelper(bool partition_table);
         NValue resultHelper(int32_t returnCode, bool partition_table, ValueType type);
         void callJavaUserDefinedAggregateStart(int32_t functionId);
         void callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument);
