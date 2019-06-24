@@ -160,6 +160,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     private static final int POS_COL_COUNT = Integer.SIZE / Byte.SIZE + 1;
     private static final int POS_COL_TYPES = POS_COL_COUNT + Short.SIZE / Byte.SIZE;
 
+    private static final int DEFAULT_ALLOCATION_SIZE = 1024;
+
     /**
      * <p>Object that represents the name and schema for a {@link VoltTable} column.
      * Primarily used to construct in the constructor {@link VoltTable#VoltTable(ColumnInfo...)}
@@ -447,11 +449,15 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * extraMetadata param can be null.
      */
     VoltTable(ExtraMetadata extraMetadata, ColumnInfo[] columns, int columnCount) {
+        this(extraMetadata, columns, columnCount, DEFAULT_ALLOCATION_SIZE);
+    }
+
+    VoltTable(ExtraMetadata extraMetadata, ColumnInfo[] columns, int columnCount, int defAllocationSize) {
         // memoize any provided extra metadata for test
         m_extraMetadata = extraMetadata;
 
-        // allocate a 1K table backing for starters
-        int allocationSize = 1024;
+        // Use a minimum of 1k
+        int allocationSize = defAllocationSize > DEFAULT_ALLOCATION_SIZE ? defAllocationSize : DEFAULT_ALLOCATION_SIZE;
         m_buffer = ByteBuffer.allocate(allocationSize);
 
         // while not successful at initializing,

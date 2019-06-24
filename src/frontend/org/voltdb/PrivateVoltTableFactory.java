@@ -19,6 +19,8 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 
+import org.voltdb.VoltTable.ColumnInfo;
+
 /**
  * Deliberately awkward access to package-private constructors of
  * VoltTable. End users shouldn't call the constructors, but VoltDB
@@ -46,6 +48,10 @@ public abstract class PrivateVoltTableFactory {
         VoltTable vt = new VoltTable();
         vt.initFromByteArray(backingBuff, position, len);
         return vt;
+    }
+
+    public static VoltTable createVoltTableWithColumns(ColumnInfo[] columns, int columnCount, int allocSize) {
+        return new VoltTable(null, columns, columnCount, allocSize);
     }
 
     /**
