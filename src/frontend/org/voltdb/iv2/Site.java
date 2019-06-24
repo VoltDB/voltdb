@@ -1272,7 +1272,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
-        TupleStreamStateInfo info = null;
+        TupleStreamStateInfo info;
         if (hasReplicatedStateInfo != 0) {
             long replicatedSequenceNumber = resultBuffer.getLong();
             long replicatedSpUniqueId = resultBuffer.getLong();
