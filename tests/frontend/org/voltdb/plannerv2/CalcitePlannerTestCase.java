@@ -35,7 +35,6 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
-
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlannerType;
@@ -68,10 +67,12 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
             sqlNode = planner.parse(sql);
         } catch (Throwable e) {
             throw new RuntimeException("Error while parsing query: " + sql, e);
+        } finally {
+            planner.close();
         }
         CompiledPlan cp;
         try {
-            cp = PlannerTool.getCompiledPlanCalcite(getSchemaPlus(), sqlNode);
+            cp = PlannerTool.getCompiledPlanCalcite(planner, getSchemaPlus(), sqlNode);
         } catch (ValidationException e) {
             throw new RuntimeException("Error while Validating query: " + sql, e);
         } catch (RelConversionException e) {

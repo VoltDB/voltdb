@@ -197,10 +197,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511: ", tresult, vresult, EPSILON);
 
-        // ENG-16141 remove comment once resolved
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults()[0];
-        //tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
-        //assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult, EPSILON);
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
@@ -214,12 +213,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)), COUNT(*), MIN(v1) FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511expRCM: ", tresult, vresult, EPSILON);
 
-        // ENG-16141 remove comment once resolved
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
-        //tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
-        //assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult, EPSILON);
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults()[0];
+        // problem with v1 > 4 -> v1 > ?, which cannot be converted
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511C: ", tresult, vresult, EPSILON);
 

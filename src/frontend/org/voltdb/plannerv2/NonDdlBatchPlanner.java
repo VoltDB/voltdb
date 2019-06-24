@@ -149,6 +149,9 @@ public class NonDdlBatchPlanner {
             while(cause != null && cause.getCause() != null) {
                 cause = cause.getCause();
             }
+            if (cause.getMessage().contains("class org.apache.calcite.sql.SqlDynamicParam: ?")) {
+                throw new PlannerFallbackException();
+            }
             throw new PlanningErrorException(ex.getMessage(), cause);
         } catch (StackOverflowError error) {
             // TODO: This is from AdHocNTBase.compileAdHocSQL()

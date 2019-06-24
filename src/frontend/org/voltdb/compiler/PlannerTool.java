@@ -219,16 +219,16 @@ public class PlannerTool {
         return plan;
     }
 
-    public static synchronized CompiledPlan getCompiledPlanCalcite(SchemaPlus schemaPlus, SqlNode sqlNode)
+    public static synchronized CompiledPlan getCompiledPlanCalcite(VoltPlanner planner, SchemaPlus schemaPlus, SqlNode sqlNode)
             throws ValidationException, RelConversionException, PlannerFallbackException{
         // TRAIL [Calcite-AdHoc-DQL/DML:4] PlannerTool.planSqlCalcite()
-        VoltPlanner planner = new VoltPlanner(schemaPlus);
+        //VoltPlanner planner = new VoltPlanner(schemaPlus);
 
         // Validate the task's SqlNode.
-        SqlNode validatedNode = planner.validate(sqlNode);
+        //SqlNode validatedNode = planner.validate(sqlNode);
 
         // Convert SqlNode to RelNode.
-        RelNode rel = planner.convert(validatedNode);
+        RelNode rel = planner.convert(sqlNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
@@ -331,6 +331,8 @@ public class PlannerTool {
             }
 
             // check L2 cache is hit or miss
+            VoltPlanner planner = new VoltPlanner(m_schemaPlus);
+            planner.validate(node);
             AdHocPlannedStatement ahps = null;
             ParameterizedSqlTask ptask = new ParameterizedSqlTask(task);
             String parameterizedQuery = ptask.getParsedQuery().toString();
@@ -345,7 +347,7 @@ public class PlannerTool {
                 //////////////////////
                 // PLAN THE STMT
                 //////////////////////
-                CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, node);
+                CompiledPlan plan = getCompiledPlanCalcite(planner, m_schemaPlus, node);
                 plan.sql = task.getSQL();
                 CorePlan core = new CorePlan(plan, m_catalogHash);
                 //throw new PlannerFallbackException();
