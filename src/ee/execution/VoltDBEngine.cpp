@@ -689,7 +689,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::serializeToBuffer(int32_t functionId, const NValue& argument, ValueType type) {
+void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& argument, ValueType type) {
     // Estimate the size of the buffer we need. We will put:
     //   * size of the buffer (function ID + parameters)
     //   * function ID (int32_t)
@@ -759,7 +759,7 @@ NValue VoltDBEngine::resultHelper(int32_t returnCode, bool partition_table, Valu
 void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // callJavaUserDefinedAggregateStart() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateStart();
@@ -769,7 +769,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, const NValue& argument) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToBuffer(functionId, argument, info->paramTypes.front());
+    serializeToUDFOutputBuffer(functionId, argument, info->paramTypes.front());
     // callJavaUserDefinedAggrregateAssemble() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateAssemble();
@@ -779,7 +779,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateAssemble(int32_t functionId, cons
 void VoltDBEngine::callJavaUserDefinedAggregateCombine(int32_t functionId, const NValue& argument) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToBuffer(functionId, argument, VALUE_TYPE_VARBINARY);
+    serializeToUDFOutputBuffer(functionId, argument, VALUE_TYPE_VARBINARY);
     // callJavaUserDefinedAggrregateCombine() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCombine();
@@ -791,7 +791,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
     checkInfo(info, functionId);
     // check whether this table is a partition table or a replicated table
     bool partition_table = agg_type == EXPRESSION_TYPE_AGGREGATE_USER_DEFINE_WORKER ? true : false;
-    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // if this is a partition table, we send code "1" to the Java side. Otherwise, we send "0"
     m_udfOutput.writeBool(partition_table);
     // callJavaUserDefinedAggregateWorkerEnd() will inform the Java end to execute the
@@ -803,7 +803,7 @@ NValue VoltDBEngine::callJavaUserDefinedAggregateWorkerEnd(int32_t functionId, E
 NValue VoltDBEngine::callJavaUserDefinedAggregateCoordinatorEnd(int32_t functionId) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkInfo(info, functionId);
-    serializeToBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
+    serializeToUDFOutputBuffer(functionId, NValue::getNullValue(VALUE_TYPE_INVALID), VALUE_TYPE_INVALID);
     // callJavaUserDefinedAggregateCoordinatorEnd() will inform the Java end to execute the
     // Java user-defined function. It will return 0 if the execution is successful.
     int32_t returnCode = m_topend->callJavaUserDefinedAggregateCoordinatorEnd();
