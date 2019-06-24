@@ -1623,13 +1623,13 @@ public class ParserDQL extends ParserBase {
     private Expression readAggregate() {
 
         int        tokenT = token.tokenType;
-        String     func_name = token.tokenString;
+        String     funcName = token.tokenString;
         Expression aggExpr;
 
         read();
         readThis(Tokens.OPENBRACKET);
 
-        aggExpr = readAggregateExpression(tokenT, func_name);
+        aggExpr = readAggregateExpression(tokenT, funcName);
 
         readThis(Tokens.CLOSEBRACKET);
         if (token.tokenType == Tokens.OVER) {
@@ -1646,7 +1646,7 @@ public class ParserDQL extends ParserBase {
         return aggExpr;
     }
 
-    private ExpressionAggregate readAggregateExpression(int tokenT, String func_name) {
+    private ExpressionAggregate readAggregateExpression(int tokenT, String funcName) {
 
         int     type     = ParserDQL.getExpressionType(tokenT);
         boolean distinct = false;
@@ -1710,8 +1710,8 @@ public class ParserDQL extends ParserBase {
                 break;
 
             case OpTypes.USER_DEFINE_AGGREGATE :
-                int functionid = FunctionForVoltDB.newVoltDBFunctionID(func_name);
-                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid, func_name);
+                int functionid = FunctionForVoltDB.newVoltDBFunctionID(funcName);
+                ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e, functionid, funcName);
                 return aggregateExp;
 
             default :
