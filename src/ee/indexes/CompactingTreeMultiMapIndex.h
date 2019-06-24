@@ -190,6 +190,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
     }
 
     void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) {
+        // do moveToGreaterThanKey(), null values in the search key will be treated as maximum
+
+        // IntsKey will pack the key data into uint64, so we can not tell if it is
+        // a NULL value then (a TINYINT NULL is a valid value in INT).
+        // In that case, we will change all numeric null key values into maximum.
         for (int i = 0; i < searchKey->getSchema()->totalColumnCount(); i++) {
             if (searchKey->getNValue(i).isNull()) {
                 const ValueType valueType = searchKey->getSchema()->columnType(i);
@@ -211,7 +216,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
                 }
             }
         }
-        // do moveToGreaterThanKey()
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.upperBoundNullAsMax(KeyType(searchKey));
         // find prev entry

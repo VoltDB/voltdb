@@ -423,9 +423,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         index->moveToLessThanKey(&index_values, indexCursor);
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-                        // find the entry whose key is greater than search key,
-                        // do a forward scan using initialExpr to find the correct
-                        // start point to do reverse scan
+                        // find the entry whose key is less or equal than search key
+                        // as the start point to do a reverse scan
                         index->moveToKeyOrLess(&index_values, indexCursor);
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {

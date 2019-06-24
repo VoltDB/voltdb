@@ -1275,6 +1275,9 @@ inline int TableTuple::compare(const TableTuple &other) const {
     return VALUE_COMPARE_EQUAL;
 }
 
+/**
+ * Compare two tuples. Null value in the rhs tuple will be treated as maximum.
+ */
 inline int TableTuple::compareNullAsMax(const TableTuple &other) const {
     const int columnCount = m_schema->columnCount();
     int diff;

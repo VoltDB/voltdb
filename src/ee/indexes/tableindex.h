@@ -314,6 +314,7 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
+    // move the cursor to the first tuple less than or equal to the given key.
     virtual void moveToKeyOrLess(TableTuple *searchKey, IndexCursor& cursor) {
         throwFatalException("Invoked TableIndex virtual method moveToKeyOrLess which has no implementation");
     };

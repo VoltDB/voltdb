@@ -377,7 +377,9 @@ struct IntsComparator
         return operator()(lhs, rhs);
     }
 
-    const IntsComparator * getNullAsMaxComparator() const {
+    // IntsComparator not really has a NullAsMaxComparator, we can pre-process the data and
+    // convert the NULLs into maximums.
+    const IntsComparator *getNullAsMaxComparator() const {
         return this;
     }
 

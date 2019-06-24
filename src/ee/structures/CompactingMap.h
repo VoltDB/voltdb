@@ -221,6 +221,7 @@ public:
 
     iterator lowerBound(const Key &key) const;
     iterator upperBound(const Key &key) const;
+    // do upperBound(key) but treat null values in key as maximum
     iterator upperBoundNullAsMax(const Key &key) const;
 
     std::pair<iterator, iterator> equalRange(const Key &key) const;
