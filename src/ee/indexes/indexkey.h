@@ -379,8 +379,8 @@ struct IntsComparator
 
     // IntsComparator not really has a NullAsMaxComparator, we can pre-process the data and
     // convert the NULLs into maximums.
-    const IntsComparator *getNullAsMaxComparator() const {
-        return this;
+    const IntsComparator getNullAsMaxComparator() const {
+        return *this;
     }
 
 protected:
@@ -643,9 +643,8 @@ struct GenericComparator
         return operator()(lhs, rhs);
     }
 
-    const std::unique_ptr<GenericNullAsMaxComparator<keySize>> getNullAsMaxComparator() const {
-        return std::unique_ptr<GenericNullAsMaxComparator<keySize>>(
-                new GenericNullAsMaxComparator<keySize>(m_keySchema));
+    const GenericNullAsMaxComparator<keySize> getNullAsMaxComparator() const {
+        return GenericNullAsMaxComparator<keySize>(m_keySchema);
     }
 
 protected:
@@ -846,9 +845,8 @@ struct TupleKeyComparator
         return operator()(lhs, rhs);
     }
 
-    const std::unique_ptr<TupleKeyNullAsMaxComparator> getNullAsMaxComparator() const {
-        return std::unique_ptr<TupleKeyNullAsMaxComparator>(
-                new TupleKeyNullAsMaxComparator(m_keySchema));
+    const TupleKeyNullAsMaxComparator getNullAsMaxComparator() const {
+        return TupleKeyNullAsMaxComparator(m_keySchema);
     }
 
 protected:
@@ -928,13 +926,13 @@ struct NullAsMaxComparatorWithPointer : public KeyType::KeyComparator {
             : KeyType::KeyComparator(keySchema) {}
 
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
-        int rv = (*KeyType::KeyComparator::getNullAsMaxComparator())(lhs, rhs);
+        int rv = KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
     }
 
     // Do a comparison, but don't compare pointers to tuple storage.
     int compareWithoutPointer(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
-        return (*KeyType::KeyComparator::getNullAsMaxComparator())(lhs, rhs);
+        return KeyType::KeyComparator::getNullAsMaxComparator()(lhs, rhs);
     }
 };
 
@@ -953,9 +951,8 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
         return KeyType::KeyComparator::operator()(lhs, rhs);
     }
 
-    const std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>> getNullAsMaxComparator() const {
-        return std::unique_ptr<NullAsMaxComparatorWithPointer<KeyType>>(
-                new NullAsMaxComparatorWithPointer<KeyType>(this->m_keySchema));
+    const NullAsMaxComparatorWithPointer<KeyType> getNullAsMaxComparator() const {
+        return NullAsMaxComparatorWithPointer<KeyType>(this->m_keySchema);
     }
 
 };

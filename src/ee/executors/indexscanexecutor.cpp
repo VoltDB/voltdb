@@ -467,7 +467,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             tableIndex->moveToLessThanKey(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-            // find the entry whose key is less or equal than search key
+            // find the entry whose key is less than or equal to search key
             // as the start point to do a reverse scan
             tableIndex->moveToKeyOrLess(&searchKey, indexCursor);
         }

@@ -1280,10 +1280,11 @@ inline int TableTuple::compare(const TableTuple &other) const {
  */
 inline int TableTuple::compareNullAsMax(const TableTuple &other) const {
     const int columnCount = m_schema->columnCount();
+    assert(columnCount == other.m_schema->columnCount());
     int diff;
     for (int ii = 0; ii < columnCount; ii++) {
-        const NValue lhs = getNValue(ii);
-        const NValue rhs = other.getNValue(ii);
+        const NValue& lhs = getNValue(ii);
+        const NValue& rhs = other.getNValue(ii);
         diff = lhs.compareNullAsMax(rhs);
         if (diff) {
             return diff;
