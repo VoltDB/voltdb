@@ -2691,6 +2691,8 @@ inline int NValue::compare(const NValue& rhs) const {
 inline int NValue::compareNullAsMax(const NValue& rhs) const {
     int hasNullCompare = compareNull(rhs);
     if (hasNullCompare != VALUE_COMPARE_INVALID) {
+        // VALUE_COMPARE_EQUAL indicates lhs == null && rhs == null, do nothing.
+        // VALUE_COMPARE_LESSTHAN indicates lhs == null && rhs != null, do nothing.
         // VALUE_COMPARE_GREATERTHAN indicates lhs != null && rhs == null, flip the result.
         return hasNullCompare == VALUE_COMPARE_GREATERTHAN ? VALUE_COMPARE_LESSTHAN : hasNullCompare;
     }
