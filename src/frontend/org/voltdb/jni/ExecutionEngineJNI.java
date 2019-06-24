@@ -963,27 +963,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public int callJavaUserDefinedAggregateCombine() {
         UserDefinedAggregateFunctionRunner udafRunner = getUdafRunner();
-        Object worker_object = null;
+        Object workerObject = null;
         try {
             assert(udafRunner != null);
             // get the worker's byte array from the buffer
-            byte[] worker_byte_array = UserDefinedAggregateFunctionRunner.readVarbinary(m_udfBuffer);
+            byte[] workerByteArray = UserDefinedAggregateFunctionRunner.readVarbinary(m_udfBuffer);
             // convert worker's byte array to the object
-            ByteArrayInputStream bis = new ByteArrayInputStream(worker_byte_array);
-            ObjectInput in = null;
+            ByteArrayInputStream bis = new ByteArrayInputStream(workerByteArray);
+            ObjectInput in = new UDAFObjectInputStream(bis);
             try {
-                in = new UDAFObjectInputStream(bis);
-                worker_object = in.readObject();
+                workerObject = in.readObject();
             } finally {
                 try {
-                    if (in != null) {
-                        in.close();
-                    }
+                    in.close();
                 } catch (IOException ex) {
                 }
             }
             // call the combine method with the deserialized worker object
-            udafRunner.combine(worker_object);
+            udafRunner.combine(workerObject);
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
             return 0;
@@ -1010,12 +1007,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // if there is a coordinator, we serialized the object to a byte array
             // and the return type for a worker is a varbinary
             if (isForPartitionTable) {
-                Object worker_instance = udafRunner.getFunctionInstance();
+                Object workerInstance = udafRunner.getFunctionInstance();
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 ObjectOutput out = null;
                 try {
                     out = new ObjectOutputStream(bos);
-                    out.writeObject(worker_instance);
+                    out.writeObject(workerInstance);
                     out.flush();
                     returnValue = bos.toByteArray();
                 } finally {
