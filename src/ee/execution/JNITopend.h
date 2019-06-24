@@ -73,7 +73,6 @@ public:
 
     bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
 
-    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name);
     int32_t callJavaUserDefinedFunction();
     int32_t callJavaUserDefinedAggregateStart();
     int32_t callJavaUserDefinedAggregateAssemble();
@@ -115,6 +114,7 @@ private:
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
+    void initJavaUserDefinedMethod(jclass jniClass, jmethodID &method, const char* name);
 };
 
 }
