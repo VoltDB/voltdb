@@ -241,4 +241,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
 
     @Override
     public void transactionCommitted(long spHandle) {}
+
+    public boolean isActive() {
+        return false;
+    }
 }

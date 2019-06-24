@@ -216,6 +216,8 @@ public class SnapshotSiteProcessor {
      */
     public static void populateExternalStreamsStatesFromSites(SystemProcedureExecutionContext context) {
         Database database = context.getDatabase();
+        SiteProcedureConnection spc = context.getSiteProcedureConnection();
+
         for (Table t : database.getTables()) {
             if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
@@ -226,8 +228,7 @@ public class SnapshotSiteProcessor {
                 s_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] usoAndSequenceNumber =
-                    context.getSiteProcedureConnection().getUSOForExportTable(t.getTypeName());
+            long[] usoAndSequenceNumber = spc.getUSOForExportTable(t.getTypeName());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             new ExportSnapshotTuple(
@@ -235,13 +236,16 @@ public class SnapshotSiteProcessor {
                                 usoAndSequenceNumber[1],
                                 usoAndSequenceNumber[2]));
         }
-        TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
-        s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
-        if (drStateInfo.containsReplicatedStreamInfo) {
-            s_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+
+        TupleStreamStateInfo drStateInfo = spc.getDRTupleStreamStateInfo();
+        if (drStateInfo != null) {
+            s_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
+            if (drStateInfo.containsReplicatedStreamInfo) {
+                s_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+            }
         }
 
-        if (!context.getSiteProcedureConnection().externalStreamsEnabled()) {
+        if (!spc.externalStreamsEnabled()) {
             s_disabledStreams.add(context.getPartitionId());
         }
     }

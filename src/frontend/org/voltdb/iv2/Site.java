@@ -1260,6 +1260,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
+        if (m_drGateway == null || !m_drGateway.isActive()) {
+            return null;
+        }
         // Set the psetBuffer buffer capacity and clear the buffer
         m_ee.getParamBufferForExecuteTask(0);
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
