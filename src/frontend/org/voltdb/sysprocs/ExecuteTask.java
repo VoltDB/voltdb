@@ -77,13 +77,15 @@ public class ExecuteTask extends VoltSystemProcedure
             {
                 TupleStreamStateInfo stateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
                 result = createDRTupleStreamStateResultTable();
-                result.addRow(context.getHostId(), context.getPartitionId(), 0,
-                        stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
-                        stateInfo.drVersion);
-                if (stateInfo.containsReplicatedStreamInfo) {
-                    result.addRow(context.getHostId(), context.getPartitionId(), 1,
-                            stateInfo.replicatedInfo.drId, stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                if (stateInfo != null) {
+                    result.addRow(context.getHostId(), context.getPartitionId(), 0, stateInfo.partitionInfo.drId,
+                            stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
                             stateInfo.drVersion);
+                    if (stateInfo.containsReplicatedStreamInfo) {
+                        result.addRow(context.getHostId(), context.getPartitionId(), 1, stateInfo.replicatedInfo.drId,
+                                stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                                stateInfo.drVersion);
+                    }
                 }
                 break;
             }
