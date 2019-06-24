@@ -271,10 +271,10 @@ public:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(0, 64*1024),
-        m_drReplicatedStream(16383, 64*1024),
-        m_drStreamReplica(0, 64*1024),
-        m_drReplicatedStreamReplica(16383, 64*1024),
+      : m_drStream(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStream(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drStreamReplica(0, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
+        m_drReplicatedStreamReplica(16383, 64*1024, DRTupleStream::LATEST_PROTOCOL_VERSION),
         m_undoToken(0),
         m_spHandleReplica(0)
     {
