@@ -46,6 +46,8 @@ function find-directories() {
     SQLGRAMMAR_DIR=$VOLTDB_TESTS/sqlgrammar
     UDF_TEST_DIR=$VOLTDB_TESTS/testfuncs
     UDF_TEST_DDL=$UDF_TEST_DIR/org/voltdb_testfuncs
+    # Default value, assuming 'community', open-source version of VoltDB
+    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
 }
 
 # Find the directories and set variables, only if not set already
@@ -66,6 +68,8 @@ function build() {
 function build-pro() {
     echo -e "\n$0 performing: build-pro $BUILD_ARGS"
     test-tools-build-pro $BUILD_ARGS
+    # Same as for 'community' VoltDB, for now
+    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     code[0]=$code_tt_build
 }
 
@@ -178,6 +182,8 @@ function server() {
 function server-pro() {
     echo -e "\n$0 performing: server-pro"
     test-tools-server-pro
+    # Same as for 'community' VoltDB, for now
+    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deploy_pro.xml
     code[3]=${code_tt_server}
 }
 
