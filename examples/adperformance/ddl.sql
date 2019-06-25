@@ -82,7 +82,7 @@ CREATE TABLE event_data (
   is_conversion          INTEGER       NOT NULL
 );
 CREATE INDEX ttl ON event_data (utc_time);
-ALTER TABLE event_data USING TTL 1 MINUTES ON COLUMN utc_time;
+ALTER TABLE event_data ALTER USING TTL 1 MINUTES ON COLUMN utc_time;
 PARTITION TABLE event_data ON COLUMN creative_id;
 
 -------------- VIEWS ----------------------------------------------

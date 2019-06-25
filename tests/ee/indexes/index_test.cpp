@@ -71,8 +71,6 @@
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
-#include "common/FixUnusedAssertHack.h"
-
 
 using namespace std;
 using namespace voltdb;
@@ -320,7 +318,8 @@ public:
         m_engine->initialize(0, 0, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
         partitionCount = htonl(partitionCount);
         m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
-        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames, signature));
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id,
+                    "test_table", schema, columnNames, signature));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -342,7 +341,7 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i + 20));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i * 11));
-            assert(true == table->insertTuple(tuple));
+            vassert(table->insertTuple(tuple));
         }
     }
 
@@ -583,11 +582,9 @@ TEST_F(IndexTest, IntsUnique) {
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     bool exceptionThrown = false;
-    try
-    {
+    try {
         EXPECT_EQ(false, table->insertTuple(tmptuple));
-    }
-    catch (SerializableEEException &e)
+    } catch (SerializableEEException &e)
     {
         exceptionThrown = true;
     }

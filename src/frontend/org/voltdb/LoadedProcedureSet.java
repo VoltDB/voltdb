@@ -259,6 +259,11 @@ public class LoadedProcedureSet {
 
         // if not in the cache, compile the full default proc and put it in the cache
         if (pr == null) {
+            // nibble delete and migrate have special statements
+            if (procName.endsWith(DefaultProcedureManager.NIBBLE_MIGRATE_PROC) ||
+                    procName.endsWith(DefaultProcedureManager.NIBBLE_DELETE_PROC)) {
+                return pr;
+            }
             Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
             if (catProc != null) {
                 String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);

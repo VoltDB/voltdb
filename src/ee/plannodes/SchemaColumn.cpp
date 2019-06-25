@@ -18,6 +18,7 @@
 #include <stdexcept>
 
 #include "SchemaColumn.h"
+#include "common/debuglog.h"
 
 using namespace std;
 using namespace voltdb;
@@ -57,7 +58,7 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
         PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
 
         m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
-        assert(m_expression);
+        vassert(m_expression);
     }
 }
 

@@ -23,15 +23,24 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateTable extends AdhocDDLTestBase {
@@ -303,4 +312,78 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
+    public void testCreateMigrateTable() throws Exception {
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+
+        Properties props = new Properties();
+        props.put("replicated", String.valueOf(false));
+        props.put("skipinternals", "false");
+        props.put("socket.dest", "localhost:5001");
+        props.put("timezone", "GMT");
+
+        builder.addExport(true, ServerExportEnum.CUSTOM, props, "MigrateTableTarget");
+        ServerListener serverSocket = new ServerListener(5001);
+        serverSocket.start();
+        builder.setUseDDLSchema(true);
+        LocalCluster m_cluster = new LocalCluster("test_migrate_export_enabled.jar", 2, 1, 0,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
+        m_cluster.setHasLocalServer(false);
+        m_cluster.setMaxHeap(1024);
+        boolean success = m_cluster.compile(builder);
+
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            // test create table is working
+            m_client.callProcedure("@AdHoc", "create table T migrate to target MigrateTableTarget (id int not null);");
+            m_client.callProcedure("@AdHoc", "create index migratingIndex on t(id) where not migrating;");
+            assertTrue(findTableInSystemCatalogResults("T"));
+            m_client.callProcedure("@AdHoc", "insert into t values(1);");
+            m_client.callProcedure("@AdHoc", "insert into t values(2);");
+            m_client.callProcedure("@AdHoc", "insert into t values(3);");
+            // test migrating index is working
+            VoltTable tb = m_client.callProcedure("@AdHoc", "select * from t where not migrating;").getResults()[0];
+            // if no ttl column is set then it will behave like a regular table
+            assertEquals(tb.getRowCount(), 3);
+
+            m_client.callProcedure("@AdHoc",
+                    "create table T2 migrate to target MigrateTableTarget (ts1 timestamp not null, ts2 timestamp not null);");
+            assertTrue(findTableInSystemCatalogResults("T2"));
+            // test ALTER table ADD / DROP / ALTER TTL column
+            boolean threw;
+            try {
+                threw = false;
+                m_client.callProcedure("@AdHoc",
+                        "alter table T2 add using ttl 10 on column ts1;");
+            } catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("May not add TTL column"));
+                threw = true;
+            }
+            assertTrue("Shouldn't have been able to alter add ttl column in migrate table.", threw);
+            try {
+                threw = false;
+                m_client.callProcedure("@AdHoc",
+                        "alter table T2 drop ttl;");
+            } catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("May not drop TTL column"));
+                threw = true;
+            }
+            assertTrue("Shouldn't have been able to alter drop ttl column in migrate table.", threw);
+        } finally {
+            teardownSystem();
+        }
+    }
 }

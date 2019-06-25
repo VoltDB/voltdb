@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -795,27 +796,33 @@ public class LeaderAppointer implements Promotable
         }
         tmLog.info(WHOMIM + "Recalculate partition leaders after node down is detected.");
         // iterate through all partitions to see if its current leaders are on the failed hosts.
+        SortedSet<Host> hosts = new TreeSet<Host>(hostLeaderMap.values());
+
         for (PartitionCallback cb : m_callbacks.values()) {
-            SortedSet<Host> hosts = new TreeSet<Host>();
-            hosts.addAll(hostLeaderMap.values());
             int hostId = CoreUtils.getHostIdFromHSId(cb.m_currentLeader);
             //This partition has a valid leader
             if (hostLeaderMap.containsKey(hostId)) {
                 continue;
             }
-            for (Host host : hosts) {
+
+            // find the host which has the lowest leader count.
+            Iterator<Host> iter = hosts.iterator();
+            while (iter.hasNext()) {
+                Host host = iter.next();
                 //The host does not have a replica of this partition
                 if (!(host.partitions.contains(cb.m_partitionId))) {
                     continue;
                 }
 
-                //find the host which has the lowest leader count.
+                iter.remove();
                 host.increasePartitionLeader();
                 cb.newLeaderHostId = host.id;
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(WHOMIM + String.format("Move partition leader to host %d from %d for partition %d.",
                             host.id, hostId, cb.m_partitionId));
                 }
+
+                hosts.add(host);
                 break;
             }
         }

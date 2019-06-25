@@ -25,19 +25,19 @@ public class MpRestartSequenceGenerator {
     // signed / unsigned conversions easier.
     // having MPI promotions for up to 1,000,000 Rejoined nodes, should be enough
     // for now. Restart flag reset means that this came from a SPI leader promotion
-    static final long NODEID_BITS = 20;
+    static final long LEADERID_BITS = 20;
     static final long RESTART_BITS = 1;
     static final long COUNTER_BITS = 42;
 
-    static final long NODEID_MAX_VALUE = (1L << NODEID_BITS) - 1L;
+    static final long LEADERID_MAX_VALUE = (1L << LEADERID_BITS) - 1L;
     static final long RESTART_MAX_VALUE = (1L << RESTART_BITS) - 1L;
     static final long COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
     private final long m_highOrderFields;
     private long m_counter = 0;
 
-    public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
-        assert (nodeId <= NODEID_MAX_VALUE);
-        m_highOrderFields = ((long)nodeId << (COUNTER_BITS + RESTART_BITS))
+    public MpRestartSequenceGenerator(int leaderId, boolean forRestart) {
+        assert (leaderId <= LEADERID_MAX_VALUE);
+        m_highOrderFields = ((long)leaderId << (COUNTER_BITS + RESTART_BITS))
                           | (forRestart ? (1L << COUNTER_BITS) : 0);
     }
 
@@ -62,7 +62,7 @@ public class MpRestartSequenceGenerator {
         return ((restartSeqId >> COUNTER_BITS) & RESTART_MAX_VALUE) == 1;
     }
 
-    public static int getNodeId(long restartSeqId) {
+    public static int getLeaderId(long restartSeqId) {
         return (int) (restartSeqId >> (COUNTER_BITS + RESTART_BITS));
     }
 
@@ -71,7 +71,7 @@ public class MpRestartSequenceGenerator {
         if (restartSeqId == CompleteTransactionMessage.INITIAL_TIMESTAMP) {
             return "(INITIAL)";
         }
-        return "(" + MpRestartSequenceGenerator.getNodeId(restartSeqId) + ":" +
+        return "(" + MpRestartSequenceGenerator.getLeaderId(restartSeqId) + ":" +
                 MpRestartSequenceGenerator.getSequence(restartSeqId) + (isForRestart(restartSeqId) ? "R)" : ")");
     }
 
@@ -81,7 +81,7 @@ public class MpRestartSequenceGenerator {
             sb.append("(INITIAL)");
             return;
         }
-        sb.append("(").append(MpRestartSequenceGenerator.getNodeId(restartSeqId)).append(":");
+        sb.append("(").append(MpRestartSequenceGenerator.getLeaderId(restartSeqId)).append(":");
         sb.append(MpRestartSequenceGenerator.getSequence(restartSeqId));
         if (isForRestart(restartSeqId)) {
             sb.append("R)");

@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
 #include "common/TupleSchemaBuilder.h"
@@ -224,7 +224,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     const TupleSchema *tupleSchema = scheme.tupleSchema;
-    assert(tupleSchema);
+    vassert(tupleSchema);
     bool isIntsOnly = true;
     bool isInlinesOrColumnsOnly = true;
     std::vector<ValueType> keyColumnTypes;
@@ -289,7 +289,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     TupleSchema *keySchema = TupleSchema::createKeySchema(keyColumnTypes, keyColumnLengths, keyColumnInBytes);
-    assert(keySchema);
+    vassert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);
     TableIndex *retval = picker.getInstance();

@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -109,7 +110,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -655,6 +655,16 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    public static List<String> getDisabledConnectors() {
+        List<String> disabledConnectors = new LinkedList<>();
+        for (Connector conn : getConnectors(VoltDB.instance().getCatalogContext())) {
+            if (!conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                disabledConnectors.add(conn.getTypeName());
+            }
+        }
+        return disabledConnectors;
     }
 
     public static boolean hasExportedTables(CatalogMap<Connector> connectors) {
@@ -3208,15 +3218,17 @@ public abstract class CatalogUtil {
         sb.append("Statement Hash: ").append(hash);
         sb.append(", Statement SQL: ").append(sqlText);
         ProcedureRunner runner = procSet.getProcByName(proc.getTypeName());
-        for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
-            for (PlanFragment frag : stmt.getFragments()) {
-                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
-                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
-                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
-                sb.append(", Plan Fragment Id:").append(planId);
-                sb.append(", Plan Stmt Text:").append(stmtText);
-                sb.append(", Json Plan:").append(new String(jsonPlan));
+        if (runner != null) {
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
             }
         }
         sb.append("\n");
@@ -3250,16 +3262,7 @@ public abstract class CatalogUtil {
         }
         return false;
     }
-    public static int getPersistentMigrateBatchSize(String tableName) {
-        Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
-        if (table != null && table.getTimetolive() != null ) {
-            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl != null && !StringUtil.isEmpty(table.getMigrationtarget())) {
-                return ttl.getBatchsize();
-            }
-        }
-        return -1;
-    }
+
     public static boolean getIsreplicated(String tableName) {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null) {

@@ -73,7 +73,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     VOLT_TRACE("found class: %d", jniClass == NULL);
     if (jniClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(jniClass != 0);
+        vassert(jniClass != 0);
         throw std::exception();
     }
 
@@ -84,7 +84,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
                     "(Ljava/nio/ByteBuffer;)V");
     if (m_fallbackToEEAllocatedBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_fallbackToEEAllocatedBufferMID != 0);
+        vassert(m_fallbackToEEAllocatedBufferMID != 0);
         throw std::exception();
     }
 
@@ -92,7 +92,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             jniClass, "callJavaUserDefinedFunction", "()I");
     if (m_callJavaUserDefinedFunctionMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_callJavaUserDefinedFunctionMID != 0);
+        vassert(m_callJavaUserDefinedFunctionMID != 0);
         throw std::exception();
     }
 
@@ -100,35 +100,35 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             jniClass, "resizeUDFBuffer", "(I)V");
     if (m_resizeUDFBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_resizeUDFBufferMID != 0);
+        vassert(m_resizeUDFBufferMID != 0);
         throw std::exception();
     }
 
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_nextDependencyMID != 0);
+        vassert(m_nextDependencyMID != 0);
         throw std::exception();
     }
 
     m_traceLogMID = m_jniEnv->GetMethodID(jniClass, "traceLog", "(ZLjava/lang/String;Ljava/lang/String;)V");
     if (m_traceLogMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_traceLogMID != 0);
+        vassert(m_traceLogMID != 0);
         throw std::exception();
     }
 
     m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(IIJJJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_fragmentProgressUpdateMID != 0);
+        vassert(m_fragmentProgressUpdateMID != 0);
         throw std::exception();
     }
 
     m_planForFragmentIdMID = m_jniEnv->GetMethodID(jniClass, "planForFragmentId", "(J)[B");
     if (m_planForFragmentIdMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_planForFragmentIdMID != 0);
+        vassert(m_planForFragmentIdMID != 0);
         throw std::exception();
     }
 
@@ -139,21 +139,21 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;I)V");
     if (m_crashVoltDBMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_crashVoltDBMID != NULL);
+        vassert(m_crashVoltDBMID != NULL);
         throw std::exception();
     }
 
     m_exportManagerClass = m_jniEnv->FindClass("org/voltdb/export/ExportManager");
     if (m_exportManagerClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_exportManagerClass != NULL);
+        vassert(m_exportManagerClass != NULL);
         throw std::exception();
     }
 
     m_exportManagerClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
     if (m_exportManagerClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_exportManagerClass != NULL);
+        vassert(m_exportManagerClass != NULL);
         throw std::exception();
     }
 
@@ -163,7 +163,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(ILjava/lang/String;JJJJJLjava/nio/ByteBuffer;)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_pushExportBufferMID != NULL);
+        vassert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
     m_pushExportEOFMID = m_jniEnv->GetStaticMethodID(
@@ -172,21 +172,21 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(ILjava/lang/String;)V");
     if (m_pushExportEOFMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_pushExportEOFMID != NULL);
+        vassert(m_pushExportEOFMID != NULL);
         throw std::exception();
     }
 
     m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
     if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_partitionDRGatewayClass != NULL);
+        vassert(m_partitionDRGatewayClass != NULL);
         throw std::exception();
     }
 
     m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
     if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_partitionDRGatewayClass != NULL);
+        vassert(m_partitionDRGatewayClass != NULL);
         throw std::exception();
     }
 
@@ -202,7 +202,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     if (m_pushDRBufferMID == NULL || m_pushPoisonPillMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_pushDRBufferMID != NULL && m_pushPoisonPillMID != NULL);
+        vassert(m_pushDRBufferMID != NULL && m_pushPoisonPillMID != NULL);
         throw std::exception();
     }
 
@@ -212,21 +212,21 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(IIJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_reportDRConflictMID != NULL);
+        vassert(m_reportDRConflictMID != NULL);
         throw std::exception();
     }
 
     m_decompressionClass = m_jniEnv->FindClass("org/voltdb/utils/CompressionService");
     if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_decompressionClass != NULL);
+        vassert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
     m_decompressionClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_decompressionClass));
     if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_decompressionClass != NULL);
+        vassert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
@@ -236,7 +236,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "(Ljava/lang/String;)[B");
     if (m_decodeBase64AndDecompressToBytesMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_decodeBase64AndDecompressToBytesMID != NULL);
+        vassert(m_decodeBase64AndDecompressToBytesMID != NULL);
         throw std::exception();
     }
 
@@ -245,7 +245,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
                                                           "(JJLjava/nio/ByteBuffer;)Z");
     if (m_storeLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_storeLargeTempTableBlockMID != 0);
+        vassert(m_storeLargeTempTableBlockMID != 0);
         throw std::exception();
     }
 
@@ -254,7 +254,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
                                                           "(JJLjava/nio/ByteBuffer;)Z");
     if (m_loadLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_loadLargeTempTableBlockMID != 0);
+        vassert(m_loadLargeTempTableBlockMID != 0);
         throw std::exception();
     }
 
@@ -263,7 +263,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
                                                             "(JJ)Z");
     if (m_releaseLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_releaseLargeTempTableBlockMID != 0);
+        vassert(m_releaseLargeTempTableBlockMID != 0);
         throw std::exception();
     }
 }

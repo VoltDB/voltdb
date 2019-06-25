@@ -23,6 +23,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Exception thrown by native Execution Engine
@@ -33,6 +34,7 @@ public class DRTableNotFoundException extends SerializableException {
 
     private long m_hash; // the hash value from the remote cluster for which it failed
     private long m_remoteTxnUniqueId; // the remote cluster's txn id
+    private int m_catalogVersion; // local catalog version when this error was generated
 
     public DRTableNotFoundException() {
         super();
@@ -42,6 +44,7 @@ public class DRTableNotFoundException extends SerializableException {
         super(b);
         this.m_hash = b.getLong();
         this.m_remoteTxnUniqueId = b.getLong();
+        this.m_catalogVersion = b.getInt();
     }
 
     @Override
@@ -53,23 +56,44 @@ public class DRTableNotFoundException extends SerializableException {
         m_remoteTxnUniqueId = remoteTxnUniqueId;
     }
 
+    public void setCatalogVersion(int catalogVersion) {
+        m_catalogVersion = catalogVersion;
+    }
+
+    @Override
     public void setClientResponseResults(ClientResponseImpl cr) {
+        cr.setResultTables(new VoltTable[] { getClientResponseTable(m_remoteTxnUniqueId, m_catalogVersion) });
+    }
+
+    public static VoltTable getClientResponseTable(long remoteTxnUniqueId, int catalogVersion) {
         ColumnInfo[] resultColumns = new ColumnInfo[] {
-                new ColumnInfo("SOURCE_UNIQUEID", VoltType.BIGINT)
+                new ColumnInfo("SOURCE_UNIQUEID", VoltType.BIGINT),
+                new ColumnInfo("CATALOG_VERSION", VoltType.INTEGER)
         };
         VoltTable result = new VoltTable(resultColumns);
-        result.addRow(m_remoteTxnUniqueId);
-        cr.setResultTables(new VoltTable[] { result });
+        result.addRow(remoteTxnUniqueId, catalogVersion);
+        return result;
     }
 
     @Override
     protected int p_getSerializedSize() {
-        return 16;
+        return 20;
     }
 
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
         b.putLong(m_hash);
         b.putLong(m_remoteTxnUniqueId);
+        b.putInt(m_catalogVersion);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.DR_TABLE_HASH_NOT_FOUND;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "TABLE NOT FOUND FOR REMOTE TABLE HASH";
     }
 }

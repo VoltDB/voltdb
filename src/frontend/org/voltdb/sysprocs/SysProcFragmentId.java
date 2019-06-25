@@ -280,6 +280,9 @@ public class SysProcFragmentId
     public static final int PF_elasticRemoveResume = 382;
     public static final int PF_elasticRemoveResumeAggregate = 383;
 
+    // @License
+    public static final int PF_systemInformationLicense = 390;
+
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 

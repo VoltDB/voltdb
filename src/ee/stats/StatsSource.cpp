@@ -16,7 +16,6 @@
  */
 
 #include "stats/StatsSource.h"
-
 #include "common/executorcontext.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -114,7 +113,7 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     m_interval = interval;
     if (m_statsTable == NULL) {
         VOLT_DEBUG("Table stats for site %" PRId64 ", partition %d is missing", siteId, partitionId);
-        assert (m_statsTable != NULL);
+        vassert(m_statsTable != NULL);
         return NULL;
     }
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));

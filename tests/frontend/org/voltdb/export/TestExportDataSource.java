@@ -67,6 +67,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.VoltFile;
@@ -133,7 +134,7 @@ public class TestExportDataSource extends TestCase {
 
         @Override
         public void updateInitialExportStateToSeqNo(int partitionId,
-                String signature, boolean isRecover, boolean isRejoin,
+                String signature, StreamStartAction action,
                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                 boolean isLowestSite) {
         }

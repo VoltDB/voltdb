@@ -25,7 +25,9 @@ import java.nio.ByteBuffer;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltProcedure;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Base class for runtime exceptions that can be serialized to ByteBuffers without involving Java's
@@ -160,6 +162,16 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
     public String getMessage() { return m_message; }
 
     /**
+     * Override this method if the ClientResponse sent back must contain
+     * result rows with additional information.
+     *
+     * @param cr
+     */
+    public void setClientResponseResults(ClientResponseImpl cr) {
+        // Does nothing by default
+    }
+
+    /**
      * Number of bytes necessary to store the serialized representation of this exception
      * @return Number of bytes
      */
@@ -229,6 +241,11 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
         final int ordinal = b.get();
         assert (ordinal != SerializableExceptions.None.ordinal());
         return SerializableExceptions.values()[ordinal].deserializeException(b);
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.UNEXPECTED_FAILURE;
     }
 
     @Override

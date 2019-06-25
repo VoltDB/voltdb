@@ -81,7 +81,7 @@ public class MpScheduler extends Scheduler
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
     final private MpTransactionTaskQueue m_pendingTasks;
-    private final int m_hostId;
+    private final int m_leaderId;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle =TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
@@ -90,7 +90,7 @@ public class MpScheduler extends Scheduler
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
     long m_repairLogAwaitingTruncate = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
 
-    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int hostId)
+    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderId)
     {
         super(partitionId, taskQueue);
         m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
@@ -98,7 +98,7 @@ public class MpScheduler extends Scheduler
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
-        m_hostId = hostId;
+        m_leaderId = leaderId;
         m_leaderMigrationMap = Maps.newHashMap();
     }
 
@@ -359,7 +359,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), false, m_hostId);
+                        m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -374,14 +374,14 @@ public class MpScheduler extends Scheduler
 
             task = instantiateNpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, involvedPartitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_hostId);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
         }
 
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_hostId, false);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -460,7 +460,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true, m_hostId);
+                        m_buddyHSIds.get(m_nextBuddy), true, m_leaderId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -469,7 +469,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), true, m_hostId, false);
+                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -653,8 +653,8 @@ public class MpScheduler extends Scheduler
         return NP_PROCEDURE_CLASS.newInstance(params);
     }
 
-    public int getHostId() {
-        return m_hostId;
+    public int getLeaderId() {
+        return m_leaderId;
     }
 
     @Override

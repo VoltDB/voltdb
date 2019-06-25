@@ -24,23 +24,20 @@
 package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import org.junit.Test;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.planner.PlanningErrorException;
-import org.voltdb.utils.MiscUtils;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.junit.Test;
+import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     private void setup(String ddl) throws Exception {
@@ -62,17 +59,31 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
 
     @Test
     public void testSimple() throws Exception {
-        testMigrate("CREATE TABLE with_ttl(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
-                        "CREATE TABLE without_ttl(i int NOT NULL, j FLOAT);",
+        testMigrate(
+                "CREATE TABLE with_ttl migrate to target foo (i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT);\n" +
+                "CREATE TABLE with_ttl_no_target(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                "CREATE TABLE without_ttl_no_target(i int NOT NULL, j FLOAT);\n",
                 Stream.of(
                         Pair.of("MIGRATE FROM without_ttl;", false),
-                        Pair.of("MIGRATE FROM without_ttl WHERE i > 0;", false),
+                        Pair.of("MIGRATE FROM without_ttl WHERE not migrating;", true),
+                        Pair.of("MIGRATE FROM without_ttl WHERE i < 0 and not migrating;", true),
                         Pair.of("MIGRATE FROM with_ttl;", false),
                         Pair.of("MIGRATE FROM with_ttl WHERE j > 0;", false),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i = 0;", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i = 0 OR j > 0;", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE i + j > 0", true),
-                        Pair.of("MIGRATE FROM with_ttl WHERE power(i, j) > 0;", true)
+                        Pair.of("MIGRATE FROM with_ttl WHERE not migrating;", true),
+                        Pair.of("MIGRATE FROM with_ttl WHERE not migrating() and j > 0;", true),
+                        Pair.of("MIGRATE FROM with_ttl_no_target where not migrating;", false),
+                        Pair.of("MIGRATE FROM without_ttl_no_target where not migrating();", false),
+                        // we do prevent user from doing this
+                        Pair.of("MIGRATE FROM with_ttl WHERE not not migrating;", false),
+                        Pair.of("MIGRATE FROM with_ttl WHERE migrating() and j > 0;", false),
+                        // we don't prevent user from doing this
+                        Pair.of("MIGRATE FROM with_ttl WHERE not (not migrating);", true),
+                        // ENG-16463
+                        Pair.of("MIGRATE FROM without_ttl where j is not null;", false),
+                        Pair.of("MIGRATE FROM without_ttl where j is null;", false),
+                        Pair.of("MIGRATE FROM without_ttl where j is not null and not migrating;", true),
+                        Pair.of("MIGRATE FROM without_ttl where j is null and not migrating;", true)
                 ).collect(Collectors.toList()));
     }
 
@@ -89,7 +100,8 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
                     final String msg = e.getMessage();
                     assertTrue("Received unexpected failure for query " + stmt + ": " + msg,
                             !pass && (msg.contains(" invalid WHERE expression") ||
-                                    msg.contains("Cannot migrate from table ")));
+                                    msg.contains("Cannot migrate from table ") ||
+                                    msg.contains("unexpected token: NOT")));
                 }
             });
         } finally {
@@ -97,4 +109,13 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
+    // test sql funtion contains ?
+    public void testENG16508() throws Exception {
+        String ddl = "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT, ts TIMESTAMP);\n";
+        setup(ddl);
+        ClientResponse res = m_client.callProcedure("@AdHoc", "MIGRATE FROM without_ttl where not migrating and ts < dateAdd(second, ?, now);", 1);
+        assertEquals(res.getStatus(), ClientResponse.SUCCESS);
+        teardownSystem();
+    }
 }

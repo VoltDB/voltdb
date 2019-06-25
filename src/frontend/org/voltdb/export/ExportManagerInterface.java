@@ -35,6 +35,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 
 /**
@@ -119,13 +120,13 @@ public interface ExportManagerInterface {
 
     public void shutdown();
 
-    public void startPolling(CatalogContext catalogContext);
+    public void startPolling(CatalogContext catalogContext, StreamStartAction action);
 
     public void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-            boolean isRecover, boolean isRejoin,
+            StreamStartAction action,
             Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
             boolean isLowestSite);
 
@@ -144,5 +145,5 @@ public interface ExportManagerInterface {
     public void sync();
 
     public void clientInterfaceStarted(ClientInterface clientInterface);
-    public void invokeMigrateRowsDelete(int partition, String tableName, int batchSize, long deletableTxnId,  ProcedureCallback cb);
+    public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb);
 }

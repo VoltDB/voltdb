@@ -45,11 +45,6 @@ JIRA_PASS = os.environ.get('jirapass', None)
 # TODO: change this back to 'ENG', before merging to master
 JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
-# Used to help prevent a Jira ticket from exceeding Jira's maximum
-# description size (32,767 characters, total)
-MAX_NUM_CHARS_PER_JIRA_DESCRIPTION  = 32767
-MAX_NUM_CHARS_PER_DESCRIPTION_PIECE = 2000
-
 # Queries
 
 # System Leaderboard - Leaderboard for master system tests on apprunner.
@@ -794,7 +789,7 @@ tr:hover{
         summary_partial_query = " AND summary ~ '" + "' AND summary ~ '".join(summary_keys)
         full_jira_query = ("project = %s AND status != Closed"
                            + summary_partial_query + labels_partial_query
-                           + "' ORDER BY key DESC"
+                           + "' ORDER BY key ASC"
                            ) % str(project)
         tickets = []
         try:
@@ -911,7 +906,7 @@ tr:hover{
 
     def create_jira_bug_ticket(self, channel, test_suite, summary,
                                jenkins_job, build_number,
-                               descriptions, version, labels,
+                               description, version, labels,
                                priority='Major', attachments={},
                                jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                project=JIRA_PROJECT, component='Core',
@@ -924,9 +919,7 @@ tr:hover{
                are marked 'is related to'.
         :param summary: The Summary to be used in the Jira ticket that is to
                be created.
-        :param descriptions: One or more pieces of the Description to be added to
-               the Jira ticket; each one will be checked separately for being too
-               long (more than MAX_NUM_CHARS_PER_DESCRIPTION_PIECE characters).
+        :param description: The Description for the new Jira ticket.
         :param version: The (VoltDB) Version that this bug affects.
         :param labels: The Labels to list in the Jira ticket.
         :param priority: The Priority of the Jira ticket.
@@ -945,7 +938,7 @@ tr:hover{
         logging.debug('  channel     : '+str(channel))
         logging.debug('  test_suite  : '+str(test_suite))
         logging.debug('  summary     : '+str(summary))
-        logging.debug('  descriptions:\n'+str(descriptions)+'\n')
+        logging.debug('  description :\n'+str(description)+'\n')
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -962,25 +955,12 @@ tr:hover{
         issue_dict = {
             'project': project,
             'summary': summary,
+            'description': description,
             'issuetype': {
                 'name': 'Bug'
             },
             'labels': labels
         }
-
-        new_description = ''
-        for dp in descriptions:
-            if len(dp) <= MAX_NUM_CHARS_PER_DESCRIPTION_PIECE:
-                new_description = new_description + dp
-            else:
-                half_length  = int(MAX_NUM_CHARS_PER_DESCRIPTION_PIECE / 2)
-                truncated_dp = dp[:half_length] +'\n...[truncated]...\n' \
-                             + dp[-half_length:]
-                new_description  = new_description + truncated_dp
-                logging.warn('Description piece of length %d characters '
-                             'truncated to %d characters:\n    %s'
-                             % (len(dp), len(truncated_dp), truncated_dp) )
-        issue_dict['description'] = new_description
 
         issue_dict['components'] = self.get_jira_component_list(jira, component, project)
         issue_dict['versions']   = self.get_jira_version_list(jira, version, project)
@@ -1000,7 +980,7 @@ tr:hover{
                 logging.exception("Jira ticket creation failed with Exception:"
                                   "\n    %s\n    using:\n    %s"
                                   % (str(e), str(issue_dict)) )
-                return new_issue
+                raise e
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -1055,120 +1035,6 @@ tr:hover{
         return new_issue
 
 
-    def get_modified_description(self, old_description, new_description_pieces,
-                                 num_chars_for_partial_match=12,
-                                 ignore_partial_match_for_last_n_pieces=1):
-        """Interweaves an old (Jira bug ticket) description with new description
-           pieces; essentially, parts of the old description that match new
-           description pieces will remain unchanged, but preceded first by parts
-           of the old description that preceded it and then by pieces of the new
-           description that preceded the matching piece.
-        """
-        # Original, very simple version, without interweaving:
-#         new_description = old_description
-# 
-#         for dp in new_description_pieces:
-#             if not (dp in old_description):
-#                 new_description = new_description + dp
-
-        logging.debug('In get_modified_description')
-        logging.debug('    old_description:\n'+str(old_description))
-        logging.debug('    new_description_pieces:\n'+str(new_description_pieces))
-
-        # Find the new_description_pieces that match parts of the old_description,
-        # both full and partial matches; the first num_chars_for_partial_match
-        # (~12) non-trivial characters are used for a partial match; for a partial
-        # match, the final ignore_partial_match_for_last_n_pieces (~1) elements of
-        # new_description_pieces are not checked, but just appended to the end of
-        # the new description (if they don't match fully)
-        matching_substring_indexes = []
-        for i in range(len(new_description_pieces)):
-            dp = new_description_pieces[i]
-            if dp in old_description:
-                start = old_description.index(dp)
-                end   = start + len(dp)
-                # keys: ndpi for 'new_description_pieces index';
-                # odsi for 'old_description start index';
-                # odei for 'old_description end index';
-                # full: True for a full (not partial) match
-                matching_substring_indexes.append({'ndpi':i,   'odsi':start,
-                                                   'odei':end, 'full':True })
-            elif i < len(new_description_pieces) - ignore_partial_match_for_last_n_pieces:
-                # In determining the number of characters to check for a partial
-                # match, don't count very common characters like '-', '\n', '\'
-                dpr = dp.replace('-', '').replace('\n', '').replace('\\', '')
-                if len(dpr) < 1:
-                    continue
-                dpi = dp.index(dpr[0]) + num_chars_for_partial_match
-                if dp[:dpi] in old_description:
-                    start = old_description.index(dp[:dpi])
-                    # keys: as above, but 'odei' is not used
-                    matching_substring_indexes.append({'ndpi':i, 'odsi':start,
-                                                       'odei':0, 'full':False })
-
-        # If every one of the new_description_pieces was found in the
-        # old_description, just return the old_description unaltered
-        if ( len(matching_substring_indexes) == len(new_description_pieces) and
-                all(msi['full'] for msi in matching_substring_indexes) ):
-            return old_description
-
-        # Interweave the non-matching and matching old_description parts
-        # and new_description_pieces
-        new_description = ''
-        old_desc_index = 0    # index in a string (of characters)
-        new_desc_index = 0    # index in a list (of strings)
-        for msi in matching_substring_indexes:
-            logging.debug('    msi: '+str(msi))
-
-            new_desc_end_index = msi['ndpi'] + 1
-            # Special case: if a partially matching new_description_piece is
-            # extremely long, skip it; this can sometimes avoid exceeding Jira's
-            # maximum description size (32,767 characters)
-            if ( not msi['full'] and len(new_description_pieces[msi['ndpi']])
-                                         > MAX_NUM_CHARS_PER_DESCRIPTION_PIECE ):
-                new_desc_end_index = msi['ndpi']
-                skipped_ndp = new_description_pieces[msi['ndpi']]
-                logging.warn('Ignoring the following description piece, because '
-                             'it partly matches the old description and has a '
-                             'length of %d characters:\n    %s'
-                             % (len(skipped_ndp), skipped_ndp) )
-
-            # Add in any parts of the old_description that we haven't used yet,
-            # and which precede the current match (full or partial); and elements
-            # of the new_description_pieces that we haven't used yet, up to and
-            # including the one that matches (fully or partially)
-            new_description = ( new_description
-                + old_description[old_desc_index:msi['odsi']]
-                + ''.join(new_description_pieces[i][:MAX_NUM_CHARS_PER_DESCRIPTION_PIECE]
-                          for i in range(new_desc_index, new_desc_end_index)) )
-            # henceforth, ignore the new_description_pieces that we've now used
-            new_desc_index = msi['ndpi'] + 1
-            # henceforth, ignore the parts of the old_description that we've now used...
-            if msi['full']:
-                old_desc_index = msi['odei']  # ... including a full match
-            else:
-                old_desc_index = msi['odsi']  # ... excluding a partial match
-            logging.debug('    old_desc_index, new_desc_index: '+str(old_desc_index)+', '+str(new_desc_index))
-
-        # Append any old_description parts and new_description_pieces after
-        # the last matching ones
-        new_description = (new_description
-            + old_description[old_desc_index:]
-            + ''.join(new_description_pieces[i] for i in range(new_desc_index, len(new_description_pieces) )) )
-        logging.debug('    new_description:\n'+str(new_description))
-
-        if len(new_description) > MAX_NUM_CHARS_PER_JIRA_DESCRIPTION:
-            suffix = '\n[Truncated]'
-            last_char_index = MAX_NUM_CHARS_PER_JIRA_DESCRIPTION - len(suffix)
-            logging.warn('Updated Jira description truncated to:\n    %s'
-                         % new_description[:last_char_index] )
-            logging.warn('This part was left out of the truncated Jira description:\n    %s'
-                         % new_description[last_char_index:] )
-            return new_description[:last_char_index] + suffix
-
-        return new_description
-
-
     def summary_differs_significantly(self, old_summary, new_summary):
         """Determines whether the old and new (Jira ticket) summaries are
            'significantly' different: if they are identical, or if they are
@@ -1191,7 +1057,7 @@ tr:hover{
 
     def modify_jira_bug_ticket(self, channel, summary_keys, summary,
                                jenkins_job, build_number,
-                               descriptions, version, labels,
+                               description, version, labels,
                                priority='Major', attachments={}, ticket_to_modify=None,
                                jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                project=JIRA_PROJECT, component='Core',
@@ -1206,9 +1072,7 @@ tr:hover{
                be created or modified
         :param jenkins_job ????: One or more substrings of the Summary, used to
                determine whether a Jira ticket already exists for this issue
-        :param descriptions: One or more pieces of the Description to be added
-               to the Jira ticket; the pieces that already exist in the existing
-               ticket do not get added, to avoid redundancy.
+        :param description: The Description for the modified Jira ticket.
         :param version ???: The (VoltDB) Version that this bug affects
         :param labels ??: The Labels to list in the Jira ticket
         :param priority: The Priority of the Jira ticket
@@ -1229,7 +1093,7 @@ tr:hover{
         logging.debug('  summary     : '+str(summary))
         logging.debug('  jenkins_job : '+str(jenkins_job))
         logging.debug('  build_number: '+str(build_number))
-        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  description : '+str(description))
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -1253,33 +1117,59 @@ tr:hover{
             # Update the Jira ticket's summary, description, etc.
             previous_summary  = ticket_to_modify.fields.summary
             old_description   = ticket_to_modify.fields.description
-            new_description   = self.get_modified_description(old_description, descriptions)
             previous_priority = ticket_to_modify.fields.priority
-#             logging.info('previous_priority: '+str(previous_priority))
+
             # If ticket has been marked as a "Blocker" (presumably manually),
             # then do not downgrade it
             if previous_priority == 'Blocker':
                 priority = previous_priority
-            try:
-                ticket_to_modify.update(fields={'summary'    : summary,
-                                                'description': new_description,
-#                                                 'fixVersions': [{"set":[{"name" : version}]}],
-                                                'labels'     : labels,
-                                                'priority'   : {'name': priority}
-                                                })
-            except Exception as e:
-                logging.exception("Jira ticket update failed with Exception:\n    %s"
-                                  "\n    for Jira ticket %s, using:"
-                                  "\n    version '%s', priority '%s', labels %s;"
-                                  "\n    old and new summaries:\n    '%s'\n    '%s'"
-                                  "\n    old description:\n    %s"
-                                  "\n    new description pieces:\n    %s"
-                                  "\n    new (combined) description:\n    %s\n"
-                                  % (str(e), str(ticket_to_modify.key),
-                                     version, priority, str(labels),
-                                     previous_summary, summary, old_description,
-                                     str(descriptions), new_description) )
-                return ticket_to_modify
+
+            # Try to update the Jira ticket without email notification; but if
+            # that fails (as seems to happen fairly often, but unpredictably),
+            # update it with email notification (which is the default)
+            exception = None
+            exception_count = 0
+            for notification in [False, True]:
+                try:
+                    if notification:
+                        ticket_to_modify.update(fields={'summary'    : summary,
+                                                        'description': description,
+                                                        'labels'     : labels,
+                                                        'priority'   : {'name': priority}
+                                                        }
+                                                )
+                    else:
+                        ticket_to_modify.update(notify=False,
+                                                fields={'summary'    : summary,
+                                                        'description': description,
+                                                        'labels'     : labels,
+                                                        'priority'   : {'name': priority}
+                                                        },
+                                                )
+                    break
+                except Exception as e:
+                    exception = e
+                    exception_count += 1
+                    logging.warn("Jira ticket update (notify=%s) failed with Exception:"
+                                 "\n    %s"
+                                 "\n    for Jira ticket %s, using:"
+                                 "\n        version '%s', priority '%s', labels %s;"
+                                 "\n    old and new summaries:"
+                                 "\n        '%s'"
+                                 "\n        '%s'"
+                                 "\n    old description:"
+                                 "\n        %s"
+                                 "\n    new (updated) description:"
+                                 "\n        %s\n"
+                                 % (str(notification), str(e),
+                                    str(ticket_to_modify.key),
+                                    version, priority, str(labels),
+                                    previous_summary, summary,
+                                    old_description, description) )
+            # If an exception was thrown for both values of 'notification',
+            # throw the latter exception
+            if exception_count > 1:
+                raise exception
 
             # Add attachments to the Jira ticket
             with_attachments = ''
@@ -1329,7 +1219,7 @@ tr:hover{
 
     def create_or_modify_jira_bug_ticket(self, channel, summary_keys, summary,
                                          jenkins_job, build_number,
-                                         descriptions, version, labels,
+                                         description, version, labels,
                                          priority='Major', attachments={}, existing_ticket=None,
                                          jira=None, user=JIRA_USER, passwd=JIRA_PASS,
                                          project=JIRA_PROJECT, component='Core',
@@ -1344,10 +1234,7 @@ tr:hover{
         :param summary: The Summary to be used in the Jira ticket that is to
                be created or modified.
         :param jenkins_job ????
-        :param descriptions: One or more pieces of the Description to be used
-               in (or added to) the Jira ticket; if there is an existing bug
-               ticket that gets modified, the pieces that already exist in the
-               existing ticket do not get added, to avoid redundancy.
+        :param description: The Description for the new or modified Jira ticket.
         :param version: The (VoltDB) Version that this bug affects.
         :param labels: The Labels to list in the Jira ticket.
         :param priority: The Priority of the Jira ticket.
@@ -1375,7 +1262,7 @@ tr:hover{
         logging.debug('  summary_keys: '+str(summary_keys))
         logging.debug('  summary     : '+str(summary))
         logging.debug('  jenkins_job : '+str(jenkins_job))
-        logging.debug('  descriptions: '+str(descriptions))
+        logging.debug('  description : '+str(description))
         logging.debug('  version     : '+str(version))
         logging.debug('  labels      : '+str(labels))
         logging.debug('  priority    : '+str(priority))
@@ -1404,7 +1291,7 @@ tr:hover{
 
             return self.modify_jira_bug_ticket(channel, summary_keys, summary,
                                                jenkins_job, build_number,
-                                               descriptions, version, labels,
+                                               description, version, labels,
                                                priority, attachments, existing_ticket,
                                                jira, user, passwd,
                                                project, component,
@@ -1416,7 +1303,7 @@ tr:hover{
 
             return self.create_jira_bug_ticket(channel, summary_keys[0], summary,
                                                jenkins_job, build_number,
-                                               descriptions, version, labels,
+                                               description, version, labels,
                                                priority, attachments,
                                                jira, user, passwd,
                                                project, component, DRY_RUN)
@@ -1445,7 +1332,7 @@ tr:hover{
             except Exception as e:
                 logging.exception("Closing Jira ticket %s failed with Exception:\n    %s"
                                   % (str(ticket_to_close.key), str(e)) )
-                return ticket_to_close
+                raise e
 
             logging_message = ("Closed ticket %s (https://issues.voltdb.com/browse/%s), "
                                "with summary:\n    '%s'"

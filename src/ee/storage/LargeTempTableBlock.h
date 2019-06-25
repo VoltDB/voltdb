@@ -148,13 +148,13 @@ public:
 
     /** Mark this block as pinned and un-evictable */
     void pin() {
-        assert(!m_isPinned);
+        vassert(!m_isPinned);
         m_isPinned = true;
     }
 
     /** Mark this block as unpinned and evictable */
     void unpin() {
-        assert(m_isPinned);
+        vassert(m_isPinned);
         m_isPinned = false;
     }
 
@@ -186,7 +186,7 @@ public:
     /** Swap the contents of the two blocks.  It's up to the caller to
         invalidate any copies of this block on disk. */
     void swap(LargeTempTableBlock* otherBlock) {
-        assert(m_schema->isCompatibleForMemcpy(otherBlock->m_schema));
+        vassert(m_schema->isCompatibleForMemcpy(otherBlock->m_schema));
         // id should stay the same
         // m_schema is the same
         m_storage.swap(otherBlock->m_storage);

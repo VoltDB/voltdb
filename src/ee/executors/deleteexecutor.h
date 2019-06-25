@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREDELETEEXECUTOR_H
-#define HSTOREDELETEEXECUTOR_H
+#pragma once
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -61,17 +60,10 @@ class DeletePlanNode;
 class AbstractTempTable;
 class PersistentTable;
 
-class DeleteExecutor : public AbstractExecutor
-{
+class DeleteExecutor : public AbstractExecutor {
 public:
     DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-          m_node(NULL),
-          m_truncate(false),
-          m_inputTable(NULL),
-          m_inputTuple()
-    {
-    }
+        : AbstractExecutor(engine, abstract_node) {}
 
 protected:
     bool p_init(AbstractPlanNode*,
@@ -79,17 +71,16 @@ protected:
     bool p_execute(const NValueArray &params);
 
 private:
-    DeletePlanNode* m_node;
+    DeletePlanNode* m_node = nullptr;
 
     /** true if all tuples are deleted, truncate is the only case we
         don't need PK to delete tuples. */
-    bool m_truncate;
-    AbstractTempTable* m_inputTable;
-    TableTuple m_inputTuple;
+    bool m_truncate = false;
+    AbstractTempTable* m_inputTable = nullptr;
+    TableTuple m_inputTuple{};
 
     static int64_t s_modifiedTuples;
 };
 
 }
 
-#endif

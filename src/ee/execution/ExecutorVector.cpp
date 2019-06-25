@@ -52,8 +52,8 @@
 
 namespace voltdb {
 
-boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(VoltDBEngine* engine,
-                                                                       catalog::Statement *stmt) {
+boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(
+        VoltDBEngine* engine, catalog::Statement *stmt) {
     const string& b64plan = stmt->fragments().begin()->second->plannodetree();
     const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
     return fromJsonPlan(engine, jsonPlan, -1);
@@ -61,10 +61,10 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromCatalogStatement(VoltDBEng
 
 boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
       VoltDBEngine* engine, const std::string& jsonPlan, int64_t fragId) {
-    PlanNodeFragment *pnf = NULL;
+    std::unique_ptr<PlanNodeFragment> pnf;
     try {
-        pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
-    } catch (SerializableEEException &seee) {
+        pnf.reset(PlanNodeFragment::createFromCatalog(jsonPlan.c_str()));
+    } catch (SerializableEEException&) {
         throw;
     } catch (std::exception const& e) {
         char msg[1024 * 100];
@@ -74,7 +74,7 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-    assert(pnf->getRootNode());
+    vassert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
         char msg[1024];
@@ -96,39 +96,33 @@ boost::shared_ptr<ExecutorVector> ExecutorVector::fromJsonPlan(
 
     // Note: the executor vector takes ownership of the plan node
     // fragment here.
-    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
-                                                            tempTableLogLimit,
-                                                            tempTableMemoryLimit,
-                                                            pnf));
+    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(
+                fragId, tempTableLogLimit, tempTableMemoryLimit, pnf.release()));
     ev->init(engine);
     return ev;
 }
 
 void ExecutorVector::init(VoltDBEngine* engine) {
     // Initialize each node!
-    for (PlanNodeFragment::PlanNodeMapIterator it = m_fragment->executeListBegin();
-         it != m_fragment->executeListEnd(); ++it) {
-        assert(it->second != NULL);
-        const std::vector<AbstractPlanNode*>& planNodeList = *it->second;
-        std::auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
-        BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
+    for (auto it = m_fragment->executeListBegin(); it != m_fragment->executeListEnd(); ++it) {
+        auto const& planNodeList = it->second;
+        std::vector<AbstractExecutor*> executorList;
+        for(AbstractPlanNode* planNode : planNodeList) {
             initPlanNode(engine, planNode);
-            executorList->push_back(planNode->getExecutor());
+            executorList.emplace_back(planNode->getExecutor());
         }
-        m_subplanExecListMap.insert(make_pair(it->first, executorList.get()));
-        executorList.release();
+        m_subplanExecListMap.emplace(it->first, executorList);
     }
 }
 
 std::string ExecutorVector::debug() const {
     std::ostringstream oss;
-    std::map<int, std::vector<AbstractExecutor*>* >::const_iterator it;
     oss << "Fragment ID: " << m_fragId << ", ";
     oss << "Temp table memory in bytes: " << m_limits.getAllocated() << std::endl;
-    for (it = m_subplanExecListMap.begin(); it != m_subplanExecListMap.end(); ++it) {
-        std::vector<AbstractExecutor*>& executorList = *it->second;
-       oss << "Statement id:" << it->first << ", list size: " << executorList.size() << ", ";
-        BOOST_FOREACH (AbstractExecutor* ae, executorList) {
+    for (auto const& it : m_subplanExecListMap) {
+       auto const& executorList = it.second;
+       oss << "Statement id:" << it.first << ", list size: " << executorList.size() << ", ";
+        for(AbstractExecutor* ae : executorList) {
             oss << ae->getPlanNode()->debug(" ") << "\n";
         }
     }
@@ -136,16 +130,16 @@ std::string ExecutorVector::debug() const {
 }
 
 void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) {
-    assert(node);
-    assert(node->getExecutor() == NULL);
+    vassert(node);
+    vassert(node->getExecutor() == NULL);
 
     // Executor is created here. An executor is *devoted* to this
     // plannode so that it can cache anything for the plannode
     AbstractExecutor* executor = getNewExecutor(engine, node, isLargeQuery());
     if (executor == NULL) {
         char message[256];
-        snprintf(message, sizeof(message), "Unexpected error. "
-                 "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
+        snprintf(message, sizeof(message),
+                "Unexpected error. Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
                  (intmax_t)m_fragId, (int)node->getPlanNodeType());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
@@ -154,24 +148,19 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
     // If this PlanNode has an internal PlanNode (e.g.,
     // AbstractScanPlanNode can have internal Projections), set
     // that internal node's executor as well.
-    std::map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
-    for (internal_it = node->getInlinePlanNodes().begin();
-         internal_it != node->getInlinePlanNodes().end(); internal_it++) {
-        AbstractPlanNode* inline_node = internal_it->second;
-        initPlanNode(engine, inline_node);
+    for (auto iter : node->getInlinePlanNodes()) {
+        initPlanNode(engine, iter.second);
     }
 
     // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(engine, *this)) {
-        return;
+    if (! executor->init(engine, *this)) {
+        char msg[1024 * 10];
+        snprintf(msg, sizeof(msg),
+                "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
+                node->debug().c_str(), (intmax_t)m_fragId);
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
-
-    char msg[1024 * 10];
-    snprintf(msg, sizeof(msg),
-             "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
-             node->debug().c_str(), (intmax_t)m_fragId);
-    VOLT_ERROR("%s", msg);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
 }
 
 void ExecutorVector::setupContext(ExecutorContext* executorContext) {
@@ -181,29 +170,19 @@ void ExecutorVector::setupContext(ExecutorContext* executorContext) {
 void ExecutorVector::resetLimitStats() { m_limits.resetPeakMemory(); }
 
 const std::vector<AbstractExecutor*>& ExecutorVector::getExecutorList(int planId) {
-    assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
-    return *(m_subplanExecListMap.find(planId)->second);
+    vassert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
+    return m_subplanExecListMap.find(planId)->second;
 }
 
 void ExecutorVector::getRidOfSendExecutor(int planId) {
-    std::map<int, std::vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.find(planId);
-    assert(it != m_subplanExecListMap.end());
-    std::vector<AbstractExecutor*> executorList = *(it->second);
-    std::auto_ptr<std::vector<AbstractExecutor*> > executorListWithoutSend(new std::vector<AbstractExecutor*>());
-    BOOST_FOREACH (AbstractExecutor* executor, executorList) {
+    auto iter = m_subplanExecListMap.find(planId);
+    vassert(iter != m_subplanExecListMap.end());
+    std::vector<AbstractExecutor*> const executorList = iter->second;
+    iter->second.clear();
+    for(AbstractExecutor* executor : executorList) {
         if (executor->getPlanNode()->getPlanNodeType() != PLAN_NODE_TYPE_SEND) {
-            executorListWithoutSend->push_back(executor);
+            iter->second.emplace_back(executor);
         }
-    }
-    delete it->second;
-    it->second = executorListWithoutSend.get();
-    executorListWithoutSend.release();
-}
-
-ExecutorVector::~ExecutorVector() {
-    typedef  std::map<int, std::vector<AbstractExecutor*>*>::value_type MapEntry;
-    BOOST_FOREACH(MapEntry &entry, m_subplanExecListMap) {
-        delete entry.second;
     }
 }
 

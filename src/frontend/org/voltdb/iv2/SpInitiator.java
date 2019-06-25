@@ -129,7 +129,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
         m_scheduler.initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), "SpInitiator-iv2appointees-" + partition,
                 ZKUtil.joinZKPath(VoltZK.iv2appointees, Integer.toString(partition)), m_leadersChangeHandler);
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks, getInitiatorHSId());
         m_scheduler.m_repairLog = m_repairLog;
     }
 
@@ -364,5 +364,10 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
             replicasAdded = ((SpTerm) m_term).updateReplicas(snapshotTransactionState);
         }
         m_scheduler.forwardPendingTaskToRejoinNode(replicasAdded, snapshotTransactionState.m_spHandle);
+    }
+
+    @Override
+    protected InitiatorMailbox createInitiatorMailbox(JoinProducerBase joinProducer) {
+        return new InitiatorMailbox(m_partitionId, m_scheduler, m_messenger, m_repairLog, joinProducer);
     }
 }

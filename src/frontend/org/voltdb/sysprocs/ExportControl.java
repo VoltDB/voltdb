@@ -87,7 +87,7 @@ public class ExportControl extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, String exportSource, String[] targets, String operationMode) throws Exception {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String streamName, String[] targets, String operationMode) throws Exception {
         VoltTable results = new VoltTable(
                 new ColumnInfo("SOURCE", VoltType.STRING),
                 new ColumnInfo("TARGET", VoltType.STRING),
@@ -101,18 +101,24 @@ public class ExportControl extends VoltSystemProcedure {
             return new VoltTable[] {results};
         }
 
-        exportSource = exportSource == null ? "" : exportSource;
-        LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + Arrays.toString(targets));
-        if (!StringUtil.isEmpty(exportSource)) {
+        streamName = streamName == null ? "" : streamName;
+        if (!StringUtil.isEmpty(streamName)) {
             RealVoltDB volt = (RealVoltDB)VoltDB.instance();
             Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
-            boolean isThere = exportStreams.stream().anyMatch(exportSource::equalsIgnoreCase);
+            boolean isThere = exportStreams.stream().anyMatch(streamName::equalsIgnoreCase);
             if (!isThere) {
-                results.addRow(exportSource, "", -1,"FAILURE", "Export stream " + exportSource + " does not exist.");
+                results.addRow(streamName, "", -1,"FAILURE", "Export stream " + streamName + " does not exist.");
                 return new VoltTable[] {results};
             }
         }
-        return performExportControl(exportSource, targets, operationMode);
+
+        if (targets.length == 0 || Arrays.stream(targets).allMatch(s -> StringUtil.isEmpty(s))) {
+            results.addRow(streamName, "", -1,"FAILURE", "Target list is empty");
+            return new VoltTable[] {results};
+        }
+
+        LOG.info("Export " + operationMode + " source:" + streamName + " targets:" + Arrays.toString(targets));
+        return performExportControl(streamName, targets, operationMode);
     }
 
     private final VoltTable[] performExportControl(String exportSource,

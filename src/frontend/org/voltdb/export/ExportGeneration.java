@@ -39,7 +39,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -54,7 +53,6 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionMonitor.ExportSnapshotTuple;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -63,9 +61,9 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
@@ -363,7 +361,7 @@ public class ExportGeneration implements Generation {
                             try {
                                 if (generationIdCreated < eds.getGenerationIdCreated()) {
                                     if (exportLog.isDebugEnabled()) {
-                                        exportLog.debug("Ignored staled RELEASE_BUFFER message for " + eds.toString() +
+                                        exportLog.debug("Ignored stale RELEASE_BUFFER message for " + eds.toString() +
                                                 " , sequence number: " + seqNo + ", generationIdCreated: " + generationIdCreated +
                                                 " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                                 " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
@@ -410,11 +408,6 @@ public class ExportGeneration implements Generation {
             }
             for( ExportDataSource eds: partitionMap.values()) {
                 eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
-                if (newHSIds != null && !newHSIds.isEmpty()) {
-                    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
-                    // master stream resends the event when the export mailbox is aware of new streams.
-                    eds.forwardAckToNewJoinedReplicas(newHSIds);
-                }
             }
         }
     }
@@ -628,8 +621,7 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites, processor, genId);
         source.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
         adFilePartitions.add(source.getPartitionId());
-        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(source.getTableName());
-        source.setupMigrateRowsDeleter(migrateBatchSize,
+        source.setupMigrateRowsDeleter(
                 CatalogUtil.getIsreplicated(source.getTableName()) ? MpInitiator.MP_INIT_PID : source.getPartitionId());
 
         if (exportLog.isDebugEnabled()) {
@@ -695,8 +687,7 @@ public class ExportGeneration implements Generation {
                                 table.getPartitioncolumn(),
                                 m_directory.getPath());
                         exportDataSource.setCoordination(m_messenger.getZK(), m_messenger.getHostId());
-                        int migrateBatchSize = CatalogUtil.getPersistentMigrateBatchSize(key);
-                        exportDataSource.setupMigrateRowsDeleter(migrateBatchSize, table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
+                        exportDataSource.setupMigrateRowsDeleter(table.getIsreplicated() ? MpInitiator.MP_INIT_PID : exportDataSource.getPartitionId());
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Creating ExportDataSource for table in catalog " + key
                                     + " partition " + partition + " site " + siteId);
@@ -875,7 +866,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String streamName,
-                                                boolean isRecover, boolean isRejoin,
+                                                StreamStartAction action,
                                                 Map<Integer, ExportSnapshotTuple> sequenceNumberPerPartition,
                                                 boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
@@ -888,7 +879,7 @@ public class ExportGeneration implements Generation {
             if (source != null) {
                 ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(partitionId);
                 if (sequences != null) {
-                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                     tasks.add(task);
                 }
             }
@@ -902,7 +893,7 @@ public class ExportGeneration implements Generation {
                         if (!source.inCatalog()) {
                             ExportSnapshotTuple sequences = sequenceNumberPerPartition.get(source.getPartitionId());
                             if (sequences != null) {
-                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, isRejoin, sequences.getSequenceNumber(), sequences.getGenerationId());
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(action, sequences.getSequenceNumber(), sequences.getGenerationId());
                                 tasks.add(task);
                             }
                         }
@@ -1009,28 +1000,20 @@ public class ExportGeneration implements Generation {
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
         exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         synchronized (m_dataSourcesByPartition) {
-            RealVoltDB volt = (RealVoltDB) VoltDB.instance();
-            for (Iterator<Integer> partitionIt = m_dataSourcesByPartition.keySet().iterator(); partitionIt.hasNext();) {
-                // apply to partition leaders only
-                Integer partition = partitionIt.next();
-                boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
-                if (!isLeader) {
-                    continue;
-                }
-                Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
-                for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
-                    ExportDataSource eds = it.next();
-                    if (!StringUtil.isEmpty(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+            for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
+                Integer partition = partitionDataSourceMap.getKey();
+                for (ExportDataSource source : partitionDataSourceMap.getValue().values()) {
+                    if (!source.getTableName().equalsIgnoreCase(exportSource)) {
                         continue;
                     }
 
                     // no target match
-                    if (!exportTargets.isEmpty() && !exportTargets.contains(eds.getTarget())) {
+                    if (!exportTargets.contains(source.getTarget())) {
                         continue;
                     }
 
-                    if (eds.processStreamControl(operation)) {
-                        results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
+                    if (source.processStreamControl(operation)) {
+                        results.addRow(source.getTableName(), source.getTarget(), partition, "SUCCESS", "");
                     }
                 }
             }
@@ -1045,6 +1028,26 @@ public class ExportGeneration implements Generation {
                     source.updateGenerationId(genId);
                 }
             }
+        }
+    }
+
+    /**
+     * Iterate over sources to clean up stale buffers; this is done in a blocking fashion.
+     */
+    public void cleanupStaleBuffers(StreamStartAction action) {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    tasks.add(source.cleanupStaleBuffers(action));
+                }
+            }
+        }
+        try {
+            if (!tasks.isEmpty())
+                Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            exportLog.error("Unexpected exception cleaning stale buffers.", e);
         }
     }
 

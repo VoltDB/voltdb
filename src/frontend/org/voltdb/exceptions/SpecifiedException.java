@@ -85,7 +85,8 @@ public class SpecifiedException extends SerializableException {
         return new String(m_statusStringBytes, Charsets.UTF_8);
     }
 
-    public byte getStatus() {
+    @Override
+    public byte getClientResponseStatus() {
         return m_status;
     }
 }

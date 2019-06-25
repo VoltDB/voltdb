@@ -21,6 +21,8 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import org.voltdb.client.ClientResponse;
+
 /**
  * Exceptions that are intended to be caught by the user in a stored procedure are SQLExceptions
  * or extend SQLException. Normal operation of Volt should continue after a SQLException
@@ -99,5 +101,15 @@ public class SQLException extends SerializableException {
     @Override
     protected SerializableExceptions getExceptionType() {
         return SerializableExceptions.SQLException;
+    }
+
+    @Override
+    public byte getClientResponseStatus() {
+        return ClientResponse.GRACEFUL_FAILURE;
+    }
+
+    @Override
+    public String getShortStatusString() {
+        return "SQL ERROR";
     }
 }

@@ -18,7 +18,7 @@
 #ifndef JSONFUNCTIONS_H_
 #define JSONFUNCTIONS_H_
 
-#include <cassert>
+#include <common/debuglog.h>
 #include <cstring>
 #include <string>
 #include <sstream>
@@ -278,7 +278,7 @@ private:
     }
 
     bool readChar(char& c) {
-        assert(m_head != NULL && m_tail != NULL);
+        vassert(m_head != NULL && m_tail != NULL);
         if (m_head == m_tail) {
             return false;
         }
@@ -308,7 +308,7 @@ private:
 
 /** implement the 2-argument SQL FIELD function */
 template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& docNVal = arguments[0];
     const NValue& pathNVal = arguments[1];
@@ -328,11 +328,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     }
 
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
     int32_t lenPath;
-    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
+    const char* pathChars = pathNVal.getObject_withoutNull(lenPath);
     std::string result;
     if (doc.get(pathChars, lenPath, result)) {
         return getTempStringValue(result.c_str(), result.length() - 1);
@@ -342,7 +342,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
 
 /** implement the 2-argument SQL ARRAY_ELEMENT function */
 template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    vassert(arguments.size() == 2);
 
     const NValue& docNVal = arguments[0];
     if (docNVal.isNull()) {
@@ -357,7 +357,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
         return getNullStringValue();
     }
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     const std::string doc(docChars, lenDoc);
 
     int32_t index = indexNVal.castAsIntegerAndGetValue();
@@ -417,7 +417,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     }
 
     int32_t lenDoc;
-    const char* docChars = getObject_withoutNull(&lenDoc);
+    const char* docChars = getObject_withoutNull(lenDoc);
     const std::string doc(docChars, lenDoc);
 
     Json::Value root;
@@ -446,7 +446,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
 
 /** implement the 3-argument SQL SET_FIELD function */
 template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
+    vassert(arguments.size() == 3);
 
     const NValue& docNVal = arguments[0];
     const NValue& pathNVal = arguments[1];
@@ -477,13 +477,13 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
     }
 
     int32_t lenDoc;
-    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
+    const char* docChars = docNVal.getObject_withoutNull(lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
     int32_t lenPath;
-    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
+    const char* pathChars = pathNVal.getObject_withoutNull(lenPath);
     int32_t lenValue;
-    const char* valueChars = valueNVal.getObject_withoutNull(&lenValue);
+    const char* valueChars = valueNVal.getObject_withoutNull(lenValue);
 
     try {
         doc.set(pathChars, lenPath, valueChars, lenValue);

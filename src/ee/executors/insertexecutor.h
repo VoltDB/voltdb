@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREINSERTEXECUTOR_H
-#define HSTOREINSERTEXECUTOR_H
+#pragma once
 
 #include "common/Pool.hpp"
 #include "common/common.h"
@@ -61,31 +60,10 @@ class AbstractTempTable;
 /**
  * This is the executor for insert nodes.
  */
-class InsertExecutor : public AbstractExecutor
-{
+class InsertExecutor : public AbstractExecutor {
  public:
- InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-     : AbstractExecutor(engine, abstract_node),
-        m_node(NULL),
-        m_inputTable(NULL),
-        m_partitionColumn(-1),
-        m_multiPartition(false),
-        m_isStreamed(false),
-        m_hasStreamView(false),
-        m_isUpsert(false),
-        m_sourceIsPartitioned(false),
-        m_hasPurgeFragment(false),
-        m_templateTupleStorage(),
-        m_nowFields(),
-        m_targetTable(NULL),
-        m_modifiedTuples(0),
-        m_count_tuple(),
-        m_persistentTable(NULL),
-        m_upsertTuple(),
-        m_templateTuple(),
-        m_tempPool(NULL)
-    {
-    }
+     InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+         : AbstractExecutor(engine, abstract_node) { }
 
     /**
      * Return false iff all the work is done in init.  Inserting
@@ -94,8 +72,7 @@ class InsertExecutor : public AbstractExecutor
      * don't have any work to do.
      */
     bool p_execute_init(const TupleSchema *inputSchema,
-                        AbstractTempTable *newOutputTable,
-                        TableTuple &temp_tuple);
+            AbstractTempTable *newOutputTable, TableTuple &temp_tuple);
 
     /**
      * Insert a row into the target table and then count it.
@@ -112,22 +89,26 @@ class InsertExecutor : public AbstractExecutor
     Table *getTargetTable() {
         return m_targetTable;
     }
+
+    char const* exceptionMessage() const {
+       return ! m_sourceIsPartitioned && ! s_errorMessage.empty() ?
+          s_errorMessage.c_str() : nullptr;
+    }
  protected:
-    bool p_init(AbstractPlanNode*,
-                const ExecutorVector& executorVector);
+    bool p_init(AbstractPlanNode*, const ExecutorVector& executorVector);
     bool p_execute(const NValueArray &params);
 
 
-    InsertPlanNode* m_node;
-    AbstractTempTable* m_inputTable;
+    InsertPlanNode* m_node = nullptr;
+    AbstractTempTable* m_inputTable = nullptr;
 
-    int m_partitionColumn;
-    bool m_multiPartition;
-    bool m_isStreamed;
-    bool m_hasStreamView;
-    bool m_isUpsert;
-    bool m_sourceIsPartitioned;
-    bool m_hasPurgeFragment;
+    int m_partitionColumn = -1;
+    bool m_multiPartition = false;
+    bool m_isStreamed = false;
+    bool m_hasStreamView = false;
+    bool m_isUpsert = false;
+    bool m_sourceIsPartitioned = false;
+    bool m_hasPurgeFragment = false;
 
  private:
 
@@ -150,8 +131,7 @@ class InsertExecutor : public AbstractExecutor
      * don't have any work to do.
      */
     bool p_execute_init_internal(const TupleSchema *inputSchema,
-                                 AbstractTempTable *newOutputTable,
-                                 TableTuple &temp_tuple);
+            AbstractTempTable *newOutputTable, TableTuple &temp_tuple);
     /**
      * Insert a row into the target table and then count it.
      */
@@ -159,7 +139,7 @@ class InsertExecutor : public AbstractExecutor
 
     /** A tuple with the target table's schema that is populated
      * with default values for each field. */
-    StandAloneTupleStorage m_templateTupleStorage;
+    StandAloneTupleStorage m_templateTupleStorage{};
 
     /** A memory pool for allocating non-inlined varchar and
      * varbinary default values */
@@ -168,19 +148,20 @@ class InsertExecutor : public AbstractExecutor
     /** A list of indexes of each column in the template tuple
      * that has a DEFAULT of NOW, which must be set on each
      * execution of this plan. */
-    std::vector<int> m_nowFields;
+    std::vector<int> m_nowFields{};
     /*
      * These are logically local variables to p_execute.
      * But they are shared between p_execute and p_execute_init.
      */
-    Table* m_targetTable;
-    int64_t m_modifiedTuples;
+    Table* m_targetTable = nullptr;
+    int64_t m_modifiedTuples = 0;
     static int64_t s_modifiedTuples;
-    TableTuple m_count_tuple;
-    PersistentTable* m_persistentTable;
-    TableTuple m_upsertTuple;
-    TableTuple m_templateTuple;
-    Pool* m_tempPool;
+    static std::string s_errorMessage;
+    TableTuple m_count_tuple{};
+    PersistentTable* m_persistentTable = nullptr;
+    TableTuple m_upsertTuple{};
+    TableTuple m_templateTuple{};
+    Pool* m_tempPool = nullptr;
 };
 
 /**
@@ -190,4 +171,3 @@ class InsertExecutor : public AbstractExecutor
 InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node);
 }
 
-#endif

@@ -1,0 +1,19 @@
+CREATE TABLE migrate_me migrate to target foo (
+  i int NOT NULL,
+  j int NOT NULL
+);
+
+CREATE TABLE dont_migrate_me (
+  i int NOT NULL,
+  j int NOT NULL
+);
+
+MIGRATE FROM dont_migrate_me;
+
+MIGRATE FROM dont_migrate_me WHERE not migrating;
+
+MIGRATE FROM migrate_me;
+
+MIGRATE FROM migrate_me where i > 0;
+
+MIGRATE FROM migrate_me WHERE not migrating and i > 0;

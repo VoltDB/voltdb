@@ -33,6 +33,7 @@
 #include "logging/StdoutLogProxy.h"
 #include "storage/table.h"
 
+#include "common/debuglog.h"
 #include "common/ElasticHashinator.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
@@ -617,7 +618,7 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     if (staticDebugVerbose) {
         std::cout << "loadCatalog" << std::endl;
     }
-    assert(m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 
@@ -636,7 +637,7 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
-    assert(m_engine);
+    vassert(m_engine);
     update_catalog_cmd *uc = (update_catalog_cmd*) cmd;
     if (!m_engine) {
         return kErrorCode_Error;
@@ -659,11 +660,11 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
 
 int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     // expect a single initialization.
-    assert(!m_engine);
+    vassert(!m_engine);
     delete m_engine;
 
     // voltdbengine::initialize expects catalogids.
-    assert(sizeof(CatalogId) == sizeof(int));
+    vassert(sizeof(CatalogId) == sizeof(int));
 
     struct initialize {
         struct ipc_command cmd;
@@ -737,7 +738,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::toggleProfiler(struct ipc_command *cmd) {
-    assert(m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 
@@ -757,7 +758,7 @@ int8_t VoltDBIPC::toggleProfiler(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
-    assert(m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 
@@ -775,7 +776,7 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
-    assert(m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 
@@ -792,7 +793,7 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
-    assert (m_engine);
+    vassert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
 
@@ -932,7 +933,7 @@ void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::strin
         printf("Error - blocking read of %s failed. %jd read %jd attempted",
                 description.c_str(), (intmax_t)byteCountRead, (intmax_t)byteCountExpected);
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
 }
@@ -1089,7 +1090,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         printf("Error - blocking read failed. %jd read %jd attempted",
                 (intmax_t)bytes, (intmax_t)sizeof(int8_t));
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
 
@@ -1100,7 +1101,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         printf("Received unexpected response code %d to retrieve dependency request\n",
                 (int)responseCode);
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
 
@@ -1111,7 +1112,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         printf("Error - blocking read failed. %jd read %jd attempted",
                 (intmax_t)bytes, (intmax_t)sizeof(int32_t));
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
 
@@ -1135,7 +1136,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         printf("Error - blocking read failed. %jd read %jd attempted",
                 (intmax_t)bytes, (intmax_t)dependencyLength);
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
     return dependencyData;
@@ -1150,7 +1151,7 @@ static std::string readLengthPrefixedBytesToStdString(int fd) {
     ssize_t numBytesRead = read(fd, &length, sizeof(int32_t));
     checkBytesRead(sizeof(int32_t), numBytesRead, "plan bytes length");
     length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
-    assert(length > 0);
+    vassert(length > 0);
 
     boost::scoped_array<char> bytes(new char[length + 1]);
     numBytesRead = 0;
@@ -1254,7 +1255,7 @@ int64_t VoltDBIPC::fragmentProgressUpdate(
         printf("Error - blocking read after progress update failed. %jd read %jd attempted",
                 (intmax_t)bytes, (intmax_t)sizeof(nextStep));
         fflush(stdout);
-        assert(false);
+        vassert(false);
         exit(-1);
     }
     if (staticDebugVerbose) {
@@ -1539,7 +1540,6 @@ void VoltDBIPC::deleteMigratedRows(struct ipc_command *cmd) {
                                                static_cast<int64_t>(ntohll(migrate_msg->uniqueId)),
                                                tableName,
                                                static_cast<int64_t>(ntohll(migrate_msg->deletableTxnId)),
-                                               static_cast<int32_t>(ntohl(migrate_msg->maxRowCount)),
                                                static_cast<int64_t>(ntohll(migrate_msg->undoToken)));
     char response[1];
     response[0] = result ? 1 : 0;
@@ -1585,7 +1585,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     int retval = -1;
     try {
         int cnt = serialize_in.readShort();
-        assert(cnt> -1);
+        vassert(cnt> -1);
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         retval =
@@ -1872,7 +1872,7 @@ void *eethread(void *ptr) {
                 std::cout << std::endl;
             }
         }
-        assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
+        vassert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
         if (staticDebugVerbose) {
             std::cout << "Completed command: " << ntohl(cmd->command) << std::endl;
         }
@@ -1900,9 +1900,9 @@ int main(int argc, char **argv) {
     // allow caller to specify the number of ees - defaults to 1
     if (argc >= 2) {
         char *eecountStr = argv[1];
-        assert(eecountStr);
+        vassert(eecountStr);
         eecount = atoi(eecountStr);
-        assert(eecount >= 0);
+        vassert(eecount >= 0);
     // NOTE: EEProcess.java code validates the first few lines of this process
     // output, so keep it up to date with these printfs.
         printf("== eecount = %d ==\n", eecount);
@@ -1913,10 +1913,10 @@ int main(int argc, char **argv) {
     // allow caller to override port with the second argument
     if (argc == 3) {
         char *portStr = argv[2];
-        assert(portStr);
+        vassert(portStr);
         port = atoi(portStr);
-        assert(port > 0);
-        assert(port <= 65535);
+        vassert(port > 0);
+        vassert(port <= 65535);
     }
 
     struct sockaddr_in address;
@@ -1992,7 +1992,7 @@ int main(int argc, char **argv) {
         int code = pthread_join(eeThreads[ee], NULL);
         // stupid if to avoid compiler warning
         if (code != 0) {
-            assert(code == 0);
+            vassert(code == 0);
         }
     }
 

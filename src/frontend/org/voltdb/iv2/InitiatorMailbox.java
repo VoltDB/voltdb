@@ -84,8 +84,8 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    VoltLogger hostLog = new VoltLogger("HOST");
-    VoltLogger tmLog = new VoltLogger("TM");
+    final VoltLogger hostLog = new VoltLogger("HOST");
+    final VoltLogger tmLog = new VoltLogger("TM");
 
     protected final int m_partitionId;
     protected final Scheduler m_scheduler;
@@ -667,7 +667,9 @@ public class InitiatorMailbox implements Mailbox
             if (message.isStatusReset()) {
                 if ( m_leaderMigrationState.get() == LeaderMigrationState.TXN_RESTART) {
                     m_leaderMigrationState.compareAndSet(LeaderMigrationState.TXN_RESTART ,LeaderMigrationState.NONE);
-                } else {
+                } else if (!m_scheduler.isLeader()){
+
+                    // Update the status only if the site has not been promoted.
                     m_leaderMigrationState.set(LeaderMigrationState.TXN_DRAINED);
                 }
                 m_newLeaderHSID.set(Long.MIN_VALUE);

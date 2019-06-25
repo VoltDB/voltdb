@@ -209,6 +209,10 @@ public final class DBBPool {
             }
         }
 #endif
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + ": " + b;
+        }
     }
 
     /**
