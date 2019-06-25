@@ -346,6 +346,7 @@ class NValue {
      */
     int compareNull(const NValue& rhs) const;
     int compare(const NValue& rhs) const;
+    int compareNullAsMax(const NValue& rhs) const;
     int compare_withoutNull(const NValue& rhs) const;
 
     /* Return a boolean NValue with the comparison result */
@@ -2679,6 +2680,21 @@ inline int NValue::compare(const NValue& rhs) const {
     int hasNullCompare = compareNull(rhs);
     if (hasNullCompare != VALUE_COMPARE_INVALID) {
         return hasNullCompare;
+    }
+
+    return compare_withoutNull(rhs);
+}
+
+/**
+ * Compare two NValues. Null value in the rhs will be treated as maximum.
+ */
+inline int NValue::compareNullAsMax(const NValue& rhs) const {
+    int hasNullCompare = compareNull(rhs);
+    if (hasNullCompare != VALUE_COMPARE_INVALID) {
+        // VALUE_COMPARE_EQUAL indicates lhs == null && rhs == null, do nothing.
+        // VALUE_COMPARE_LESSTHAN indicates lhs == null && rhs != null, do nothing.
+        // VALUE_COMPARE_GREATERTHAN indicates lhs != null && rhs == null, flip the result.
+        return hasNullCompare == VALUE_COMPARE_GREATERTHAN ? VALUE_COMPARE_LESSTHAN : hasNullCompare;
     }
 
     return compare_withoutNull(rhs);

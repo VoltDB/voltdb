@@ -1165,6 +1165,40 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testENG15836() throws Exception {
+        final String ddl = "CREATE TABLE ENG15836 (\n" +
+                "PROD_KEY integer NOT NULL,\n" +
+                "SDATE INTEGER\n" +
+                ");\n" +
+                "\n" +
+                "CREATE INDEX ENG15836_IDX ON ENG15836 (PROD_KEY, SDATE);";
+
+        final TestEnv env = new TestEnv(ddl,
+                m_catalogJar, m_pathToDeployment, 2, 1, 0);
+
+        try {
+            env.setUp();
+            Batcher batcher = new Batcher(env);
+
+            // insert some data
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 886, 1);", 1);
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 886, 1);", 1);
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 887, 2);", 1);
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 887, 2);", 1);
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 890, 4);", 1);
+            batcher.add("INSERT INTO ENG15836 ( PROD_KEY,  SDATE) VALUES( 890, 4);", 1);
+            batcher.run();
+
+            final ClientResponse cr = env.m_client.callProcedure("@AdHoc",
+                    "SELECT COUNT(*) FROM ENG15836 apb WHERE PROD_KEY IN (886, 887, 890) AND apb.sdate <= 100;");
+
+            assertContentOfTable(new Object[][]{{6}}, cr.getResults()[0]);
+        } finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */
