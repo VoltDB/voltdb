@@ -57,6 +57,7 @@
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
+<envdefault prop="calcite" var="calcite" default="false" />
 
 <!-- enable code coverage for JUnit's if USE_JACOCO in environment-->
 <condition property="use_jacoco" value="true">
@@ -1797,6 +1798,7 @@ TEST CASES
             <jvmarg value="-Dtestcount=${testcount}" />
             <jvmarg value="-Drun.flaky.tests=${run.flaky.tests}" />
             <jvmarg value="-Drun.flaky.tests.debug=${run.flaky.tests.debug}" />
+            <jvmarg value="-DPLAN_WITH_CALCITE=${calcite}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>

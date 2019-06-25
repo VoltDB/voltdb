@@ -70,17 +70,14 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     protected final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
-    private boolean m_usingCalcite = true; // TODO: do we need to control this switch for testing purpose?
+    private final boolean m_usingCalcite =
+            Boolean.parseBoolean(System.getProperty("PLAN_WITH_CALCITE", "false"));
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
-    boolean m_isConfiguredForNonVoltDBBackend =
+    private final boolean m_isConfiguredForNonVoltDBBackend =
         m_backendTargetType == BackendTarget.HSQLDB_BACKEND ||
         m_backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
         m_backendTargetType == BackendTarget.POSTGIS_BACKEND;
-
-    protected void setUsingCalcite(boolean usingCalcite) {
-        m_usingCalcite = usingCalcite;
-    }
 
     abstract protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException;
     abstract protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params);
