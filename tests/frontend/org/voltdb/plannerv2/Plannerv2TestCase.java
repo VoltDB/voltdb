@@ -261,6 +261,11 @@ public class Plannerv2TestCase extends PlannerTestCase {
     }
 
     public class InlineRulesTester extends PhysicalConversionRulesTester {
+        @Override public void reset() {
+            super.reset();
+            AbstractPlanNode.resetPlanNodeIds();
+        }
+
         @Override public void pass() throws AssertionError {
             super.pass();
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
