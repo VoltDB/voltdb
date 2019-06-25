@@ -112,11 +112,8 @@ public class TracingBenchmark {
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
 
-        @Option(desc = "Enable benchmark on stored procedure: insert")
+        @Option(desc = "Choose stored procedure for benchmark: true for VOTES.INSERT and false for DistinctCount")
         boolean doInsert = true;
-
-        @Option(desc = "Enable bencjmark on stored procedure: select count")
-        boolean doSelectCount = false;
 
         @Override
         public void validate() {
@@ -219,7 +216,7 @@ public class TracingBenchmark {
                     throw new RuntimeException(response.getStatusString());
                 }
             }
-        } else if (this.config.doSelectCount) {
+        } else {
             // initialize detabase
             client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
             // reset the stats after initialization
