@@ -39,7 +39,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -1004,12 +1003,12 @@ public class ExportGeneration implements Generation {
             for (Map.Entry<Integer, Map<String, ExportDataSource>> partitionDataSourceMap : m_dataSourcesByPartition.entrySet()) {
                 Integer partition = partitionDataSourceMap.getKey();
                 for (ExportDataSource source : partitionDataSourceMap.getValue().values()) {
-                    if (!StringUtil.isEmpty(exportSource) && !source.getTableName().equalsIgnoreCase(exportSource)) {
+                    if (!source.getTableName().equalsIgnoreCase(exportSource)) {
                         continue;
                     }
 
                     // no target match
-                    if (!exportTargets.isEmpty() && !exportTargets.contains(source.getTarget())) {
+                    if (!exportTargets.contains(source.getTarget())) {
                         continue;
                     }
 

@@ -1655,26 +1655,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         switch (operation) {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED) {
-                long firstUnpolledSeqNo;
-                if (m_gapTracker.getFirstGap() != null) {
-                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
-                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
-                } else {
-                    firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
-                    exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
-                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
-
-                }
-                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
-                clearGap(true);
-
                 // Satisfy a pending poll request
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            pollImpl(m_pollTask);
+                            if (isMaster() && m_pollTask != null) {
+                                long firstUnpolledSeqNo;
+                                if (m_gapTracker.getFirstGap() != null) {
+                                    firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                                    exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+                                } else {
+                                    firstUnpolledSeqNo = m_gapTracker.getFirstSeqNo();
+                                    exportLog.warn("Export data is missing [" + m_firstUnpolledSeqNo + ", " + (firstUnpolledSeqNo - 1) +
+                                            "] and cluster is complete. Skipping to next available transaction for " + this.toString());
+
+                                }
+                                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
+                                clearGap(true);
+                                pollImpl(m_pollTask);
+                            }
                         } catch (Exception e) {
                             exportLog.error("Exception polling export buffer after RELEASE", e);
                         } catch (Error e) {
