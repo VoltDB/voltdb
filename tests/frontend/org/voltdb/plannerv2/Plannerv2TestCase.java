@@ -42,6 +42,8 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.PlanNodeList;
 
 /**
  * Base class for planner v2 test cases.
@@ -75,6 +77,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         String m_expectedException;
         String m_expectedPlan;
         String m_expectedTransform;
+        String m_expectedVoltPlanJson;
         SqlNode m_parsedNode;
         SqlNode m_validatedNode;
         RelRoot m_root;
@@ -83,7 +86,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
         void reset() {
             m_sap = null;
-            m_expectedException = m_expectedPlan = m_expectedTransform = null;
+            m_expectedException = m_expectedPlan = m_expectedTransform = m_expectedVoltPlanJson = null;
             m_parsedNode = m_validatedNode = null;
             m_root = null;
             m_transformedNode = null;
@@ -102,6 +105,11 @@ public class Plannerv2TestCase extends PlannerTestCase {
 
         public Tester plan(String expectedPlan) {
             m_expectedPlan = expectedPlan;
+            return this;
+        }
+
+        public Tester json(String expectedVoltPlanJson) {
+            m_expectedVoltPlanJson = expectedVoltPlanJson;
             return this;
         }
 
@@ -257,12 +265,21 @@ public class Plannerv2TestCase extends PlannerTestCase {
             super.pass();
             m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
                     HepMatchOrder.ARBITRARY, m_transformedNode, true);
-            if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal() && m_expectedTransform != null) {
-                String actualTransform = RelOptUtil.toString(m_transformedNode);
-                // eliminate the HepRelVertex number which can be arbitrary
-                m_expectedTransform = m_expectedTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
-                actualTransform = actualTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
-                assertEquals(m_expectedTransform, actualTransform);
+            if (m_ruleSetIndex == PlannerRules.Phase.INLINE.ordinal()) {
+                if (m_expectedTransform != null) {
+                    String actualTransform = RelOptUtil.toString(m_transformedNode);
+                    // eliminate the HepRelVertex number which can be arbitrary
+                    m_expectedTransform = m_expectedTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
+                    actualTransform = actualTransform.replaceAll("HepRelVertex#\\d+", "HepRelVertex");
+                    assertEquals(m_expectedTransform, actualTransform);
+                }
+                if (m_expectedVoltPlanJson != null) {
+                    assertTrue(m_transformedNode instanceof VoltPhysicalRel);
+                    AbstractPlanNode voltPlan = ((VoltPhysicalRel)m_transformedNode).toPlanNode();
+                    PlanNodeList planNodeList = new PlanNodeList(voltPlan, false);
+                    String actualPlan = planNodeList.toJSONString();
+                    assertEquals(m_expectedVoltPlanJson, actualPlan);
+                }
             }
         }
     }
