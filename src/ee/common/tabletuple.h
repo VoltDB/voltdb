@@ -497,6 +497,7 @@ public:
     bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
 
     int compare(const TableTuple &other) const;
+    int compareNullAsMax(const TableTuple &other) const;
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
@@ -1247,6 +1248,24 @@ inline int TableTuple::compare(const TableTuple &other) const {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
         diff = lhs.compare(rhs);
+        if (diff) {
+            return diff;
+        }
+    }
+    return VALUE_COMPARE_EQUAL;
+}
+
+/**
+ * Compare two tuples. Null value in the rhs tuple will be treated as maximum.
+ */
+inline int TableTuple::compareNullAsMax(const TableTuple &other) const {
+    const int columnCount = m_schema->columnCount();
+    assert(columnCount == other.m_schema->columnCount());
+    int diff;
+    for (int ii = 0; ii < columnCount; ii++) {
+        const NValue& lhs = getNValue(ii);
+        const NValue& rhs = other.getNValue(ii);
+        diff = lhs.compareNullAsMax(rhs);
         if (diff) {
             return diff;
         }
