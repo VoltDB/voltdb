@@ -152,12 +152,14 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     vassert(schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    bool isTableWithMigrate = schema->isTableWithMigrate();
-    if (! m_isMaterialized && ((hiddenColumnCount == 1 && !isTableWithMigrate) ||
-        (hiddenColumnCount == 2 && isTableWithMigrate))) {
-        m_drTimestampColumnIndex = 0; // The first hidden column
-        // At some point if we have more than one hidden column in a table,
-        // we'll need a system for keeping track of which are which.
+    if (hiddenColumnCount > 0) {
+        for (int i = 0; i < hiddenColumnCount; ++i) {
+            const TupleSchema::HiddenColumnInfo *info = schema->getHiddenColumnInfo(i);
+            if (info->columnType == HiddenColumn::XDCR_TIMESTAMP) {
+                m_drTimestampColumnIndex = i;
+                break;
+            }
+        }
     }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
@@ -605,7 +607,7 @@ struct CompiledSwap {
 
 #ifdef NDEBUG
 static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
-    return false;
+    return true;
 }
 #else
 static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {

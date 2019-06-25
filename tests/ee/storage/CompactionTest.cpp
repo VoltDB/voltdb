@@ -134,17 +134,11 @@ public:
     }
 
     void initTable() {
-        std::vector<ValueType> hiddenTypes;
-        std::vector<int32_t> hiddenColumnLengths;
-        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, true);
-        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+        std::vector<TupleSchema::HColumnType> hiddenTypes(HIDDEN_COLUMN_COUNT, TupleSchema::HCOLUMN_MIGRATE_TXN);
         const std::vector<bool> columnInBytes (m_tableSchemaAllowNull.size(), false);
 
-        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-
-
         m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes, m_tableSchemaColumnSizes, m_tableSchemaAllowNull, columnInBytes,
-                                                       hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes, true);
+                                                       hiddenTypes);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,

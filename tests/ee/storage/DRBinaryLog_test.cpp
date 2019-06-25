@@ -329,19 +329,13 @@ public:
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
         columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
 
-        std::vector<ValueType> hiddenTypes;
-        std::vector<int32_t> hiddenColumnLengths;
-        std::vector<bool> hiddenColumnAllowNull(HIDDEN_COLUMN_COUNT, false);
-        const std::vector<bool> hiddenColumnInBytes (hiddenColumnAllowNull.size(), false);
+        std::vector<TupleSchema::HColumnType> hiddenTypes(HIDDEN_COLUMN_COUNT, TupleSchema::HCOLUMN_XDCR_TIMESTAMP);
 
-        hiddenTypes.push_back(VALUE_TYPE_BIGINT);    hiddenColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-
-
-        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
         columnAllowNull[0] = false;
-        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
-        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
+        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
+        m_schemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
 
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_BIGINT", "C_DECIMAL",
