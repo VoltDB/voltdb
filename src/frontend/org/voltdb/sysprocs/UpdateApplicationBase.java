@@ -86,7 +86,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * For UpdateClasses, this will contain the class deletion patterns
      * For AdHoc DDL work, this will be null
      */
-    private static CatalogChangeResult prepareApplicationCatalogDiff(
+    public static CatalogChangeResult prepareApplicationCatalogDiff(
             String invocationName, final byte[] operationBytes, final String operationString,
             final String[] adhocDDLStmts, final List<SqlNode> sqlNodes, final byte[] replayHashOverride,
             final boolean isPromotion, final boolean useAdhocDDL, String hostname, String user) {

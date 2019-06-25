@@ -23,10 +23,6 @@
 
 package org.voltdb.catalog;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.net.URL;
 
@@ -51,9 +47,12 @@ import org.voltdb_testprocs.catalog.resourceuse.UseResourceProc;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 
+import static org.junit.Assert.*;
+
 public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
-    private Pair<InMemoryJarfile, String> buildInMemoryJar(byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
+    private Pair<InMemoryJarfile, String> buildInMemoryJar(
+            byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
         // turn it into an in memory JarFile
         InMemoryJarfile IMJF = new InMemoryJarfile(rawCatalog);
 
@@ -63,14 +62,14 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
         String resourceContentsString = Resources.toString(resourceURL, Charsets.UTF_8);
         if (useVersionInName) {
             IMJF.put("org/voltdb_testprocs/catalog/resourceuse/catalog_resource" + resourceFileVersion + ".txt", resourceContents);
-        }
-        else {
+        } else {
             IMJF.put("org/voltdb_testprocs/catalog/resourceuse/resource.txt", resourceContents);
         }
         return Pair.of(IMJF, resourceContentsString);
     }
 
-    private Pair<File, String> buildJarFile(byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
+    private Pair<File, String> buildJarFile(
+            byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
         Pair<InMemoryJarfile, String> rslt = buildInMemoryJar(rawCatalog, resourceFileVersion, useVersionInName);
         // write the new jar to disk
         File jarPath = new File(Configuration.getPathToCatalogForTest("jarWithResource" + resourceFileVersion + ".jar"));
@@ -78,7 +77,8 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
         return Pair.of(jarPath, rslt.getSecond());
     }
 
-    private Pair<byte[], String> buildJarBytes(byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
+    private Pair<byte[], String> buildJarBytes(
+            byte[] rawCatalog, String resourceFileVersion, boolean useVersionInName) throws Exception {
         Pair<InMemoryJarfile, String> rslt = buildInMemoryJar(rawCatalog, resourceFileVersion, useVersionInName);
         return Pair.of(rslt.getFirst().getFullJarBytes(), rslt.getSecond());
     }
@@ -92,7 +92,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
         Pair<File, String> ucChange1 = buildJarFile(rawCatalog, "1", false);
         Pair<File, String> ucChange2 = buildJarFile(rawCatalog, "2", false);
-        assertFalse(ucChange1.getSecond().equals(ucChange2.getSecond()));
+        assertNotEquals(ucChange2.getSecond(), ucChange1.getSecond());
 
         // start voltdb
         VoltProjectBuilder vpb = new VoltProjectBuilder();
@@ -129,7 +129,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
             VoltTableRow row = t.fetchRow(0);
             String resourceContentsStringRT = row.getString(0);
-            assertTrue(ucChange1.getSecond().equals(resourceContentsStringRT));
+            assertEquals(resourceContentsStringRT, ucChange1.getSecond());
 
             // load the second jar to replace the resource
             client.updateClasses(ucChange2.getFirst(), "");
@@ -145,9 +145,8 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
             row = t.fetchRow(0);
             resourceContentsStringRT = row.getString(0);
-            assertTrue(ucChange2.getSecond().equals(resourceContentsStringRT));
-        }
-        finally {
+            assertEquals(resourceContentsStringRT, ucChange2.getSecond());
+        } finally {
             if (client != null) {
                 client.close();
             }
@@ -197,7 +196,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
             VoltTableRow row = t.fetchRow(0);
             String resourceContentsStringRT = row.getString(0);
-            assertTrue(ucChange1.getSecond().equals(resourceContentsStringRT));
+            assertEquals(resourceContentsStringRT, ucChange1.getSecond());
 
             // load the second jar to replace the resource
             client.callProcedure("@UpdateApplicationCatalog", ucChange2.getFirst(), null);
@@ -213,9 +212,8 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
             row = t.fetchRow(0);
             resourceContentsStringRT = row.getString(0);
-            assertTrue(ucChange2.getSecond().equals(resourceContentsStringRT));
-        }
-        finally {
+            assertEquals(resourceContentsStringRT, ucChange2.getSecond());
+        } finally {
             if (client != null) {
                 client.close();
             }

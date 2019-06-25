@@ -219,6 +219,11 @@ public class LocalCluster extends VoltServerConfig {
     }
     public int getHttpOverridePort() { return m_httpOverridePort; };
 
+    @Override
+    public boolean isUsingCalcite() {
+        return false;
+    }
+
     /*
      * Enable pre-compiled regex search in logs
      */
@@ -409,7 +414,7 @@ public class LocalCluster extends VoltServerConfig {
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j).
             setForceVoltdbCreate(true);
-        if (javaLibraryPath!=null) {
+        if (javaLibraryPath != null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
@@ -424,7 +429,7 @@ public class LocalCluster extends VoltServerConfig {
      * @param mismatchSchema schema to put on one node, or null if node should be empty
      * @param nodeID node to put the mismatch, or null to re-enable matched schemas
      */
-    public void setMismatchSchemaForInit( String mismatchSchema, Integer nodeID ){
+    public void setMismatchSchemaForInit( String mismatchSchema, Integer nodeID) {
         assert isNewCli();
         assert m_usesStagedSchema;
         m_mismatchSchema = mismatchSchema;
@@ -450,10 +455,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void overrideStartCommandVerb(String verb) {
-        if (verb == null || verb.trim().isEmpty()) {
-            return;
+        if (verb != null && !verb.trim().isEmpty()) {
+            templateCmdLine.startCommand(verb);
         }
-        this.templateCmdLine.startCommand(verb);
     }
 
     public void setCustomCmdLn(String customCmdLn) {
