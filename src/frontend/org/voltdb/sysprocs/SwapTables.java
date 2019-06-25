@@ -52,10 +52,13 @@ public class SwapTables extends AdHocNTBase {
     }
     @Override
     protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
-        throw new PlanningErrorException("Unsupported operation");
+        assert params.size() == 2;
+        assert params.getParam(0) instanceof String &&
+                params.getParam(1) instanceof String;
+        return run((String) params.getParam(0), (String) params.getParam(1));
     }
 
-    public CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
+    private CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
         final String sql = "@SwapTables " + theTable + " " + otherTable;
         final Object[] userParams = null;
         final CatalogContext context = VoltDB.instance().getCatalogContext();

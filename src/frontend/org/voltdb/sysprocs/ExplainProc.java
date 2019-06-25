@@ -26,7 +26,6 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.utils.Encoder;
 
@@ -39,7 +38,7 @@ public class ExplainProc extends AdHocNTExplain {
 
     @Override
     protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
-        throw new PlanningErrorException("Unsupported operation");
+        return run(stringOf(params));
     }
 
     @Override

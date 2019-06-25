@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.ParameterSet;
 import org.voltdb.client.ClientResponse;
 
@@ -29,8 +28,14 @@ import java.util.concurrent.CompletableFuture;
 abstract public class AdHocNTExplain extends AdHocNTBase {
     abstract public CompletableFuture<ClientResponse> run(String fullViewNames);
 
+    protected String stringOf(ParameterSet params) {
+        assert params.size() == 1;
+        assert params.getParam(0) instanceof String;
+        return (String) params.getParam(0);
+    }
+
     @Override
-    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException {
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         return runUsingLegacy(params);
     }
 }

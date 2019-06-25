@@ -49,7 +49,7 @@ public class NonDdlBatchPlanner {
      */
     private final CatalogContext m_catalogContext;
 
-    public NonDdlBatchPlanner(NonDdlBatch batch) {
+    NonDdlBatchPlanner(NonDdlBatch batch) {
         m_batch = batch;
         m_catalogContext = VoltDB.instance().getCatalogContext();
     }
@@ -102,13 +102,9 @@ public class NonDdlBatchPlanner {
             throw new PlanningErrorException(errorSummary);
         }
 
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                m_batch.getUserParameters(),
-                plannedStmts,
-                partitionParamIndex,
-                partitionParamType,
-                partitionParamValue,
-                m_batch.getUserPartitioningKeys());
+        final AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                m_batch.getUserParameters(), plannedStmts, partitionParamIndex,
+                partitionParamType, partitionParamValue, m_batch.getUserPartitioningKeys());
         if (m_batch.getContext().getLogger().isDebugEnabled()) {
             m_batch.getContext().logBatch(m_catalogContext, plannedStmtBatch, m_batch.getUserParameters());
         }
@@ -144,8 +140,8 @@ public class NonDdlBatchPlanner {
             }
             throw new PlanningErrorException(ex.getMessage(), cause);
         } catch (StackOverflowError error) {
-            // TODO: This is from AdHocNTBase.compileAdHocSQL()
-            // Maybe it is not needed any more in Calcite.
+            // NOTE: This is from AdHocNTBase.compileAdHocSQL()
+            // We need it, as long as Calcite could fall back.
 
             /*
              * Overly long predicate expressions can cause a StackOverflowError in various

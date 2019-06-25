@@ -22,25 +22,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
-public class Explain extends AdHocNTExplain {
-    private AdHocNTBaseContext m_context = new AdHocNTBaseContext();
+public class Explain extends AdHocNTBase {
+    private final AdHocNTBaseContext m_context = new AdHocNTBaseContext();
 
     @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         return runInternal(params);
-    }
-
-    @Override
-    public CompletableFuture<ClientResponse> run(String sql) {
-        throw new PlanningErrorException("Unsupported operation");
     }
 
     /**
@@ -56,11 +50,13 @@ public class Explain extends AdHocNTExplain {
      * @since 9.1
      */
     @Override
-    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException {
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
         try {
             // We do not need to worry about the ParameterSet,
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
             return SqlBatch.from(params, m_context, ExplainMode.EXPLAIN_ADHOC).execute();
+        } catch (PlannerFallbackException e) {
+            return runUsingLegacy(params);
         } catch (Exception ex) { // For now, let's just fail the batch if any error happens.
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
         }

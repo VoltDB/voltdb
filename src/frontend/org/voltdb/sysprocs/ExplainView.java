@@ -26,7 +26,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compilereport.ViewExplainer;
-import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 
 //Go to the catalog and fetch all the "explain plan" strings of the queries in the view.
@@ -39,7 +38,7 @@ public class ExplainView extends AdHocNTExplain {
 
     @Override
     protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
-        throw new PlanningErrorException("Unsupported operation");
+        return run(stringOf(params));
     }
 
     @Override

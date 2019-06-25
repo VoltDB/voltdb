@@ -64,8 +64,7 @@ public class AdHocSpForTest extends AdHocNTBase {
 
         final List<String> sqlStatements = SQLLexer.splitStatements(sql).getCompletelyParsedStmts();
         if (sqlStatements.size() != 1) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "@AdHocSpForTest expects precisely one statement (no batching).");
         }
 
@@ -76,9 +75,7 @@ public class AdHocSpForTest extends AdHocNTBase {
             }
             String ddlToken = SQLLexer.extractDDLToken(stmt);
             if (ddlToken != null) {
-                return makeQuickResponse(
-                        ClientResponse.GRACEFUL_FAILURE,
-                        "@AdHocSpForTest doesn't support DDL.");
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "@AdHocSpForTest doesn't support DDL.");
             }
         }
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(), sqlStatements, false, userPartitionKey,

@@ -26,9 +26,8 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.PlanningErrorException;
 
-public class ExplainJSON extends AdHocNTExplain {
+public class ExplainJSON extends AdHocNTBase {
 
     @Override
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
@@ -36,8 +35,8 @@ public class ExplainJSON extends AdHocNTExplain {
     }
 
     @Override
-    public CompletableFuture<ClientResponse> run(String sql) {
-        throw new PlanningErrorException("Unsupported operation");
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) {
+        return runUsingLegacy(params);
     }
 
     @Override

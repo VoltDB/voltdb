@@ -185,7 +185,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Compile a batch of one or more SQL statements into a set of plans.
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
-    public static AdHocPlannedStatement compileAdHocSQL(
+    private static AdHocPlannedStatement compileAdHocSQL(
             PlannerTool plannerTool, String sqlStatement, boolean inferPartitioning,
             Object userPartitionKey, ExplainMode explainMode, boolean isLargeQuery,
             boolean isSwapTables, Object[] userParamSet) throws PlanningErrorException {
