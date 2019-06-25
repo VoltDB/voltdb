@@ -85,8 +85,8 @@ TEST_F(TableTupleTest, HiddenColumns)
     TupleSchemaBuilder builder(2, 2);
     builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
-    builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    builder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
+    builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
+    builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
@@ -95,25 +95,23 @@ TEST_F(TableTupleTest, HiddenColumns)
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
-    NValue nvalHiddenString = ValueFactory::getStringValue("platy数p");
 
     tuple.setNValue(0, nvalVisibleBigint);
     tuple.setNValue(1, nvalVisibleString);
     tuple.setHiddenNValue(0, nvalHiddenBigint);
-    tuple.setHiddenNValue(1, nvalHiddenString);
+    tuple.setHiddenNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
 
     EXPECT_EQ(0, tuple.getNValue(0).compare(nvalVisibleBigint));
     EXPECT_EQ(0, tuple.getNValue(1).compare(nvalVisibleString));
     EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
-    EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(nvalHiddenString));
+    EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(NValue::getNullValue(VALUE_TYPE_BIGINT)));
 
-    EXPECT_EQ(8 + (4 + 6) + 8 + (4 + 6+3), tuple.maxDRSerializationSize());
+    EXPECT_EQ(8 + (4 + 6) + 8 + 8, tuple.maxDRSerializationSize());
 
-    tuple.setHiddenNValue(1, ValueFactory::getNullStringValue());
-    nvalHiddenString.free();
+    tuple.setHiddenNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
 
-    // The hidden string is null, takes 0 serialized byte
-    EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
+    // The hidden string is null, takes 8 serialized byte
+    EXPECT_EQ(8 + (4 + 6) + 8 + 8, tuple.maxDRSerializationSize());
 
     nvalVisibleString.free();
 }
@@ -126,8 +124,8 @@ TEST_F(TableTupleTest, ToJsonArray)
     builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
     builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
     builder.setColumnAtIndex(2, VALUE_TYPE_VARCHAR, 256);
-    builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    builder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
+    builder.setHiddenColumnAtIndex(0, HiddenColumn::XDCR_TIMESTAMP);
+    builder.setHiddenColumnAtIndex(1, HiddenColumn::MIGRATE_TXN);
     ScopedTupleSchema schema(builder.build());
 
     StandAloneTupleStorage autoStorage(schema.get());
@@ -136,19 +134,17 @@ TEST_F(TableTupleTest, ToJsonArray)
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
     NValue nvalVisibleString = ValueFactory::getStringValue("数据库");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
-    NValue nvalHiddenString = ValueFactory::getStringValue("platypus");
 
     tuple.setNValue(0, nvalVisibleBigint);
     tuple.setNValue(1, nvalVisibleString);
     tuple.setNValue(2, ValueFactory::getNullValue());
     tuple.setHiddenNValue(0, nvalHiddenBigint);
-    tuple.setHiddenNValue(1, nvalHiddenString);
+    tuple.setHiddenNValue(1, nvalHiddenBigint);
 
     puts(tuple.toJsonArray().c_str());
     //EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]"));
     EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"\\u6570\\u636e\\u5e93\",\"null\"]"));
 
-    nvalHiddenString.free();
     nvalVisibleString.free();
 }
 
