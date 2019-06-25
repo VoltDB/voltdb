@@ -158,7 +158,7 @@ function tracing-benchmark() {
             --outputFormat=${1: -1} \
             --latencyreport=true \
             --ratelimit=20000 \
-            --doInsert=false
+            --doInsert=true
 }
 
 function tracing-benchmark-showAll() {
