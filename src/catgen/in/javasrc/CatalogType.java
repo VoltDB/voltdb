@@ -60,7 +60,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         T resolve() {
             synchronized (m_lock) {
                 if (m_unresolvedPath != null) {
-                    m_value = (T) getCatalog().getCatalogOperator().getItemForPath(getCatalog(), m_unresolvedPath);
+                    m_value = (T) getCatalog().getCatalogOperator().getItemForPath(m_unresolvedPath);
                     m_unresolvedPath = null;
                 }
                 return m_value;

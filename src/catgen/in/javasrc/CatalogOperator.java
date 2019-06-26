@@ -45,6 +45,10 @@ public class CatalogOperator {
      * @param path the absolute path to the wanted node.
      * @return the catalog item at the specified path.
      */
+    CatalogType getItemForPath(String path) {
+        return getItemForPath(m_catalog, path);
+    }
+
     native CatalogType getItemForPath(Catalog catalog, String path);
 
     /**
