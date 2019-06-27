@@ -48,8 +48,8 @@ import junit.framework.Test;
  * Tests of SQL statements that use User-Defined Functions (UDF's).
  */
 public class TestUserDefinedFunctions extends RegressionSuite {
-    static private Random random = new Random();
-    static private final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
+    static protected Random random = new Random();
+    static protected final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
     static private final double PI = 3.1415926535897932384;
     static private final BigDecimal MIN_DECIMAL_VALUE = new BigDecimal("-99999999999999999999999999.999999999999");
     static private final BigDecimal MAX_DECIMAL_VALUE = new BigDecimal( "99999999999999999999999999.999999999999");
