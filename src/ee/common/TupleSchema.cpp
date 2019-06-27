@@ -104,20 +104,22 @@ TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType>& column
       TupleSchema::countUninlineableObjectColumns(columnTypes, columnSizes, columnInBytes);
     const uint16_t columnCount = static_cast<uint16_t>(columnTypes.size());
     const uint16_t hiddenColumnCount = static_cast<uint16_t>(hiddenColumnTypes.size());
+    vassert(hiddenColumnCount < UNSET_HIDDEN_COLUMN);
     int memSize = memSizeForTupleSchema(columnCount,
                                         uninlineableObjectColumnCount,
                                         hiddenColumnCount);
 
     // allocate the set amount of memory and cast it to a tuple pointer
-    TupleSchema *retval = reinterpret_cast<TupleSchema*>(new char[memSize]);
-
+    char *data = new char[memSize];
     // clear all the offset values
-    memset(retval, 0, memSize);
+    ::memset(data, 0, memSize);
+    TupleSchema *retval = reinterpret_cast<TupleSchema *>(data);
+    ::memset(retval->m_hiddenColumnIndexes, UNSET_HIDDEN_COLUMN, sizeof(retval->m_hiddenColumnIndexes));
+
     retval->m_columnCount = columnCount;
     retval->m_uninlinedObjectColumnCount = uninlineableObjectColumnCount;
     retval->m_hiddenColumnCount = hiddenColumnCount;
     retval->m_isHeaderless = false;
-    retval->m_isTableWithMigrate = false;
     uint16_t uninlinedObjectColumnIndex = 0;
     for (uint16_t ii = 0; ii < columnCount; ii++) {
         const ValueType type = columnTypes[ii];
@@ -140,11 +142,9 @@ TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema) {
                                         schema->m_hiddenColumnCount);
 
     // allocate the set amount of memory and cast it to a tuple pointer
-    TupleSchema *retval = reinterpret_cast<TupleSchema*>(new char[memSize]);
-
-    memcpy(retval, schema, memSize);
-
-    return retval;
+    char *data = new char[memSize];
+    ::memcpy(data, schema, memSize);
+    return reinterpret_cast<TupleSchema*>(data);
 }
 
 TupleSchema* TupleSchema::createTupleSchema(const TupleSchema *schema,
@@ -287,6 +287,8 @@ void TupleSchema::setHiddenColumnMetaData(uint16_t index, HiddenColumn::Type col
     HiddenColumnInfo *columnInfo = getHiddenColumnInfo(index);
     columnInfo->columnType = columnType;
     uint16_t absoluteIndex = columnCount() + index;
+    vassert(m_hiddenColumnIndexes[columnType] == UNSET_HIDDEN_COLUMN);
+    m_hiddenColumnIndexes[columnType] = index;
     switch (columnType) {
     default:
         vassert(false);
@@ -296,7 +298,6 @@ void TupleSchema::setHiddenColumnMetaData(uint16_t index, HiddenColumn::Type col
         setColumnMetaDataCommon(absoluteIndex, columnInfo, VALUE_TYPE_BIGINT, 8, false);
         return;
     case HiddenColumn::MIGRATE_TXN:
-        m_isTableWithMigrate = true;
         setColumnMetaDataCommon(absoluteIndex, columnInfo, VALUE_TYPE_BIGINT, 8, true);
         return;
     }

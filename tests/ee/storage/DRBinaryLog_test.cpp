@@ -329,7 +329,7 @@ public:
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
         columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
 
-        std::vector<TupleSchema::HColumnType> hiddenTypes(HIDDEN_COLUMN_COUNT, TupleSchema::HCOLUMN_XDCR_TIMESTAMP);
+        std::vector<HiddenColumn::Type> hiddenTypes(HIDDEN_COLUMN_COUNT,HiddenColumn::XDCR_TIMESTAMP);
 
         m_replicatedSchema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
         m_replicatedSchemaReplica = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes);
