@@ -917,7 +917,9 @@ public class TestFunctionsSuite extends RegressionSuite {
             doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
             fail();
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("Illegal mixing of types in CASE or COALESCE statement"));
+            assertTrue(pcex.getMessage().contains(
+                    m_usingCalcite ? "Illegal mixing of types in CASE or COALESCE statement" :
+                            "incompatible data types in combination"));
         }
         try {
             doTestThreeColCoalesce(cl, "S1", "I2", "T3", "100");

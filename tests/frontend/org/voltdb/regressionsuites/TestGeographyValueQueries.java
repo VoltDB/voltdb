@@ -252,10 +252,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // equals
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t1.poly "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly = t2.poly "
-                            + "order by t1.pk").getResults()[0];
+                    "select t1.pk, t1.name, t1.poly from " + tbl +
+                            " as t1, t as t2 where t1.poly = t2.poly order by t1.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", BERMUDA_TRIANGLE_POLY},
                     {1, "Bermuda Triangle with a hole", BERMUDA_TRIANGLE_HOLE_POLY},
@@ -265,10 +263,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // not equals
             vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t2.pk, t2.name "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly != t2.poly "
-                            + "order by t1.pk, t2.pk").getResults()[0];
+                    "select t1.pk, t1.name, t2.pk, t2.name from " + tbl +
+                            " as t1, t as t2 where t1.poly != t2.poly order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 2, "Billerica Triangle"},
@@ -286,10 +282,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // less than
             vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t2.pk, t2.name "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly < t2.poly "
-                            + "order by t1.pk, t2.pk").getResults()[0];
+                    "select t1.pk, t1.name, t2.pk, t2.name from " + tbl +
+                            " as t1, t as t2 where t1.poly < t2.poly order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
@@ -301,10 +295,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // less than or equal to
             vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t2.pk, t2.name "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly <= t2.poly "
-                            + "order by t1.pk, t2.pk").getResults()[0];
+                    "select t1.pk, t1.name, t2.pk, t2.name from " + tbl +
+                            " as t1, t as t2 where t1.poly <= t2.poly order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
                     {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
@@ -320,10 +312,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // greater than
             vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t2.pk, t2.name "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly > t2.poly "
-                            + "order by t1.pk, t2.pk").getResults()[0];
+                    "select t1.pk, t1.name, t2.pk, t2.name from " + tbl +
+                            " as t1, t as t2 where t1.poly > t2.poly order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
@@ -335,10 +325,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // greater than or equal to
             vt = client.callProcedure("@AdHoc",
-                    "select t1.pk, t1.name, t2.pk, t2.name "
-                            + "from " + tbl + " as t1, t as t2 "
-                            + "where t1.poly >= t2.poly "
-                            + "order by t1.pk, t2.pk").getResults()[0];
+                    "select t1.pk, t1.name, t2.pk, t2.name from " + tbl +
+                            " as t1, t as t2 where t1.poly >= t2.poly order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
                     {0, "Bermuda Triangle", 2, "Billerica Triangle"},
@@ -354,20 +342,12 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // is null
             vt = client.callProcedure("@AdHoc",
-                    "select pk, name "
-                            + "from " + tbl + " "
-                            + "where poly is null "
-                            + "order by pk").getResults()[0];
-            assertContentOfTable(new Object[][] {
-                    {4, "null poly"}},
-                    vt);
+                    "select pk, name from " + tbl + " where poly is null order by pk").getResults()[0];
+            assertContentOfTable(new Object[][] {{4, "null poly"}}, vt);
 
             // is not null
             vt = client.callProcedure("@AdHoc",
-                    "select pk, name "
-                            + "from " + tbl + " "
-                            + "where poly is not null "
-                            + "order by pk").getResults()[0];
+                    "select pk, name from " + tbl + " where poly is not null order by pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole"},
@@ -378,15 +358,12 @@ public class TestGeographyValueQueries extends RegressionSuite {
     }
 
     public void testArithmetic() throws Exception {
-        Client client = getClient();
-
+        final Client client = getClient();
         fillTable(client, "t", 0);
-
-        verifyStmtFails(client, "select pk, poly + poly from t order by pk",
-                "Cannot apply '\\+' to arguments of type");
-
-        verifyStmtFails(client, "select pk, poly + 1 from t order by pk",
-                "Cannot apply '\\+' to arguments of type");
+        final String expectedErrorMessage =
+                m_usingCalcite ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
+        verifyStmtFails(client, "select pk, poly + poly from t order by pk", expectedErrorMessage);
+        verifyStmtFails(client, "select pk, poly + 1 from t order by pk", expectedErrorMessage);
     }
 
     // The shell is 5 fixed but arbitrarily selected points.
@@ -427,14 +404,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
         String cheesyOrigin = "POINT(0.0 0.0)";
         String cheesyInHole = "POINT(15  15)";
-        List<String> exteriorPoints = Arrays.asList("POINT( 60  60)",
-                                                    "POINT( 60 -60)",
-                                                    "POINT(-60 -60)",
-                                                    "POINT(-60  60)");
-        List<String> centers = Arrays.asList("POINT( 11  11)",
-                                             "POINT( 11 -11)",
-                                             "POINT(-11 -11)",
-                                             "POINT(-11  11)");
+        List<String> exteriorPoints = Arrays.asList("POINT( 60  60)", "POINT( 60 -60)", "POINT(-60 -60)", "POINT(-60  60)");
+        List<String> centers = Arrays.asList("POINT( 11  11)", "POINT( 11 -11)", "POINT(-11 -11)", "POINT(-11  11)");
         client.callProcedure("T.INSERT", 0, "SHELL", cheesyShellPolygon);
         client.callProcedure("T.INSERT", 1, "Formaggio", cheesyPolygon);
         for (int idx = 0; idx < cheesyHoles.size(); idx += 1) {
@@ -455,7 +426,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // Make sure that all the polygons
         // are valid.
         VoltTable vt = client.callProcedure("@AdHoc", "select t.pk from t where not isValid(t.poly) order by t.pk").getResults()[0];
-        assertTrue("fillCheesyTable: " + vt.getRowCount() + " invalid polygons.", vt.getRowCount() == 0);
+        assertEquals("fillCheesyTable: " + vt.getRowCount() + " invalid polygons.", 0, vt.getRowCount());
     }
 
     // This is mostly a planner test, as the planner had problems recognizing that geo types
@@ -536,16 +507,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // Also, none of the exterior points are contained in
         // the shell or cheesy polygon.
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select t.pk, location.pk "
-                + "from t, location "
-                + "  where location.pk < 300 and t.pk < 100 "
-                + "        and contains(t.poly, location.loc_point) "
-                + "  order by t.pk, location.pk;").getResults()[0];
-        Object [][] expectedQ1 = new Object[][] {
-            {0, 0},
-            {0, 1},
-            {1, 0},
-        };
+                "select t.pk, location.pk from t, location   where location.pk < 300 and t.pk < 100 "
+                + "        and contains(t.poly, location.loc_point) order by t.pk, location.pk;").getResults()[0];
+        Object [][] expectedQ1 = new Object[][] {{0, 0}, {0, 1}, {1, 0}};
         assertContentOfTable(expectedQ1, vt);
     }
 
@@ -597,7 +561,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
             } else if (polyKey == 1) {
                 cheeseMap.put(ptKey, distance);
             } else {
-                assertTrue("Unexpected polygon : " + polyKey, false);
+                fail("Unexpected polygon : " + polyKey);
             }
             indices.add(ptKey);
         }
@@ -613,10 +577,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // each 20degrees on a side, and all symmetric around
         // the origin (longitude = latitude = 0.0).
         vt = client.callProcedure("@AdHoc",
-                "select l.pk, distance(l.loc_point, t.poly) "
-                + "from t, location as l "
-                + "  where t.pk = 1 and 300 <= l.pk "
-                + "  order by l.pk;").getResults()[0];
+                "select l.pk, distance(l.loc_point, t.poly) from t, location as l where t.pk = 1 and 300 <= l.pk order by l.pk;")
+                .getResults()[0];
         double dist = -1;
         while (vt.advanceRow()) {
             if (dist < 0) {
@@ -634,13 +596,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
             int pk = 0;
             pk = fillTable(client, tbl, pk);
             pk = fillTable(client, tbl, pk);
-            pk = fillTable(client, tbl, pk);
+            fillTable(client, tbl, pk);
 
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "select poly, count(*) "
-                            + "from " + tbl + " "
-                            + "group by poly "
-                            + "order by poly asc")
+                    "select poly, count(*) from " + tbl + " group by poly order by poly asc")
                             .getResults()[0];
             assertContentOfTable(new Object[][] {
                     {null, 3},
@@ -733,10 +692,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
             VoltTable vt = client.callProcedure("select_in_" + tbl,
                     (Object)(new GeographyValue[] {BERMUDA_TRIANGLE_POLY, null, LOWELL_SQUARE_POLY}))
                     .getResults()[0];
-            assertContentOfTable(new Object[][] {
-                    {0},
-                    {3}},
-                    vt);
+            assertContentOfTable(new Object[][] {{0}, {3}}, vt);
 
             try {
                 client.callProcedure("select_in_" + tbl,

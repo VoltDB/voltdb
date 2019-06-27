@@ -113,8 +113,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
             client.updateClasses(ucChange1.getFirst(), "");
 
             // create the procedure from loaded jar
-            ClientResponse cr = client.callProcedure(
-                    "@AdHoc",
+            ClientResponse cr = client.callProcedure("@AdHoc",
                     "create procedure from class org.voltdb_testprocs.catalog.resourceuse.UseResourceProc;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -128,8 +127,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
             assertEquals(VoltType.STRING, t.getColumnType(0));
 
             VoltTableRow row = t.fetchRow(0);
-            String resourceContentsStringRT = row.getString(0);
-            assertEquals(resourceContentsStringRT, ucChange1.getSecond());
+            assertEquals(ucChange1.getSecond(), row.getString(0));
 
             // load the second jar to replace the resource
             client.updateClasses(ucChange2.getFirst(), "");
@@ -144,8 +142,7 @@ public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
             assertEquals(VoltType.STRING, t.getColumnType(0));
 
             row = t.fetchRow(0);
-            resourceContentsStringRT = row.getString(0);
-            assertEquals(resourceContentsStringRT, ucChange2.getSecond());
+            assertEquals(ucChange2.getSecond(), row.getString(0));
         } finally {
             if (client != null) {
                 client.close();

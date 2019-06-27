@@ -189,10 +189,14 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         verifyStmtFails(client, "select MOD(NULL, NULL) from R1", "data type cast needed for parameter or null literal");
 
         // Mix of decimal and ints
-        verifyStmtFails(client, "select MOD(25.32, 2) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD(2, 25.32) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "Cannot apply 'MOD' to arguments of type");
-        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "Cannot apply 'MOD' to arguments of type");
+        verifyStmtFails(client, "select MOD(25.32, 2) from R1",
+                m_usingCalcite ? "Cannot apply 'MOD' to arguments of type" : "incompatible data type in operation");
+        verifyStmtFails(client, "select MOD(2, 25.32) from R1",
+                m_usingCalcite ? "Cannot apply 'MOD' to arguments of type" : "incompatible data type in operation");
+        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1",
+                m_usingCalcite ? "Cannot apply 'MOD' to arguments of type" : "incompatible data type in operation");
+        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1",
+                m_usingCalcite ? "Cannot apply 'MOD' to arguments of type" : "incompatible data type in operation");
     }
 
     @Test
@@ -231,7 +235,8 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals( 0, r.get("C1", VoltType.INTEGER));
 
         // invalid data type for unary minus
-        verifyStmtFails(client, "select -desc from P1", "Cannot apply '-' to arguments of type");
+        verifyStmtFails(client, "select -desc from P1",
+                m_usingCalcite ? "Cannot apply '-' to arguments of type" : "incompatible data type in operation");
 
         // check -(-var) = var
         cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
@@ -799,14 +804,15 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         r.advanceToRow(4);
         resultB = r.getLong(0);
         assertEquals(10, resultB);
+        final String expectedErrorMessage = m_usingCalcite ?
+                    "Cannot apply 'ABS' to arguments of type" : "incompatible data type in operation";
 
         boolean caught = false;
         try {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -816,8 +822,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 'ABC'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'ABS' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -970,12 +975,13 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertTrue(caught);
 
         caught = false;
+        final String expectedErrorMessage = m_usingCalcite ?
+                    "Cannot apply 'SUBSTRING' to arguments of type" : "incompatible data type in operation";
         try {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM 2) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -985,8 +991,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM DESC) > '9'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
@@ -996,8 +1001,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (DESC FROM DESC) > 'ABC'");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            String msg = e.getMessage();
-            assertTrue(msg.contains("Cannot apply 'SUBSTRING' to arguments of type"));
+            assertTrue(e.getMessage().contains(expectedErrorMessage));
             caught = true;
         }
         assertTrue(caught);
