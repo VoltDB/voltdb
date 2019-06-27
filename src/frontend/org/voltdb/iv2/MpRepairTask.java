@@ -81,17 +81,9 @@ public class MpRepairTask extends SiteTasker
                     try {
                         algo.start().get();
                         repairLogger.info(whoami + "finished repair.");
-
-                        if (!m_leaderMigration && m_mailbox.m_messenger != null) {
-                            // Determine if all the partition leaders are on live hosts
-                            Set<Integer> partitionLeaderHosts = CoreUtils.getHostIdsFromHSIDs(m_spMasters);
-                            partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
-
-                            // At this point, all the repairs are completed. This should be the final repair task
-                            // in the repair process. Remove the mp repair blocker
-                            if (partitionLeaderHosts.isEmpty()) {
-                                VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
-                            }
+                        if (!m_leaderMigration) {
+                            // At this point, all sp repairs are completed. Remove the mp repair blocker
+                            VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
                         }
                     } catch (CancellationException e) {
                         repairLogger.info(whoami + "interrupted during repair.  Retrying.");
