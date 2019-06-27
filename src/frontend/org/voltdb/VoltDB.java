@@ -854,20 +854,26 @@ public class VoltDB {
                     return;
                 }
                 case LICENSE: {
-                    File licFH;
+                    if(!m_isEnterprise)
+                    {
+                        System.out.println("Community Edition does not have license files");
+                        return;
+                    }else {
+                        File licFH;
 
-                    if (m_pathToLicense == null) {
-                        licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
-                        m_pathToLicense = licFH.getAbsolutePath();
-                    } else {
-                        licFH = new VoltFile(m_pathToLicense);
-                    }
+                        if (m_pathToLicense == null) {
+                            licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
+                            m_pathToLicense = licFH.getAbsolutePath();
+                        } else {
+                            licFH = new VoltFile(m_pathToLicense);
+                        }
 
-                    if (!licFH.exists()) {
-                        System.out.println("FATAL: License file not found.");
-                        referToDocAndExit();
+                        if (!licFH.exists()) {
+                            System.out.println("FATAL: License file not found.");
+                            referToDocAndExit();
+                        }
+                        return;
                     }
-                    return;
                 }
             }
         }
