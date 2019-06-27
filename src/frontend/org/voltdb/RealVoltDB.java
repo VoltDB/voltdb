@@ -776,15 +776,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private int outputLicense(Configuration config) {
-        File licFH = new VoltFile(config.m_voltdbRoot.getParent(), "license.xml");
-        try {
-            if (!licFH.isFile() || !licFH.canRead()) {
-                consoleLog.fatal("Failed to get license. " + licFH.getAbsolutePath());
-                return -1;
-            }
-            config.m_pathToLicense = licFH.getCanonicalPath();
-        } catch (IOException e) {
-            consoleLog.fatal("Failed to read license: " + e.getMessage());
+        File licFH = new VoltFile(config.m_pathToLicense);
+
+        if (!licFH.isFile() || !licFH.canRead()) {
+            consoleLog.fatal("Failed to get license. " + licFH.getAbsolutePath());
             return -1;
         }
 
@@ -794,7 +789,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return -1;
             }
             try {
-                File target = new File("./license.xml");
+                File target = new File(config.m_getOutput);
                 InputStream is = null;
                 OutputStream os = null;
                 try {
@@ -814,7 +809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + " : " + e.getMessage());
                 return -1;
             }
-            consoleLog.info("license.xml saved in " + config.m_getOutput.trim());
+            consoleLog.info("license saved as " + config.m_getOutput.trim());
         } catch (Exception e) {
             consoleLog.fatal("Failed to get license. " + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
             return -1;

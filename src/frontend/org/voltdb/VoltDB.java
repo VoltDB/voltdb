@@ -854,12 +854,19 @@ public class VoltDB {
                     return;
                 }
                 case LICENSE: {
-                    File licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
+                    File licFH;
+
+                    if (m_pathToLicense == null) {
+                        licFH = new VoltFile(m_voltdbRoot.getParent(), "license.xml");
+                        m_pathToLicense = licFH.getAbsolutePath();
+                    } else {
+                        licFH = new VoltFile(m_pathToLicense);
+                    }
+
                     if (!licFH.exists()) {
                         System.out.println("FATAL: License file not found.");
                         referToDocAndExit();
                     }
-                    m_pathToLicense = licFH.getAbsolutePath();
                     return;
                 }
             }
@@ -1462,6 +1469,7 @@ public class VoltDB {
     public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
         Configuration config = new Configuration(args);
+
         try {
             if (!config.validate()) {
                 System.exit(-1);

@@ -34,8 +34,8 @@ def show_license(runner):
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Display information about a live database.',
-	modifiers = [VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.'), 
-				VOLT.Modifier('license', show_license, 'Display license information.')]
+	modifiers = (VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.'), 
+                 VOLT.Modifier('license', show_license, 'Display license information.'))
 )
 def show(runner):
     runner.go()
