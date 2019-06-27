@@ -34,6 +34,8 @@ public class CatalogOperator {
         NativeLibraryLoader.loadCatalogAPIs();
     }
 
+    static final char MAP_SEPARATOR = '#';
+
     final Catalog m_catalog;
 
     public CatalogOperator(Catalog catalog) {
@@ -45,11 +47,50 @@ public class CatalogOperator {
      * @param path the absolute path to the wanted node.
      * @return the catalog item at the specified path.
      */
-    CatalogType getItemForPath(String path) {
-        return getItemForPath(m_catalog, path);
+    CatalogType getItemForPath(final String path) {
+        // check the cache
+        CatalogType retval = m_catalog.m_pathCache.getIfPresent(path);
+        if (retval != null) {
+            return retval;
+        }
+
+        int index = path.lastIndexOf('/');
+        if (index == -1) {
+            return getItemForPathPart(m_catalog, path);
+        }
+
+        // recursive case
+        String immediateParentPath = path.substring(0, index);
+        String subPath = path.substring(index);
+
+        CatalogType immediateParent = getItemForPath(immediateParentPath);
+        if (immediateParent == null) {
+            return null;
+        }
+        // cache all parents
+        m_catalog.m_pathCache.put(immediateParentPath, immediateParent);
+
+        return getItemForPathPart(immediateParent, subPath);
     }
 
-    native CatalogType getItemForPath(Catalog catalog, String path);
+    static CatalogType getItemForPathPart(CatalogType parent, String path) {
+        if (path.length() == 0) {
+            return parent;
+        }
+
+        boolean hasStartSlash = path.charAt(0) == '/';
+
+        if ((path.length() == 1) && hasStartSlash) {
+            return parent;
+        }
+
+        int index = path.lastIndexOf(MAP_SEPARATOR);
+
+        String collection = path.substring(hasStartSlash ? 1 : 0, index);
+        String name = path.substring(index + 1, path.length());
+
+        return parent.getCollection(collection).get(name);
+    }
 
     /**
      * Run one or more single-line catalog commands separated by newlines.
