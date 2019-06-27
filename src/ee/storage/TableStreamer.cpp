@@ -103,11 +103,6 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                                predicateStrings, m_table.activeTupleCount()));
                     break;
 
-                case TABLE_STREAM_RECOVERY:
-                    context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
-                                                      m_tableId));
-                    break;
-
                 case TABLE_STREAM_ELASTIC_INDEX:
                     context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
                                                      predicateStrings));

@@ -24,7 +24,6 @@
 #include "harness.h"
 
 #include "common/NValue.hpp"
-#include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/TupleSchema.h"

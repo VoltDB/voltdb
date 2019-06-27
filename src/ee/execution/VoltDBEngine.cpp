@@ -63,7 +63,6 @@
 #include "common/ElasticHashinator.h"
 #include "common/ExecuteWithMpMemory.h"
 #include "common/InterruptException.h"
-#include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 
@@ -2582,21 +2581,6 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     return remaining;
 }
 
-/*
- * Apply the updates in a recovery message.
- */
-void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
-    CatalogId tableId = message->tableId();
-    Table* found = getTableById(tableId);
-    if (! found) {
-        throwFatalException(
-                "Attempted to process recovery message for tableId %d but the table could not be found", tableId);
-    }
-    PersistentTable *table = dynamic_cast<PersistentTable*>(found);
-    vassert(table);
-    table->processRecoveryMessage(message, NULL);
-}
-
 int64_t VoltDBEngine::exportAction(bool syncAction,
                                    int64_t uso,
                                    int64_t seqNo,
@@ -2892,8 +2876,6 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     m_currExecutorVec->setupContext(m_executorContext);
     m_executorContext->popModifiedTupleCounter();
 }
-
-static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);

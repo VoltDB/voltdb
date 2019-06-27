@@ -139,8 +139,6 @@ SET (VOLTDB_SRC
   common/NValue.cpp
   common/PlannerDomValue.cpp
   common/Pool.cpp
-  common/RecoveryProtoMessage.cpp
-  common/RecoveryProtoMessageBuilder.cpp
   common/SQLException.cpp
   common/SegvException.cpp
   common/SerializableEEException.cpp
@@ -264,7 +262,6 @@ SET (VOLTDB_SRC
   storage/MaterializedViewTriggerForInsert.cpp
   storage/MaterializedViewTriggerForWrite.cpp
   storage/PersistentTableStats.cpp
-  storage/RecoveryContext.cpp
   storage/StreamedTableStats.cpp
   storage/TableCatalogDelegate.cpp
   storage/TableStats.cpp

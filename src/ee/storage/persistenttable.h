@@ -62,8 +62,8 @@
 #include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
+#include "storage/tableiterator.h"
 #include "storage/TableStreamerInterface.h"
-#include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
 #include "storage/streamedtable.h"
@@ -417,11 +417,6 @@ public:
                        std::vector<int>& retPositions);
 
     /**
-     * Process the updates from a recovery message
-     */
-    void processRecoveryMessage(RecoveryProtoMsg* message, Pool* pool);
-
-    /**
      * Create a tree index on the primary key and then iterate it and hash
      * the tuple data.
      */
@@ -715,7 +710,7 @@ private:
 
     /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * for loadNextDependency or processRecoveryMessage
+     * for loadNextDependency
      */
     virtual void processLoadedTuple(TableTuple& tuple,
                                     ReferenceSerializeOutput* uniqueViolationOutput,

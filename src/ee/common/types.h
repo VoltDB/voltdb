@@ -403,11 +403,6 @@ enum TableStreamType {
     // was used for TABLE_STREAM_ELASTIC_INDEX_READ.
     TABLE_STREAM_ELASTIC_INDEX_CLEAR,
 
-    // Table stream types that don't use predicates.
-    // Add new non-predicate types below TABLE_STREAM_RECOVERY so
-    // that tableStreamTypeHasPredicates() doesn't have to change.
-    TABLE_STREAM_RECOVERY,
-
     // Table stream type provided when no stream is active.
     TABLE_STREAM_NONE = -1
 };
@@ -435,13 +430,6 @@ inline bool tableStreamTypeIsSnapshot(TableStreamType streamType) {
 }
 
 /**
- * Return true if the table stream type is for recovery.
- */
-inline bool tableStreamTypeIsRecovery(TableStreamType streamType) {
-    return streamType == TABLE_STREAM_RECOVERY;
-}
-
-/**
  * Return true if the table stream type valid.
  */
 inline bool tableStreamTypeIsValid(TableStreamType streamType) {
@@ -458,33 +446,6 @@ inline bool tableStreamTypeIsStreamIndexing(TableStreamType streamType) {
 enum StatisticsSelectorType {
     STATISTICS_SELECTOR_TYPE_TABLE,
     STATISTICS_SELECTOR_TYPE_INDEX
-};
-
-// ------------------------------------------------------------------
-// Recovery protocol message types
-// ------------------------------------------------------------------
-enum RecoveryMsgType {
-    /*
-     * Message containing freshly scanned tuples to be inserted
-     */
-    RECOVERY_MSG_TYPE_SCAN_TUPLES = 0,
-    /*
-     * Message indicating that the table scan is complete, future polling
-     * will produce delta data
-     */
-    RECOVERY_MSG_TYPE_SCAN_COMPLETE = 1,
-    /*
-     * Message containing whole tuples that are either updates or inserts
-     */
-    RECOVERY_MSG_TYPE_DELTA_MERGE_TUPLES = 2,
-    /*
-     * Message containing primary keys that must be deleted
-     */
-    RECOVERY_MSG_TYPE_DELTA_DELETE_PKEYS = 3,
-    /*
-     * Generated when all recovery data for a table has been generated
-     */
-    RECOVERY_MSG_TYPE_COMPLETE = 4
 };
 
 // ------------------------------------------------------------------

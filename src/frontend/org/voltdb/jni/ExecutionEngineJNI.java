@@ -36,7 +36,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
-import org.voltdb.exceptions.DRTableNotFoundException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
@@ -691,11 +690,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public long[] getUSOForExportTable(String streamName) {
         return nativeGetUSOForExportTable(pointer, getStringBytes(streamName));
-    }
-
-    @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
     }
 
     @Override

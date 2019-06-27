@@ -594,8 +594,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                                List<DBBPool.BBContainer> outputBuffers);
 
-    public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
-
     /** Releases the Engine object. */
     public abstract void release() throws EEException, InterruptedException;
 
@@ -1128,13 +1126,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *         (such as the table not being COW mode).
      */
     protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
-
-    /**
-     * Process a recovery message and load the data it contains.
-     * @param pointer Pointer to an engine instance
-     * @param message Recovery message to load
-     */
-    protected native void nativeProcessRecoveryMessage(long pointer, long message, int offset, int length);
 
     /**
      * Calculate a hash code for a table.
