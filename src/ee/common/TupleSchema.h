@@ -148,9 +148,6 @@ public:
     /** Return the number of hidden columns in the schema for the tuple. */
     inline uint16_t hiddenColumnCount() const;
 
-    /** Return true if there is a hidden column on the table with stream. */
-    inline bool isTableWithMigrate() const;
-
     /** Return true if tuples with this schema do not have an accessible header byte. */
     inline bool isHeaderless() const {
         return m_isHeaderless;
@@ -223,7 +220,22 @@ public:
 
     uint16_t totalColumnCount() const;
 
+    /** Returns the index of the hidden column of columnType. The value
+     * returned by this method will not be valid if hasHiddenColumn(columnType)
+     * returns false.
+     */
+    uint8_t getHiddenColumnIndex(HiddenColumn::Type columnType) const {
+        return m_hiddenColumnIndexes[columnType];
+    }
+
+    /** Returns whether or not a hidden column of columnType is in this tuple schema */
+    bool hasHiddenColumn(HiddenColumn::Type columnType) const {
+        return m_hiddenColumnIndexes[columnType] != UNSET_HIDDEN_COLUMN;
+    }
+
 private:
+    static const uint8_t UNSET_HIDDEN_COLUMN = 0xFF;
+
     /** These methods are like their public counterparts, but accepts
      *  indexes >= m_columnCount, in order to access hidden columns or
      *  the terminating ColumnInfo object. */
@@ -281,8 +293,7 @@ private:
     // Whether or not the tuples using this schema have a header byte
     bool m_isHeaderless;
 
-    // has a hidden column for table with migrate
-    bool m_isTableWithMigrate;
+    uint8_t m_hiddenColumnIndexes[HiddenColumn::MAX_HIDDEN_COUNT];
 
     /*
      * Data storage for:
@@ -315,10 +326,6 @@ inline uint16_t TupleSchema::columnCount() const {
 
 inline uint16_t TupleSchema::hiddenColumnCount() const {
     return m_hiddenColumnCount;
-}
-
-inline bool TupleSchema::isTableWithMigrate() const {
-    return m_isTableWithMigrate;
 }
 
 inline uint16_t TupleSchema::totalColumnCount() const {

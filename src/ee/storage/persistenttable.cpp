@@ -127,7 +127,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_noAvailableUniqueIndex(false)
     , m_smallestUniqueIndex(NULL)
     , m_smallestUniqueIndexCrc(0)
-    , m_drTimestampColumnIndex(-1)
     , m_pkeyIndex(NULL)
     , m_mvHandler(NULL)
     , m_mvTrigger(NULL)
@@ -151,16 +150,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             bool ownsTupleSchema,
                                             int32_t compactionThreshold) {
     vassert(schema != NULL);
-    uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    if (hiddenColumnCount > 0) {
-        for (int i = 0; i < hiddenColumnCount; ++i) {
-            const TupleSchema::HiddenColumnInfo *info = schema->getHiddenColumnInfo(i);
-            if (info->columnType == HiddenColumn::XDCR_TIMESTAMP) {
-                m_drTimestampColumnIndex = i;
-                break;
-            }
-        }
-    }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
 
@@ -2497,8 +2486,7 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
 }
 
 uint16_t PersistentTable::getMigrateColumnIndex() {
-    // The last column is the migrate column for now.
-    return (m_schema->hiddenColumnCount() -1);
+    return m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
 }
 
 bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {

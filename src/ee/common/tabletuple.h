@@ -647,11 +647,11 @@ private:
     inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
         // Exclude the hidden column for persistent table with stream
         uint16_t hiddenColumnCount = m_schema->hiddenColumnCount();
-        if (m_schema->isTableWithMigrate()) {
-            hiddenColumnCount--;
-        }
+        uint8_t migrateColumn = m_schema->getHiddenColumnIndex(HiddenColumn::MIGRATE_TXN);
         for (int colIdx = 0; colIdx < hiddenColumnCount; colIdx++) {
-            getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
+            if (colIdx != migrateColumn) {
+                getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
+            }
         }
     }
 
