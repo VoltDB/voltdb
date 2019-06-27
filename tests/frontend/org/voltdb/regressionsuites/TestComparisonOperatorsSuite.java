@@ -30,18 +30,16 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 
-public class TestComparisonOperatorsSuite  extends RegressionSuite {
+public class TestComparisonOperatorsSuite extends RegressionSuite {
     public TestComparisonOperatorsSuite(String name) {
         super(name);
     }
 
-    static private void setUpSchema(VoltProjectBuilder project)
-            throws IOException {
+    static private void setUpSchema(VoltProjectBuilder project) throws IOException {
         String literalSchema =
                 "CREATE TABLE S1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
@@ -99,8 +97,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         subTestIsDistinctFromInCompatibleTypes(client);
     }
 
-    private void populateTableForIsDistinctFromTests(Client client)
-            throws IOException, NoConnectionsException, ProcCallException {
+    private void populateTableForIsDistinctFromTests(Client client) throws IOException, ProcCallException {
                                 //        id,   wage, dept
         client.callProcedure("S1.insert", 1,    1000, 1);
         client.callProcedure("S1.insert", 3,    3000, 1);
@@ -190,11 +187,9 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
             {9,  5152,          2,  1000,           2},
             {9,  5152,          2,  5253,           3},
             {10, Long.MIN_VALUE,2,  1000,           2},
-            {10, Long.MIN_VALUE,2,  5253,           3}};
+            {10, Long.MIN_VALUE,2,  5253,           3}
+        };
         validateTableOfLongs(client, sql, expected);
-
-
-
         /*
         // ENG-15279, ENG-15234: NULL value, type promotion
         // left join on column that has null values
@@ -211,13 +206,12 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         */
     }
 
-    private void subTestIsDistinctFromUsingSubqueries(Client client)
-            throws Exception {
+    private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception {
         // Once support for 'is distinct from' is available on HSQL-backend,
         // remove the assert below.
         // The expected results below were validated against official HSQL
         // (version 2.3.2/2.3.3) and against postgres.
-        assert( ! isHSQL());
+        assert(! isHSQL());
 
         String sql;
         long[][] expected;
@@ -230,9 +224,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "GROUP BY wage " +
                 "HAVING COUNT(*) is distinct from 7 " +
                 "ORDER BY wage";
-        expected = new long[][] {
-            {Long.MIN_VALUE,    1},
-            {5253,              1}};
+        expected = new long[][] {{Long.MIN_VALUE,    1}, {5253,              1}};
         validateTableOfLongs(client, sql, expected);
 
         sql = "SELECT id, wage, count(*) from S1 "+
@@ -290,11 +282,9 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         verifyStmtFails(client, sql, "unexpected token: SELECT");
     }
 
-    private void subTestIsDistinctFromInCompatibleTypes(Client client)
-            throws Exception {
-        String sql;
-        sql = "SELECT * FROM S1 A WHERE A.WAGE is distinct from \'Z\';";
-        verifyStmtFails(client, sql, "incompatible data types in combination");
+    private void subTestIsDistinctFromInCompatibleTypes(Client client) throws Exception {
+        verifyStmtFails(client, "SELECT * FROM S1 A WHERE A.WAGE is distinct from \'Z\';",
+                "incompatible data types in combination");
     }
 
     public void testCaseWhen() throws Exception {
@@ -346,33 +336,30 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
                     "WHEN num >=5 THEN NULL ELSE NULL END " +
                     "FROM R1 ORDER BY 1;";
-            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+            cl.callProcedure("@AdHoc", sql).getResults();
             fail();
-        }
-        catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("ELSE clause or at least one THEN clause must be non-NULL"));
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    m_usingCalcite ? "ELSE clause or at least one THEN clause must be non-NULL" :  // Calcite message
+                            "data type cast needed for parameter or null literal"));               // legacy message
         }
 
-        try {
-            // Use String as the casted type
-            sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                    "WHEN num >=5 THEN NULL ELSE 'NULL' END " +
-                    "FROM R1 ORDER BY 1;";
-            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
-        }
-        catch (Exception ex) {
-            fail();
-        }
+        // Use String as the casted type
+        sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                "WHEN num >=5 THEN NULL ELSE 'NULL' END " +
+                "FROM R1 ORDER BY 1;";
+        cl.callProcedure("@AdHoc", sql).getResults();
 
         try {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
                     "WHEN num >=5 THEN 'I am null' ELSE num END " +
                     "FROM R1 ORDER BY 1;";
-            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+            cl.callProcedure("@AdHoc", sql).getResults();
             // hsql232 ENG-8586 CASE WHEN having no incompatibility problem with this: fail();
-        }
-        catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Illegal mixing of types in CASE or COALESCE statement"));
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    m_usingCalcite ? "Illegal mixing of types in CASE or COALESCE statement" :
+                            "incompatible data types in combination"));
         }
 
         // Test string types
@@ -382,15 +369,10 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         assertEquals(2, vt.getRowCount());
         vt.advanceRow();
         assertEquals(vt.getLong(0), 1);
-        assertTrue(vt.getString(1).equals("Good"));
+        assertEquals("Good", vt.getString(1));
         vt.advanceRow();
         assertEquals(vt.getLong(0), 2);
-        if (isHSQL()) {
-            assertTrue(vt.getString(1).contains("Bad"));
-        }
-        else {
-            assertTrue(vt.getString(1).equals("Bad"));
-        }
+        assertTrue(vt.getString(1).contains("Bad"));
 
 
         // Test string concatenation
@@ -401,15 +383,10 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         assertEquals(2, vt.getRowCount());
         vt.advanceRow();
         assertEquals(vt.getLong(0), 1);
-        assertTrue(vt.getString(1).equals("VoltDB:Good"));
+        assertEquals("VoltDB:Good", vt.getString(1));
         vt.advanceRow();
         assertEquals(vt.getLong(0), 2);
-        if (isHSQL()) {
-            assertTrue(vt.getString(1).contains("Memsql:Bad"));
-        }
-        else {
-            assertTrue(vt.getString(1).equals("Memsql:Bad"));
-        }
+        assertTrue(vt.getString(1).contains("Memsql:Bad"));
 
         // Test inlined varchar/varbinary value produced by CASE WHEN.
         // This is regression coverage for ENG-6666.
@@ -428,8 +405,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "WHERE ID = 72;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
-        assertTrue(VoltTable.varbinaryToPrintableString(
-                vt.getVarbinary(0)).contains("DEADBEEF"));
+        assertTrue(VoltTable.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
 
         cl.callProcedure("R1.insert", 3, "ORACLE", 8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
@@ -438,10 +414,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "CASE WHEN num > 7 THEN num * 10 ELSE num * 8 END " +
                 "END " +
                 "FROM R1 ORDER BY 1;";
-        expected = new long[][] {
-            {1, 5},
-            {2, 40},
-            {3, 80}};
+        expected = new long[][] {{1, 5}, {2, 40}, {3, 80}};
         validateTableOfLongs(cl, sql, expected);
 
 
@@ -450,20 +423,14 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "WHEN num >=5 THEN num END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        expected = new long[][] {
-            {1, Long.MIN_VALUE},
-            {2, 5},
-            {3, 8}};
+        expected = new long[][] {{1, Long.MIN_VALUE}, {2, 5}, {3, 8}};
         validateTableOfLongs(vt, expected);
 
         sql = "SELECT ID, CASE WHEN num > 3 AND num < 5 THEN 4 " +
                 "WHEN num >=5 THEN num*10 END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.BIGINT, vt.getColumnType(1));
-        expected = new long[][] {
-            {1, Long.MIN_VALUE},
-            {2, 50},
-            {3, 80}};
+        expected = new long[][] {{1, Long.MIN_VALUE}, {2, 50}, {3, 80}};
         validateTableOfLongs(vt, expected);
 
         // Test NULL
@@ -472,11 +439,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        expected = new long[][] {
-            {1, 0},
-            {2, 15},
-            {3, 18},
-            {4, Long.MIN_VALUE}};
+        expected = new long[][] {{1, 0}, {2, 15}, {3, 18}, {4, Long.MIN_VALUE}};
         validateTableOfLongs(vt, expected);
     }
 
@@ -513,8 +476,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         try {
             setUpSchema(project);
-        }
-        catch(IOException excp) {
+        } catch(IOException ignored) {
             fail();
         }
         LocalCluster config = null;

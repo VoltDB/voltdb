@@ -213,7 +213,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         // load the procedures for the test
@@ -326,14 +326,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addProcedure(BadParamTypesForTimestamp.class);
     }
 
-    public void testExplicitErrorUDF() throws Exception
-    {
+    public void testExplicitErrorUDF() throws Exception {
         System.out.println("STARTING testExplicitErrorUDF");
         Client client = getClient();
         ProcedureCallback callback = new ProcedureCallback() {
             @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
+            public void clientCallback(ClientResponse clientResponse) {
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                     throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
                 }
@@ -379,8 +377,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
+        client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -425,8 +423,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
+        client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -516,11 +514,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             client.callProcedure("@AdHoc",
                     "select bdata, CHAR_LENGTH(bdata) from BINARYTEST where ID = 1");
           fail("char_length on columns which are not string expression is not supported");
-        }
-        catch (ProcCallException pce) {
-            final String msg = pce.getMessage();
-            assertTrue(msg
-                    .contains("Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'"));
+        } catch (ProcCallException pce) {
+            assertTrue(pce.getMessage().contains(
+                    m_usingCalcite ?
+                            "Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'" :
+                            "incompatible data type in operation"));
         }
 
     }
@@ -541,11 +539,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("@AdHoc", "Delete from P1;");
-        cr = client.callProcedure("P1.insert", 1, "IBM", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "Microsoft", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 3, "Hewlett Packard", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 4, "Gateway", 10, 1.1);
+        client.callProcedure("@AdHoc", "Delete from P1;");
+        client.callProcedure("P1.insert", 1, "IBM", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "Microsoft", 10, 1.1);
+        client.callProcedure("P1.insert", 3, "Hewlett Packard", 10, 1.1);
+        client.callProcedure("P1.insert", 4, "Gateway", 10, 1.1);
         cr = client.callProcedure("P1.insert", 5, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -637,9 +635,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("@AdHoc", "Delete from P1;");
-        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        client.callProcedure("@AdHoc", "Delete from P1;");
+        client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -649,7 +647,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals(null,result.getString(1));
+        assertNull(result.getString(1));
     }
 
     private void subtestDECODEVeryLong() throws IOException, ProcCallException {
@@ -658,9 +656,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("@AdHoc", "Delete from P1;");
-        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        client.callProcedure("@AdHoc", "Delete from P1;");
+        client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -679,7 +677,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("@AdHoc", "Delete from P3_INLINE_DESC;");
+        client.callProcedure("@AdHoc", "Delete from P3_INLINE_DESC;");
         cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", "zheng2", 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -724,8 +722,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             assertEquals("zheng",result.getString(0));
-
-
         } catch (ProcCallException pce) {
             System.out.println(pce);
             fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
@@ -738,9 +734,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("@AdHoc", "Delete from P1;");
-        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        client.callProcedure("@AdHoc", "Delete from P1;");
+        client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -858,8 +854,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "null ratio", "null tm", "null var", "null dec"});
 
 
-        cr = client.callProcedure("P2.insert", 1, new Timestamp(1000L));
-        cr = client.callProcedure("P2.insert", 2, null);
+        client.callProcedure("P2.insert", 1, new Timestamp(1000L));
+        client.callProcedure("P2.insert", 2, null);
         // Test timestamp
         cr = client.callProcedure("TestDecodeNullTimestamp", 1);
         checkDecodeNullResult(cr, new String[]{"2013-07-18 02:00:00.123457"});
@@ -877,7 +873,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // Test Null return type
         cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, NULL, 10) " +
                 " from R3 where id = 2");
-        assertTrue(cr.getResults()[0].getRowCount() == 1);
+        assertEquals(1, cr.getResults()[0].getRowCount());
         assertTrue(cr.getResults()[0].advanceRow());
         assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
 
@@ -923,7 +919,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
         try {
-            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
+            client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("SQL error while compiling query"));
@@ -1016,57 +1012,40 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result;
 
         // Test user-found anomaly around complex filter using functions
-        try {
-            cr = client.callProcedure("@Explain",
-                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
-                    "    ( LOCK_TIME IS NULL OR " +
-                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
-                    10, 5000);
-            //* enable for debug */ System.out.println(cr.getResults()[0]);
-        } catch (Exception ex) {
-            fail();
-        }
+        client.callProcedure("@Explain",
+                "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                        "    ( LOCK_TIME IS NULL OR " +
+                        "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                10, 5000);
+        //* enable for debug */ System.out.println(cr.getResults()[0]);
 
-        try {
-            cr = client.callProcedure("@AdHoc",
-                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
-                    "    ( LOCK_TIME IS NULL OR " +
-                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
-                    10, 10000);
-            result = cr.getResults()[0];
-            assertEquals(0, result.getRowCount());
-            //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
-            fail();
-        }
+        cr = client.callProcedure("@AdHoc",
+                "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                        "    ( LOCK_TIME IS NULL OR " +
+                        "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                10, 10000);
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+        //* enable for debug */ System.out.println(result);
 
-        try {
-            cr = client.callProcedure("GOT_BAD_PARAM_COUNTS_INLINE", 10, 10000);
-            result = cr.getResults()[0];
-            assertEquals(0, result.getRowCount());
-            //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
-            fail();
-        }
+        cr = client.callProcedure("GOT_BAD_PARAM_COUNTS_INLINE", 10, 10000);
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+        //* enable for debug */ System.out.println(result);
 
-        try {
-            cr = client.callProcedure("GotBadParamCountsInJava", 10, 10000);
-            result = cr.getResults()[0];
-            assertEquals(0, result.getRowCount());
-            //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
-            fail();
-        }
+        cr = client.callProcedure("GotBadParamCountsInJava", 10, 10000);
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+        //* enable for debug */ System.out.println(result);
 
         try {
             // Purposely neglecting to list an select columns or '*'.
-            cr = client.callProcedure("@Explain", "SELECT TOP ? FROM PAULTEST WHERE NAME IS NOT NULL AND (LOCK_TIME IS NULL OR SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME));");
+            client.callProcedure("@Explain", "SELECT TOP ? FROM PAULTEST WHERE NAME IS NOT NULL AND (LOCK_TIME IS NULL OR SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME));");
             //* enable for debug */ System.out.println(cr.getResults()[0]);
             fail("Expected to detect missing SELECT columns");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("unexpected token: FROM"));
-            return;
         }
         //* enable for debug */ System.out.println(cr.getResults()[0]);
     }
@@ -1077,10 +1056,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
-        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
-        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
-        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+        client.callProcedure("P2.insert", 0, new Timestamp(0L));
+        client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
 
         // Test AdHoc
         cr = client.callProcedure("@AdHoc", "select to_timestamp(second, 1372640523) from P2 limit 1");
@@ -1092,7 +1071,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Test string input number, expect error
         try {
-            cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
+            client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("SQL error while compiling query"));
@@ -1196,7 +1175,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // Test Standard TRUNCATE function for floating numbers
         Exception ex = null;
         try {
-            cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
+            client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
         } catch (Exception e) {
             System.out.println(e.getMessage());
             ex = e;
@@ -1212,7 +1191,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         ex = null;
         try {
-            cr = client.callProcedure("TRUNCATE", 0);
+            client.callProcedure("TRUNCATE", 0);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             ex = e;
@@ -1389,41 +1368,36 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         for (String procname : jsonProcs) {
             try {
-                cr = client.callProcedure(procname, 1, "id", "1");
+                client.callProcedure(procname, 1, "id", "1");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 9"));
             }
 
             try {
-                cr = client.callProcedure(procname, 2, "id", "2");
+                client.callProcedure(procname, 2, "id", "2");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 16"));
             }
 
             try {
-                cr = client.callProcedure(procname, 3, "id", "3");
+                client.callProcedure(procname, 3, "id", "3");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 30"));
             }
 
             try {
-                cr = client.callProcedure(procname, 4, "id", "4");
+                client.callProcedure(procname, 4, "id", "4");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 11"));
             }
         }
     }
 
-    public void testFormatCurrency() throws Exception
-    {
+    public void testFormatCurrency() throws Exception {
         System.out.println("STARTING testFormatCurrency");
         Client client = getClient();
         ClientResponse cr = null;
@@ -1597,14 +1571,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // out of int64_t range
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
             fail("range validity check failed for FORMAT_CURRENCY");
-        }
-        catch (ProcCallException pcex) {
+        } catch (ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("out of range"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 9");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 9");
             fail("range validity check failed for FORMAT_CURRENCY");
         }
         catch (ProcCallException pcex) {
@@ -1613,50 +1586,50 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // check invalid type
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(id, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(id, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             // TODO: I have no idea why the exception is different
             assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(var, 2) from R3 where id = 1");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(var, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
@@ -1703,7 +1676,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         // it will go out of the range of int64_t
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12");
+            client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("out of range"));
@@ -1754,16 +1727,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // check the validity of the second parameter
-        verifyStmtFails(client,
-                        "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0",
-                        "the second parameter");
-        verifyStmtFails(client,
-                        "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0",
-                        "the second parameter");
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0",
+                "the second parameter");
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0",
+                "the second parameter");
     }
 
-    public void testFunc_Str() throws Exception
-    {
+    public void testFunc_Str() throws Exception {
         System.out.println("STARTING testFunc_Str");
         Client client = getClient();
         ClientResponse cr = null;
@@ -1837,8 +1807,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select STR(DEC, -19) from D1 where id = 12", "the second parameter should be <= 38 and > 0");
     }
 
-    public void testRound() throws Exception
-    {
+    public void testRound() throws Exception {
         System.out.println("STARTING testRound");
         Client client = getClient();
         ClientResponse cr = null;
@@ -2014,40 +1983,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select ROUND(dec, 2) from D1 where id = 8", "out of range");
 
         // check invalid type
-        verifyStmtFails(client,
-                        "select ROUND(id, 2) from R3 where id = 1",
+        verifyStmtFails(client, "select ROUND(id, 2) from R3 where id = 1", "can't be cast as DECIMAL");
+        verifyStmtFails(client, "select ROUND(tiny, 2) from R3 where id = 1",
                         "can't be cast as DECIMAL");
-        verifyStmtFails(client,
-                        "select ROUND(tiny, 2) from R3 where id = 1",
-                        "can't be cast as DECIMAL");
-        verifyStmtFails(client,
-                        "select ROUND(small, 2) from R3 where id = 1",
-                        "can't be cast as DECIMAL");
-        verifyStmtFails(client,
-                        "select ROUND(num, 2) from R3 where id = 1",
-                        "can't be cast as DECIMAL");
-        verifyStmtFails(client,
-                        "select ROUND(big, 2) from R3 where id = 1",
-                        "can't be cast as DECIMAL");
-        verifyStmtFails(client,
-                        "select ROUND(tm, 2) from R3 where id = 1",
-                        "Cannot apply 'ROUND' to arguments of type");
-        verifyStmtFails(client,
-                        "select ROUND(var, 2) from R3 where id = 1",
-                        "Cannot apply 'ROUND' to arguments of type");
-        verifyStmtFails(client,
-                        "select ROUND(DEC, -19) from D1 where id = 12",
-                        "out of range");
+        verifyStmtFails(client, "select ROUND(small, 2) from R3 where id = 1", "can't be cast as DECIMAL");
+        verifyStmtFails(client, "select ROUND(num, 2) from R3 where id = 1", "can't be cast as DECIMAL");
+        verifyStmtFails(client, "select ROUND(big, 2) from R3 where id = 1", "can't be cast as DECIMAL");
+        verifyStmtFails(client, "select ROUND(tm, 2) from R3 where id = 1",
+                m_usingCalcite ? "Cannot apply 'ROUND' to arguments of type" : "incompatible data type in operation" );
+        verifyStmtFails(client, "select ROUND(var, 2) from R3 where id = 1",
+                m_usingCalcite ? "Cannot apply 'ROUND' to arguments of type" : "incompatible data type in operation" );
+        verifyStmtFails(client, "select ROUND(DEC, -19) from D1 where id = 12", "out of range");
         // check the validity of the second parameter
-        verifyStmtFails(client,
-                        "select ROUND(DEC, 15) from D1 where id = 0",
-                        "the second parameter");
-        verifyStmtFails(client,
-                        "select ROUND(DEC, -26) from D1 where id = 0",
-                        "the second parameter");
+        verifyStmtFails(client, "select ROUND(DEC, 15) from D1 where id = 0", "the second parameter");
+        verifyStmtFails(client, "select ROUND(DEC, -26) from D1 where id = 0",
+                "the second parameter");
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
+    public void testConcat() throws IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
         ClientResponse cr;
@@ -2125,7 +2078,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
 
         try {
-            cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
+            client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
         }
@@ -2153,8 +2106,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         int i = 0;
         for (long val : bitnotInterestingValues) {
-            client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)",
-                    i, val);
+            client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)", i, val);
             ++i;
         }
 
@@ -2204,7 +2156,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // bitnot(null) produces null
         long val = result.getLong(0);
-        assertEquals(true, result.wasNull());
+        assertTrue(result.wasNull());
         assertEquals(Long.MIN_VALUE, val);
 
         // bitnot(MAX_VALUE) produces MIN_VALUE, which would be
@@ -2364,14 +2316,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // normal tests
         long[] binInterestingValues = new long[] {
-            Long.MIN_VALUE + 1,
-            Long.MIN_VALUE + 1000,
-            -1,
-            0,
-            1,
-            1000,
-            Long.MAX_VALUE - 1,
-            Long.MAX_VALUE
+                Long.MIN_VALUE + 1, Long.MIN_VALUE + 1000, -1, 0, 1, 1000, Long.MAX_VALUE - 1, Long.MAX_VALUE
         };
 
         int i = 0;
@@ -2476,8 +2421,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         if (ipVersion.length() == 0) {
             cr = client.callProcedure(tableName.toUpperCase() + ".INSERT", presentation, 0x0);
-        }
-        else {
+        } else {
             byte[] zeros = new byte[16];
             cr = client.callProcedure(tableName.toUpperCase() + ".INSERT", presentation, zeros);
         }
@@ -2487,11 +2431,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             String sql = String.format("select inet%s_aton(pres) from %s;", ipVersion, tableName);
             cr = client.callProcedure("@AdHoc", sql);
             fail(String.format("Expected inet address %s to fail.", presentation));
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             ex = e;
-        }
-        finally {
+        } finally {
             assertNotNull(ex);
             assertTrue("Expected a SQL ERROR here", ex.getMessage().contains("SQL ERROR"));
         }
@@ -2538,8 +2480,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         if (bytes != null) {
             assertEquals(bytes.length, actual.length);
             assertEqualByteArrays(bytes, actual);
-        }
-        else {
+        } else {
             assertTrue(vt.wasNull());
         }
 
@@ -2550,8 +2491,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         actual_str = vt.getString(0);
         if (presentation != null) {
             assertEquals(presentation, actual_str);
-        }
-        else {
+        } else {
             assertTrue(vt.wasNull());
         }
 
@@ -2562,8 +2502,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         actual_str = vt.getString(0);
         if (presentation != null) {
             assertEquals(presentation, actual_str);
-        }
-        else {
+        } else {
             assertTrue(vt.wasNull());
         }
 
@@ -2574,8 +2513,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         actual = vt.getVarbinary(0);
         if (bytes != null) {
             assertEqualByteArrays(bytes, actual);
-        }
-        else {
+        } else {
             assertTrue(vt.wasNull());
         }
     }
@@ -2584,47 +2522,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Client client = getClient();
 
         validateIPv4Addr(client, "INET4_TEST", null, null);
-        validateIPv4Addr(client,
-                         "INET4_TEST",
-                         "127.0.0.1",
-                         0x7f000001L);
-        validateIPv4Addr(client,
-                         "INET4_TEST_PPRES",
-                         "127.0.0.1",
-                         0x7f000001L);
-        validateIPv4Addr(client,
-                         "INET4_TEST",
-                         "192.168.7.40",
-                         0xc0a80728L);
-        validateIPv4Addr(client,
-                         "INET4_TEST_PPRES",
-                         "192.168.7.40",
-                         0xc0a80728L);
-        validateIPv4Addr(client,
-                         "INET4_TEST",
-                         "1.1.1.1",
-                         0x01010101L);
-        validateIPv4Addr(client,
-                         "INET4_TEST",
-                         "1.1.1.1",
-                         0x01010101L);
-        validateIPv4Addr(client,
-                         "INET4_TEST",
-                         "1.2.3.4",
-                         0x01020304L);
-        validateIPv4Addr(client,
-                         "INET4_TEST_PPRES",
-                         "1.2.3.4",
-                         0x01020304L);
-        invalidIPAddr(client,
-                        "INET4_TEST",
-                        "01.02.03.04");
-        invalidIPAddr(client,
-                        "INET4_TEST",
-                        "arglebargle");
-        invalidIPAddr(client,
-                        "INET4_TEST",
-                        "192.168.7.6/24");
+        validateIPv4Addr(client, "INET4_TEST", "127.0.0.1", 0x7f000001L);
+        validateIPv4Addr(client, "INET4_TEST_PPRES", "127.0.0.1", 0x7f000001L);
+        validateIPv4Addr(client, "INET4_TEST", "192.168.7.40", 0xc0a80728L);
+        validateIPv4Addr(client, "INET4_TEST_PPRES", "192.168.7.40", 0xc0a80728L);
+        validateIPv4Addr(client, "INET4_TEST", "1.1.1.1", 0x01010101L);
+        validateIPv4Addr(client, "INET4_TEST", "1.1.1.1", 0x01010101L);
+        validateIPv4Addr(client, "INET4_TEST", "1.2.3.4", 0x01020304L);
+        validateIPv4Addr(client, "INET4_TEST_PPRES", "1.2.3.4", 0x01020304L);
+        invalidIPAddr(client, "INET4_TEST", "01.02.03.04");
+        invalidIPAddr(client, "INET4_TEST", "arglebargle");
+        invalidIPAddr(client, "INET4_TEST", "192.168.7.6/24");
 
         // Only test for nulls on INET6_TEST and not the
         // partitioned table, since we can't insert a null
@@ -2633,90 +2541,38 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // The function inet_ntop does not put leading zeros
         // in any of these numbers.  So "::0102:" would
         // fail.
-        validateIPv6Addr(client,
-                         "INET6_TEST",
-                         "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
-                         new short[] {
-                                 (short)0xab01,
-                                 (short)0xcd12,
-                                 (short)0xef21,
-                                 (short)0x01ab,
-                                 (short)0x12cd,
-                                 (short)0x34ef,
-                                 (short)0xa01b,
-                                 (short)0xc23d
-                         });
-        validateIPv6Addr(client,
-                         "INET6_TEST_PPRES",
-                         "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
-                         new short[] {
-                                 (short)0xab01,
-                                 (short)0xcd12,
-                                 (short)0xef21,
-                                 (short)0x01ab,
-                                 (short)0x12cd,
-                                 (short)0x34ef,
-                                 (short)0xa01b,
-                                 (short)0xc23d
-                         });
-        validateIPv6Addr(client,
-                         "INET6_TEST",
-                         "::",
-                         new short[] {
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000
-                         });
-        validateIPv6Addr(client,
-                         "INET6_TEST_PPRES",
-                         "::",
-                         new short[] {
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000
-                         });
-        validateIPv6Addr(client,
-                         "INET6_TEST",
-                         "::1",
-                         new short[] {
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0001
-                         });
-        validateIPv6Addr(client,
-                         "INET6_TEST_PPRES",
-                         "::1",
-                         new short[] {
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0000,
-                                 (short)0x0001
-                         });
-        invalidIPAddr(client,
-                        "INET6_TEST",
-                        ":::");
-        invalidIPAddr(client,
-                        "INET6_TEST",
-                        "arglebargle");
+        validateIPv6Addr(client, "INET6_TEST", "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
+                new short[] {
+                        (short)0xab01, (short)0xcd12, (short)0xef21, (short)0x01ab,
+                        (short)0x12cd, (short)0x34ef, (short)0xa01b, (short)0xc23d
+                });
+        validateIPv6Addr(client, "INET6_TEST_PPRES", "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
+                new short[] {
+                        (short)0xab01, (short)0xcd12, (short)0xef21, (short)0x01ab,
+                        (short)0x12cd, (short)0x34ef, (short)0xa01b, (short)0xc23d
+                });
+        validateIPv6Addr(client, "INET6_TEST", "::",
+                new short[] {
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000,
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000
+                });
+        validateIPv6Addr(client, "INET6_TEST_PPRES", "::",
+                new short[] {
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000,
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000
+                });
+        validateIPv6Addr(client, "INET6_TEST", "::1",
+                new short[] {
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000,
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0001
+                });
+        validateIPv6Addr(client, "INET6_TEST_PPRES", "::1",
+                new short[] {
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0000,
+                        (short)0x0000, (short)0x0000, (short)0x0000, (short)0x0001
+                });
+        invalidIPAddr(client, "INET6_TEST", ":::");
+        invalidIPAddr(client, "INET6_TEST", "arglebargle");
     }
 
     public void testDateadd() throws IOException, ProcCallException {
@@ -2730,8 +2586,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "PARTITION TABLE P2 ON COLUMN ID;\n" +
          */
         Client client = getClient();
-        ClientResponse cr = null;
-        VoltTable vt = null;
+        ClientResponse cr;
+        VoltTable vt;
 
         cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (10000, '2000-01-01 01:00:00.000000');");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2931,15 +2787,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                         + "DATEADD(SECOND, NULL,TM), DATEADD(MILLISECOND, NULL,TM), "
                         + "DATEADD(MICROSECOND, NULL,TM) FROM P2 WHERE ID = 20005;").getResults()[0];
         assertTrue(vt.advanceRow());
-        assertEquals(null, vt.getTimestampAsTimestamp(0));
-        assertEquals(null, vt.getTimestampAsTimestamp(1));
-        assertEquals(null, vt.getTimestampAsTimestamp(2));
-        assertEquals(null, vt.getTimestampAsTimestamp(3));
-        assertEquals(null, vt.getTimestampAsTimestamp(4));
-        assertEquals(null, vt.getTimestampAsTimestamp(5));
-        assertEquals(null, vt.getTimestampAsTimestamp(6));
-        assertEquals(null, vt.getTimestampAsTimestamp(7));
-        assertEquals(null, vt.getTimestampAsTimestamp(8));
+        assertNull(vt.getTimestampAsTimestamp(0));
+        assertNull(vt.getTimestampAsTimestamp(1));
+        assertNull(vt.getTimestampAsTimestamp(2));
+        assertNull(vt.getTimestampAsTimestamp(3));
+        assertNull(vt.getTimestampAsTimestamp(4));
+        assertNull(vt.getTimestampAsTimestamp(5));
+        assertNull(vt.getTimestampAsTimestamp(6));
+        assertNull(vt.getTimestampAsTimestamp(7));
+        assertNull(vt.getTimestampAsTimestamp(8));
 
         // Test null timestamp
         cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20006, null)");
@@ -2952,15 +2808,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                         + "DATEADD(SECOND, 1, TM), DATEADD(MILLISECOND, 1, TM), "
                         + "DATEADD(MICROSECOND, 1, TM) FROM P2 WHERE ID = 20006;").getResults()[0];
         assertTrue(vt.advanceRow());
-        assertEquals(null, vt.getTimestampAsTimestamp(0));
-        assertEquals(null, vt.getTimestampAsTimestamp(1));
-        assertEquals(null, vt.getTimestampAsTimestamp(2));
-        assertEquals(null, vt.getTimestampAsTimestamp(3));
-        assertEquals(null, vt.getTimestampAsTimestamp(4));
-        assertEquals(null, vt.getTimestampAsTimestamp(5));
-        assertEquals(null, vt.getTimestampAsTimestamp(6));
-        assertEquals(null, vt.getTimestampAsTimestamp(7));
-        assertEquals(null, vt.getTimestampAsTimestamp(8));
+        assertNull(vt.getTimestampAsTimestamp(0));
+        assertNull(vt.getTimestampAsTimestamp(1));
+        assertNull(vt.getTimestampAsTimestamp(2));
+        assertNull(vt.getTimestampAsTimestamp(3));
+        assertNull(vt.getTimestampAsTimestamp(4));
+        assertNull(vt.getTimestampAsTimestamp(5));
+        assertNull(vt.getTimestampAsTimestamp(6));
+        assertNull(vt.getTimestampAsTimestamp(7));
+        assertNull(vt.getTimestampAsTimestamp(8));
 
         // Test null or illegal datepart
         boolean throwed = false;
@@ -3199,36 +3055,43 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             "PRIMARY KEY (ID) ); " +
          */
 
-       cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
+       cr = client.callProcedure("@AdHoc",
+               "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE REGEXP_POSITION(DESC, 'TEST') > 0;").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE REGEXP_POSITION(DESC, 'TEST') > 0;").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(1, vt.asScalarLong());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') > 0").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') > 0").getResults()[0];
         assertFalse(vt.advanceRow());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') > 0").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') > 0").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'ci') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'ci') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
-        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'iiccii') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'iiccii') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
         boolean expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
-            assertFalse("Expected exception for illegal regular expression in regexp_position.", true);
+            fail("Expected exception for illegal regular expression in regexp_position.");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
             assertTrue(e.getClientResponse().getStatusString().contains("Regular Expression Compilation Error: missing closing parenthesis"));
@@ -3239,7 +3102,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
-            assertFalse("Expected exception for illegal match flag in regexp_position.", true);
+            fail("Expected exception for illegal match flag in regexp_position.");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
             assertTrue(e.getClientResponse().getStatusString().contains("Illegal Match Flags"));
@@ -3336,20 +3199,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         doTestIsValidTimestamp(202, true);
 
         // How these functions might typically be used:
-        validateTableOfLongs(client,
-                "update p2 "
-                + "set tm = min_valid_timestamp() "
-                + "where tm < min_valid_timestamp()",
+        validateTableOfLongs(client, "update p2 set tm = min_valid_timestamp() where tm < min_valid_timestamp()",
                 new long[][] {{1}});
-        validateTableOfLongs(client,
-                "update p2 "
-                + "set tm = max_valid_timestamp() "
-                + "where tm > max_valid_timestamp()",
+        validateTableOfLongs(client, "update p2 set tm = max_valid_timestamp() where tm > max_valid_timestamp()",
                 new long[][] {{1}});
 
         // No more invalid timestamps
-        validateTableOfLongs(client,
-                "select * from p2 where not is_valid_timestamp(tm)",
+        validateTableOfLongs(client, "select * from p2 where not is_valid_timestamp(tm)",
                 new long[][] {});
     }
 

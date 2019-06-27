@@ -49,7 +49,7 @@ public class NonDdlBatchPlanner {
      */
     private final CatalogContext m_catalogContext;
 
-    public NonDdlBatchPlanner(NonDdlBatch batch) {
+    NonDdlBatchPlanner(NonDdlBatch batch) {
         m_batch = batch;
         m_catalogContext = VoltDB.instance().getCatalogContext();
     }
@@ -75,7 +75,6 @@ public class NonDdlBatchPlanner {
         for (final SqlTask task : m_batch) {
             try {
                 final AdHocPlannedStatement result = planTask(task);
-                // System.err.println(result.core.toString().replace("{\"ID\":", "\n{\"ID\":"));
                 if (m_batch.inferPartitioning()) {
                     // The planning tool may have optimized for the single partition case
                     // and generated a partition parameter.
@@ -103,13 +102,9 @@ public class NonDdlBatchPlanner {
             throw new PlanningErrorException(errorSummary);
         }
 
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                m_batch.getUserParameters(),
-                plannedStmts,
-                partitionParamIndex,
-                partitionParamType,
-                partitionParamValue,
-                m_batch.getUserPartitioningKeys());
+        final AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                m_batch.getUserParameters(), plannedStmts, partitionParamIndex,
+                partitionParamType, partitionParamValue, m_batch.getUserPartitioningKeys());
         if (m_batch.getContext().getLogger().isDebugEnabled()) {
             m_batch.getContext().logBatch(m_catalogContext, plannedStmtBatch, m_batch.getUserParameters());
         }
@@ -136,8 +131,7 @@ public class NonDdlBatchPlanner {
         assert(ptool != null);
         try {
             return ptool.planSqlCalcite(task);
-        } catch (PlannerFallbackException ex) {
-            // Let go the PlannerFallbackException so we can fall back to the legacy planner.
+        } catch (PlannerFallbackException ex) { // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
         } catch (Exception ex) {
             Throwable cause = ex.getCause();
@@ -146,8 +140,8 @@ public class NonDdlBatchPlanner {
             }
             throw new PlanningErrorException(ex.getMessage(), cause);
         } catch (StackOverflowError error) {
-            // TODO: This is from AdHocNTBase.compileAdHocSQL()
-            // Maybe it is not needed any more in Calcite.
+            // NOTE: This is from AdHocNTBase.compileAdHocSQL()
+            // We need it, as long as Calcite could fall back.
 
             /*
              * Overly long predicate expressions can cause a StackOverflowError in various
