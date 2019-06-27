@@ -35,7 +35,6 @@
 
 #include "common/debuglog.h"
 #include "common/ElasticHashinator.h"
-#include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
 #include "common/SynchronizedThreadLock.h"
@@ -190,8 +189,6 @@ private:
     void getStats(struct ipc_command *cmd);
 
     int8_t loadTable(struct ipc_command *cmd);
-
-    int8_t processRecoveryMessage( struct ipc_command *cmd);
 
     void tableHashCode( struct ipc_command *cmd);
 
@@ -545,9 +542,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 20:
         exportAction(cmd);
         result = kErrorCode_None;
-        break;
-      case 21:
-          result = processRecoveryMessage(cmd);
         break;
       case 22:
           tableHashCode(cmd);
@@ -1492,15 +1486,6 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
-}
-
-int8_t VoltDBIPC::processRecoveryMessage( struct ipc_command *cmd) {
-    recovery_message *recoveryMessage = (recovery_message*) cmd;
-    const int32_t messageLength = ntohl(recoveryMessage->messageLength);
-    ReferenceSerializeInputBE input(recoveryMessage->message, messageLength);
-    RecoveryProtoMsg message(&input);
-    m_engine->processRecoveryMessage(&message);
-    return kErrorCode_Success;
 }
 
 void VoltDBIPC::tableHashCode( struct ipc_command *cmd) {

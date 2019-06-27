@@ -61,7 +61,6 @@
 
 #include "common/ExecuteWithMpMemory.h"
 #include "common/FailureInjection.h"
-#include "common/RecoveryProtoMessage.h"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
@@ -1850,26 +1849,6 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor& outputStreams,
 }
 
 /**
- * Process the updates from a recovery message
- */
-void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool* pool) {
-    switch (message->msgType()) {
-    case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (isPersistentTableEmpty()) {
-            uint32_t tupleCount = message->totalTupleCount();
-            BOOST_FOREACH (auto index, m_indexes) {
-                index->ensureCapacity(tupleCount);
-            }
-        }
-        loadTuplesFromNoHeader(*message->stream(), pool);
-        break;
-    }
-    default:
-        throwFatalException("Attempted to process a recovery message of unknown type %d", message->msgType());
-    }
-}
-
-/**
  * Create a tree index on the primary key and then iterate it and hash
  * the tuple data.
  */
@@ -2046,11 +2025,6 @@ void PersistentTable::doIdleCompaction() {
 }
 
 bool PersistentTable::doForcedCompaction() {
-    if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
-            "Deferring compaction until recovery is complete.");
-        return false;
-    }
     bool hadWork1 = true;
     bool hadWork2 = true;
     int64_t notPendingCompactions = 0;

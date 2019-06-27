@@ -214,10 +214,6 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
-    }
-
-    @Override
     public long tableHashCode( int tableId) {
         throw new UnsupportedOperationException();
     }

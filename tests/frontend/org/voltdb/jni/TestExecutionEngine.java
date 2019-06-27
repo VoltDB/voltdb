@@ -34,7 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -294,124 +293,6 @@ public class TestExecutionEngine extends TestCase {
         assertTrue(loadResults.getFirst().length > 4 &&
                 Arrays.equals(loadResults.getFirst(), loadResults.getSecond()));
 
-    }
-
-    public void testStreamTables() throws Exception {
-        // Each EE needs its own thread for correct initialization.
-        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
-        final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
-        final ExecutorService es = Executors.newSingleThreadExecutor();
-        es.submit(new Runnable() {
-            @Override
-            public void run() {
-                destinationEngine.set(
-                        new ExecutionEngineJNI(
-                                CLUSTER_ID,
-                                1,
-                                1,
-                                2,
-                                NODE_ID,
-                                "",
-                                0,
-                                64*1024,
-                                100,
-                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
-            }
-        }).get();
-
-        es.execute(new Runnable() {
-            @Override
-            public void run() {
-                destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
-            }
-        });
-
-        initializeSourceEngine(2);
-
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
-
-        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
-        int STOCK_TABLEID = stockTableId(m_catalog);
-
-        loadTestTables(m_catalog);
-
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                          new SnapshotPredicates(-1).toBytes());
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                          new SnapshotPredicates(-1).toBytes());
-
-        final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
-        origin.b().clear();
-        final BBContainer container = new BBContainer(origin.b()){
-
-            @Override
-            public void discard() {
-                checkDoubleFree();
-                origin.discard();
-            }};
-        try {
-
-
-            List<BBContainer> output = new ArrayList<BBContainer>();
-            output.add(container);
-            int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
-                                                                   TableStreamType.RECOVERY,
-                                                                   output).getSecond()[0];
-            assertTrue(serialized > 0);
-            container.b().limit(serialized);
-
-            es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
-                }
-            }).get();
-
-            serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
-                                                               TableStreamType.RECOVERY,
-                                                               output).getSecond()[0];
-            assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
-
-            assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
-
-            container.b().clear();
-            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
-                                                               TableStreamType.RECOVERY,
-                                                               output).getSecond()[0];
-            assertTrue(serialized > 0);
-            container.b().limit(serialized);
-
-            es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    destinationEngine.get().processRecoveryMessage( container.b(), container.address());
-                }
-            }).get();
-
-            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
-                                                               TableStreamType.RECOVERY,
-                                                               output).getSecond()[0];
-            assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
-            assertEquals( STOCK_TABLEID, container.b().getInt());
-
-            assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
-        } finally {
-            container.discard();
-            es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        destinationEngine.get().release();
-                    }
-                    catch (EEException | InterruptedException e) {
-                    }
-                }
-            }).get();
-            terminateSourceEngine();
-            es.shutdown();
-        }
     }
 
     private int warehouseTableId(Catalog catalog) {

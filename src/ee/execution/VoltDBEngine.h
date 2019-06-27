@@ -95,7 +95,6 @@ class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
 class ExecutorVector;
 class PersistentTable;
-class RecoveryProtoMsg;
 class StreamedTable;
 class Table;
 class TableCatalogDelegate;
@@ -484,11 +483,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                          TableStreamType streamType,
                                          ReferenceSerializeInputBE& serializeIn,
                                          std::vector<int>& retPositions);
-
-        /*
-         * Apply the updates in a recovery message.
-         */
-        void processRecoveryMessage(RecoveryProtoMsg* message);
 
         /**
          * Perform an action on behalf of Export.

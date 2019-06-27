@@ -108,7 +108,6 @@
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
 #include "common/SegvException.hpp"
-#include "common/RecoveryProtoMessage.h"
 #include "common/ElasticHashinator.h"
 #include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
@@ -1211,31 +1210,6 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
         topend->crashVoltDB(e);
     }
     return NULL;
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeProcessRecoveryMessage
- * Signature: (JJII)V
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint offset, jint remaining) {
-    //ProfilerEnable();
-    VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    char *data = reinterpret_cast<char*>(buffer_ptr) + offset;
-    try {
-        if (data == NULL) {
-            throwFatalException("Failed to get byte array elements of recovery message");
-        }
-        ReferenceSerializeInputBE input(data, remaining);
-        RecoveryProtoMsg message(&input);
-        return engine->processRecoveryMessage(&message);
-    } catch (const FatalException &e) {
-        topend->crashVoltDB(e);
-    }
-    //ProfilerDisable();
 }
 
 /*

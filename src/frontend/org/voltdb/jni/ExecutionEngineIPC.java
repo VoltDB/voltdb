@@ -1646,24 +1646,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long pointer) {
-        try {
-            m_data.clear();
-            m_data.putInt(Commands.RecoveryMessage.m_id);
-            m_data.putInt(buffer.remaining());
-            m_data.put(buffer);
-
-            m_data.flip();
-            m_connection.write();
-
-            m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
     public long tableHashCode(int tableId) {
         try {
             m_data.clear();
