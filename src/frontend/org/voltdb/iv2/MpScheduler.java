@@ -183,13 +183,9 @@ public class MpScheduler extends Scheduler
                 }
             }
         }
-        // Determine if all the partition leaders are on live hosts, that is, all partitions have promoted
-        // their leaders.
-        Set<Integer> partitionLeaderHosts = CoreUtils.getHostIdsFromHSIDs(m_iv2Masters);
-        partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
 
         // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI, partitionLeaderHosts.isEmpty());
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];
     }

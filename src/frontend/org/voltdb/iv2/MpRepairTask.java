@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import org.voltcore.logging.VoltLogger;
@@ -60,15 +61,13 @@ public class MpRepairTask extends SiteTasker
     private final boolean m_leaderMigration;
 
     // Indicate if the round of leader promotion has been completed
-    private final boolean m_partitionLeaderPromotionComplete;
-    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration, boolean partitionLeaderPromotionComplete)
+    public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean leaderMigration)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
         m_leaderMigration = leaderMigration;
-        m_partitionLeaderPromotionComplete = partitionLeaderPromotionComplete;
         algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, leaderMigration);
     }
 
@@ -82,6 +81,18 @@ public class MpRepairTask extends SiteTasker
                     try {
                         algo.start().get();
                         repairLogger.info(whoami + "finished repair.");
+
+                        if (!m_leaderMigration && m_mailbox.m_messenger != null) {
+                            // Determine if all the partition leaders are on live hosts
+                            Set<Integer> partitionLeaderHosts = CoreUtils.getHostIdsFromHSIDs(m_spMasters);
+                            partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
+
+                            // At this point, all the repairs are completed. This should be the final repair task
+                            // in the repair process. Remove the mp repair blocker
+                            if (partitionLeaderHosts.isEmpty()) {
+                                VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                            }
+                        }
                     } catch (CancellationException e) {
                         repairLogger.info(whoami + "interrupted during repair.  Retrying.");
                     }
@@ -90,12 +101,6 @@ public class MpRepairTask extends SiteTasker
                     VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
                 } finally {
                     m_repairRan = true;
-
-                    // At this point, all the repairs are completed. This should be the final repair task
-                    // in the repair process. Remove the mp repair blocker
-                    if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
-                        VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
-                    }
                 }
             }
         }
