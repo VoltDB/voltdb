@@ -856,8 +856,8 @@ public class VoltDB {
                 case LICENSE: {
                     if(!m_isEnterprise)
                     {
-                        System.out.println("Community Edition does not have license files");
-                        return;
+                        System.out.println("Community Edition of VoltDB does not have license files");
+                        referToDocAndExit();
                     }else {
                         File licFH;
 
