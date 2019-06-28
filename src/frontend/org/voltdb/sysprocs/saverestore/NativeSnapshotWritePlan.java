@@ -283,7 +283,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         if (isActiveActiveDRed && table.getIsdred()) {
             VoltTable tbl;
-            if (TableType.needsShadowStream(table.getTabletype())) {
+            if (TableType.isPersistentMigrate(table.getTabletype())) {
                 tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO, CatalogUtil.MIGRATE_HIDDEN_COLUMN_INFO);
             } else {
                 tbl = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
@@ -316,7 +316,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     tbl,
                     txnId,
                     timestamp);
-        } else if (TableType.needsShadowStream(table.getTabletype())) {
+        } else if (TableType.isPersistentMigrate(table.getTabletype())) {
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
                     clusterName,
