@@ -30,6 +30,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -774,6 +775,48 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return 0;
     }
 
+    private int outputLicense(Configuration config) {
+        File licFH = new VoltFile(config.m_pathToLicense);
+
+        if (!licFH.isFile() || !licFH.canRead()) {
+            consoleLog.fatal("Failed to get license. " + licFH.getAbsolutePath());
+            return -1;
+        }
+
+        try {
+            if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
+                consoleLog.fatal("Failed to save license.xml, file already exists: " + config.m_getOutput);
+                return -1;
+            }
+            try {
+                File target = new File(config.m_getOutput);
+                InputStream is = null;
+                OutputStream os = null;
+                try {
+                    is = new FileInputStream(licFH);
+                    os = new FileOutputStream(target);
+                    byte[] buffer = new byte[1024];
+                    int length;
+                    while ((length = is.read(buffer)) > 0) {
+                        os.write(buffer, 0, length);
+                    }
+                } finally {
+                    is.close();
+                    os.close();
+                }
+            } catch (IOException e) {
+                consoleLog.fatal("Failed to copy license to " + config.m_getOutput
+                        + " : " + e.getMessage());
+                return -1;
+            }
+            consoleLog.info("license saved as " + config.m_getOutput.trim());
+        } catch (Exception e) {
+            consoleLog.fatal("Failed to get license. " + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
+            return -1;
+        }
+        return 0;
+    }
+
     @Override
     public void cli(Configuration config) {
         if (config.m_startAction != StartAction.GET) {
@@ -804,6 +847,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 break;
             case CLASSES:
                 returnStatus = outputProcedures(config);
+                break;
+            case LICENSE:
+                returnStatus = outputLicense(config);
                 break;
         }
         VoltDB.exit(returnStatus);
