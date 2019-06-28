@@ -34,6 +34,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
@@ -538,14 +539,16 @@ public class VoltZK {
     public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log)
     {
         try {
-            zk.delete(node, -1);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
+            if (!deleteZNodeWithRetries(zk, node)) {
                 if (log != null) {
-                    log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+                    log.error("Failed to remove action blocker: " + node);
                 }
-                return false;
             }
+        } catch (KeeperException e) {
+            if (log != null) {
+                log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
+            }
+            return false;
         } catch (InterruptedException e) {
             return false;
         }
@@ -553,6 +556,40 @@ public class VoltZK {
             log.info("Remove action blocker " + node + " successfully.");
         }
         return true;
+    }
+
+    public static boolean deleteZNodeWithRetries(ZooKeeper zk, String path)
+            throws InterruptedException, KeeperException {
+        final int maxCount = 5;
+        int failedCount = 0;
+        while (failedCount < maxCount) {
+          try {
+            zk.delete(path, -1);
+            return true;
+          } catch (KeeperException e) {
+              switch (e.code()) {
+              case OPERATIONTIMEOUT:
+                  failedCount++;
+                  try {
+                      Thread.sleep(100 * failedCount);
+                  } catch (InterruptedException ie) {
+                  }
+                  break;
+              default:
+                  throw e;
+              }
+          } catch (InterruptedException e) {
+              failedCount++;
+              if (failedCount == maxCount) {
+                  throw e;
+              }
+              try {
+                  Thread.sleep(100 * failedCount);
+              } catch (InterruptedException ie) {
+              }
+          }
+        }
+        return false;
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {

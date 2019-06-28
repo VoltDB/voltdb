@@ -28,7 +28,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltcore.logging.VoltLogger;
-
+import org.voltdb.VoltZK;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 //Use the mechanism similar to leader election by creating sequential ephemeral nodes.
@@ -113,9 +113,12 @@ public class ZooKeeperLock implements Watcher {
     public void releaseLock() throws IOException {
         if (m_currentPath != null) {
             try {
-                m_zk.delete(m_currentPath, -1);
+                if (!VoltZK.deleteZNodeWithRetries(m_zk, m_currentPath)) {
+                    hostLog.warn("Failed to delete ZK lock:" + m_currentPath);
+                }
                 m_currentPath = null;
             } catch (KeeperException | InterruptedException e) {
+                hostLog.warn("Failed to delete ZK lock:" + m_currentPath + " " + e.getMessage());
                 throw new IOException(e);
             }
         }
