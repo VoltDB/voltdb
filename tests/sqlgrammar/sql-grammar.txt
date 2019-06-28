@@ -124,16 +124,24 @@ table-name-w-pk-i-s-v   ::= R7 | P7
 # These tables are declared with TTL columns and/or MIGRATE targets:
 table-w-ttl-column-only ::= R21 | P21
 table-w-migrate-only    ::= R31 | P31
+table-name-w-migrate    ::= {table-w-migrate-only}
+table-name-ttl-or-migr  ::= {table-w-migrate-only} | {table-w-ttl-column-only}
+
+# These are definitions that are to be used only when running SQL grammar
+# generator with the 'pro' version of VoltDB, due to the limited number of
+# streams in 'community'
 table-w-ttl-and-migrate ::= R141 | P141
-table-name-w-ttl-col    ::= {table-w-ttl-column-only} | {table-w-ttl-and-migrate}
-table-name-w-migrate    ::= {table-w-migrate-only}    | {table-w-ttl-and-migrate}
-table-name-ttl-or-migr  ::= {table-w-ttl-column-only} | {table-w-migrate-only} | \
-                            {table-w-ttl-and-migrate}
+pro-table-name-w-migrate::= {table-w-migrate-only} | {table-w-ttl-and-migrate}
+pro-tbl-name-ttl-or-migr::= {table-w-ttl-column-only} | {pro-table-name-w-migrate}
+
+# Stream names are also only to be used only when running SQL grammar generator
+# with the 'pro' version of VoltDB; so they're set to something else, otherwise
+stream-name             ::= {ddl-table-name}
+pro-stream-name         ::= S100
 
 # MIGRATE (DML) statements will usually use a table with a declared MIGRATE
 # target; but occasionally will use a regular, non-MIGRATE table, which is
 # invalid, so it should return a reasonable error message but not crash
-ttl-table-name          ::= {table-name-w-ttl-col} 19| {table-or-view-name}
 migrate-table-name      ::= {table-name-w-migrate} 19| {table-or-view-name}
 
 # Only identical tables (including indexes) without views can be swapped;
@@ -149,9 +157,9 @@ swappable-tables        ::= R11[,] R12 | P11[,] P12 | R13[,] R14 | P13[,] P14 | 
                             'R12'[,] 'R11' | 'P12'[,] 'P11' | 'R14'[,] 'R13' | 'P14'[,] 'P13' | \
                             {table-name}[,] {table-name} | '{table-name}'[,] '{table-name}'
 
-legit-table-name        ::= {ddl-table-name} 5| {table-name-ttl-or-migr} 5| \
-                            {table-name-w-no-pk} | \
-                            {table-name-w-pk-int}    4| {table-name-w-pk-str} | \
+legit-table-name        ::= {ddl-table-name}         5| {stream-name} | \
+                            {table-name-ttl-or-migr} 5| {table-name-w-no-pk}      | \
+                            {table-name-w-pk-int}    4| {table-name-w-pk-str}     | \
                             {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
                             {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
 
@@ -328,11 +336,6 @@ sub-query-set           ::= {sub-query} [AS ]{table-alias:t1} 6| \
                             {sub-query} [AS ]{table-alias:t5}
 
 # Same as above, but for tables created with TTL and/or MIGRATE clauses
-ttl-table-name-set      ::= {ttl-table-name:t1} 6| \
-                            {ttl-table-name:t2} 6| \
-                            {ttl-table-name:t3} 3| \
-                            {ttl-table-name:t4} 2| \
-                            {ttl-table-name:t5}
 migrate-table-name-set  ::= {migrate-table-name:t1} 6| \
                             {migrate-table-name:t2} 6| \
                             {migrate-table-name:t3} 3| \

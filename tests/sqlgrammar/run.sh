@@ -68,7 +68,7 @@ function build() {
 function build-pro() {
     echo -e "\n$0 performing: build-pro $BUILD_ARGS"
     test-tools-build-pro $BUILD_ARGS
-    # Same as for 'community' VoltDB, for now
+    # For now, the same deployment file is used for 'community' and 'pro'
     DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     code[0]=$code_tt_build
 }
@@ -182,8 +182,8 @@ function server() {
 function server-pro() {
     echo -e "\n$0 performing: server-pro"
     test-tools-server-pro
-    # Same as for 'community' VoltDB, for now
-    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deploy_pro.xml
+    # For now, the same deployment file is used for 'community' and 'pro'
+    DEPLOYMENT_FILE=$SQLGRAMMAR_DIR/deployment.xml
     code[3]=${code_tt_server}
 }
 
@@ -232,6 +232,31 @@ function ddl-if-needed() {
     fi
 }
 
+# Load the extra SQL-grammar-gen schema needed for a 'pro' build and tests,
+# after the regular ones needed for 'community'
+function ddl-pro() {
+    ddl-if-needed
+
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $SQLGRAMMAR_DIR/DDL-pro.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < $SQLGRAMMAR_DIR/DDL-pro.sql
+    code4e=$?
+
+    # Reset the default value of the args to pass to SQL-grammar-gen, to include
+    # the values in sql-grammar-pro.txt, which are intended to be used only with
+    # the 'pro' version of VoltDB, and with DDL-pro.sql
+    DEFAULT_ARGS="$DEFAULT_ARGS --grammar=sql-grammar.txt,sql-grammar-pro.txt"
+
+    code[4]=$((${code[4]}|$code4e))
+}
+
+# Load the 'pro' schema and procedures (in sqlcmd), only if not loaded already
+function ddl-pro-if-needed() {
+    # TODO: find a more reliable test of whether 'ddl-pro' has been loaded
+    if [[ -z "${code[4]}" ]]; then
+        ddl-pro
+    fi
+}
+
 # Run everything you need to before running the SQL-grammar-generator tests,
 # using a 'community', open-source build, without actually running them;
 # provides a "fresh start", i.e., re-builds the latest versions of VoltDB
@@ -256,7 +281,7 @@ function prepare-pro() {
     debug
     jars
     server-pro
-    ddl
+    ddl-pro
 }
 
 # Run the SQL-grammar-generator tests, only, on the assumption that 'prepare'
@@ -275,6 +300,14 @@ function tests-only() {
 function tests() {
     server-if-needed
     ddl-if-needed
+    tests-only
+}
+
+# Run the SQL-grammar-generator tests, with the usual prerequisites
+function tests-pro() {
+    server-pro-if-needed
+    ddl-pro-if-needed
+    echo -e "\n$0 performing: tests-pro$ARGS"
     tests-only
 }
 
@@ -337,8 +370,8 @@ function tests-help() {
 
 # Print a simple help message, describing the options for this script
 function help() {
-    echo -e "\nUsage: ./run.sh {build[-pro]|init|debug|jars|server[-pro]|ddl|prepare[-pro]|"
-    echo -e "  tests-only|tests|shutdown|all[-pro]|tests-help|test-tools-help|help}\n"
+    echo -e "\nUsage: ./run.sh {build[-pro]|init|debug|jars|server[-pro]|ddl[-pro]|prepare[-pro]|"
+    echo -e "  tests-only|tests[-pro]|shutdown|all[-pro]|tests-help|test-tools-help|help}\n"
     echo -e "This script is used to run the SQL-grammar-generator tests, and the various things that"
     echo -e "  go with them, e.g., building and running a VoltDB server, or shutting it down afterward."
     echo -e "Options:"
@@ -349,7 +382,8 @@ function help() {
     echo -e "    jars            : creates the (Java) .jar files needed by the tests"
     echo -e "    server          : starts a VoltDB server ('community', open-source version)"
     echo -e "    server-pro      : starts a VoltDB server ('pro' version)"
-    echo -e "    ddl             : runs (in sqlcmd) the DDL (.sql) files needed by the tests"
+    echo -e "    ddl             : runs (in sqlcmd) the DDL (.sql) files needed by the ('community') tests"
+    echo -e "    ddl-pro         : runs (in sqlcmd) the DDL (.sql) files needed by the ('pro') tests"
     echo -e "    prepare         : runs (almost) all of the above, except the '-pro' options"
     echo -e "    prepare-pro     : runs (almost) all of the above, using the '-pro' options"
     echo -e "    tests-only      : runs only the tests, on the assumption that 'prepare' has been run"
@@ -362,7 +396,7 @@ function help() {
     echo -e "    help            : prints this message"
     echo -e "The 'tests-only', 'tests', and 'all' options accept arguments: see the 'tests-help' option for details."
     echo -e "The 'build[-pro]', options accept VoltDB build arguments, e.g. '-Dbuild=debug'."
-    echo -e "Some options (build[-pro], init, jars, server[-pro], ddl) may have '-if-needed' appended,"
+    echo -e "Some options (build[-pro], init, jars, server[-pro], ddl[-pro]) may have '-if-needed' appended,"
     echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
     PRINT_ERROR_CODE=0
@@ -394,7 +428,7 @@ function exit-with-code() {
             echo -e "\ncode3a code3b: $code_voltdb_init $code_voltdb_start (server-init, server-start)"
         fi
         if [[ "${code[4]}" -ne "0" ]]; then
-            echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d (grammar-ddl, UDF-drop, UDF-load, UDF-ddl)"
+            echo -e "\ncode4a code4b code4c code4d: $code4a $code4b $code4c $code4d $code4e (grammar-ddl, UDF-drop, UDF-load, UDF-ddl, grammar-pro)"
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
     fi
@@ -420,7 +454,7 @@ BUILD_ARGS=
 while [[ -n "$1" ]]; do
     CMD="$1"
     ARGS=
-    if [[ "$1" == build* || "$1" == "tests" || "$1" == "tests-only" ||
+    if [[ "$1" == build*     || "$1" == tests* ||
           "$1" == "shutdown" || "$1" == all* ]]; then
         while [[ "$2" == -* ]]; do
             if [[ "$2" == --suffix=* ]]; then

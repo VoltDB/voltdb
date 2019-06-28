@@ -831,9 +831,6 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     # separately
     sql_statement_count = sql.count(';')
     if sql_statement_count > 1:
-        print 'TEMP DEBUG: In print_sql_statement:'
-        print 'TEMP DEBUG:   sql:\n', str(sql)
-        print 'TEMP DEBUG:   sql_statement_count :', str(sql_statement_count)
         start_index = 0
         for i in range(sql_statement_count):
             end_index = sql.find(';', start_index)
@@ -844,12 +841,9 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 print '         i                  :', str(i)
                 print '         start_index        :', str(start_index)
                 print '         end_index          :', str(end_index)
+                print '         sql[start_index:]  :\n', str(sql[start_index:])
                 break
             sql_substring = sql[start_index:end_index].strip() + ';'
-            print 'TEMP DEBUG:   i            :', str(i)
-            print 'TEMP DEBUG:   start_index  :', str(start_index)
-            print 'TEMP DEBUG:   end_index    :', str(end_index)
-            print 'TEMP DEBUG:   sql_substring\n:', str(sql_substring)
             print_sql_statement(sql_substring, num_chars_in_sql_type)
             start_index = end_index + 1
         return
@@ -1084,17 +1078,9 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
     global max_time, debug, grammar
     global count_sql_statements, sql_output_file, sqlcmd_output_file
 
-    print 'TEMP DEBUG: In generate_sql_statements:'
-    print 'TEMP DEBUG:   sql_statement_type      :', str(sql_statement_type)
-    print 'TEMP DEBUG:   num_sql_statements      :', str(num_sql_statements)
-    print 'TEMP DEBUG:   max_save_statements     :', str(max_save_statements)
-    print 'TEMP DEBUG:   delete_statement_type   :', str(delete_statement_type)
-    print 'TEMP DEBUG:   delete_statement_number :', str(delete_statement_number)
-
     # A negative number of SQL statements means to run until the time limit is reached
     if num_sql_statements < 0:
         num_sql_statements = sys.maxsize
-        print 'TEMP DEBUG:   num_sql_statements(2)   :', str(num_sql_statements)
 
     count = 0
     # Include any initial statements (e.g. INSERT) in the total count
@@ -1426,13 +1412,8 @@ if __name__ == "__main__":
     count_sql_statements = {}
     if options.initial_number:
         total_initial_statement_count = 0
-        print 'TEMP DEBUG: initial_number    :', str(options.initial_number)
-        print 'TEMP DEBUG: initial_type      :', str(options.initial_type)
         for sql_statement_type in options.initial_type.split(','):
             total_initial_statement_count += int(options.initial_number)
-            print 'TEMP DEBUG: sql_statement_type:', str(sql_statement_type)
-            print 'TEMP DEBUG: initial_number    :', str(int(options.initial_number))
-            print 'TEMP DEBUG: total_initial_statement_count:', str(int(total_initial_statement_count))
             generate_sql_statements(sql_statement_type, int(total_initial_statement_count))
     for sql_statement_type in options.type.split(','):
         generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
