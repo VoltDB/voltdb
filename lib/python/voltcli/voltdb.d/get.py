@@ -23,7 +23,7 @@ get_resource_help = ('Supported configuration resources for get command are \'cl
                      '           classes    - gets procedure classes of current node\n'
                      '           deployment - gets deployment configuration of current node\n'
                      '           schema     - gets schema of current node\n'
-                     '           license     - gets license of current node\n')						 
+                     '           license     - gets license of current node\n')
 output_help = ('Specifies the path and file name for the output file. Defaults are: '
                'Deployment - deployment.xml;\r\n'
                'Schema - schema.sql;\r\n'
