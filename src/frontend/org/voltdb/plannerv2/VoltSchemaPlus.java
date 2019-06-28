@@ -17,9 +17,11 @@
 
 package org.voltdb.plannerv2;
 
+import java.util.Map;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.plannerv2.sqlfunctions.VoltSqlFunctions;
 
@@ -55,9 +57,13 @@ public class VoltSchemaPlus {
         });
 
         // add Volt extend SQL functions to the SchemaPlus
-        VoltSqlFunctions.VOLT_SQL_FUNCTIONS.forEach(functionPair -> {
-            schema.add(functionPair.getFirst().toUpperCase(), ScalarFunctionImpl.create(functionPair.getSecond(),"eval"));
-        });
+        for (Map.Entry<String, Pair<Class, Class[]>> function :
+                VoltSqlFunctions.VOLT_SQL_FUNCTIONS.entries()) {
+            schema.add(function.getKey().toUpperCase(),
+                    ScalarFunctionImpl.create(function.getValue().getFirst(),
+                                              function.getKey(),
+                                              function.getValue().getSecond()));
+        }
 
         return schema;
     }

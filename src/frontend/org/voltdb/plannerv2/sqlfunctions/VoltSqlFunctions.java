@@ -17,7 +17,7 @@
 
 package org.voltdb.plannerv2.sqlfunctions;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import org.voltcore.utils.Pair;
 
 /**
@@ -35,9 +35,11 @@ import org.voltcore.utils.Pair;
  * @since 9.1
  */
 public class VoltSqlFunctions {
-    // the name, class pair of volt extend sql functions
-    public static final ImmutableList<Pair<String, Class<?>>> VOLT_SQL_FUNCTIONS =
-            ImmutableList.of(Pair.of("MIGRATING", Migrating.class));
+    // The map from method name to an ImmutableList of classes for registering
+    // volt extend sql functions. The first class in the list implements the method,
+    // the classes that follow are argument types.
+    public static final ImmutableMultimap<String, Pair<Class, Class []>> VOLT_SQL_FUNCTIONS =
+            ImmutableMultimap.of("migrating", Pair.of(Migrating.class, new Class []{}));
 
     //-------------------------------------------------------------
     //                   volt extend sql functions
@@ -45,7 +47,7 @@ public class VoltSqlFunctions {
 
     // MIGRATING() function
     public static class Migrating {
-        public static boolean eval() {
+        public static boolean migrating() {
             // we only need the sql function in validate&plan phase, and the return value doesn't matter.
             // Calcite won't evaluate the function during planning
             return true;
