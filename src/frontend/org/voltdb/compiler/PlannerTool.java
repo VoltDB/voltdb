@@ -332,7 +332,6 @@ public class PlannerTool {
 
             // check L2 cache is hit or miss
             VoltPlanner planner = new VoltPlanner(m_schemaPlus);
-            planner.validate(node);
             AdHocPlannedStatement ahps = null;
             ParameterizedSqlTask ptask = new ParameterizedSqlTask(task);
             String parameterizedQuery = ptask.getParsedQuery().toString();
@@ -347,6 +346,7 @@ public class PlannerTool {
                 //////////////////////
                 // PLAN THE STMT
                 //////////////////////
+                planner.validate(node);
                 CompiledPlan plan = getCompiledPlanCalcite(planner, m_schemaPlus, node);
                 plan.sql = task.getSQL();
                 CorePlan core = new CorePlan(plan, m_catalogHash);
