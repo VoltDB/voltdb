@@ -1270,7 +1270,7 @@ JAVA COMPILATION
     <envdefault prop='plan_with_calcite' var='plan_with_calcite' default='${plan_with_calcite}' />
 </target>
 
-<target name="compile_core" depends="compile_client, using_calcite" >
+<target name="compile_core" depends="compile_client, using_calcite">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
@@ -1462,10 +1462,8 @@ NATIVE EE STUFF
 </target>
 
 <!-- Build the jni library. -->
-<target name='jnicompile'
-    depends='compile, jnicompile_temp, uptodate_jni_h.check'
-    description="Build C++ JNI library."
-    unless='uptodate_jni_h'>
+<target name='jnicompile' depends='compile, jnicompile_temp, uptodate_jni_h.check'
+    description="Build C++ JNI library." unless='uptodate_jni_h'>
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
     <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
     <delete file="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h" />
@@ -1512,8 +1510,7 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='voltdbipc'
-        depends='ee'
+<target name='voltdbipc' depends='ee'
         description='Make the voltdbipc binary.  Actually ee does this, but this is for Jenkins compatibility.' />
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
@@ -1739,12 +1736,7 @@ TEST CASES
             <!-- write per-testcase output to testoutput folder -->
             <formatter type="plain" usefile="true" />
             <!-- write all kinds of fun voltdb output to testoutput folder -->
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
+            <formatter type='xml' classname="org.voltdb.VoltJUnitFormatter" usefile='false' extension="none" />
             <!-- write xml output for the report  -->
             <formatter type="xml" />
 
@@ -2026,17 +2018,14 @@ TEST CASES
     </jacoco:report>
 </target>
 
-<target
-    name='testability-report'
-    depends="voltdbthin.jar"
+<target name='testability-report' depends="voltdbthin.jar"
     description="produce Google Code testability-explorer report">
     <path id="testability.lib">
         <pathelement location="${vendor.lib.dir}/ant-testability-explorer.jar" />
         <pathelement location="${vendor.lib.dir}/testability-explorer.jar" />
     </path>
     <taskdef name="testability" classname="com.google.ant.TestabilityTask" classpathref="testability.lib" />
-    <testability
-        resultfile="${build.dir}/testability.result.html" print="html"
+    <testability resultfile="${build.dir}/testability.result.html" print="html"
         errorfile="${build.dir}/testability.err.txt">
         <classpath>
             <fileset dir="${build.prod.dir}">
@@ -2054,11 +2043,8 @@ TEST CASES
         <attribute name="format"/>
         <sequential>
             <echo>@{language} @{srcdir} @{format}</echo>
-            <cpdtask
-                minimumTokenCount="100"
-                outputFile="${build.dir}/cpd-@{language}.@{format}"
-                language="@{language}"
-                format="@{format}">
+            <cpdtask minimumTokenCount="100" outputFile="${build.dir}/cpd-@{language}.@{format}"
+                language="@{language}" format="@{format}">
                 <fileset dir="@{srcdir}">
                     <include name="**/*.@{language}"/>
                     <exclude name="**/pmsg/*.@{language}"/>
@@ -2076,7 +2062,6 @@ TEST CASES
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
 <target name="junitclass" description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)" depends='using_calcite'>
-
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
