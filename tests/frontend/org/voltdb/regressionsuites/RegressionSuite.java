@@ -97,7 +97,7 @@ public class RegressionSuite extends TestCase {
      * the actual parser/planner being in use. Eventually when we fully integrate with Calcite and replace our
      * legacy planner, we don't need to take branches on those test logic.
      */
-    final boolean m_usingCalcite = Boolean.parseBoolean(System.getProperty("PLAN_WITH_CALCITE", "false"));
+    final boolean m_usingCalcite = Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false"));
 
     /**
      * Trivial constructor that passes parameter on to superclass.

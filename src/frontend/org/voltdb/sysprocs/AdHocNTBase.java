@@ -71,7 +71,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
     private final boolean m_usingCalcite =
-            Boolean.parseBoolean(System.getProperty("PLAN_WITH_CALCITE", "false"));
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false"));
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
     private final boolean m_isConfiguredForNonVoltDBBackend =
@@ -87,6 +87,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     // call runInternal() method.
     abstract public CompletableFuture<ClientResponse> run(ParameterSet params);
     protected CompletableFuture<ClientResponse> runInternal(ParameterSet params) {
+        //System.err.println("Calcite mode ? " + m_usingCalcite);
         if (m_usingCalcite) {
             try {
                 return runUsingCalcite(params);

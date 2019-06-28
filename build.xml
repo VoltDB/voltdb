@@ -23,14 +23,8 @@
     <attribute name="excludes" default=""/>
     <attribute name="includes" default=""/>
     <sequential>
-        <javac
-            srcdir="@{srcdir}"
-            destdir="@{destdir}"
-            excludes="@{excludes}"
-            includes="@{includes}"
-            encoding='UTF-8'
-            debug='true'
-            includeAntRuntime='false'>
+        <javac srcdir="@{srcdir}" destdir="@{destdir}" excludes="@{excludes}" includes="@{includes}"
+            encoding='UTF-8' debug='true' includeAntRuntime='false'>
             <compilerarg if:set="use_jacoco" value="-g:lines"/>
             <classpath refid="project.classpath" />
         </javac>
@@ -57,7 +51,6 @@
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
-<envdefault prop="calcite" var="calcite" default="false" />
 
 <!-- enable code coverage for JUnit's if USE_JACOCO in environment-->
 <condition property="use_jacoco" value="true">
@@ -459,10 +452,9 @@ PRIMARY ENTRY POINTS
 ***************************************
 -->
 
-<target name="default"
-    depends="compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
-    description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
-/>
+<target name="default" depends="compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
+    description="Compile Java classes and C++ JNI library and minify the javascript artifacts."/>
+
 <target name="check"
     depends="licensecheck, default, ee"
     description="Run Java and C++ JNI testcases." >
@@ -482,8 +474,8 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
-<target name="check_noclustering"
-    depends="licensecheck, compile, ee"
+
+<target name="check_noclustering" depends="licensecheck, compile, ee"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -500,8 +492,8 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
-<target name="check_quick"
-    depends="compile, ee"
+
+<target name="check_quick" depends="compile, ee"
     description="Run a subset of Java testcases and test fragments." >
     <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
         <isset property="timeoutLength"/>
@@ -518,8 +510,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 
-<target name="check_sql"
-    depends="licensecheck, compile, ee, eecheck"
+<target name="check_sql" depends="licensecheck, compile, ee, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
@@ -554,27 +545,18 @@ PRIMARY ENTRY POINTS
     <condition property="set_port" value="-p ${port}" else="">
         <isset property="port"/>
     </condition>
-    <exec executable="tools/killstragglers.sh"
-          failonerror="true" timeout="180000">
+    <exec executable="tools/killstragglers.sh" failonerror="true" timeout="180000">
         <arg value="${set_port}" />
     </exec>
 </target>
 
-<target name="all"
-    depends="compile, ee, junit, eecheck, javadoc, jars, bindoc"
-    description="Do all tasks."
-/>
-<target name="jars"
-    depends="voltdb.jar, voltdbfat.jar, voltdbclient.jar, importbundles"
-    description="Create production JAR files."
-/>
-<target name="dist"
-    depends="dist_client, dist_internal"
-    description="Create VoltDB release packages with examples and documentation."
-/>
+<target name="all" depends="compile, ee, junit, eecheck, javadoc, jars, bindoc" description="Do all tasks." />
+<target name="jars" depends="voltdb.jar, voltdbfat.jar, voltdbclient.jar, importbundles"
+    description="Create production JAR files." />
+<target name="dist" depends="dist_client, dist_internal"
+    description="Create VoltDB release packages with examples and documentation." />
 
-<target name="bindoc" depends="buildinfo"
-        description="Generate README for certain bin programs.">
+<target name="bindoc" depends="buildinfo" description="Generate README for certain bin programs.">
     <exec executable="/bin/sh">
         <arg value="-c" />
         <arg value="${base.dir}/bin/voltadmin help &gt; ${base.dir}/README.voltadmin" />
@@ -590,15 +572,8 @@ DISTRIBUTION
 <target name="javadoc">
     <echo message="Building Stored Procedure JavaDoc"/>
     <!-- populate selected server/compiler javadoc documentation -->
-    <javadoc
-        destdir="doc/javadoc/procedure-api"
-        Public="true"
-        version="true"
-        use="true"
-        failonerror="true"
-        additionalparam="-quiet"
-        Overview='${src.gpl.dir}/overview-public.html'
-        Windowtitle='VoltDB Server APIs'>
+    <javadoc destdir="doc/javadoc/procedure-api" Public="true" version="true" use="true"
+        failonerror="true" additionalparam="-quiet" Overview='${src.gpl.dir}/overview-public.html' Windowtitle='VoltDB Server APIs'>
         <link href="${j2se_api}"/>
         <classpath refid='project.classpath' />
         <fileset dir="." defaultexcludes="yes">
@@ -1093,10 +1068,7 @@ JAR BUILDING
                 <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
-                <attribute
-                    name="Title"
-                    value="VoltDB compiler, server, and client interface libraries"
-                />
+                <attribute name="Title" value="VoltDB compiler, server, and client interface libraries" />
                 <attribute name="Date" value="${TODAY}" />
             </section>
         </manifest>
@@ -1134,10 +1106,7 @@ JAR BUILDING
                 <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
-                <attribute
-                    name="Title"
-                    value="VoltDB Stored Procedure JavaDoc"
-                />
+                <attribute name="Title" value="VoltDB Stored Procedure JavaDoc" />
                 <attribute name="Date" value="${TODAY}" />
             </section>
         </manifest>
@@ -1171,10 +1140,7 @@ JAR BUILDING
 	                <attribute name="Author" value="VoltDB Inc." />
 	            </section>
 	            <section name="Shared">
-	                <attribute
-	                    name="Title"
-	                    value="VoltDB Database Sources"
-	                />
+	                <attribute name="Title" value="VoltDB Database Sources" />
 	                <attribute name="Date" value="${TODAY}" />
 	            </section>
 	        </manifest>
@@ -1233,10 +1199,7 @@ JAR BUILDING
                 <attribute name="Author" value="VoltDB Inc." />
             </section>
             <section name="Shared">
-                <attribute
-                    name="Title"
-                    value="VoltDB compiler, server, client and test libraries"
-                />
+                <attribute name="Title" value="VoltDB compiler, server, client and test libraries" />
                 <attribute name="Date" value="${TODAY}" />
             </section>
         </manifest>
@@ -1297,15 +1260,23 @@ JAVA COMPILATION
    <echo message="Calcite jar refreshed." />
 </target>
 
-<target name="compile_core" depends="compile_client" >
+<target name='using_calcite'>
+    <exec executable="awk" failonerror="false" resultproperty="using_calcite">
+        <arg value='BEGIN{ while(("git branch --no-color" | getline) > 0) { if (match($0, "* .*calcite-")) exit 0} exit 1}'/>
+    </exec>
+    <condition property='plan_with_calcite'>
+        <equals arg1='${using_calcite}' arg2='0'/>
+    </condition>
+    <envdefault prop='plan_with_calcite' var='plan_with_calcite' default='${plan_with_calcite}' />
+</target>
+
+<target name="compile_core" depends="compile_client, using_calcite" >
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
     <mkdir dir='${build.testfunc.dir}' />
-    <exec
-        dir='${src.gpl.dir}/org/voltdb/utils'
-        executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
-        failonerror='true' />
+
+    <exec dir='${src.gpl.dir}/org/voltdb/utils' executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py' failonerror='true' />
     <depend
         srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${src.testfunc.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}:${build.testfunc.dir}"
@@ -1498,36 +1469,18 @@ NATIVE EE STUFF
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
     <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
     <delete file="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h" />
-    <move
-        file='${build.dir}/org_voltdb_jni_ExecutionEngine.h'
-        todir='${src.ee.dir}'
-    />
-    <move
-        file='${build.dir}/org_voltcore_utils_DBBPool.h'
-        todir='${src.ee.dir}'
-    />
-    <move
-        file='${build.dir}/org_voltdb_utils_PosixAdvise.h'
-        todir='${src.ee.dir}'
-    />
+    <move file='${build.dir}/org_voltdb_jni_ExecutionEngine.h' todir='${src.ee.dir}' />
+    <move file='${build.dir}/org_voltcore_utils_DBBPool.h' todir='${src.ee.dir}' />
+    <move file='${build.dir}/org_voltdb_utils_PosixAdvise.h' todir='${src.ee.dir}' />
 </target>
 
 
 <target name='uptodate_jni_h.check' depends='jnicompile_temp'>
     <condition property='uptodate_jni_h'>
         <and>
-            <filesmatch
-                file1="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h"
-                file2="${build.dir}/org_voltdb_jni_ExecutionEngine.h"
-            />
-            <filesmatch
-                file1="${src.ee.dir}/org_voltcore_utils_DBBPool.h"
-                file2="${build.dir}/org_voltcore_utils_DBBPool.h"
-            />
-            <filesmatch
-                file1="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h"
-                file2="${build.dir}/org_voltdb_utils_PosixAdvise.h"
-            />
+            <filesmatch file1="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" file2="${build.dir}/org_voltdb_jni_ExecutionEngine.h" />
+            <filesmatch file1="${src.ee.dir}/org_voltcore_utils_DBBPool.h" file2="${build.dir}/org_voltcore_utils_DBBPool.h" />
+            <filesmatch file1="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h" file2="${build.dir}/org_voltdb_utils_PosixAdvise.h" />
         </and>
     </condition>
 </target>
@@ -1536,27 +1489,9 @@ NATIVE EE STUFF
     <delete file="${build.dir}/org_voltdb_jni_ExecutionEngine.h"/>
     <delete file="${build.dir}/org_voltcore_utils_DBBPool.h" />
     <delete file="${build.dir}/org_voltdb_utils_PosixAdvise.h" />
-    <javah
-        classpathref="project.classpath"
-        force="yes"
-        verbose="yes"
-        class="org.voltdb.jni.ExecutionEngine"
-        destdir="${build.dir}"
-    />
-    <javah
-        classpathref="project.classpath"
-        force="yes"
-        verbose="yes"
-        class="org.voltcore.utils.DBBPool"
-        destdir="${build.dir}"
-    />
-    <javah
-        classpathref="project.classpath"
-        force="yes"
-        verbose="yes"
-        class="org.voltdb.utils.PosixAdvise"
-        destdir="${build.dir}"
-    />
+    <javah classpathref="project.classpath" force="yes" verbose="yes" class="org.voltdb.jni.ExecutionEngine" destdir="${build.dir}" />
+    <javah classpathref="project.classpath" force="yes" verbose="yes" class="org.voltcore.utils.DBBPool" destdir="${build.dir}" />
+    <javah classpathref="project.classpath" force="yes" verbose="yes" class="org.voltdb.utils.PosixAdvise" destdir="${build.dir}" />
 </target>
 
 <target name='eeconfig' depends='catalog, jnicompile, buildinfo'
@@ -1762,8 +1697,7 @@ TEST CASES
             printsummary="false"
             timeout="${junit.timeout}"
             maxmemory='2048M'
-            showoutput="${junit.showoutput}"
-        >
+            showoutput="${junit.showoutput}">
             <classpath refid='project.classpath' />
             <jvmarg value="-server" />
             <!-- Following option is commented out because
@@ -1798,7 +1732,7 @@ TEST CASES
             <jvmarg value="-Dtestcount=${testcount}" />
             <jvmarg value="-Drun.flaky.tests=${run.flaky.tests}" />
             <jvmarg value="-Drun.flaky.tests.debug=${run.flaky.tests.debug}" />
-            <jvmarg value="-DPLAN_WITH_CALCITE=${calcite}" />
+            <jvmarg value="-Dplan_with_calcite=${plan_with_calcite}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>
@@ -1837,8 +1771,7 @@ TEST CASES
     </sequential>
 </target>
 
-<target name="junit"
-    description="Execute JUnit test suites.">
+<target name="junit" description="Execute JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1848,10 +1781,10 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_sql"
-    description="Execute JUnit test suites stressing sql functionality vs. process architecture.">
+<target name="junit_sql" description="Execute JUnit test suites stressing sql functionality vs. process architecture." depends='using_calcite'>
     <run_junit>
         <tests>
+            <jvmarg value="-Dplan_with_calcite=${plan_with_calcite}" />
             <fileset dir='${build.test.dir}'>
                 <!-- Standard junit fileset -->
                 <patternset refid="junit.all.path" />
@@ -1883,8 +1816,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_regression"
-    description="Execute JUnit regression test suites.">
+<target name="junit_regression" description="Execute JUnit regression test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1895,8 +1827,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_regression_h1"
-    description="Execute first half of JUnit regression test suites.">
+<target name="junit_regression_h1" description="Execute first half of JUnit regression test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1906,8 +1837,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_regression_h2"
-    description="Execute second half of JUnit regression test suites.">
+<target name="junit_regression_h2" description="Execute second half of JUnit regression test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1917,8 +1847,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_other"
-    description="Execute JUnit test suites except regression tests.">
+<target name="junit_other" description="Execute JUnit test suites except regression tests.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1933,8 +1862,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_other_p1"
-    description="Execute part 1 of other JUnit test suites.">
+<target name="junit_other_p1" description="Execute part 1 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1944,8 +1872,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_other_p2"
-    description="Execute part 2 of other JUnit test suites.">
+<target name="junit_other_p2" description="Execute part 2 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1955,8 +1882,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_other_p3"
-    description="Execute part 3 of other JUnit test suites.">
+<target name="junit_other_p3" description="Execute part 3 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -2010,11 +1936,7 @@ TEST CASES
                 <include name="TEST-*.xml" />
             </fileset>
             <report format="noframes" todir="${build.testoutput.dir}/report"/>
-            <report
-                styledir="tools"
-                format="noframes"
-                todir="${build.testoutput.dir}"
-            />
+            <report styledir="tools" format="noframes" todir="${build.testoutput.dir}" />
         </junitreport>
 
         <exec dir="${build.testoutput.dir}" executable='cat'>
@@ -2109,18 +2031,10 @@ TEST CASES
     depends="voltdbthin.jar"
     description="produce Google Code testability-explorer report">
     <path id="testability.lib">
-        <pathelement
-            location="${vendor.lib.dir}/ant-testability-explorer.jar"
-        />
-        <pathelement
-            location="${vendor.lib.dir}/testability-explorer.jar"
-        />
+        <pathelement location="${vendor.lib.dir}/ant-testability-explorer.jar" />
+        <pathelement location="${vendor.lib.dir}/testability-explorer.jar" />
     </path>
-    <taskdef
-        name="testability"
-        classname="com.google.ant.TestabilityTask"
-        classpathref="testability.lib"
-    />
+    <taskdef name="testability" classname="com.google.ant.TestabilityTask" classpathref="testability.lib" />
     <testability
         resultfile="${build.dir}/testability.result.html" print="html"
         errorfile="${build.dir}/testability.err.txt">
@@ -2133,11 +2047,7 @@ TEST CASES
 </target>
 
 <target name="cpd">
-    <taskdef
-        name="cpdtask"
-        classname="net.sourceforge.pmd.cpd.CPDTask"
-        classpath="${vendor.lib.dir}/pmd-4.2.5.jar"
-    />
+    <taskdef name="cpdtask" classname="net.sourceforge.pmd.cpd.CPDTask" classpath="${vendor.lib.dir}/pmd-4.2.5.jar" />
     <macrodef name="cpd">
         <attribute name="language"/>
         <attribute name="srcdir"/>
@@ -2165,8 +2075,7 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name="junitclass"
-    description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
+<target name="junitclass" description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)" depends='using_calcite'>
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
