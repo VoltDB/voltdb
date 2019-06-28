@@ -987,11 +987,11 @@ tr:hover{
             if attachments:
                 try:
                     new_attachments = self.add_attachments(jira, new_issue.id, attachments)
-                    with_attachments = ', with attachment(s)' + ' (with ID ' + ', '.join(
+                    with_attachments = ', with attachment' + ' (ID ' + ', '.join(
                         new_attachments[i].id for i in range(len(new_attachments)) ) + ')'
                 except Exception as e:
-                    with_attachments = ', without specified attachment(s)'
-                    logging.warn("Unable (in create_jira_bug_ticket) to add attachments:"
+                    with_attachments = ', without specified attachment'
+                    logging.warn("Unable (in create_jira_bug_ticket) to add attachment(s):"
                                  "\n    '%s'\n  due to Exception:\n    %s"
                                  % (str(attachments), str(e)) )
 
@@ -1129,9 +1129,11 @@ tr:hover{
             # update it with email notification (which is the default)
             exception = None
             exception_count = 0
+            with_attachments = ''
             for notification in [False, True]:
                 try:
                     if notification:
+                        with_attachments = ' (notify=True)'
                         ticket_to_modify.update(fields={'summary'    : summary,
                                                         'description': description,
                                                         'labels'     : labels,
@@ -1139,6 +1141,7 @@ tr:hover{
                                                         }
                                                 )
                     else:
+                        with_attachments = ' (notify=False)'
                         ticket_to_modify.update(notify=False,
                                                 fields={'summary'    : summary,
                                                         'description': description,
@@ -1172,15 +1175,14 @@ tr:hover{
                 raise exception
 
             # Add attachments to the Jira ticket
-            with_attachments = ''
             if attachments:
                 try:
                     new_attachments = self.add_attachments(jira, ticket_to_modify.id, attachments)
-                    with_attachments = ', with attachment(s)' + ' (with ID ' + ', '.join(
+                    with_attachments += ', with attachment' + ' (ID ' + ', '.join(
                         new_attachments[i].id for i in range(len(new_attachments)) ) + ')'
                 except Exception as e:
-                    with_attachments = ', without specified attachment(s)'
-                    logging.warn("Unable (in modify_jira_bug_ticket) to add attachments:"
+                    with_attachments += ', without specified attachment'
+                    logging.warn("Unable (in modify_jira_bug_ticket) to add attachment(s):"
                                  "\n    '%s'\n  due to Exception:\n    %s"
                                  % (str(attachments), str(e)) )
                 try:
