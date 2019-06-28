@@ -87,8 +87,7 @@ public class SysProcFragmentId
                 fragId == PF_balancePartitionsClearIndex ||
                 fragId == PF_distribute ||
                 fragId == PF_applyBinaryLog ||
-                fragId == PF_migrateRows ||
-                fragId == PF_migrateRowsAggregate);
+                fragId == PF_migrateRows);
     }
 
     // @LoadMultipartitionTable
