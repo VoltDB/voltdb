@@ -1064,8 +1064,8 @@ class Stats(object):
 
         summary_keys = [issue['className'], issue['testName']]
         channel      = issue['channel']
-        labels       = issue['labels']
         build_number = issue['build']
+        labels       = issue.get('labels', [JIRA_LABEL_FOR_AUTO_FILING])
 
         closed_issue_url = None
         try:
