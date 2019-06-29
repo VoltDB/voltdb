@@ -45,6 +45,11 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
     }
 
     @Override
+    public long[] getDurablePlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_migrateRows};
+    }
+
+    @Override
     public DependencyPair executePlanFragment(Map<Integer,List<VoltTable>> dependencies,
         long fragmentId, ParameterSet params, SystemProcedureExecutionContext context)
     {

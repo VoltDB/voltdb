@@ -17,10 +17,12 @@
 
 package org.voltdb;
 
+import java.util.List;
+
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
-
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 
@@ -144,6 +146,10 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
+    // Cache the fragments of VoltSysemProcedure which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableList<Long> durableSysProcFragments;
+
     static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
@@ -230,5 +236,21 @@ public class SystemProcedureCatalog {
         builder.put("@ElasticRemove",           new Config("org.voltdb.sysprocs.ElasticRemove",            false, false, false, 0,    VoltType.INVALID,   true,  false, false,     true,   false,            true,         true ));
 
         listing = builder.build();
+    }
+
+    // Set up the cache when system procedures are loaded on execution sites.
+    public static void collectDurableSysProcFragments(List<Long> fragments) {
+        if (durableSysProcFragments == null){
+            synchronized(SystemProcedureCatalog.class) {
+                if (durableSysProcFragments == null) {
+                    durableSysProcFragments = ImmutableList.<Long>builder() .addAll(fragments).build();
+                }
+            }
+        }
+    }
+
+    public static boolean isFragmentDurableForReplay(Long fragId) {
+        assert(durableSysProcFragments != null);
+        return durableSysProcFragments.contains(fragId);
     }
 }

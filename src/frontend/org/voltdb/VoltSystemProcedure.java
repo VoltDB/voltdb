@@ -117,6 +117,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      */
     abstract public long[] getPlanFragmentIds();
 
+    /**
+     * return all SysProc durable plan fragments that needs to be registered
+     * These fragments will be replayed in rejoining process.
+     */
+    public long[] getDurablePlanFragmentIds() {
+        return new long[]{};
+    }
+
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public long siteId = -1;

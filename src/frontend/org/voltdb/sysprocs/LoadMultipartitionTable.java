@@ -49,6 +49,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         return new long[]{SysProcFragmentId.PF_distribute, SysProcFragmentId.PF_aggregate};
     }
 
+    @Override
+    public long[] getDurablePlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_distribute};
+    }
 
     @Override
     public DependencyPair executePlanFragment(

@@ -17,10 +17,13 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -34,6 +37,7 @@ import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
 
 public class LoadedProcedureSet {
 
@@ -180,6 +184,7 @@ public class LoadedProcedureSet {
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
+        List<Long> durableFragments = Lists.newArrayList();
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -239,8 +244,15 @@ public class LoadedProcedureSet {
                 }
 
                 builder.put(entry.getKey().intern(), runner);
+                if (!sysProc.singlePartition && sysProc.durable) {
+                    long[] fragIds =  procedure.getDurablePlanFragmentIds();
+                    if (fragIds != null && fragIds.length > 0) {
+                        durableFragments.addAll(Arrays.stream(fragIds).boxed().collect(Collectors.toList()));
+                    }
+                }
             }
         }
+        SystemProcedureCatalog.collectDurableSysProcFragments(durableFragments);
         return builder.build();
     }
 

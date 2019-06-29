@@ -72,6 +72,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -105,7 +106,6 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -971,9 +971,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
-                    if (!filter(tibm)) {
-                        t.runFromTaskLog(this);
-                    }
+                    t.runFromTaskLog(this);
                 }
             }
             else {
@@ -1000,13 +998,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
-        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
-        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+        // Multi part AdHoc Does not need to be checked because its an alias and runs procedure as planned.
+        if (tibm instanceof FragmentTaskMessage) {
+            FragmentTaskMessage msg = (FragmentTaskMessage)tibm;
+            long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
+            if (msg.isSysProcTask() && !SystemProcedureCatalog.isFragmentDurableForReplay(fragId)) {
                 return true;
             }
-        }
-        else if (tibm instanceof Iv2InitiateTaskMessage) {
+        } else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
             final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
             // All durable sysprocs and non-sysprocs should not get filtered.
