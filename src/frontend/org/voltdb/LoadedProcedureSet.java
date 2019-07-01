@@ -185,6 +185,7 @@ public class LoadedProcedureSet {
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
         List<Long> durableFragments = Lists.newArrayList();
+        List<String> replayableProcs = Lists.newArrayList();
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -249,10 +250,13 @@ public class LoadedProcedureSet {
                     if (fragIds != null && fragIds.length > 0) {
                         durableFragments.addAll(Arrays.stream(fragIds).boxed().collect(Collectors.toList()));
                     }
+                    if (procedure.shouldProcForReplay()) {
+                        replayableProcs.add("@" + runner.m_procedureName);
+                    }
                 }
             }
         }
-        SystemProcedureCatalog.collectDurableSysProcFragments(durableFragments);
+        SystemProcedureCatalog.collectSysFragmentOrProcForReplay(durableFragments, replayableProcs);
         return builder.build();
     }
 

@@ -1003,11 +1003,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             FragmentTaskMessage msg = (FragmentTaskMessage)tibm;
 
             // @AdHoc_RW_MP fragments should not be filtered out
-            if (!msg.isSysProcTask() || "AdHoc_RW_MP".equalsIgnoreCase(msg.getProcedureName())) {
+            if (!msg.isSysProcTask()) {
                 return false;
             }
             long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
-            return !(SystemProcedureCatalog.isFragmentDurableForReplay(fragId));
+            return !(SystemProcedureCatalog.isFragmentOrProcForReplay(fragId, msg.getProcedureName()));
         } else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
             final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());

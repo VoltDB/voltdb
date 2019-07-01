@@ -48,4 +48,8 @@ public class NibbleDeleteMP extends NibbleDeleteBase {
                                   true);
     }
 
+    @Override
+    public boolean shouldProcForReplay() {
+        return true;
+    }
 }

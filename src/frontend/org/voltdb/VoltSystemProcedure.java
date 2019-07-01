@@ -125,6 +125,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         return new long[]{};
     }
 
+    /**
+     * @return true if the procedure should not be skiped from TaskLog replay
+     */
+    public boolean shouldProcForReplay() {
+        return false;
+    }
+
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
         public long siteId = -1;

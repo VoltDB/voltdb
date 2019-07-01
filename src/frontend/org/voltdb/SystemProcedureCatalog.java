@@ -148,8 +148,11 @@ public class SystemProcedureCatalog {
 
     // Cache the fragments of VoltSysemProcedure which should be processed
     // when TaskLogs are replayed during rejoining.
-    static ImmutableList<Long> durableSysProcFragments;
+    static ImmutableList<Long> sysProcFragmentsForReplay;
 
+    // Cache VoltSysemProcedure by name which should be processed
+    // when TaskLogs are replayed during rejoining.
+    static ImmutableList<String> sysProcsForReplay;
     static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
@@ -239,18 +242,25 @@ public class SystemProcedureCatalog {
     }
 
     // Set up the cache when system procedures are loaded on execution sites.
-    public static void collectDurableSysProcFragments(List<Long> fragments) {
-        if (durableSysProcFragments == null){
+    public static void collectSysFragmentOrProcForReplay(List<Long> fragments, List<String> procs) {
+        if (sysProcFragmentsForReplay == null){
             synchronized(SystemProcedureCatalog.class) {
-                if (durableSysProcFragments == null) {
-                    durableSysProcFragments = ImmutableList.<Long>builder() .addAll(fragments).build();
+                if (sysProcFragmentsForReplay == null) {
+                    sysProcFragmentsForReplay = ImmutableList.<Long>builder().addAll(fragments).build();
+                    sysProcsForReplay = ImmutableList.<String>builder().addAll(procs).build();
                 }
             }
         }
     }
 
-    public static boolean isFragmentDurableForReplay(Long fragId) {
-        assert(durableSysProcFragments != null);
-        return durableSysProcFragments.contains(fragId);
+    public static boolean isFragmentOrProcForReplay(Long fragId, String procName) {
+        assert(sysProcFragmentsForReplay != null);
+        if (sysProcFragmentsForReplay.contains(fragId)) {
+            return true;
+        }
+        if (procName != null) {
+            return sysProcsForReplay.contains(procName);
+        }
+        return false;
     }
 }

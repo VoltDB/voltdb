@@ -22,15 +22,20 @@ import org.voltdb.VoltTable;
 
 public class MigrateRowsMP extends MigrateRowsBase {
 
-        public VoltTable run(SystemProcedureExecutionContext ctx,
-                             String tableName, String columnName,
-                             String compStr, VoltTable parameter, long chunksize) {
-            return migrateRowsCommon(ctx,
-                                      tableName,
-                                      columnName,
-                                      compStr,
-                                      parameter,
-                                      chunksize,
-                                      true);
-        }
+    public VoltTable run(SystemProcedureExecutionContext ctx,
+            String tableName, String columnName,
+            String compStr, VoltTable parameter, long chunksize) {
+        return migrateRowsCommon(ctx,
+                tableName,
+                columnName,
+                compStr,
+                parameter,
+                chunksize,
+                true);
+    }
+
+    @Override
+    public boolean shouldProcForReplay() {
+        return true;
+    }
 }
