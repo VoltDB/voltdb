@@ -1001,10 +1001,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // Multi part AdHoc Does not need to be checked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage) {
             FragmentTaskMessage msg = (FragmentTaskMessage)tibm;
-            long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
-            if (msg.isSysProcTask() && !SystemProcedureCatalog.isFragmentDurableForReplay(fragId)) {
-                return true;
+
+            // @AdHoc_RW_MP fragments should not be filtered out
+            if (!msg.isSysProcTask() || "AdHoc_RW_MP".equalsIgnoreCase(msg.getProcedureName())) {
+                return false;
             }
+            long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
+            return !(SystemProcedureCatalog.isFragmentDurableForReplay(fragId));
         } else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
             final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
