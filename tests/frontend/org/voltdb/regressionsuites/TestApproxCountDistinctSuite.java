@@ -416,29 +416,42 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         Client client = getClient();
 
         // Currently only fixed-width types are allowed
-
+        String expectedPattern = m_usingCalcite ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARCHAR\\(256\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vc) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = m_usingCalcite ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARBINARY\\(256\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vb) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = m_usingCalcite ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARCHAR\\(4\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vc_inline) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
+        expectedPattern = m_usingCalcite ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<VARBINARY\\(4\\)>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(vb_inline) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
 
         // FLOAT is not allowed because wierdnesses of the floating point type:
         // NaN, positive and negative zero, [de]normalized numbers.
-
+        expectedPattern = m_usingCalcite ?
+                "Cannot apply 'APPROX_COUNT_DISTINCT' to arguments of type 'APPROX_COUNT_DISTINCT\\(<FLOAT>\\)'" :
+                "incompatible data type in operation";
         verifyStmtFails(client,
                 "select approx_count_distinct(ff) from unsupported_column_types;",
-                "incompatible data type in operation");
+                expectedPattern);
     }
 
     public TestApproxCountDistinctSuite(String name) {
