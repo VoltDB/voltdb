@@ -106,6 +106,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -433,9 +434,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(final int tableId, TableStreamType type,
+                HiddenColumnFilter hiddenColumnFilter, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
+            return m_ee.activateTableStream(tableId, type, hiddenColumnFilter,
+                    undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -1052,11 +1055,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             SnapshotFormat format,
+            HiddenColumnFilter hiddenColumnFilter,
             Deque<SnapshotTableTask> tasks,
             long txnId,
             boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, isTruncation, extraSnapshotData);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, hiddenColumnFilter, tasks, txnId, isTruncation,
+                extraSnapshotData);
     }
 
     /*

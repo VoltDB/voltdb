@@ -36,6 +36,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -187,7 +188,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
+    public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+            long undoQuantumToken, byte[] predicates) {
         return false;
     }
 

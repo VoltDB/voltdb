@@ -1778,6 +1778,7 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
     TableStreamType streamType,
+    HiddenColumnFilter::Type hiddenColumnFilterType,
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInputBE& serializeIn) {
@@ -1807,7 +1808,9 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
+    const HiddenColumnFilter filter = HiddenColumnFilter::create(hiddenColumnFilterType, m_schema);
+
+    return m_tableStreamer->activateStream(m_surgeon, streamType, filter, predicateStrings);
 }
 
 /**
@@ -1816,6 +1819,7 @@ bool PersistentTable::activateStream(
  * Return true on success or false if it was already active.
  */
 bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
+        HiddenColumnFilter::Type hiddenColumnFilterType,
         boost::shared_ptr<TableStreamerInterface> tableStreamer,
         CatalogId tableId,
         std::vector<std::string>& predicateStrings,
@@ -1825,7 +1829,8 @@ bool PersistentTable::activateWithCustomStreamer(TableStreamType streamType,
     m_tableStreamer = tableStreamer;
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
-        success = m_tableStreamer->activateStream(m_surgeon, streamType, predicateStrings);
+        const HiddenColumnFilter filter = HiddenColumnFilter::create(hiddenColumnFilterType, m_schema);
+        success = m_tableStreamer->activateStream(m_surgeon, streamType, filter, predicateStrings);
     }
     return success;
 }

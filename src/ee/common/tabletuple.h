@@ -47,6 +47,7 @@
 #define HSTORETABLETUPLE_H
 
 #include "common/common.h"
+#include "common/HiddenColumnFilter.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/ValueFactory.hpp"
@@ -93,6 +94,7 @@ class TupleIterator;
 class ElasticScanner;
 class StandAloneTupleStorage;
 class SetAndRestorePendingDeleteFlag;
+
 
 class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
@@ -499,7 +501,7 @@ public:
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool, bool elasticJoin);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
+    void serializeTo(voltdb::SerializeOutput& output, const HiddenColumnFilter *filter = NULL) const;
     size_t serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray) const;
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -876,21 +878,18 @@ inline TableTuple::TableTuple() :
     m_schema(NULL), m_data(NULL) {
 }
 
-inline TableTuple::TableTuple(const TableTuple &rhs) :
-    m_schema(rhs.m_schema), m_data(rhs.m_data) {
+inline TableTuple::TableTuple(const TableTuple &rhs) : m_schema(rhs.m_schema), m_data(rhs.m_data) {
 }
 
-inline TableTuple::TableTuple(const TupleSchema *schema) :
-    m_schema(schema), m_data(NULL) {
+inline TableTuple::TableTuple(const TupleSchema *schema) : m_schema(schema), m_data(NULL) {
     vassert(m_schema);
 }
 
 /** Setup the tuple given the specified data location and schema **/
-inline TableTuple::TableTuple(char *data, const voltdb::TupleSchema *schema) {
+inline TableTuple::TableTuple(char *data, const voltdb::TupleSchema *schema) :
+            m_schema(schema), m_data(data){
     vassert(data);
     vassert(schema);
-    m_data = data;
-    m_schema = schema;
 }
 
 inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
@@ -1170,7 +1169,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) const {
+inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, const HiddenColumnFilter *filter) const {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {
@@ -1179,10 +1178,12 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
         value.serializeTo(output);
     }
 
-    if (includeHiddenColumns) {
+    if (filter) {
         for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
-            NValue value = getHiddenNValue(j);
-            value.serializeTo(output);
+            if (filter->include(j)) {
+                NValue value = getHiddenNValue(j);
+                value.serializeTo(output);
+            }
         }
     }
 
@@ -1214,7 +1215,7 @@ inline bool TableTuple::equals(const TableTuple &other) const {
     return equalsNoSchemaCheck(other);
 }
 
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns /*= false*/) const {
+inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);

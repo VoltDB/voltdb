@@ -76,6 +76,11 @@ public:
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
+    /* The index value used to represent no hidden column.
+     * This value is guaranteed to be greater than all valid hidden column indexes
+     */
+    static const uint8_t UNSET_HIDDEN_COLUMN = 0xFF;
+
     /** Static factory method to create a TupleSchema a fixed number
      *  of all visible columns */
     static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
@@ -221,8 +226,8 @@ public:
     uint16_t totalColumnCount() const;
 
     /** Returns the index of the hidden column of columnType. The value
-     * returned by this method will not be valid if hasHiddenColumn(columnType)
-     * returns false.
+     * returned by this method will be UNSET_HIDDEN_COLUMN if this schema
+     * does not have a column which is the requested type.
      */
     uint8_t getHiddenColumnIndex(HiddenColumn::Type columnType) const {
         return m_hiddenColumnIndexes[columnType];
@@ -234,8 +239,6 @@ public:
     }
 
 private:
-    static const uint8_t UNSET_HIDDEN_COLUMN = 0xFF;
-
     /** These methods are like their public counterparts, but accepts
      *  indexes >= m_columnCount, in order to access hidden columns or
      *  the terminating ColumnInfo object. */

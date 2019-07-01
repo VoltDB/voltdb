@@ -48,6 +48,7 @@
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
+#include "common/HiddenColumnFilter.h"
 #include "common/ThreadLocalPool.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
@@ -462,6 +463,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 CatalogId tableId,
                 TableStreamType streamType,
+                HiddenColumnFilter::Type hiddenColumnFilterType,
                 int64_t undoToken,
                 ReferenceSerializeInputBE& serializeIn);
 

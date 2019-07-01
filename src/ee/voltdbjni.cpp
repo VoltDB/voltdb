@@ -957,7 +957,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
  * Signature: (JIIIJ[B)Z
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
-        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jlong undoToken,
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jbyte schemaFilterType, jlong undoToken,
         jbyteArray serialized_predicates)
 {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
@@ -972,7 +972,8 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
+            voltdb::HiddenColumnFilter::Type hiddenColumnFilter = static_cast<voltdb::HiddenColumnFilter::Type>(schemaFilterType);
+            bool success = engine->activateTableStream(tableId, tableStreamType, hiddenColumnFilter, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;

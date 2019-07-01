@@ -403,6 +403,7 @@ public:
      * Return true on success or false if it was already active.
      */
     bool activateStream(TableStreamType streamType,
+                        HiddenColumnFilter::Type hiddenColumnFilterType,
                         int32_t partitionId,
                         CatalogId tableId,
                         ReferenceSerializeInputBE& serializeIn);
@@ -614,6 +615,7 @@ private:
      * Return true on success or false if it was already active.
      */
     bool activateWithCustomStreamer(TableStreamType streamType,
+                                    HiddenColumnFilter::Type hiddenColumnFilterType,
                                     boost::shared_ptr<TableStreamerInterface> tableStreamer,
                                     CatalogId tableId,
                                     std::vector<std::string>& predicateStrings,

@@ -2406,6 +2406,7 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        HiddenColumnFilter::Type hiddenColumnFilter,
         int64_t undoToken,
         ReferenceSerializeInputBE &serializeIn) {
     Table* found = getTableById(tableId);
@@ -2421,7 +2422,7 @@ bool VoltDBEngine::activateTableStream(
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(streamType, hiddenColumnFilter, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 

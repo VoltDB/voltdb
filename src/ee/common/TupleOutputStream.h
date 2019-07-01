@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include "serializeio.h"
+#include "HiddenColumnFilter.h"
 
 namespace voltdb {
 class TableTuple;
@@ -52,7 +53,7 @@ public:
     /**
      * Write a tuple and return the number of bytes written.
      */
-    std::size_t writeRow(const TableTuple &tuple);
+    std::size_t writeRow(const TableTuple &tuple, const HiddenColumnFilter &hiddenColumnFilter);
 
     /**
      * Return true if nbytes can fit in the buffer's remaining space.

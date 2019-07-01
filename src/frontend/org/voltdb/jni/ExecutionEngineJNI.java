@@ -43,6 +43,7 @@ import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
@@ -610,9 +611,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
+                                       HiddenColumnFilter hiddenColumnFilter,
                                        long undoQuantumToken,
                                        byte[] predicates) {
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), hiddenColumnFilter.getId(),
                                          undoQuantumToken, predicates);
     }
 
