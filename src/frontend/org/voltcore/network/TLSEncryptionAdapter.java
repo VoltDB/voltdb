@@ -263,7 +263,7 @@ public class TLSEncryptionAdapter {
                 messages.m_messages.release();
             }
 
-            if (m_inflightMessages != null && m_inflightMessages.m_messages.refCnt() > 0) {
+            if (m_inflightMessages != null && m_inflightMessages.m_messages != null && m_inflightMessages.m_messages.refCnt() > 0) {
                 m_inflightMessages.m_messages.release();
             }
         } finally {
