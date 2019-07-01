@@ -126,7 +126,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     }
 
     /**
-     * @return true if the procedure should not be skiped from TaskLog replay
+     * @return true if the procedure should not be skipped from TaskLog replay
      */
     public boolean shouldProcForReplay() {
         return false;

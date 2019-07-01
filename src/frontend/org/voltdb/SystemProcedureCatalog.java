@@ -22,8 +22,8 @@ import java.util.List;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
-import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 /**
@@ -148,11 +148,11 @@ public class SystemProcedureCatalog {
 
     // Cache the fragments of VoltSysemProcedure which should be processed
     // when TaskLogs are replayed during rejoining.
-    static ImmutableList<Long> sysProcFragmentsForReplay;
+    static ImmutableSet<Long> s_sysProcFragmentsForReplay;
 
     // Cache VoltSysemProcedure by name which should be processed
     // when TaskLogs are replayed during rejoining.
-    static ImmutableList<String> sysProcsForReplay;
+    static ImmutableSet<String> s_sysProcsForReplay;
     static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
@@ -243,23 +243,23 @@ public class SystemProcedureCatalog {
 
     // Set up the cache when system procedures are loaded on execution sites.
     public static void collectSysFragmentOrProcForReplay(List<Long> fragments, List<String> procs) {
-        if (sysProcFragmentsForReplay == null){
+        if (s_sysProcFragmentsForReplay == null && s_sysProcsForReplay == null){
             synchronized(SystemProcedureCatalog.class) {
-                if (sysProcFragmentsForReplay == null) {
-                    sysProcFragmentsForReplay = ImmutableList.<Long>builder().addAll(fragments).build();
-                    sysProcsForReplay = ImmutableList.<String>builder().addAll(procs).build();
+                if (s_sysProcFragmentsForReplay == null && s_sysProcsForReplay == null) {
+                    s_sysProcFragmentsForReplay = ImmutableSet.<Long>builder().addAll(fragments).build();
+                    s_sysProcsForReplay = ImmutableSet.<String>builder().addAll(procs).build();
                 }
             }
         }
     }
 
     public static boolean isFragmentOrProcForReplay(Long fragId, String procName) {
-        assert(sysProcFragmentsForReplay != null);
-        if (sysProcFragmentsForReplay.contains(fragId)) {
+        assert(s_sysProcFragmentsForReplay != null && s_sysProcsForReplay != null);
+        if (s_sysProcFragmentsForReplay.contains(fragId)) {
             return true;
         }
         if (procName != null) {
-            return sysProcsForReplay.contains(procName);
+            return s_sysProcsForReplay.contains(procName);
         }
         return false;
     }
