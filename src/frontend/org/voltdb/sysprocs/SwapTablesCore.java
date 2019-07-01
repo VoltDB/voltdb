@@ -42,6 +42,11 @@ public class SwapTablesCore extends AdHocBase {
     }
 
     @Override
+    public long[] getDurablePlanFragmentIds() {
+        return new long[] { SysProcFragmentId.PF_swapTables};
+    }
+
+    @Override
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params, SystemProcedureExecutionContext context) {
         VoltTable dummy = new VoltTable(STATUS_SCHEMA);
         dummy.addRow(STATUS_OK);
