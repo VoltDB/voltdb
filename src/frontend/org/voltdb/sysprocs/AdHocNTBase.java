@@ -70,8 +70,32 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     protected final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
             new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
 
-    private final boolean m_usingCalcite =
-            Boolean.parseBoolean(System.getProperty("PLAN_WITH_CALCITE", "false"));
+    /**
+     * There are two ways to set planning with calcite: either by setting the JAVA properties; or by setting the
+     * environment variable.
+     *
+     * The first way is used by build.xml to make Jenkins be Git branch aware, and only use Calcite planner when the
+     * branch it is in contains "calcite-" string (case sensitive). You don't need to do anything to make it work that
+     * way.
+     *
+     * The second way is needed for developer that run some quick test in sqlcmd, or need to run `startdb' locally.
+     * The first way does not work here, because this is the easiest way to by pass Python scripts for starting
+     * `bin/voltdb' without passing JVM variable down. To use it in `sqlcmd':
+     *
+     * $ export plan_with_calcite=true
+     * $ startdb ... # or use developer script `kvdb', `vdb'
+     * $ sqlcmd # the planner is using Calcite
+     *
+     * To use it within an IDE (IntelliJ for example), remember to add
+     * plan_with_calcite=true
+     * in Run -> Edit Configurations -> (VoltDB) -> Edit environment variables.
+     *
+     * Note that changes made to enviroment variable masks the mechanism how build.xml decides to pick planner based on
+     * the Git branch name.
+     */
+    private static final boolean USING_CALCITE =
+            Boolean.parseBoolean(System.getProperty("plan_with_calcite", "false")) ||
+            Boolean.parseBoolean(System.getenv("plan_with_calcite"));
 
     BackendTarget m_backendTargetType = VoltDB.instance().getBackendTargetType();
     private final boolean m_isConfiguredForNonVoltDBBackend =
@@ -87,7 +111,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     // call runInternal() method.
     abstract public CompletableFuture<ClientResponse> run(ParameterSet params);
     protected CompletableFuture<ClientResponse> runInternal(ParameterSet params) {
-        if (m_usingCalcite) {
+        if (USING_CALCITE) {
             try {
                 return runUsingCalcite(params);
             } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
@@ -486,13 +510,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         Object partitionKey = singlePartition ? "1" : null;
 
         List<AdHocPlannedStatement> stmts = new ArrayList<>();
-        AdHocPlannedStatement result = null;
-
-        result = compileAdHocSQL(ptool, sql, false, // do not infer partitioning
-                partitionKey, // use as partition key
-                ExplainMode.NONE, false, // not a large query
-                false, // not swap tables
-                userParams);
+        AdHocPlannedStatement result = compileAdHocSQL(ptool, sql, false, partitionKey,
+                ExplainMode.NONE, false, false, userParams);
         stmts.add(result);
 
         return new AdHocPlannedStmtBatch(userParams, stmts, -1, null, null, userParams);
