@@ -1063,8 +1063,9 @@ class Stats(object):
             JENKINSBOT = JenkinsBot()
 
         summary_keys = [issue['className'], issue['testName']]
-        channel      = issue['channel']
-        build_number = issue['build']
+        channel      = issue.get('channel')
+        jenkins_job  = issue.get('job', 'Unknown job')
+        build_number = issue.get('build', 'Unknown build')
         labels       = issue.get('labels', [JIRA_LABEL_FOR_AUTO_FILING])
 
         closed_issue_url = None
