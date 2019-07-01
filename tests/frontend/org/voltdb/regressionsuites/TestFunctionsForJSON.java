@@ -32,7 +32,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 /**
  * Tests for SQL that was recently (early 2012) unsupported, related to JSON
@@ -67,17 +66,13 @@ public class TestFunctionsForJSON extends RegressionSuite {
     private static final int TOTAL_NUM_ROWS = FULL_TABLE.length;
     private static final boolean DEBUG = false;
 
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
     /**
      * @return
      * @throws IOException
      * @throws NoConnectionsException
      * @throws ProcCallException
      */
-    private void loadJS1(Client client) throws IOException, NoConnectionsException, ProcCallException
-    {
+    private void loadJS1(Client client) throws IOException, NoConnectionsException, ProcCallException {
 
         final String jstemplate = "{\n" +
                 "    \"id\": %d,\n" +
@@ -182,24 +177,24 @@ public class TestFunctionsForJSON extends RegressionSuite {
         debugPrintJsonDoc(DEBUG, description, client, rowIds);
     }
 
-    private void testProcWithValidJSON(long[] expectedResult, Client client,
-                                       String procName, Object... parameters) throws Exception {
+    private void testProcWithValidJSON(
+            long[] expectedResult, Client client, String procName, Object... parameters) throws Exception {
         ClientResponse cr = client.callProcedure(procName, parameters);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable result = cr.getResults()[0];
         validateRowOfLongs(result, expectedResult);
     }
 
-    private void testProcWithValidJSON(long[][] expectedResult, Client client,
-                                       String procName, Object... parameters) throws Exception {
+    private void testProcWithValidJSON(
+            long[][] expectedResult, Client client, String procName, Object... parameters) throws Exception {
         ClientResponse cr = client.callProcedure(procName, parameters);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable result = cr.getResults()[0];
         validateTableOfLongs(result, expectedResult);
     }
 
-    private void testProcWithValidJSON(String expectedResult, Client client,
-                                       String procName, Object... parameters) throws Exception {
+    private void testProcWithValidJSON(
+            String expectedResult, Client client, String procName, Object... parameters) throws Exception {
         ClientResponse cr = client.callProcedure(procName, parameters);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable result = cr.getResults()[0];
@@ -207,11 +202,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(expectedResult, result.get(0, result.getColumnType(0)));
     }
 
-    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client, int rowId,
-                                         String procName, Object... parameters) throws Exception {
-        String procDescription = "'" + procName + "', with parameters:";
+    private void testProcWithInvalidJSON(
+            String expectedErrorMessage, Client client, int rowId, String procName, Object... parameters) throws Exception {
+        StringBuilder procDescription = new StringBuilder("'" + procName + "', with parameters:");
         for (int i=0; i < parameters.length; i++) {
-            procDescription += "\n" + (parameters[i] == null ? "null" : parameters[i].toString());
+            procDescription.append("\n").append(parameters[i] == null ? "null" : parameters[i].toString());
         }
         try {
             testProcWithValidJSON("FAILURE", client, procName, parameters);
@@ -227,8 +222,8 @@ public class TestFunctionsForJSON extends RegressionSuite {
         }
     }
 
-    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client,
-                                         String procName, Object... parameters) throws Exception {
+    private void testProcWithInvalidJSON(
+            String expectedErrorMessage, Client client, String procName, Object... parameters) throws Exception {
         testProcWithInvalidJSON(expectedErrorMessage, client, 1, procName, parameters);
     }
 
@@ -274,16 +269,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         try {
             cr = client.callProcedure("IdFieldProc", "id", 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
+        } catch (ProcCallException ignored) {
             fail("parameter check failed");
         }
 
         try {
             cr = client.callProcedure("IdFieldProc", 1, "1");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
+        } catch ( ProcCallException ignored) {
             fail("parameter check failed");
         }
 
@@ -365,9 +358,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROW1,  client, "IdFieldProc", "tag", "One");
 
         // Same case-sensitive tests, using ad-hoc queries
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'one' ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'ONE' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW1,  client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'One' ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'one' ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'ONE' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW1,  client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') = 'One' ORDER BY ID");
     }
 
     /** Used to test ENG-6620, part 1 (dotted path notation) / ENG-6832. */
@@ -381,16 +377,22 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "inner.second.third.dairy", "1");
 
         // Same dot-notation tests, using ad-hoc queries
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.veggies') = 'good for you' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.fruits') = '1' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.meats') = 'yum' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW1,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.dairy') = '1' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.veggies') = 'good for you' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.fruits') = '1' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.meats') = 'yum' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW1,    client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.dairy') = '1' ORDER BY ID");
 
         // Test \ escape for dot in element name, not used for sub-path
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "dot\\.char", "foo.bar");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "dot.char", "foo.bar");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'dot\\.char') = 'foo.bar' ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'dot.char') = 'foo.bar' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'dot\\.char') = 'foo.bar' ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'dot.char') = 'foo.bar' ORDER BY ID");
 
         // Verify that dot notation returns nothing when used on a primitive
         // (integer, float, boolean, string), or an array
@@ -403,13 +405,20 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "arr.0");
 
         // Same primitive/array tests, using ad-hoc queries
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bool.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'last.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr.veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr.0') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bool.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'last.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr.veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr.0') IS NOT NULL ORDER BY ID");
 
         // Compare with similar behavior when FIELD is called twice
         testProcWithValidJSON(EMPTY_TABLE, client, "NotNullField2Proc", "id",   "veggies");
@@ -421,14 +430,20 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "NotNullField2Proc", "tag", "veggies");
 
         // Same FIELD(FIELD) tests, using ad-hoc queries
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'id'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'numeric'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'bool'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'last'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'arr'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'arr'), 'veggies') IS NOT NULL ORDER BY ID");
-        testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "@AdHoc",
-                                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'tag'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'id'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'numeric'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'bool'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'last'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'arr'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'arr'), 'veggies') IS NOT NULL ORDER BY ID");
+        testProcWithInvalidJSON("Syntax error: value, object or array expected", client,
+                "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'tag'), 'veggies') IS NOT NULL ORDER BY ID");
     }
 
     /** Used to test ENG-6620, part 2 (array index notation) / ENG-6832. */
@@ -450,30 +465,50 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][" + Integer.MAX_VALUE + "]");
 
         // Same index-notation tests, using ad-hoc queries
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[0]') = '0' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW2,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[1]') = '2' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2]') = '100' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-1]') = '100' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-1]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[3]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][0]') = 'One' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][0]') = '2' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][1]') = '3' ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][3]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][" + Integer.MAX_VALUE + "]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[0]') = '0' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW2,    client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[1]') = '2'" +
+                        " ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2]') = '10" +
+                        "0' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-1]') = '1" +
+                        "00' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-1]') IS N" +
+                        "OT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[3]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc"
+                ,"SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][0]') = 'One' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][0]') = '2' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][1]') = '3' ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][3]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][" + Integer.MAX_VALUE + "]') IS NOT NULL ORDER BY ID");
 
         // Test using 2147483646, which is Integer.MAX_VALUE - 1
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[2147483646]");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][2147483646]");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483646]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2147483646]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483646]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2147483646]') IS NOT NULL ORDER BY ID");
 
         // Test \ escape for brackets in element name, not used for array index
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "bracket]]  ] chars", "[foo]");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bracket]\\[\\[] \\[ ] chars') = '[foo]' ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bracket]]  ] chars') = '[foo]' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bracket]\\[\\[] \\[ ] chars') = '[foo]' ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bracket]]  ] chars') = '[foo]' ORDER BY ID");
 
         // Verify that index notation returns nothing when used on a primitive
         // (integer, float, boolean, string), or an object
@@ -485,12 +520,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "inner[0]");
 
         // Same primitive/object tests, using ad-hoc queries
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bool[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'last[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'bool[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'last[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner[0]') IS NOT NULL ORDER BY ID");
 
         // Compare with similar behavior when FIELD is called with ARRAY_ELEMENT
         testProcWithValidJSON(FULL_TABLE, client, "NullArrayProc", "id", 0);
@@ -501,13 +542,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "NullArrayProc", "tag", 0);
 
         // Same ARRAY_ELEMENT tests, using ad-hoc queries
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'id'), 0) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'numeric'), 0) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'bool'), 0) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'last'), 0) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'inner'), 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'id'), 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'numeric'), 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'bool'), 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'last'), 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'inner'), 0) IS NULL ORDER BY ID");
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "@AdHoc",
-                                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'tag'), 0) IS NULL ORDER BY ID");
+                "SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, 'tag'), 0) IS NULL ORDER BY ID");
 
         // Test index notation with no name specified (a weird case!)
         testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[0]");
@@ -521,15 +567,24 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[-1]", 3);
 
         // Same nameless array tests, using ad-hoc queries
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[-1]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[3]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') = '1' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') = '2' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') = '3' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[-1]') = '3' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[-1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[3]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') = '1' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') = '2' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') = '3' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, '[-1]') = '3' ORDER BY ID");
     }
 
     /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined) / ENG-6832. */
@@ -546,13 +601,20 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr3d[-1]");
 
         // Same tests, using ad-hoc queries
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[0]') = '0' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW2,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[1]') = '2' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].veggies') = 'good for you' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1].veggies') = 'good for you' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].dairy') = '3' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1].dairy') = '3' ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[0]') = '0' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW2,    client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[1]') = '2' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].veggies') = 'good for you' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1].veggies') = 'good for you' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].dairy') = '3' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW3,    client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1].dairy') = '3' ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[-1]') IS NOT NULL ORDER BY ID");
     }
 
     /** Used to test ENG-6620 / ENG-6832, for numeric, floating-point data, which
@@ -571,125 +633,151 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
 
         // Same numeric tests, using ad-hoc queries
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric') IN ('1.2', '1.20') ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.numeric') IN ('2.3', '2.30') ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2]') IN ('4.5', '4.50') ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][-1][-1]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][-1][-1]') IN ('4.5', '4.50') ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[2]') IN ('3.4', '3.40') ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].numeric') IN ('5.6', '5.60') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric') IN ('1.2', '1.20') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.numeric') IN ('2.3', '2.30') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2]') IN ('4.5', '4.50') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][-1][-1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][-1][-1]') IN ('4.5', '4.50') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.arr[2]') IN ('3.4', '3.40') ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[2].numeric') IN ('5.6', '5.60') ORDER BY ID");
     }
 
     /** Used to test ENG-6832, for various null values (in both parameters,
      *  with and without quotes), and related queries. */
-      // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
-//    public void testFIELDFunctionWithNullValues() throws Exception {
-//        Client client = getClient();
-//        loadJS1(client);
-//
-//        // Call the FIELD function with null first (JSON doc column) parameter
-//        // (using both the "NullSetFieldDocProc" Stored Proc and ad-hoc queries)
-//        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, null);
-//        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 0);
-//        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "true");
-//        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "id");
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, '0') IS NULL ORDER BY ID");
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 'true') IS NULL ORDER BY ID");
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 'id') IS NULL ORDER BY ID");
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(null, null) FROM JS1 WHERE ID = 5");
-//
-//        // Or, similarly, where the DOC column, or 'id' within it, has null value
-//        long[][] idNotDefined = new long[][]{{5},{6},{8},{10},{11},{12},{13},{14},{15}};
-//        testProcWithValidJSON(idNotDefined, client, "NullFieldProc", "id");
-//        testProcWithValidJSON(idNotDefined, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id') IS NULL ORDER BY ID");
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, 'id') FROM JS1 WHERE ID = 5");
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, 'id') FROM JS1 WHERE ID = 8");
-//
-//        // Call the FIELD function with null second ("path") parameter
-//        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "NullFieldProc", (Object) null);
-//        testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "@AdHoc",
-//                                "SELECT ID FROM JS1 WHERE FIELD(DOC, null) IS NULL");
-//
-//        // Call the FIELD function with quoted-null second ("path") parameter
-//        // (using both the "SelectFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithValidJSON((String) null, client, "SelectFieldProc", "null", 5);
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, 'null') FROM JS1 WHERE ID = 5");
-//        testProcWithValidJSON("foo", client, "SelectFieldProc", "null", 11);
-//        testProcWithValidJSON("foo", client, "@AdHoc", "SELECT FIELD(DOC, 'null') FROM JS1 WHERE ID = 11");
-//        // Similar single-quotes, but without null:
-//        testProcWithValidJSON((String) null, client, "SelectFieldProc", "foo", 5);
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, 'foo') FROM JS1 WHERE ID = 5");
-//        testProcWithValidJSON("null", client, "SelectFieldProc", "foo", 12);
-//        testProcWithValidJSON("null", client, "@AdHoc", "SELECT FIELD(DOC, 'foo') FROM JS1 WHERE ID = 12");
-//        // Note: quotes for "null" are double-escaped, for Java and JSON; the
-//        // resulting JSON document is actually: {"\"null\"":-1}
-//        testProcWithValidJSON((String) null, client, "SelectFieldProc", "\"null\"", 5);
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, '\"null\"') FROM JS1 WHERE ID = 5");
-//        testProcWithValidJSON("bar", client, "SelectFieldProc", "\"null\"", 11);
-//        testProcWithValidJSON("bar", client, "@AdHoc", "SELECT FIELD(DOC, '\"null\"') FROM JS1 WHERE ID = 11");
-//        // Similar double-quotes, but without null:
-//        testProcWithValidJSON((String) null, client, "SelectFieldProc", "\"foo\"", 5);
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT FIELD(DOC, '\"foo\"') FROM JS1 WHERE ID = 5");
-//        testProcWithValidJSON("bar", client, "SelectFieldProc", "\"foo\"", 12);
-//        testProcWithValidJSON("bar", client, "@AdHoc", "SELECT FIELD(DOC, '\"foo\"') FROM JS1 WHERE ID = 12");
-//
-//        // More single-quotes tests, with and without null
-//        testProcWithValidJSON(new long[][]{{11}}, client, "NotNullFieldProc", "null");
-//        testProcWithValidJSON(new long[][]{{12}}, client, "NotNullFieldProc", "foo");
-//        testProcWithValidJSON(new long[][]{{11}}, client, "IdFieldProc", "null", "foo");
-//        testProcWithValidJSON(new long[][]{{12}}, client, "IdFieldProc", "foo", "null");
-//        testProcWithValidJSON(new long[][]{{11}}, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'null') IS NOT NULL ORDER BY ID");
-//        testProcWithValidJSON(new long[][]{{12}}, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'foo') IS NOT NULL ORDER BY ID");
-//        testProcWithValidJSON(new long[][]{{11}}, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'null') = 'foo' ORDER BY ID");
-//        testProcWithValidJSON(new long[][]{{12}}, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'foo') = 'null' ORDER BY ID");
-//    }
+    public void testFIELDFunctionWithNullValues() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        // Call the FIELD function with null first (JSON doc column) parameter
+        // (using both the "NullSetFieldDocProc" Stored Proc and ad-hoc queries)
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, null);
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 0);
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "true");
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "id");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(null, '0') IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(null, 'true') IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(null, 'id') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(null, null) FROM JS1 WHERE ID = 5");
+
+        // Or, similarly, where the DOC column, or 'id' within it, has null value
+        long[][] idNotDefined = new long[][]{{5},{6},{8},{10},{11},{12},{13},{14},{15}};
+        testProcWithValidJSON(idNotDefined, client, "NullFieldProc", "id");
+        testProcWithValidJSON(idNotDefined, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'id') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, 'id') FROM JS1 WHERE ID = 5");
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, 'id') FROM JS1 WHERE ID = 8");
+
+        // Call the FIELD function with null second ("path") parameter
+        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "NullFieldProc", (Object) null);
+        testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, null) IS NULL");
+
+        // Call the FIELD function with quoted-null second ("path") parameter
+        // (using both the "SelectFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithValidJSON((String) null, client, "SelectFieldProc", "null", 5);
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, 'null') FROM JS1 WHERE ID = 5");
+        testProcWithValidJSON("foo", client, "SelectFieldProc", "null", 11);
+        testProcWithValidJSON("foo", client, "@AdHoc",
+                "SELECT FIELD(DOC, 'null') FROM JS1 WHERE ID = 11");
+        // Similar single-quotes, but without null:
+        testProcWithValidJSON((String) null, client, "SelectFieldProc", "foo", 5);
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, 'foo') FROM JS1 WHERE ID = 5");
+        testProcWithValidJSON("null", client, "SelectFieldProc", "foo", 12);
+        testProcWithValidJSON("null", client, "@AdHoc",
+                "SELECT FIELD(DOC, 'foo') FROM JS1 WHERE ID = 12");
+        // Note: quotes for "null" are double-escaped, for Java and JSON; the
+        // resulting JSON document is actually: {"\"null\"":-1}
+        testProcWithValidJSON((String) null, client, "SelectFieldProc", "\"null\"", 5);
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, '\"null\"') FROM JS1 WHERE ID = 5");
+        testProcWithValidJSON("bar", client, "SelectFieldProc", "\"null\"", 11);
+        testProcWithValidJSON("bar", client, "@AdHoc",
+                "SELECT FIELD(DOC, '\"null\"') FROM JS1 WHERE ID = 11");
+        // Similar double-quotes, but without null:
+        testProcWithValidJSON((String) null, client, "SelectFieldProc", "\"foo\"", 5);
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT FIELD(DOC, '\"foo\"') FROM JS1 WHERE ID = 5");
+        testProcWithValidJSON("bar", client, "SelectFieldProc", "\"foo\"", 12);
+        testProcWithValidJSON("bar", client, "@AdHoc",
+                "SELECT FIELD(DOC, '\"foo\"') FROM JS1 WHERE ID = 12");
+
+        // More single-quotes tests, with and without null
+        testProcWithValidJSON(new long[][]{{11}}, client, "NotNullFieldProc", "null");
+        testProcWithValidJSON(new long[][]{{12}}, client, "NotNullFieldProc", "foo");
+        testProcWithValidJSON(new long[][]{{11}}, client, "IdFieldProc", "null", "foo");
+        testProcWithValidJSON(new long[][]{{12}}, client, "IdFieldProc", "foo", "null");
+        testProcWithValidJSON(new long[][]{{11}}, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'null') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(new long[][]{{12}}, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'foo') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(new long[][]{{11}}, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'null') = 'foo' ORDER BY ID");
+        testProcWithValidJSON(new long[][]{{12}}, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE FIELD(DOC, 'foo') = 'null' ORDER BY ID");
+    }
 
     /** Used to test ENG-6832 (invalid array index notation, for FIELD). */
     public void testFIELDFunctionWithInvalidIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 6]",
-                                client, "IdFieldProc", "arr[-2]",  0);
+                client, "IdFieldProc", "arr[-2]",  0);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "IdFieldProc", "arr[]",    0);
+                client, "IdFieldProc", "arr[]",    0);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "IdFieldProc", "arr[abc]", 0);
+                client, "IdFieldProc", "arr[abc]", 0);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
-                                client, "IdFieldProc", "arr[",     0);
+                client, "IdFieldProc", "arr[",     0);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
-                                client, "IdFieldProc", "arr[123",  0);
+                client, "IdFieldProc", "arr[123",  0);
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 14]",
-                                client, "IdFieldProc", "arr[" + Integer.MIN_VALUE + "]",  0);
+                client, "IdFieldProc", "arr[" + Integer.MIN_VALUE + "]",  0);
 
         // Same invalid-query tests, using ad-hoc queries
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 6]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-2]') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-2]') = '0' ORDER BY ID");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[]') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[]') = '0' ORDER BY ID");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[abc]') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[abc]') = '0' ORDER BY ID");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[') = '0' ORDER BY ID");
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[123') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[123') = '0' ORDER BY ID");
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 14]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]') = '0' ORDER BY ID");
 
         // Test using 2147483648, which is Integer.MAX_VALUE + 1
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum integer value [position 13]",
-                                client, "IdFieldProc", "arr[2147483648]", 0);
+                client, "IdFieldProc", "arr[2147483648]", 0);
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum integer value [position 13]",
-                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483648]') = '0' ORDER BY ID");
+                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483648]') = '0' ORDER BY ID");
 
         // Test the wrong number of parameters
         testProcWithInvalidJSON("PROCEDURE IdFieldProc EXPECTS 2 PARAMS, BUT RECEIVED 0",
-                                client, "IdFieldProc");
+                client, "IdFieldProc");
         testProcWithInvalidJSON("PROCEDURE IdFieldProc EXPECTS 2 PARAMS, BUT RECEIVED 1",
-                                client, "IdFieldProc", "arr[0]");
+                client, "IdFieldProc", "arr[0]");
         testProcWithInvalidJSON("PROCEDURE IdFieldProc EXPECTS 2 PARAMS, BUT RECEIVED 3",
-                                client, "IdFieldProc", "arr[0]", 0, 0);
+                client, "IdFieldProc", "arr[0]", 0, 0);
     }
 
     /** Used to test ENG-6879 (invalid array index notation, for SET_FIELD). */
@@ -697,53 +785,53 @@ public class TestFunctionsForJSON extends RegressionSuite {
         Client client = getClient();
         loadJS1(client);
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 6]",
-                                client, "UpdateSetFieldProc", "arr[-2]",  "-1", 1);
+                client, "UpdateSetFieldProc", "arr[-2]",  "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "UpdateSetFieldProc", "arr[]",    "-1", 1);
+                client, "UpdateSetFieldProc", "arr[]",    "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "UpdateSetFieldProc", "arr[abc]", "-1", 1);
+                client, "UpdateSetFieldProc", "arr[abc]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
-                                client, "UpdateSetFieldProc", "arr[",     "-1", 1);
+                client, "UpdateSetFieldProc", "arr[",     "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
-                                client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
+                client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
         // 1568 is the minimum array index that will trigger this error
         testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
-                                client, "UpdateSetFieldProc", "arr[1568]", "-1", 1);
+                client, "UpdateSetFieldProc", "arr[1568]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 11]",
-                                client, "UpdateSetFieldProc", "arr[" + Integer.MIN_VALUE + "]", "-1", 1);
+                client, "UpdateSetFieldProc", "arr[" + Integer.MIN_VALUE + "]", "-1", 1);
 
         // Same invalid-query tests, using ad-hoc queries
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 6]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-2]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-2]', '-1') WHERE ID = 1");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[]', '-1') WHERE ID = 1");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[abc]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[abc]', '-1') WHERE ID = 1");
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[', '-1') WHERE ID = 1");
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[123', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[123', '-1') WHERE ID = 1");
         // 1568 is the minimum array index that will trigger this error
         testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1568]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1568]', '-1') WHERE ID = 1");
         testProcWithInvalidJSON("Invalid JSON path: Array index less than -1 [position 11]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]', '-1') WHERE ID = 1");
 
         // Test using 2147483648, which is Integer.MAX_VALUE + 1
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum allowed value of 500000 [position 10]",
-                                client, "UpdateSetFieldProc", "arr[2147483648]", "-1", 1);
+                client, "UpdateSetFieldProc", "arr[2147483648]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum allowed value of 500000 [position 10]",
-                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[2147483648]', '-1') WHERE ID = 1");
+                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[2147483648]', '-1') WHERE ID = 1");
 
         // Test the wrong number of parameters
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 0",
-                                client, "UpdateSetFieldProc");
+                client, "UpdateSetFieldProc");
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 1",
-                                client, "UpdateSetFieldProc", "arr[0]");
+                client, "UpdateSetFieldProc", "arr[0]");
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 2",
-                                client, "UpdateSetFieldProc", "arr[0]", "-1");
+                client, "UpdateSetFieldProc", "arr[0]", "-1");
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 4",
-                                client, "UpdateSetFieldProc", "arr[0]", "-1", 1, 1);
+                client, "UpdateSetFieldProc", "arr[0]", "-1", 1, 1);
     }
 
     public void testSET_FIELDFunctionWithMediumLargeIndexValue() throws Exception {
@@ -787,9 +875,10 @@ public class TestFunctionsForJSON extends RegressionSuite {
         Client client = getClient();
         loadJS1(client);
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum allowed value of 500000 [position 10]",
-                                client, 5, "SelectSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 5);
+                client, 5, "SelectSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 5);
         testProcWithInvalidJSON("Invalid JSON path: Array index greater than the maximum allowed value of 500000 [position 10]",
-                                client, 5, "@AdHoc", "SELECT SET_FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]', '-1') FROM JS1 WHERE ID = 5");
+                client, 5, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]', '-1') FROM JS1 WHERE ID = 5");
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation) / ENG-6879. */
@@ -821,12 +910,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newstr", "\"newvalue\"", 4);
 
         // Call the SET_FIELD function directly, using ad-hoc queries
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id', '-2') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool', 'false') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag', '\"Five\"') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newint', '7') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newbool', 'true') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newstr', '\"newvalue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id', '-2') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool', 'false') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag', '\"Five\"') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newint', '7') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newbool', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newstr', '\"newvalue\"') WHERE ID = 7");
 
         debugPrintJsonDoc("with new primitive values", client, 4, 7);
 
@@ -879,16 +974,23 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newobj.newbool", "true", 4);
 
         // Call the SET_FIELD function directly, using ad-hoc queries
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.veggies', '\"bad for you\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.fruits', '-1') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.meats', '\"yuck\"') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newbool', 'true') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newint', '7') WHERE ID = 4");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newstr', '\"newvalue\"') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.veggies', '\"bad for you\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.fruits', '-1') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.meats', '\"yuck\"') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newbool', 'true') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newint', '7') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newstr', '\"newvalue\"') WHERE ID = 4");
 
         // Test \ escape for dot in element name, not used for sub-path
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "dot\\.char", "\"bar.foo\"", 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'dot\\.char', '\"bar.foo\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'dot\\.char', '\"bar.foo\"') WHERE ID = 2");
 
         debugPrintJsonDoc("with new object values", client, 1, 2, 3, 4);
 
@@ -966,24 +1068,40 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr3d[1][1][-1]", 8, 4);
 
         // Call the SET_FIELD function directly, using ad-hoc queries
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1]', '-2') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[4]', '-5') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-5') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-6') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0]', '-1') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][0]', '\"Four\"') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][0]', '-2') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][1]', '-3') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][-1]', '-6') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][3]', '-5') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[3]', 'true') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '\"newvalue\"') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[2]', '7') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr3d[-1][-1][-1]', '9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1]', '-2') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[4]', '-5') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-5') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-6') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0]', '-1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][0]', '\"Four\"') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][0]', '-2') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][1]', '-3') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][-1]', '-6') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][3]', '-5') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[3]', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '\"newvalue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[2]', '7') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr3d[-1][-1][-1]', '9') WHERE ID = 7");
 
         // Test \ escape for brackets in element name, not used for array index
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bracket]\\[\\[] \\[ ] chars", "\"[bar]\"", 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bracket]\\[\\[] \\[ ] chars', '\"[bar]\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc",
+                "bracket]\\[\\[] \\[ ] chars", "\"[bar]\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bracket]\\[\\[] \\[ ] chars', '\"[bar]\"') WHERE ID = 2");
 
         debugPrintJsonDoc("with new array values", client, 1, 2, 3, 4, 7);
 
@@ -1069,9 +1187,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "[-1]", -5, 10);
 
         // Call the SET_FIELD function directly, using ad-hoc queries
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[1]', '-2') WHERE ID = 10");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[5]', '-6') WHERE ID = 10");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[-1]', '-7') WHERE ID = 10");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[1]', '-2') WHERE ID = 10");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[5]', '-6') WHERE ID = 10");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[-1]', '-7') WHERE ID = 10");
 
         debugPrintJsonDoc("with new nameless array values", client, 10);
 
@@ -1138,18 +1259,27 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[1].newint", "7", 4);
 
         // Call the SET_FIELD function directly, using ad-hoc queries
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[0]', '-1') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[1]', '-2') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newarr[-1]', '6') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newarr[-1]', '8') WHERE ID = 4");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].veggies', '\"bad for you\"') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].dairy', '-3') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[-1].newint', '6') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1].newint', '8') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[0]', '-1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[1]', '-2') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newarr[-1]', '6') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newarr[-1]', '8') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].veggies', '\"bad for you\"') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].dairy', '-3') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[-1].newint', '6') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1].newint', '8') WHERE ID = 4");
 
         // Confirm that these lines have no effect, since arr3d[0] is not an object:
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[0].newint", "-9", 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0].newint', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0].newint', '-9') WHERE ID = 2");
 
         debugPrintJsonDoc("with new object/array values", client, 1, 2, 3, 4);
 
@@ -1254,36 +1384,65 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Call the SET_FIELD function directly, using ad-hoc queries:
         // again, none of these have any effect
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id.veggies', '-9') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '\"-9.1\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool.veggies', 'true') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id.veggies', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc"
+                ,"UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggi" +
+                        "es', '\"-9.1\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc"
+                ,"UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool.veggies'" +
+                        ", 'true') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 2");
 
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id[0]', '-9') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '\"-9.1\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool[0]', 'true') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id[0]', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc"
+                ,"UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', " +
+                        "'\"-9.1\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool[0]', 'true') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 2");
 
         // Similar calls on a row without those primitives, arrays or objects defined do have an effect
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2.veggies', '-9') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '\"-9.1\"') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2.veggies', 'true') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 9");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2.veggies', '-9') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc"
+                ,"UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '\"-9.1\"') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc"
+                ,"UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2.veggies', 'true') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 9");
 
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2[0]', '-9') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '\"-9.1\"') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2[0]', 'true') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2[0]', '-9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '\"-9.1\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2[0]', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 7");
 
         debugPrintJsonDoc("with misplaced dot/index values", client, 4, 5, 7, 9);
 
@@ -1361,15 +1520,24 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[-1]", "9.1", 4);
 
         // Test the SET_FIELD function directly, using an ad-hoc query
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric', '-2.3') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.numeric', '-2.3') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][2]', '-4.5') WHERE ID = 1");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[2]', '-3.4') WHERE ID = 3");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].numeric', '-5.6') WHERE ID = 2");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newnum', '6.789') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newnum', '7.8') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[1]', '8.9') WHERE ID = 7");
-        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '9.1') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric', '-2.3') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.numeric', '-2.3') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][2]', '-4.5') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[2]', '-3.4') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].numeric', '-5.6') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newnum', '6.789') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newnum', '7.8') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[1]', '8.9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc",
+                "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '9.1') WHERE ID = 7");
 
         debugPrintJsonDoc("with new numeric values", client, 1, 2, 3, 4, 7);
 
@@ -1389,76 +1557,95 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6879, for various null values (in various parameters,
      *  with and without quotes), and related queries. */
-      // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
-//    public void testSET_FIELDFunctionWithNullValues() throws Exception {
-//        Client client = getClient();
-//        loadJS1(client);
-//
-//        // Call the SET_FIELD function with null first (JSON doc column) parameter
-//        // (using both the "NullSetFieldDocProc" Stored Proc and ad-hoc queries)
-//        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, "id", -1);
-//        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, null, -1);
-//        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, null, null);
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE SET_FIELD(null, 'id', '-1') IS NULL ORDER BY ID");
-//        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE SET_FIELD(null, null, '-1') IS NULL ORDER BY ID");
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT SET_FIELD(null, null, null) FROM JS1 WHERE ID = 5");
-//        // Or, similarly, where the DOC column has null value
-//        testProcWithValidJSON(TABLE_ROW8, client, "NullSetFieldProc", "id", -1);
-//        testProcWithValidJSON(TABLE_ROW8, client, "@AdHoc", "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', '-1') IS NULL ORDER BY ID");
-//        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 8");
-//
-//        // Call the SET_FIELD function with null second ("path") parameter
-//        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client, "NullSetFieldProc", null, -1);
-//        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client, "@AdHoc",
-//                                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, null, '-1') IS NULL");
-//
-//        // Call the SET_FIELD function with null third ("value") parameter
-//        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client, "NullSetFieldProc", "id", null);
-//        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client, "@AdHoc",
-//                                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', null) IS NULL");
-//
-//        // Call the SET_FIELD function with quoted-null second ("path") parameter
-//        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithValidJSON("{\"null\":-1}", client, "SelectSetFieldProc", "null", -1, 5);
-//        testProcWithValidJSON("{\"null\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'null', '-1') FROM JS1 WHERE ID = 5");
-//        // Similar single-quotes, but without null:
-//        testProcWithValidJSON("{\"foo\":-1}", client, "SelectSetFieldProc", "foo", -1, 5);
-//        testProcWithValidJSON("{\"foo\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'foo', '-1') FROM JS1 WHERE ID = 5");
-//        // Note: quotes for "null" are double-escaped, for Java and JSON; the
-//        // resulting JSON document is actually: {"\"null\"":-1}
-//        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "SelectSetFieldProc", "\"null\"", -1, 5);
-//        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, '\"null\"', '-1') FROM JS1 WHERE ID = 5");
-//        // Similar double-quotes, but without null:
-//        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "SelectSetFieldProc", "\"foo\"", -1, 5);
-//        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, '\"foo\"', '-1') FROM JS1 WHERE ID = 5");
-//
-//        // Call the SET_FIELD function with quoted-null third ("value") parameter
-//        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
-//        testProcWithValidJSON("{\"id\":null}", client, "SelectSetFieldProc", "id", "null", 5);
-//        testProcWithValidJSON("{\"id\":null}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', 'null') FROM JS1 WHERE ID = 5");
-//        // Similar single-quotes, but with non-null string (which is invalid):
-//        testProcWithInvalidJSON("Invalid JSON * Line 1, Column 1\n  Syntax error: value, object or array expected",
-//                                client, "SelectSetFieldProc", "id", "foo", 5);
-//        testProcWithInvalidJSON("Invalid JSON * Line 1, Column 1\n  Syntax error: value, object or array expected",
-//                                client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', 'foo') FROM JS1 WHERE ID = 5");
-//        // Note: quotes for "id" and "null" are escaped for Java; the resulting
-//        // JSON document is actually: {"id":"null"}
-//        testProcWithValidJSON("{\"id\":\"null\"}", client, "SelectSetFieldProc", "id", "\"null\"", 5);
-//        testProcWithValidJSON("{\"id\":\"null\"}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '\"null\"') FROM JS1 WHERE ID = 5");
-//        // Similar double-quotes, but without null:
-//        testProcWithValidJSON("{\"id\":\"foo\"}", client, "SelectSetFieldProc", "id", "\"foo\"", 5);
-//        testProcWithValidJSON("{\"id\":\"foo\"}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '\"foo\"') FROM JS1 WHERE ID = 5");
-//        // Without quotes, for comparison:
-//        testProcWithValidJSON("{\"id\":-1}", client, "SelectSetFieldProc", "id", -1, 5);
-//        testProcWithValidJSON("{\"id\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 5");
-//
-//        // Another edge case (not involving null), when the third ("value")
-//        // parameter is a JSON object
-//        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "SelectSetFieldProc", "id", "{\"foo\":-1}", 5);
-//        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '{\"foo\":-1}') FROM JS1 WHERE ID = 5");
-//    }
+    public void testSET_FIELDFunctionWithNullValues() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        // Call the SET_FIELD function with null first (JSON doc column) parameter
+        // (using both the "NullSetFieldDocProc" Stored Proc and ad-hoc queries)
+        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, "id", -1);
+        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, null, -1);
+        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, null, null);
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE SET_FIELD(null, 'id', '-1') IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE SET_FIELD(null, null, '-1') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT SET_FIELD(null, null, null) FROM JS1 WHERE ID = 5");
+        // Or, similarly, where the DOC column has null value
+        testProcWithValidJSON(TABLE_ROW8, client, "NullSetFieldProc", "id", -1);
+        testProcWithValidJSON(TABLE_ROW8, client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', '-1') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 8");
+
+        // Call the SET_FIELD function with null second ("path") parameter
+        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client,
+                "NullSetFieldProc", null, -1);
+        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, null, '-1') IS NULL");
+
+        // Call the SET_FIELD function with null third ("value") parameter
+        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client,
+                "NullSetFieldProc", "id", null);
+        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client, "@AdHoc",
+                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', null) IS NULL");
+
+        // Call the SET_FIELD function with quoted-null second ("path") parameter
+        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithValidJSON("{\"null\":-1}", client, "SelectSetFieldProc", "null", -1, 5);
+        testProcWithValidJSON("{\"null\":-1}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'null', '-1') FROM JS1 WHERE ID = 5");
+        // Similar single-quotes, but without null:
+        testProcWithValidJSON("{\"foo\":-1}", client, "SelectSetFieldProc", "foo", -1, 5);
+        testProcWithValidJSON("{\"foo\":-1}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'foo', '-1') FROM JS1 WHERE ID = 5");
+        // Note: quotes for "null" are double-escaped, for Java and JSON; the
+        // resulting JSON document is actually: {"\"null\"":-1}
+        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "SelectSetFieldProc",
+                "\"null\"", -1, 5);
+        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, '\"null\"', '-1') FROM JS1 WHERE ID = 5");
+        // Similar double-quotes, but without null:
+        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "SelectSetFieldProc",
+                "\"foo\"", -1, 5);
+        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, '\"foo\"', '-1') FROM JS1 WHERE ID = 5");
+
+        // Call the SET_FIELD function with quoted-null third ("value") parameter
+        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithValidJSON("{\"id\":null}", client, "SelectSetFieldProc", "id", "null", 5);
+        testProcWithValidJSON("{\"id\":null}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', 'null') FROM JS1 WHERE ID = 5");
+        // Similar single-quotes, but with non-null string (which is invalid):
+        testProcWithInvalidJSON("Invalid JSON * Line 1, Column 1\n  Syntax error: value, object or array expected",
+                client, "SelectSetFieldProc", "id", "foo", 5);
+        testProcWithInvalidJSON("Invalid JSON * Line 1, Column 1\n  Syntax error: value, object or array expected",
+                client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', 'foo') FROM JS1 WHERE ID = 5");
+        // Note: quotes for "id" and "null" are escaped for Java; the resulting
+        // JSON document is actually: {"id":"null"}
+        testProcWithValidJSON("{\"id\":\"null\"}", client, "SelectSetFieldProc", "id", "\"null\"", 5);
+        testProcWithValidJSON("{\"id\":\"null\"}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', '\"null\"') FROM JS1 WHERE ID = 5");
+        // Similar double-quotes, but without null:
+        testProcWithValidJSON("{\"id\":\"foo\"}", client, "SelectSetFieldProc",
+                "id", "\"foo\"", 5);
+        testProcWithValidJSON("{\"id\":\"foo\"}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', '\"foo\"') FROM JS1 WHERE ID = 5");
+        // Without quotes, for comparison:
+        testProcWithValidJSON("{\"id\":-1}", client, "SelectSetFieldProc", "id", -1, 5);
+        testProcWithValidJSON("{\"id\":-1}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 5");
+
+        // Another edge case (not involving null), when the third ("value")
+        // parameter is a JSON object
+        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "SelectSetFieldProc",
+                "id", "{\"foo\":-1}", 5);
+        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "@AdHoc",
+                "SELECT SET_FIELD(DOC, 'id', '{\"foo\":-1}') FROM JS1 WHERE ID = 5");
+    }
 
     public void testARRAY_ELEMENTFunction() throws Exception {
         ClientResponse cr;
@@ -1474,18 +1661,16 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(1L,result.getLong(0));
 
         try {
-            cr = client.callProcedure("IdArrayProc", "arr", "NotNumeric", "1");
+            client.callProcedure("IdArrayProc", "arr", "NotNumeric", "1");
             fail("parameter check failed");
-        }
-        catch ( ProcCallException pcex) {
+        } catch ( ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
         }
 
         try {
             cr = client.callProcedure("IdArrayProc", 1, 1, "1");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
+        } catch ( ProcCallException pcex) {
             fail("parameter check failed");
         }
 
@@ -1509,7 +1694,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertTrue(result.wasNull());
 
         cr = client.callProcedure("@AdHoc", // test negative index
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), -1) FROM JS1 WHERE ID = 1");
+                "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), -1) FROM JS1 WHERE ID = 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1518,7 +1703,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertTrue(result.wasNull());
 
         cr = client.callProcedure("@AdHoc", // test scalar not an array
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'id'), 1) FROM JS1 WHERE ID = 1");
+                "SELECT ARRAY_ELEMENT(FIELD(DOC, 'id'), 1) FROM JS1 WHERE ID = 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1527,7 +1712,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertTrue(result.wasNull());
 
         cr = client.callProcedure("@AdHoc", // test object not an array
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'inner'), 1) FROM JS1 WHERE ID = 1");
+                "SELECT ARRAY_ELEMENT(FIELD(DOC, 'inner'), 1) FROM JS1 WHERE ID = 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1578,18 +1763,16 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(3L,result.getLong(0));
 
         try {
-            cr = client.callProcedure("IdArrayLengthProc", "arr", "NoNumber");
+            client.callProcedure("IdArrayLengthProc", "arr", "NoNumber");
             fail("parameter check failed");
-        }
-        catch ( ProcCallException pcex) {
+        } catch ( ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
         }
 
         try {
             cr = client.callProcedure("IdArrayLengthProc", 1, 3);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
+        } catch ( ProcCallException pcex) {
             fail("parameter check failed");
         }
 
@@ -1687,14 +1870,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr;
 
-        cr = client.callProcedure(
-                "JSBAD.insert", 1, // OOPS. skipped comma before "bool"
-                "{\"id\":1 \"bool\": false}"
-                );
+        cr = client.callProcedure("JSBAD.insert", 1, // OOPS. skipped comma before "bool"
+                "{\"id\":1 \"bool\": false}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure(
-                "JSBAD.insert", 2, // OOPS. semi-colon in place of colon before "bool"
+        cr = client.callProcedure("JSBAD.insert", 2, // OOPS. semi-colon in place of colon before "bool"
                 "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません\"}"
                 );
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1713,34 +1893,30 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         for (String procname : jsonProcs) {
             try {
-                cr = client.callProcedure(procname, 1, "id", "1");
+                client.callProcedure(procname, 1, "id", "1");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 9"));
             }
 
             try {
-                cr = client.callProcedure(procname, 2, "id", "2");
+                client.callProcedure(procname, 2, "id", "2");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 16"));
             }
 
             try {
-                cr = client.callProcedure(procname, 3, "id", "3");
+                client.callProcedure(procname, 3, "id", "3");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 30"));
             }
 
             try {
-                cr = client.callProcedure(procname, 4, "id", "4");
+                client.callProcedure(procname, 4, "id", "4");
                 fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
+            } catch(ProcCallException pcex) {
                 assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 11"));
             }
         }
@@ -1755,7 +1931,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
+        VoltServerConfig config;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestFunctionsForJSON.class);
         boolean success;
@@ -1852,7 +2028,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         // CONFIG #1: Local Site/Partition running on JNI backend

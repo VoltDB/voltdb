@@ -361,7 +361,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         final Client client = getClient();
         fillTable(client, "t", 0);
         final String expectedErrorMessage =
-                m_usingCalcite ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
+                USING_CALCITE ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
         verifyStmtFails(client, "select pk, poly + poly from t order by pk", expectedErrorMessage);
         verifyStmtFails(client, "select pk, poly + 1 from t order by pk", expectedErrorMessage);
     }
