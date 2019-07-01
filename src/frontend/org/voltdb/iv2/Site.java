@@ -1001,8 +1001,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // Multi part AdHoc Does not need to be checked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage) {
             FragmentTaskMessage msg = (FragmentTaskMessage)tibm;
-
-            // @AdHoc_RW_MP fragments should not be filtered out
             if (!msg.isSysProcTask()) {
                 return false;
             }
