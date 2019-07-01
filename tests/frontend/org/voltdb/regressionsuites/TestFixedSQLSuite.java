@@ -2471,10 +2471,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // test overflow and any underflow decimal are rounded
             sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
             if (isHSQL()) {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                final String expectedErrorMessage = m_usingCalcite ?
+                        "Numeric literal '111111111111111111111111111111111111111.1111' out of range" :
+                        "Precision of 111111111111111111111111111111111111113.1111 to the left of the decimal point is 39 and the max is 26";
+                verifyStmtFails(client, sql, expectedErrorMessage);
+                verifyStmtFails(client, sql, expectedErrorMessage);
             } else {
-                verifyStmtFails(client, sql, "Numeric literal '111111111111111111111111111111111111111.1111' out of range");
+                final String expectedErrorMessage = m_usingCalcite ?
+                        "Numeric literal '111111111111111111111111111111111111111.1111' out of range" :
+                        "Maximum precision exceeded. Maximum of 26 digits to the left of the decimal point";
+                verifyStmtFails(client, sql, expectedErrorMessage);
             }
 
             // ENG-15234
@@ -2485,7 +2491,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
             runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
 
             sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
-            verifyStmtFails(client, sql, "Numeric literal '1.1111111111111111111E368' out of range");
+            verifyStmtFails(client, sql, m_usingCalcite ?
+                    "Numeric literal '1.1111111111111111111E368' out of range" :
+                    "java.lang.NumberFormatException");
 
 
             // test stored procedure
@@ -2962,7 +2970,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         String sql;
         VoltTable vt;
-        final String vdbPlannerError = "Aggregate expression is illegal in ORDER BY clause of non-aggregating SELECT";
+        final String vdbPlannerError = m_usingCalcite ?
+                "Aggregate expression is illegal in ORDER BY clause of non-aggregating SELECT" :
+                "Aggregate functions are not allowed in the ORDER BY clause if they do not also appear in the SELECT list.";
         final String hsqlPlannerError = "invalid ORDER BY expression";
 
         // In this bug, both HSQL and VoltDB could not handle queries with:

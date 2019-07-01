@@ -29,19 +29,20 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.plannerv2.SqlBatch;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 public class AdHoc extends AdHocNTBase {
+
+    @Override
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        return runInternal(params);
+    }
 
     /**
      * Run an AdHoc query batch through Calcite parser and planner. If there is
@@ -56,7 +57,8 @@ public class AdHoc extends AdHocNTBase {
      * @since 9.0
      * @author Yiqun Zhang
      */
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingCalcite(ParameterSet params) throws SqlParseException {
         // TRAIL [Calcite-AdHoc-DQL/DML:0] AdHoc.run()
         // TRAIL [Calcite-AdHoc-DDL:0] AdHoc.run()
         /**
@@ -67,81 +69,58 @@ public class AdHoc extends AdHocNTBase {
          * eliminated. They both need to be re-designed in the new Calcite
          * framework.
          */
-        SqlBatch batch;
-        try {
-            // We do not need to worry about the ParameterSet,
+        try { // We do not need to worry about the ParameterSet;
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-            batch = SqlBatch.from(params, m_context, ExplainMode.NONE);
-            return batch.execute();
-        } catch (PlannerFallbackException | SqlParseException ex) {
-            // Use the legacy planner to run this.
-            return runFallback(params);
-        } catch (Exception ex) {
-            // For now, let's just fail the batch if any error happens.
+            return SqlBatch.from(params, m_context, ExplainMode.NONE).execute();
+        } catch (PlannerFallbackException | SqlParseException ex) { // Use the legacy planner to run this.
+            throw ex;
+        } catch (Exception ex) {        // For any other non-calcite related exceptions, fail the batch.
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getMessage());
         }
     }
 
-    public CompletableFuture<ClientResponse> runFallback(ParameterSet params) {
+    @Override
+    protected CompletableFuture<ClientResponse> runUsingLegacy(ParameterSet params) {
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
         }
 
-        Object[] paramArray = params.toArray();
-        String sql = (String) paramArray[0];
-        Object[] userParams = null;
-        if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
-        }
+        final Object[] paramArray = params.toArray();
+        final String sql = (String) paramArray[0];
+        final Object[] userParams = params.size() > 1 ? Arrays.copyOfRange(paramArray, 1, paramArray.length) : null;
 
-        List<String> sqlStatements = new ArrayList<>();
-        AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
-        if (mix == AdHocSQLMix.EMPTY) {
-            // we saw neither DDL or DQL/DML. Make sure that we get a
-            // response back to the client
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Failed to plan, no SQL statement provided.");
+        final List<String> sqlStatements = new ArrayList<>();
+        switch (processAdHocSQLStmtTypes(sql, sqlStatements)) {
+            case EMPTY:                 // we saw neither DDL or DQL/DML. Make sure that we get a response back to the client
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Failed to plan, no SQL statement provided.");
+            case MIXED:                 // No mixing DDL and DML/DQL. Turn this into an error returned to client.
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "DDL mixed with DML and queries is unsupported.");
+            case ALL_DML_OR_DQL:        // this is where we run non-DDL sql statements
+                return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(), sqlStatements, true,
+                        null, // no partition key
+                        ExplainMode.NONE, m_backendTargetType.isLargeTempTableTarget, // back end dependent
+                        false, // is not swap tables
+                        userParams);
+            case ALL_DDL:               // Since we are not going through Calcite, there is no need to update CalciteSchema.
+                return runDDLBatch(sqlStatements, Collections.emptyList());
+            default:                    // should never reach here
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "Unsupported/unknown SQL statement type.");
         }
-
-        else if (mix == AdHocSQLMix.MIXED) {
-            // No mixing DDL and DML/DQL. Turn this into an error returned to
-            // client.
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, "DDL mixed with DML and queries is unsupported.");
-        }
-
-        else if (mix == AdHocSQLMix.ALL_DML_OR_DQL) {
-            // this is where we run non-DDL sql statements
-            return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(), sqlStatements, true, // infer
-                                                                                              // partitioning
-                    null, // no partition key
-                    ExplainMode.NONE, m_backendTargetType.isLargeTempTableTarget, // back
-                                                                                  // end
-                                                                                  // dependent.
-                    false, // is not swap tables
-                    userParams);
-        }
-
-        // at this point assume all DDL
-        assert (mix == AdHocSQLMix.ALL_DDL);
-        // Since we are not going through Calcite, there is no need to update
-        // CalciteSchema.
-        return runDDLBatch(sqlStatements, Collections.emptyList());
     }
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
-        // conflictTables tracks dropped tables before removing the ones that
-        // don't have CREATEs.
-        SortedSet<String> conflictTables = new TreeSet<>();
-        Set<String> createdTables = new HashSet<>();
+        // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
+        final SortedSet<String> conflictTables = new TreeSet<>();
+        final Set<String> createdTables = new HashSet<>();
 
-        for (String stmt : sqlStatements) {
-            // check that the DDL is allowed
+        for (String stmt : sqlStatements) {         // check that the DDL is allowed
             String rejectionExplanation = SQLLexer.checkPermitted(stmt);
             if (rejectionExplanation != null) {
                 return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, rejectionExplanation);
             }
 
-            String ddlToken = SQLLexer.extractDDLToken(stmt);
+            final String ddlToken = SQLLexer.extractDDLToken(stmt);
             // make sure not to mix drop and create in the same batch for the
             // same table
             if (ddlToken.equals("drop")) {
@@ -156,7 +135,6 @@ public class AdHoc extends AdHocNTBase {
                 }
             }
         }
-
         // check for conflicting DDL create/drop table statements.
         // unhappy if the intersection is empty
         conflictTables.retainAll(createdTables);
@@ -170,28 +148,22 @@ public class AdHoc extends AdHocNTBase {
             sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
                     + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, sb.toString());
-        }
-
-        if (!allowPausedModeWork(false, isAdminConnection())) {
+        } else if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
+        } else {
+            final boolean useAdhocDDL = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
+            if (!useAdhocDDL) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                        "Cluster is configured to use @UpdateApplicationCatalog "
+                                + "to change application schema.  AdHoc DDL is forbidden.");
+            } else {
+                logCatalogUpdateInvocation("@AdHoc");
+                return updateApplication("@AdHoc", null, /* operationBytes */
+                        null, sqlStatements.toArray(new String[0]), /* adhocDDLStmts */
+                        sqlNodes, null, false, true);
+            }
         }
-
-        boolean useAdhocDDL = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-        if (!useAdhocDDL) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                    "Cluster is configured to use @UpdateApplicationCatalog "
-                            + "to change application schema.  AdHoc DDL is forbidden.");
-        }
-
-        logCatalogUpdateInvocation("@AdHoc");
-
-        return updateApplication("@AdHoc", null, /* operationBytes */
-                null, /* operationString */
-                sqlStatements.toArray(new String[0]), /* adhocDDLStmts */
-                sqlNodes, null, /* replayHashOverride */
-                false, /* isPromotion */
-                true); /* useAdhocDDL */
     }
 
     /**
@@ -205,7 +177,6 @@ public class AdHoc extends AdHocNTBase {
      * @since 9.0
      */
     private class AdHocContext extends AdHocNTBaseContext {
-
         @Override public CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements,
                 List<SqlNode> sqlNodes) {
             return AdHoc.this.runDDLBatch(sqlStatements, sqlNodes);
