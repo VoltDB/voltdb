@@ -48,6 +48,7 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.SerializationHelper;
 
@@ -1450,12 +1451,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public boolean activateTableStream(
             int tableId,
             TableStreamType streamType,
+            HiddenColumnFilter hiddenColumnFilter,
             long undoQuantumToken,
             byte[] predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.put(hiddenColumnFilter.getId());
         m_data.putLong(undoQuantumToken);
         m_data.put(predicates); // predicates
 

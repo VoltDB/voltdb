@@ -50,6 +50,7 @@ import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -276,6 +277,7 @@ public class SnapshotSaveAPI
                     else {
                         context.getSiteSnapshotConnection().initiateSnapshots(
                                 format,
+                                SnapshotRequestConfig.getHiddenColumnFilter(finalJsData),
                                 taskList,
                                 multiPartTxnId,
                                 m_isTruncation,

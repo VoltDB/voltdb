@@ -38,8 +38,8 @@ class PersistentTableSurgeon;
 
 class CopyOnWriteContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
-                                              TableStreamType, const std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TableStreamType,
+            const  HiddenColumnFilter&, const std::vector<std::string>&);
 
 public:
 
@@ -99,6 +99,7 @@ private:
     CopyOnWriteContext(PersistentTable &table,
                        PersistentTableSurgeon &surgeon,
                        int32_t partitionId,
+                       const HiddenColumnFilter &hiddenColumnFilter,
                        const std::vector<std::string> &predicateStrings,
                        int64_t totalTuples);
 
@@ -132,6 +133,7 @@ private:
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
     const bool m_replicated;
+    const HiddenColumnFilter m_hiddenColumnFilter;
 
     void checkRemainingTuples(const std::string &label);
 

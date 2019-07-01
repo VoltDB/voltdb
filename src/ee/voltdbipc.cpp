@@ -311,6 +311,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    voltdb::HiddenColumnFilter::Type hiddenColumnFilterType;
     int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
@@ -1383,7 +1384,8 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, activateTableStreamCommand->hiddenColumnFilterType,
+                undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;

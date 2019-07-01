@@ -63,6 +63,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -266,7 +267,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        public boolean activateTableStream(int tableId, TableStreamType type, HiddenColumnFilter hiddenColumnFilter,
+                boolean undo, byte[] predicates)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }

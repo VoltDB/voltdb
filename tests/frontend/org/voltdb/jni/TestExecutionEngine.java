@@ -54,6 +54,7 @@ import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
 import junit.framework.TestCase;
 
@@ -371,7 +372,8 @@ public class TestExecutionEngine extends TestCase {
                                 true);
 
         // Build the index
-        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates.toBytes());
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, HiddenColumnFilter.NONE,
+                Long.MAX_VALUE, predicates.toBytes());
 
         // Humor serializeMore() by providing a buffer, even though it's not used.
         final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);

@@ -141,8 +141,6 @@ TEST_F(TableTupleTest, ToJsonArray)
     tuple.setHiddenNValue(0, nvalHiddenBigint);
     tuple.setHiddenNValue(1, nvalHiddenBigint);
 
-    puts(tuple.toJsonArray().c_str());
-    //EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]"));
     EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"\\u6570\\u636e\\u5e93\",\"null\"]"));
 
     nvalVisibleString.free();
@@ -346,6 +344,74 @@ TEST_F(TableTupleTest, HeaderDefaults) {
     ASSERT_FALSE(theTuple.isPendingDeleteOnUndoRelease());
     ASSERT_TRUE(theTuple.inlinedDataIsVolatile());
     ASSERT_FALSE(theTuple.nonInlinedDataIsVolatile());
+}
+
+TEST_F(TableTupleTest, HiddenColumnSerialization) {
+    UniqueEngine engine = UniqueEngineBuilder().build();
+    Pool pool;
+
+    TupleSchemaBuilder schemaBuilder(3, 2);
+    schemaBuilder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    schemaBuilder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 60);
+    schemaBuilder.setColumnAtIndex(2, VALUE_TYPE_INTEGER);
+    schemaBuilder.setHiddenColumnAtIndex(0, HiddenColumn::MIGRATE_TXN);
+    schemaBuilder.setHiddenColumnAtIndex(1, HiddenColumn::XDCR_TIMESTAMP);
+
+    ScopedTupleSchema schema(schemaBuilder.build());
+    char *storage = static_cast<char*>(pool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    TableTuple tuple(storage, schema.get());
+
+    NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
+    NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
+    NValue nvalVisibleInt = ValueFactory::getIntegerValue(1000);
+    NValue nvalHiddenMigrate = ValueFactory::getBigIntValue(1066);
+    NValue nvalHiddenXdcr = ValueFactory::getBigIntValue(1067);
+
+    tuple.setNValue(0, nvalVisibleBigint);
+    tuple.setNValue(1, nvalVisibleString);
+    tuple.setNValue(2, nvalVisibleInt);
+    tuple.setHiddenNValue(0, nvalHiddenMigrate);
+    tuple.setHiddenNValue(1, nvalHiddenXdcr);
+
+    char serialized[128];
+    ReferenceSerializeOutput unfilteredOutput(serialized, sizeof(serialized));
+    HiddenColumnFilter filterNone = HiddenColumnFilter::create(HiddenColumnFilter::NONE, schema.get());
+    tuple.serializeTo(unfilteredOutput, &filterNone);
+
+    // Reserved size + 3 bigints + string + integer
+    int unfilteredSize = 4 + NValue::getTupleStorageSize(VALUE_TYPE_BIGINT) * 3 + (4 + 6) +
+            NValue::getTupleStorageSize(VALUE_TYPE_INTEGER);
+    ASSERT_EQ(unfilteredSize, unfilteredOutput.size());
+
+    // Validate serialized contents has all columns
+    ReferenceSerializeInputBE unfilteredDeserailizer(serialized, unfilteredSize);
+    ASSERT_EQ(unfilteredSize - 4, unfilteredDeserailizer.readInt());
+    ASSERT_EQ(0, nvalVisibleBigint.compare(ValueFactory::getBigIntValue(unfilteredDeserailizer.readLong())));
+    ASSERT_EQ(0, nvalVisibleString.compare(ValueFactory::getStringValue(unfilteredDeserailizer.readTextString(), &pool)));
+    ASSERT_EQ(0, nvalVisibleInt.compare(ValueFactory::getBigIntValue(unfilteredDeserailizer.readInt())));
+    ASSERT_EQ(0, nvalHiddenMigrate.compare(ValueFactory::getBigIntValue(unfilteredDeserailizer.readLong())));
+    ASSERT_EQ(0, nvalHiddenXdcr.compare(ValueFactory::getBigIntValue(unfilteredDeserailizer.readLong())));
+    ASSERT_FALSE(unfilteredDeserailizer.hasRemaining());
+
+    ::memset(serialized, '\0', sizeof(serialized));
+    ReferenceSerializeOutput filteredOutput(serialized, sizeof(serialized));
+
+    HiddenColumnFilter filterMigrate = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, schema.get());
+    tuple.serializeTo(filteredOutput, &filterMigrate);
+
+    int filteredSize = unfilteredSize - NValue::getTupleStorageSize(VALUE_TYPE_BIGINT);
+    ASSERT_EQ(filteredSize, filteredOutput.size());
+
+    // Validate serialized contents has everything except the hidden migrate column
+    ReferenceSerializeInputBE filteredDeserailizer(serialized, filteredSize);
+    ASSERT_EQ(filteredSize - 4, filteredDeserailizer.readInt());
+    ASSERT_EQ(0, nvalVisibleBigint.compare(ValueFactory::getBigIntValue(filteredDeserailizer.readLong())));
+    ASSERT_EQ(0, nvalVisibleString.compare(ValueFactory::getStringValue(filteredDeserailizer.readTextString(), &pool)));
+    ASSERT_EQ(0, nvalVisibleInt.compare(ValueFactory::getBigIntValue(filteredDeserailizer.readInt())));
+    ASSERT_EQ(0, nvalHiddenXdcr.compare(ValueFactory::getBigIntValue(filteredDeserailizer.readLong())));
+    ASSERT_FALSE(unfilteredDeserailizer.hasRemaining());
+
+    nvalVisibleString.free();
 }
 
 int main() {

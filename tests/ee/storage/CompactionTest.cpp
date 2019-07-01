@@ -492,7 +492,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     char config[5];
     ::memset(config, 0, 5);
     ReferenceSerializeInputBE input(config, 5);
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
 
     for (int qq = 0; qq < 3; qq++) {
 #ifdef MEMCHECK
@@ -637,7 +637,7 @@ TEST_F(CompactionTest, TestENG897) {
     ::memset(config, 0, 5);
     ReferenceSerializeInputBE input(config, 5);
 
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input);
     for (int ii = 0; ii < 16130; ii++) {
         if (ii % 2 == 0) {
             continue;
@@ -678,7 +678,7 @@ TEST_F(CompactionTest, TestENG897) {
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
     ReferenceSerializeInputBE input2(config, 5);
-    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, HiddenColumnFilter::NONE, 0, m_tableId, input2);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();
     m_table->doIdleCompaction();

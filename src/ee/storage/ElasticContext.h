@@ -30,7 +30,6 @@ class CopyOnWriteTest;
 
 namespace voltdb {
 
-class PersistentTable;
 class TupleOutputStreamProcessor;
 
 class ElasticContext : public TableStreamerContext
