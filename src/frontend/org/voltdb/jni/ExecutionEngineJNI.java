@@ -59,7 +59,6 @@ import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
-import sun.misc.ObjectInputFilter;
 
 /**
  * Wrapper for native Execution Engine library.
