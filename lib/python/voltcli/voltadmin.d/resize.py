@@ -37,23 +37,16 @@ class Option:
                                   '''Conditions that can be ignored when resizing the cluster:
                                   disabled_export -- ignore pending export data for targets that are disabled''',
                                   default = ''),
-            VOLT.BooleanOption(None, '--test', 'test', 'Check the feasibility of current resizing plan.)', default = False),
-            VOLT.BooleanOption(None, '--restart', 'restart', 'Restart the previous failed resizing operation.', default = False),
-            VOLT.BooleanOption(None, '--status', 'status', 'Check the resizing progress.', default = False),
-            VOLT.BooleanOption(None, '--update', 'update', 'Update the options for the current resizing operation.', default = False),
+            VOLT.StringOption(None, '--test', 'opt', 'Check the feasibility of current resizing plan.', action='store_const', const=Option.TEST),
+            VOLT.StringOption(None, '--restart', 'opt', 'Restart the previous failed resizing operation.', action='store_const', const=Option.RESTART),
+            VOLT.StringOption(None, '--status', 'opt', 'Check the resizing progress.', action='store_const', const=Option.STATUS),
+            VOLT.StringOption(None, '--update', 'opt', 'Update the options for the current resizing operation.', action='store_const', const=Option.UPDATE),
     ),
-
 )
 
 def resize(runner):
-    if runner.opts.test:
-        procedureCaller(runner, Option.TEST)
-    elif runner.opts.restart:
-        procedureCaller(runner, Option.RESTART)
-    elif runner.opts.update:
-        procedureCaller(runner, Option.UPDATE)
-    elif runner.opts.status:
-        procedureCaller(runner, Option.STATUS)
+    if runner.opts.opt is not None:
+        procedureCaller(runner, runner.opts.opt)
     else:
         procedureCaller(runner, Option.START)
 
