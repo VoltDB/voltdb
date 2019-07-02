@@ -200,8 +200,7 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
                         "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY wage;",
                 new long[][] {{10, Long.MIN_VALUE, 1}});
 
-        if (!USING_CALCITE) {
-            // temperally disabled, see ENG-15229
+        if (!USING_CALCITE) { // temperally disabled, see ENG-15229
             validateTableOfLongs(client,
                     "select S1.wage, count(*) from S1 Right Join S2 " +
                             "on S2.wage is distinct from (SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +

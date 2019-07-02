@@ -1195,10 +1195,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 //        r = cr.getResults()[0];
 //        r.advanceRow();
-//        for (int i=0; i< 8; i++) {
-//            assertNull(r.getLong(i));
-//        }
-//        assertNull(r.getLong(8));
+//        assertNull(r.get(8, VoltType.TIMESTAMP));
 
 
         subtestExtract(client, "EXTRACT_TIMESTAMP");

@@ -493,7 +493,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 }
                 valueBag.put(asExpected, count + 1);
             }
-//dumpQueryResults(client, "select * from number_types;");
+
             // Validate that sorting on the function value does not alter the ordering of its input values.
             results = orderFunctionRun(client, numTypeNames[jj]  + "_CAST", resultValues.length/COLUMNCOUNT);
 

@@ -2922,14 +2922,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Test null or illegal datepart
         boolean throwed = false;
-//        try {
-//            client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
-//        } catch (ProcCallException e) {
-//            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-//            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
-//            throwed = true;
-//        }
-//        assertTrue(throwed);
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
         throwed = false;
         try {
