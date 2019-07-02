@@ -256,9 +256,13 @@ public class SystemProcedureCatalog {
     // return true if the fragment or the system procedure is allowed to be replayed in TaskLog
     public static boolean isAllowableInTaskLog(Long fragId, String procName) {
         assert(s_allowableSysprocFragsInTaskLog != null && s_allowableSysprocsInTaskLog != null);
+
+        // Check specified fragment IDs
         if (s_allowableSysprocFragsInTaskLog.contains(fragId)) {
             return true;
         }
+
+        // If fragId is not in the allowed list, check proc name.
         if (procName != null) {
             return s_allowableSysprocsInTaskLog.contains(procName);
         }

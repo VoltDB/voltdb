@@ -1001,6 +1001,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (!msg.isSysProcTask()) {
             return true;
         }
+
+        // fragId is not always available before FragmentTask is executed. In this case, check sysproc name.
         long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
         return (SystemProcedureCatalog.isAllowableInTaskLog(fragId, msg.getProcedureName()));
     }
