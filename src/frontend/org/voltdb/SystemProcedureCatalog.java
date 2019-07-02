@@ -148,11 +148,11 @@ public class SystemProcedureCatalog {
 
     // Cache the fragments of VoltSysemProcedure which should be processed
     // when TaskLogs are replayed during rejoining.
-    static ImmutableSet<Long> s_sysProcFragmentsForReplay;
+    static ImmutableSet<Long> s_allowableSysprocFragsInTaskLog;
 
     // Cache VoltSysemProcedure by name which should be processed
     // when TaskLogs are replayed during rejoining.
-    static ImmutableSet<String> s_sysProcsForReplay;
+    static ImmutableSet<String> s_allowableSysprocsInTaskLog;
     static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
@@ -242,24 +242,25 @@ public class SystemProcedureCatalog {
     }
 
     // Set up the cache when system procedures are loaded on execution sites.
-    public static void collectSysFragmentOrProcForReplay(List<Long> fragments, List<String> procs) {
-        if (s_sysProcFragmentsForReplay == null && s_sysProcsForReplay == null){
+    public static void setupAllowableSysprocFragsInTaskLog(List<Long> fragments, List<String> procs) {
+        if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null){
             synchronized(SystemProcedureCatalog.class) {
-                if (s_sysProcFragmentsForReplay == null && s_sysProcsForReplay == null) {
-                    s_sysProcFragmentsForReplay = ImmutableSet.<Long>builder().addAll(fragments).build();
-                    s_sysProcsForReplay = ImmutableSet.<String>builder().addAll(procs).build();
+                if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null) {
+                    s_allowableSysprocFragsInTaskLog = ImmutableSet.<Long>builder().addAll(fragments).build();
+                    s_allowableSysprocsInTaskLog = ImmutableSet.<String>builder().addAll(procs).build();
                 }
             }
         }
     }
 
-    public static boolean isFragmentOrProcForReplay(Long fragId, String procName) {
-        assert(s_sysProcFragmentsForReplay != null && s_sysProcsForReplay != null);
-        if (s_sysProcFragmentsForReplay.contains(fragId)) {
+    // return true if the fragment or the system procedure is allowed to be replayed in TaskLog
+    public static boolean isAllowableInTaskLog(Long fragId, String procName) {
+        assert(s_allowableSysprocFragsInTaskLog != null && s_allowableSysprocsInTaskLog != null);
+        if (s_allowableSysprocFragsInTaskLog.contains(fragId)) {
             return true;
         }
         if (procName != null) {
-            return s_sysProcsForReplay.contains(procName);
+            return s_allowableSysprocsInTaskLog.contains(procName);
         }
         return false;
     }

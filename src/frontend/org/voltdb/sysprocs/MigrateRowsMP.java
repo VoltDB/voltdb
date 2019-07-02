@@ -35,7 +35,7 @@ public class MigrateRowsMP extends MigrateRowsBase {
     }
 
     @Override
-    public boolean shouldProcForReplay() {
+    public boolean allowableSysprocForTaskLog() {
         return true;
     }
 }

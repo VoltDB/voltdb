@@ -250,13 +250,13 @@ public class LoadedProcedureSet {
                     if (fragIds != null && fragIds.length > 0) {
                         durableFragments.addAll(Arrays.stream(fragIds).boxed().collect(Collectors.toList()));
                     }
-                    if (procedure.shouldProcForReplay()) {
+                    if (procedure.allowableSysprocForTaskLog()) {
                         replayableProcs.add("@" + runner.m_procedureName);
                     }
                 }
             }
         }
-        SystemProcedureCatalog.collectSysFragmentOrProcForReplay(durableFragments, replayableProcs);
+        SystemProcedureCatalog.setupAllowableSysprocFragsInTaskLog(durableFragments, replayableProcs);
         return builder.build();
     }
 

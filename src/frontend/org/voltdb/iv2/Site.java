@@ -1005,7 +1005,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return false;
             }
             long fragId = VoltSystemProcedure.hashToFragId(msg.getPlanHash(0));
-            return !(SystemProcedureCatalog.isFragmentOrProcForReplay(fragId, msg.getProcedureName()));
+            return !(SystemProcedureCatalog.isAllowableInTaskLog(fragId, msg.getProcedureName()));
         } else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
             final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());

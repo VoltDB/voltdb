@@ -49,7 +49,7 @@ public class NibbleDeleteMP extends NibbleDeleteBase {
     }
 
     @Override
-    public boolean shouldProcForReplay() {
+    public boolean allowableSysprocForTaskLog() {
         return true;
     }
 }

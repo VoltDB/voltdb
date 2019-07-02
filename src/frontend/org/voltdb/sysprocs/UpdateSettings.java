@@ -55,6 +55,14 @@ public class UpdateSettings extends VoltSystemProcedure {
         };
     }
 
+    @Override
+    public long[] getDurablePlanFragmentIds() {
+        return new long[]{
+                SysProcFragmentId.PF_updateSettingsBarrier,
+                SysProcFragmentId.PF_updateSettingsBarrierAggregate,
+                SysProcFragmentId.PF_updateSettings};
+    }
+
     public UpdateSettings() {
     }
 

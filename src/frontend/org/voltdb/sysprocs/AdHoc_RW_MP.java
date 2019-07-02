@@ -43,7 +43,7 @@ public class AdHoc_RW_MP extends AdHocBase {
     }
 
     @Override
-    public boolean shouldProcForReplay() {
+    public boolean allowableSysprocForTaskLog() {
         return true;
     }
 }
