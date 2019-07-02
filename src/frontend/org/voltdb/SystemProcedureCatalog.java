@@ -22,6 +22,8 @@ import java.util.List;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.messaging.FragmentTaskMessage;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -254,7 +256,7 @@ public class SystemProcedureCatalog {
     }
 
     // return true if the fragment or the system procedure is allowed to be replayed in TaskLog
-    public static boolean isAllowableInTaskLog(Long fragId, String procName) {
+    public static boolean isAllowableInTaskLog(Long fragId, FragmentTaskMessage msg) {
         assert(s_allowableSysprocFragsInTaskLog != null && s_allowableSysprocsInTaskLog != null);
 
         // Check specified fragment IDs
@@ -263,6 +265,7 @@ public class SystemProcedureCatalog {
         }
 
         // If fragId is not in the allowed list, check proc name.
+        String procName = msg.getProcedureName();
         if (procName != null) {
             return s_allowableSysprocsInTaskLog.contains(procName);
         }
