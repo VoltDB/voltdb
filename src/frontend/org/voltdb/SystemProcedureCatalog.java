@@ -248,7 +248,6 @@ public class SystemProcedureCatalog {
                 if (s_allowableSysprocFragsInTaskLog == null && s_allowableSysprocsInTaskLog == null) {
                     s_allowableSysprocFragsInTaskLog = ImmutableSet.<Long>builder().addAll(fragments).build();
                     s_allowableSysprocsInTaskLog = ImmutableSet.<String>builder().addAll(procs).build();
-                    System.out.println("*****" + s_allowableSysprocFragsInTaskLog + "||||" + s_allowableSysprocsInTaskLog);
                 }
             }
         }
