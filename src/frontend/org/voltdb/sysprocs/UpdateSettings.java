@@ -56,7 +56,7 @@ public class UpdateSettings extends VoltSystemProcedure {
     }
 
     @Override
-    public long[] getDurablePlanFragmentIds() {
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
         return new long[]{
                 SysProcFragmentId.PF_updateSettingsBarrier,
                 SysProcFragmentId.PF_updateSettingsBarrierAggregate,

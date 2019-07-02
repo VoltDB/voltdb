@@ -45,7 +45,7 @@ public class MigrateRowsAcked_MP extends VoltSystemProcedure {
     }
 
     @Override
-    public long[] getDurablePlanFragmentIds() {
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
         return new long[]{SysProcFragmentId.PF_migrateRows};
     }
 

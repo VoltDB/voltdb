@@ -245,8 +245,8 @@ public class LoadedProcedureSet {
                 }
 
                 builder.put(entry.getKey().intern(), runner);
-                if (!sysProc.singlePartition && sysProc.durable) {
-                    long[] fragIds =  procedure.getDurablePlanFragmentIds();
+                if (!sysProc.singlePartition) {
+                    long[] fragIds =  procedure.getAllowableSysprocFragIdsInTaskLog();
                     if (fragIds != null && fragIds.length > 0) {
                         durableFragments.addAll(Arrays.stream(fragIds).boxed().collect(Collectors.toList()));
                     }

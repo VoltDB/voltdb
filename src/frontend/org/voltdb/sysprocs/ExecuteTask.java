@@ -61,7 +61,7 @@ public class ExecuteTask extends VoltSystemProcedure
     }
 
     @Override
-    public long[] getDurablePlanFragmentIds() {
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
         return new long[] { SysProcFragmentId.PF_executeTask};
     }
 

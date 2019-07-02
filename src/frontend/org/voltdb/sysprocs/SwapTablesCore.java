@@ -42,7 +42,7 @@ public class SwapTablesCore extends AdHocBase {
     }
 
     @Override
-    public long[] getDurablePlanFragmentIds() {
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
         return new long[] { SysProcFragmentId.PF_swapTables};
     }
 
