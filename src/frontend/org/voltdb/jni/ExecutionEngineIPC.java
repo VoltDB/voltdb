@@ -1192,10 +1192,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
             final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
-            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken, boolean elastic)
+            long undoToken, LoadTableCaller caller)
     throws EEException
     {
-        if (returnUniqueViolations) {
+        if (caller == LoadTableCaller.DR || caller == LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS
+                || caller == LoadTableCaller.BALANCE_PARTITIONS) {
             throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
@@ -1208,9 +1209,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(lastCommittedSpHandle);
             m_data.putLong(uniqueId);
             m_data.putLong(undoToken);
-            m_data.putInt(returnUniqueViolations ? 1 : 0);
-            m_data.putInt(shouldDRStream ? 1 : 0);
-            m_data.putInt(elastic ? 1 : 0);
+            m_data.put(caller.getId());
             verifyDataCapacity(m_data.position() + tableBytes.remaining());
         } while (m_data.position() == 0);
 

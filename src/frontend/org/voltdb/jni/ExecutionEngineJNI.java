@@ -39,6 +39,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
@@ -488,10 +489,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long spHandle,
         final long lastCommittedSpHandle,
         final long uniqueId,
-        boolean returnUniqueViolations,
-        boolean shouldDRStream,
         long undoToken,
-        boolean elastic) throws EEException
+        LoadTableCaller caller) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -505,7 +504,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken, elastic);
+                                              undoToken, caller.getId());
         checkErrorCode(errorCode);
 
         try {
