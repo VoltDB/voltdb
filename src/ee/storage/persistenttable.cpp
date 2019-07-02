@@ -1647,7 +1647,7 @@ std::string PersistentTable::debug(const std::string& spacer) const {
  * Used for snapshot restore and bulkLoad
  */
 void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool *stringPool,
-      ReferenceSerializeOutput *uniqueViolationOutput, bool shouldDRStreamRows, bool ignoreTupleLimit, bool elastic) {
+      ReferenceSerializeOutput *uniqueViolationOutput, const LoadTableCaller &caller) {
     serialInput.readInt(); // rowstart
 
     serialInput.readByte();
@@ -1710,7 +1710,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         target.setPendingDeleteOnUndoReleaseFalse();
 
         try {
-            target.deserializeFrom(serialInput, stringPool, elastic);
+            target.deserializeFrom(serialInput, stringPool, caller.getId() == LoadTableCaller::BALANCE_PARTITIONS);
         } catch (SQLException &e) {
             deleteTupleStorage(target);
             throw;
@@ -1720,7 +1720,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         // exceptions should be thrown in the try-block is pretty
         // daring and likely not correct.
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
-                           shouldDRStreamRows, ignoreTupleLimit || elastic);
+                           caller.shouldDrStream(), caller.ignoreTupleLimit());
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured

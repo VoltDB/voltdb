@@ -135,6 +135,7 @@ SET (VOLTDB_SRC
   common/FatalException.cpp
   common/InterruptException.cpp
   common/LargeTempTableBlockCache.cpp
+  common/LoadTableCaller.cpp
   common/MiscUtil.cpp
   common/NValue.cpp
   common/PlannerDomValue.cpp

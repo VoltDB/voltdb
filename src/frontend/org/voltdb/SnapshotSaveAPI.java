@@ -295,6 +295,7 @@ public class SnapshotSaveAPI
                                 try {
                                     deferredSnapshotSetup = m_deferredSetupFuture.get();
                                 } catch (Exception e) {
+                                    e.printStackTrace();
                                     // it doesn't throw
                                 }
 

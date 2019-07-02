@@ -53,6 +53,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 
@@ -115,12 +116,14 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, Long.MAX_VALUE, LoadTableCaller.DR);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE, false);
+        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, Long.MAX_VALUE,
+                LoadTableCaller.DR);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
+        assertNotNull(results);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -147,7 +150,8 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, Long.MAX_VALUE,
+                LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
     }
 
     public void testLoadTable() throws Exception {
@@ -179,7 +183,8 @@ public class TestExecutionEngine extends TestCase {
         // Assemble a very long string.
         testTable.addRow(String.join("", Collections.nCopies(15, "我能吞下玻璃而不伤身体。")));
         try {
-            sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, false, false, Long.MAX_VALUE, false);
+            sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, Long.MAX_VALUE,
+                    LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
             fail("The loadTable() call is expected to fail, but did not.");
         }
         catch (SQLException ex) {
@@ -242,8 +247,9 @@ public class TestExecutionEngine extends TestCase {
             @Override
             public byte[] call() throws Exception {
                 try {
-                    byte[] rslt = source2Engine.get().loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
-                            returnUniqueViolations, false, Long.MAX_VALUE, false);
+                    byte[] rslt = source2Engine.get().loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0, Long.MAX_VALUE,
+                            returnUniqueViolations ? LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS
+                                    : LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
                     return rslt;
                 }
                 catch (ReplicatedTableException e) {
@@ -258,7 +264,8 @@ public class TestExecutionEngine extends TestCase {
         byte[] srcRslt = null;
         try {
             srcRslt = sourceEngine.loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
-                    returnUniqueViolations, false, Long.MAX_VALUE, false);
+                    Long.MAX_VALUE,
+                    returnUniqueViolations ? LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS : LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION);
         }
         catch (ConstraintFailureException e) {
             // srcRslt already null

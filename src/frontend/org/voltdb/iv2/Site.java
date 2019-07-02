@@ -94,6 +94,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -1107,40 +1108,28 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, String clusterName, String databaseName,
-            String tableName, VoltTable data,
-            boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
+    public byte[] loadTable(TransactionState state, String tableName,
+            VoltTable data, LoadTableCaller caller) throws VoltAbortException
     {
-        Cluster cluster = m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
-        }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
-        }
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = m_context.database.getTables().getIgnoreCase(tableName);
         if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database");
         }
 
-        return loadTable(txnId, spHandle, uniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo, false);
+        return loadTable(state.txnId, state.m_spHandle, state.uniqueId, table.getRelativeIndex(), data, caller);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId,
-            VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
-            boolean undo, boolean elastic)
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data,
+            LoadTableCaller caller)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                returnUniqueViolations,
-                shouldDRStream,
-                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
-                elastic);
+                caller.createUndoToken() ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE,
+                caller);
     }
 
     @Override

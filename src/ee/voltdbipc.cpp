@@ -280,9 +280,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
-    int32_t returnUniqueViolations;
-    int32_t shouldDRStream;
-    int32_t elastic;
+    int8_t callerId;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -997,9 +995,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
-    const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
-    const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
-    const bool elastic = loadTableCommand->elastic != 0;
+    const LoadTableCaller &caller = LoadTableCaller::get(static_cast<LoadTableCaller::Id>(loadTableCommand->callerId));
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -1007,8 +1003,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
 
         bool success = m_engine->loadTable(tableId, serialize_in,
-                                           txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream, undoToken, elastic);
+                                           txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken, caller);
         if (success) {
             return kErrorCode_Success;
         } else {

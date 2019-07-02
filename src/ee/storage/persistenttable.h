@@ -567,11 +567,9 @@ public:
      * Used for snapshot restore and bulkLoad
      */
     void loadTuplesForLoadTable(SerializeInputBE& serialInput,
-                                Pool* stringPool = NULL,
-                                ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                                bool shouldDRStreamRows = false,
-                                bool ignoreTupleLimit = true,
-                                bool elastic = false);
+                                Pool* stringPool,
+                                ReferenceSerializeOutput* uniqueViolationOutput,
+                                const LoadTableCaller &caller);
 
     inline TableType getTableType() const {
         return m_tableType;

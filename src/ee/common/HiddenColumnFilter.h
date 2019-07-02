@@ -31,8 +31,8 @@ class HiddenColumnFilter {
 public:
     // Values must match those also in java enum HiddenColumnFilterType
     enum Type : uint8_t {
-        NONE,
-        EXCLUDE_MIGRATE
+        NONE = 0,
+        EXCLUDE_MIGRATE = 1
     };
 
     inline static const HiddenColumnFilter create(Type type, const TupleSchema *schema) {

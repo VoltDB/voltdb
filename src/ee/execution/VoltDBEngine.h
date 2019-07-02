@@ -48,6 +48,7 @@
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
+#include "common/LoadTableCaller.h"
 #include "common/HiddenColumnFilter.h"
 #include "common/ThreadLocalPool.h"
 #include "common/UndoLog.h"
@@ -275,10 +276,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle,
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
-                       bool returnConflictRows,
-                       bool shouldDRStream,
                        int64_t undoToken,
-                       bool elastic);
+                       const LoadTableCaller &caller);
 
         /**
          * Reset the result buffer (use the nextResultBuffer by default)

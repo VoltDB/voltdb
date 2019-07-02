@@ -116,6 +116,37 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         CATALOG_LOAD
     }
 
+    /**
+     * Enum needs to align with LoadTableCaller in ee
+     */
+    public static enum LoadTableCaller {
+        SNAPSHOT_REPORT_UNIQ_VIOLATIONS(0, false),
+        SNAPSHOT_THROW_ON_UNIQ_VIOLATION(1, false),
+        DR(2, false),
+        BALANCE_PARTITIONS(3),
+        CLIENT(4);
+
+        private final byte m_id;
+        private final boolean m_undo;
+
+        private LoadTableCaller(int id) {
+            this(id, true);
+        }
+
+        private LoadTableCaller(int id, boolean undo) {
+            m_id = (byte) id;
+            m_undo = undo;
+        }
+
+        public byte getId() {
+            return m_id;
+        }
+
+        public boolean createUndoToken() {
+            return m_undo;
+        }
+    }
+
     private FragmentContext m_fragmentContext = FragmentContext.UNKNOWN;
 
     // is the execution site dirty
@@ -736,8 +767,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations,
-        boolean shouldDRStream, long undoToken, boolean elsaticJoin) throws EEException;
+            long lastCommittedSpHandle, long uniqueId, long undoToken, LoadTableCaller caller) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -981,17 +1011,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * This method is called to initially load table data.
-     * @param pointer the VoltDBEngine pointer
-     * @param table_id catalog ID of the table
-     * @param serialized_table the table data to be loaded
-     * @param Length of the serialized table
-     * @param undoToken token for undo quantum where changes should be logged.
-     * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
-     * @param undoToken The undo token to release
+     *
+     * @param pointer               the VoltDBEngine pointer
+     * @param table_id              catalog ID of the table
+     * @param serialized_table      the table data to be loaded
+     * @param txnId                 ID of the transaction
+     * @param spHandle              SP handle for this transaction
+     * @param lastCommittedSpHandle Most recently committed SP Handled
+     * @param uniqueId              Unique ID for the transaction
+     * @param undoToken             token for undo quantum where changes should be logged.
+     * @param callerId              ID of the caller who is invoking load table
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations,
-            boolean shouldDRStream, long undoToken, boolean elastic);
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken, byte callerId);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

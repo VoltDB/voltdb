@@ -98,6 +98,7 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.jni.ExecutionEngine.LoadTableCaller;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet.RestoreResultKey;
@@ -704,16 +705,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             try {
                 VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
                                 ByteBuffer.wrap(CompressionService.decompressBytes(compressedTable)), true);
-                @SuppressWarnings("deprecation")
-                byte uniqueViolations[] =
-                        DeprecatedProcedureAPIAccess.voltLoadTable(
-                                this,
-                                context.getCluster().getTypeName(),
-                                context.getDatabase().getTypeName(),
-                                tableName,
-                                table,
-                                m_duplicateRowHandler != null,
-                                false);
+                byte uniqueViolations[] = callLoadTable(context, tableName, table);
                 if (uniqueViolations != null && !isRecover) {
                     result_str = "FAILURE";
                     error_msg = "Constraint violations in table " + tableName;
@@ -855,15 +847,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         c.discard();
                     }
                     try {
-                        @SuppressWarnings("deprecation")
-                        byte uniqueViolations[] = DeprecatedProcedureAPIAccess.voltLoadTable(
-                                this,
-                                context.getCluster().getTypeName(),
-                                context.getDatabase().getTypeName(),
-                                table_name,
-                                table,
-                                m_duplicateRowHandler != null,
-                                false);
+                        byte uniqueViolations[] = callLoadTable(context, table_name, table);
 
                         if (uniqueViolations != null && !isRecover) {
                             result_str = "FAILURE";
@@ -1007,6 +991,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         assert(false);
         return null;
+    }
+
+    private byte[] callLoadTable(SystemProcedureExecutionContext context, String tableName, VoltTable table) {
+        return context.getSiteProcedureConnection().loadTable(m_runner.getTxnState(), tableName, table,
+                m_duplicateRowHandler == null ? LoadTableCaller.SNAPSHOT_THROW_ON_UNIQ_VIOLATION
+                        : LoadTableCaller.SNAPSHOT_REPORT_UNIQ_VIOLATIONS);
     }
 
     private void handleUniqueViolations(String table_name,
