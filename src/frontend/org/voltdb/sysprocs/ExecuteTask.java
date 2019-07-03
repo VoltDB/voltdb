@@ -61,6 +61,11 @@ public class ExecuteTask extends VoltSystemProcedure
     }
 
     @Override
+    public long[] getAllowableSysprocFragIdsInTaskLog() {
+        return new long[] { SysProcFragmentId.PF_executeTask};
+    }
+
+    @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {

@@ -25,7 +25,6 @@ package org.voltdb.iv2;
 
 import org.junit.Test;
 import org.voltdb.VoltSystemProcedure;
-import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.SysProcFragmentId;
@@ -41,28 +40,25 @@ public class TestSite {
     public void testReplayFilter()
     {
         // Replay normal SPs
-        assertFalse(Site.filter(makeInit("Blah")));
+        assertTrue(Site.allowInitiateTask(makeInit("Blah")));
 
         // @LoadSinglePartitionTable a durable sysproc
-        assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
+        assertTrue(Site.allowInitiateTask(makeInit("@LoadSinglePartitionTable")));
 
         // Replay a sysproc thats not durable
-        assertTrue(Site.filter(makeInit("@Quiesce")));
+        assertFalse(Site.allowInitiateTask(makeInit("@Quiesce")));
 
         // Replay @BalancePartitions fragments
-        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_prepBalancePartitions)));
-        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitions)));
-        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitionsData)));
+        assertTrue(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_prepBalancePartitions)));
+        assertTrue(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_balancePartitions)));
+        assertTrue(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_balancePartitionsData)));
         // Replay @LoadMultipartitionTable fragments
-        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_distribute)));
+        assertTrue(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_distribute)));
         // Replay filter rejects @SnapshotRestore fragments
-        assertTrue(Site.filter(makeFrag(true, SysProcFragmentId.PF_restoreAsyncRunLoop)));
-
-        // Replay complete msgs
-        assertFalse(Site.filter(makeComplete()));
+        assertFalse(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_restoreAsyncRunLoop)));
 
         // Reject all other sysproc fragments
-        assertTrue(Site.filter(makeFrag(true, SysProcFragmentId.PF_createSnapshotTargets)));
+        assertFalse(Site.allowFragmentTask(makeFrag(true, SysProcFragmentId.PF_createSnapshotTargets)));
 
     }
 
@@ -78,10 +74,5 @@ public class TestSite {
         Iv2InitiateTaskMessage msg = mock(Iv2InitiateTaskMessage.class);
         doReturn(procName).when(msg).getStoredProcedureName();
         return msg;
-    }
-
-    private static CompleteTransactionMessage makeComplete()
-    {
-        return mock(CompleteTransactionMessage.class);
     }
 }

@@ -42,4 +42,8 @@ public class AdHoc_RW_MP extends AdHocBase {
         return runAdHoc(ctx, serializedBatchData);
     }
 
+    @Override
+    public boolean allowableSysprocForTaskLog() {
+        return true;
+    }
 }
