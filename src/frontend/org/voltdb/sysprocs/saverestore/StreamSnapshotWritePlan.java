@@ -41,16 +41,13 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TableType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Lists;
