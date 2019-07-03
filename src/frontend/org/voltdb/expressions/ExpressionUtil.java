@@ -252,6 +252,7 @@ public final class ExpressionUtil {
                 case COMPARE_LESSTHAN:
                 case COMPARE_EQUAL:
                 case COMPARE_NOTEQUAL:
+                case COMPARE_NOTDISTINCT:
                 case COMPARE_GREATERTHANOREQUALTO:
                 case COMPARE_LESSTHANOREQUALTO: {
                     final ComparisonExpression expr = new ComparisonExpression(op,
