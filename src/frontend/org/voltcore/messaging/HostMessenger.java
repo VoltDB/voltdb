@@ -402,9 +402,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /* Peers within the same partition group */
     private Set<Integer> m_peers;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
-    private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
+    private static Map<Integer, Integer> s_nextForeignHost = new HashMap<>();
     /*
      * used when coordinating joining hosts
      */
@@ -1425,16 +1425,33 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * case of binding all sites to the primary connection, this check has been added to prevent it.
              */
             if (m_hasAllSecondaryConnectionCreated) {
+                // fast path
                 // assign a foreign host for regular mailbox
                 fhost = m_fhMapping.get(hsId);
                 if (fhost == null) {
-                    int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
-                    fhost = (ForeignHost) fhosts.toArray()[index];
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
-                                " to " + fhost.hostnameAndIPAndPort());
+                    // slow path
+                    // The synchronized block below is invoked on first message to the destination only.
+                    synchronized(this) {
+                        if (s_nextForeignHost.isEmpty()) {
+                            for (Integer hId : getLiveHostIds()) {
+                                s_nextForeignHost.put(hId, 1);
+                            }
+                        }
+                        // in case of multiple threads send to the same hsId at the same time
+                        fhost = m_fhMapping.get(hsId);
+                        if (fhost == null) {
+                            Integer perFHCounter = s_nextForeignHost.get(hostId);
+                            int index = Math.abs(perFHCounter % fhosts.size());
+                            s_nextForeignHost.put(hostId, ++perFHCounter);
+                            fhost = (ForeignHost) fhosts.toArray()[index];
+                            if (hostLog.isDebugEnabled()) {
+                                hostLog.debug("bind " + CoreUtils.hsIdToString(hsId) +
+                                        " to " + fhost.hostnameAndIPAndPort() + " nextForeignHost=" +
+                                        perFHCounter + " hostId=" + hostId + " fhosts.size=" + fhosts.size());
+                            }
+                            bindForeignHost(hsId, fhost);
+                        }
                     }
-                    bindForeignHost(hsId, fhost);
                 }
             } else {
                 // otherwise use primary for a short while
