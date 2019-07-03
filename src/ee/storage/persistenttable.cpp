@@ -722,11 +722,10 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
     }
 }
 
-void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
+void PersistentTable::setDRTimestampForTuple(TableTuple& tuple, bool update) {
     vassert(hasDRTimestampColumn());
     if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
-        int64_t drTimestamp = ec->currentDRTimestamp();
-        tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
+        tuple.setHiddenNValue(getDRTimestampColumnIndex(), HiddenColumn::getDefaultValue(HiddenColumn::XDCR_TIMESTAMP));
     }
 }
 
@@ -819,11 +818,11 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
     // Write to DR stream before everything else to ensure nothing gets left in
     // the index if the append fails.
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
-        setDRTimestampForTuple(ec, target, false);
+        setDRTimestampForTuple(target, false);
     }
 
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
@@ -1018,7 +1017,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
     // Write to the DR stream before doing anything else to ensure we don't
     // leave a half updated tuple behind in case this throws.
     if (hasDRTimestampColumn() && updateDRTimestamp) {
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
+        setDRTimestampForTuple(sourceTupleWithNewValues, true);
     }
 
     if (isTableWithMigrate(m_tableType)) {
@@ -1671,7 +1670,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
     }
 
     // Check if the column count matches what the temp table is expecting
-    int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+    uint16_t expectedColumnCount = caller.getExpectedColumnCount(m_schema);
     if (colcount != expectedColumnCount) {
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
@@ -1710,7 +1709,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         target.setPendingDeleteOnUndoReleaseFalse();
 
         try {
-            target.deserializeFrom(serialInput, stringPool, caller.getId() == LoadTableCaller::BALANCE_PARTITIONS);
+            target.deserializeFrom(serialInput, stringPool, caller);
         } catch (SQLException &e) {
             deleteTupleStorage(target);
             throw;
@@ -2490,7 +2489,7 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
-   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
+   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %ld, batch remaining: %ld",
         name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
    return true;
 }

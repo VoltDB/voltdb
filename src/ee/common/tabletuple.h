@@ -47,6 +47,7 @@
 #define HSTORETABLETUPLE_H
 
 #include "common/common.h"
+#include "common/LoadTableCaller.h"
 #include "common/HiddenColumnFilter.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
@@ -498,8 +499,8 @@ public:
     int compare(const TableTuple &other) const;
     int compareNullAsMax(const TableTuple &other) const;
 
-    void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
-    void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool, bool elasticJoin);
+    void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool,
+            const LoadTableCaller &caller);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, const HiddenColumnFilter *filter = NULL) const;
     size_t serializeToExport(voltdb::ExportSerializeOutput &io,
@@ -1052,10 +1053,8 @@ inline void TableTuple::copy(const TableTuple &source) {
     ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
 }
 
-inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool) {
-    TableTuple::deserializeFrom(tupleIn, dataPool, false);
-}
-inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool, bool elastic) {
+inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool,
+        const LoadTableCaller &caller) {
     vassert(m_schema);
     vassert(m_data);
 
@@ -1101,12 +1100,9 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     for (int j = 0; j < hiddenColumnCount; ++j) {
         const TupleSchema::HiddenColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
 
-        if (elastic && columnInfo->columnType == HiddenColumn::MIGRATE_TXN) {
-            vassert(columnInfo->getVoltType() == VALUE_TYPE_BIGINT);
-
-            NValue value = NValue::getNullValue(columnInfo->getVoltType());
-            setHiddenNValue(columnInfo, value);
-            VOLT_DEBUG("Deserializing migrate hidden column for elastic operation");
+        if (caller.useDefaultValue(columnInfo->columnType)) {
+            VOLT_DEBUG("Using default value for caller %d and hidden column %d", caller.getId(), columnInfo->columnType);
+            setHiddenNValue(columnInfo, HiddenColumn::getDefaultValue(columnInfo->columnType));
         } else {
 
             // tupleIn may not have hidden column
