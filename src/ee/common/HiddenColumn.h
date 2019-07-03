@@ -19,6 +19,7 @@
 #define VOLTDB_EE_COMMON_HIDDENCOLUMN_H_
 
 #include "stdint.h"
+#include "common/NValue.hpp"
 
 namespace voltdb {
 
@@ -33,6 +34,11 @@ public:
         VIEW_COUNT,
         MAX_HIDDEN_COUNT
     };
+
+    /**
+     * Get the default NValue for the given hidden column type
+     */
+    static NValue getDefaultValue(Type type);
 };
 
 }

@@ -738,7 +738,7 @@ private:
         return ec->drStream();
     }
 
-    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
+    void setDRTimestampForTuple(TableTuple& tuple, bool update);
     void computeSmallestUniqueIndex();
 
     void addViewHandler(MaterializedViewHandler* viewHandler);

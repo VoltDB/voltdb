@@ -20,6 +20,7 @@
 
 #include "stdint.h"
 #include "common/debuglog.h"
+#include "common/TupleSchema.h"
 
 namespace voltdb {
 
@@ -41,11 +42,14 @@ public:
         BALANCE_PARTITIONS,
         // External client invocation of load table. Never provides hidden columns
         CLIENT,
-        MAX_ID
+        // Internal EE caller
+        INTERNAL,
+        // Total count of load table callers
+        ID_COUNT
     };
 
     static inline const LoadTableCaller &get(Id id) {
-        vassert(id >=0 && id < MAX_ID);
+        vassert(id >=0 && id < ID_COUNT);
         return s_callers[id];
     }
 
@@ -75,8 +79,49 @@ public:
         return m_ignoreTupleLimit;
     }
 
+    /**
+     * @return the expected column count of the table being loaded for the given schema
+     */
+    inline uint16_t getExpectedColumnCount(TupleSchema *schema) const {
+        uint16_t hiddenColumnCount = schema->hiddenColumnCount();
+
+        if (hiddenColumnCount > 0) {
+            switch(m_id) {
+            case CLIENT:
+                hiddenColumnCount = 0;
+                break;
+            case DR:
+            case BALANCE_PARTITIONS:
+                if (schema->hasHiddenColumn(HiddenColumn::MIGRATE_TXN)) {
+                    --hiddenColumnCount;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        return schema->columnCount() + hiddenColumnCount;
+    }
+
+    /**
+     * @return true if the default value for the hidden column should be used and not included in the load table
+     */
+    inline bool useDefaultValue(HiddenColumn::Type columnType) const {
+        switch (m_id) {
+        case CLIENT:
+            if (columnType == HiddenColumn::XDCR_TIMESTAMP) return true;
+            /* fallthrough */
+        case DR:
+        case BALANCE_PARTITIONS:
+            return columnType == HiddenColumn::MIGRATE_TXN;
+        default:
+            return false;
+        }
+    }
+
 private:
-    static const LoadTableCaller s_callers[MAX_ID];
+    static const LoadTableCaller s_callers[ID_COUNT];
 
     const Id m_id;
     const bool m_returnUniqueViolations;
@@ -93,7 +138,7 @@ private:
         m_id(id), m_returnUniqueViolations(returnUniqueViolations), m_shouldDRStream(shouldDRStream),
         m_ignoreTupleLimit(ignoreTupleLimit)
     {
-        vassert(id >=0 && id < MAX_ID);
+        vassert(id >=0 && id < ID_COUNT);
     }
 };
 

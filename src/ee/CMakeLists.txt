@@ -133,6 +133,7 @@ SET (VOLTDB_SRC
   catalog/tableref.cpp
   common/ExecuteWithMpMemory.cpp
   common/FatalException.cpp
+  common/HiddenColumn.cpp
   common/InterruptException.cpp
   common/LargeTempTableBlockCache.cpp
   common/LoadTableCaller.cpp

@@ -15,18 +15,22 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/LoadTableCaller.h"
+#include "common/executorcontext.hpp"
+#include "common/HiddenColumn.h"
+#include "common/ValueFactory.hpp"
 
 namespace voltdb {
-
-// Initialize all of the valid callers
-const LoadTableCaller LoadTableCaller::s_callers[] = {
-    LoadTableCaller(SNAPSHOT_REPORT_UNIQ_VIOLATIONS, true, false, true),
-    LoadTableCaller(SNAPSHOT_THROW_ON_UNIQ_VIOLATION, false, false, true),
-    LoadTableCaller(DR, true, false, true),
-    LoadTableCaller(BALANCE_PARTITIONS, true, false, true),
-    LoadTableCaller(CLIENT, false, true, false),
-    LoadTableCaller(INTERNAL, false, false, true)
-};
+NValue HiddenColumn::getDefaultValue(HiddenColumn::Type columnType) {
+    switch (columnType) {
+    case HiddenColumn::MIGRATE_TXN:
+        return NValue::getNullValue(VALUE_TYPE_BIGINT);
+    case HiddenColumn::XDCR_TIMESTAMP:
+        return ValueFactory::getBigIntValue(ExecutorContext::getExecutorContext()->currentDRTimestamp());
+    default:
+        // Unsupported hidden column type passed in
+        vassert(false);
+        return NValue::getNullValue(VALUE_TYPE_BIGINT);
+    }
+}
 
 }
