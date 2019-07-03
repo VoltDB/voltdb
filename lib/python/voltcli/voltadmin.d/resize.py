@@ -29,20 +29,26 @@ class Option:
     RESTART = 3
     UPDATE = 4
 
-def test(runner):
-    procedureCaller(runner, Option.TEST)
+@VOLT.Command(
+    bundles = VOLT.AdminBundle(),
+    description = 'Elastic resizing cluster command.',
+    options = (
+            VOLT.StringListOption(None, '--ignore', 'skip_requirements',
+                                  '''Conditions that can be ignored when resizing the cluster:
+                                  disabled_export -- ignore pending export data for targets that are disabled''',
+                                  default = ''),
+            VOLT.StringOption(None, '--test', 'opt', 'Check the feasibility of current resizing plan.', action='store_const', const=Option.TEST),
+            VOLT.StringOption(None, '--restart', 'opt', 'Restart the previous failed resizing operation.', action='store_const', const=Option.RESTART),
+            VOLT.StringOption(None, '--status', 'opt', 'Check the resizing progress.', action='store_const', const=Option.STATUS),
+            VOLT.StringOption(None, '--update', 'opt', 'Update the options for the current resizing operation.', action='store_const', const=Option.UPDATE),
+    ),
+)
 
-def start(runner):
-    procedureCaller(runner, Option.START)
-
-def restart(runner):
-    procedureCaller(runner, Option.RESTART)
-
-def status(runner):
-    procedureCaller(runner, Option.STATUS)
-
-def update(runner):
-    procedureCaller(runner, Option.UPDATE)
+def resize(runner):
+    if runner.opts.opt is not None:
+        procedureCaller(runner, runner.opts.opt)
+    else:
+        procedureCaller(runner, Option.START)
 
 def procedureCaller(runner, option):
     response = runner.call_proc('@SystemInformation',
@@ -84,25 +90,3 @@ def procedureCaller(runner, option):
     else:
         runner.error(message)
         sys.exit(1)
-
-@VOLT.Multi_Command(
-    bundles = VOLT.AdminBundle(),
-    description = 'Elastic resizing cluster command.',
-    options = (
-            VOLT.StringListOption(None, '--ignore', 'skip_requirements',
-                                  '''Conditions that can be ignored when resizing the cluster:
-                                  disabled_export -- ignore pending export data for targets that are disabled''',
-                                  default = ''),
-    ),
-    modifiers = (
-            VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
-            VOLT.Modifier('start', start, 'Start the elastically resizing.'),
-            VOLT.Modifier('restart', restart, 'Restart the previous failed resizing operation.'),
-            VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('update', update, 'Update the options for the current resizing operation.'),
-    )
-)
-
-def resize(runner):
-    runner.go()
-
