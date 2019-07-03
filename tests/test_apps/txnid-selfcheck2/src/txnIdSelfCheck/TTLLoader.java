@@ -203,7 +203,8 @@ public class TTLLoader extends BenchmarkThread {
                 long tuple_count = 0;
                 long tuple_pending = 0;
                 while ( t.advanceRow() ) {
-                    if ( tableName.equalsIgnoreCase(t.getString("SOURCE")) ) {
+                    if ( tableName.equalsIgnoreCase(t.getString("SOURCE")) &&
+                         t.getString("ACTIVE").equalsIgnoreCase("TRUE") ) {
                         tuple_count += t.getLong("TUPLE_COUNT");
                         tuple_pending += t.getLong("TUPLE_PENDING");
                     }
