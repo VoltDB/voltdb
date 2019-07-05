@@ -21,15 +21,15 @@ import com.google.common.collect.ImmutableMultimap;
 import org.voltcore.utils.Pair;
 
 /**
- * Implementation of calls to VoltDB functions through Calcite.
+ * Implementation of calls to VoltDB SQL functions through Calcite.
  * <p>
  * Steps to implement a function through Calcite:
  * <ul>
- * <li>Create a static class with a static {@code eval} method.
- * {@link org.apache.calcite.util.Smalls} in the Calcite project has many detailed examples.
- * <li>The {@code eval} method is used to validate the SQL query, we only care about its signature,
- * you can return whatever value you want.
- * <li>Put the function class together with its name into {@link #VOLT_SQL_FUNCTIONS}.
+ * <li>Under the appropriate static class, create a static method that has the same
+ * signature as the VoltDB SQL function.
+ * <li>Add the method along with its argument classes into {@link #VOLT_SQL_FUNCTIONS}.
+ * <li>Use {@link org.apache.calcite.sql.type.JavaToSqlTypeConversionRules} as a guideline
+ * for the mapping from Java types to corresponding SQL types.
  *
  * @author Chao Zhou
  * @since 9.1
@@ -39,18 +39,62 @@ public class VoltSqlFunctions {
     // volt extend sql functions. The first class in the list implements the method,
     // the classes that follow are argument types.
     public static final ImmutableMultimap<String, Pair<Class, Class []>> VOLT_SQL_FUNCTIONS =
-            ImmutableMultimap.of("migrating", Pair.of(Migrating.class, new Class []{}));
+            ImmutableMultimap.<String, Pair<Class, Class []>>builder()
+                    .put("migrating", Pair.of(MigrationFunctions.class, new Class []{}))
+                    .put("bitShiftLeft", Pair.of(BitwiseFunctions.class, new Class []{long.class, int.class}))
+                    .put("bitShiftRight", Pair.of(BitwiseFunctions.class, new Class []{long.class, int.class}))
+                    .put("bitAnd", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
+                    .put("bitNot", Pair.of(BitwiseFunctions.class, new Class []{long.class}))
+                    .put("bitOr", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
+                    .put("bitXor", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
+                    .put("hex", Pair.of(StringFunctions.class, new Class []{long.class}))
+                    .build();
 
     //-------------------------------------------------------------
     //                   volt extend sql functions
     //-------------------------------------------------------------
 
+    // We only need the sql function signature in validate&plan phase. The return value doesn't matter.
+    // Calcite won't evaluate the function during planning
+
     // MIGRATING() function
-    public static class Migrating {
+    public static class MigrationFunctions {
         public static boolean migrating() {
-            // we only need the sql function in validate&plan phase, and the return value doesn't matter.
-            // Calcite won't evaluate the function during planning
             return true;
+        }
+    }
+
+    // Bitwise functions
+    public static class BitwiseFunctions {
+        public static long bitShiftLeft(long value, int offset) {
+            return 0;
+        }
+
+        public static long bitShiftRight(long value, int offset) {
+            return 0;
+        }
+
+        public static long bitAnd(long value1, long value2) {
+            return 0;
+        }
+
+        public static long bitNot(long value) {
+            return 0;
+        }
+
+        public static long bitOr(long value1, long value2) {
+            return 0;
+        }
+
+        public static long bitXor(long value1, long value2) {
+            return 0;
+        }
+    }
+
+    // String functions
+    public static class StringFunctions {
+        public static String hex(long value) {
+            return "";
         }
     }
 }
