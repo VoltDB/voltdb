@@ -379,6 +379,10 @@ public class SynchronizedStatesManager {
             addIfMissing(m_lockPath, CreateMode.PERSISTENT, null);
             addIfMissing(m_barrierParticipantsPath, CreateMode.PERSISTENT, null);
             lockLocalState();
+            // Make sure the child count is correct so that an init does not race with a released lock where the
+            // results have not been processed yet. If it is non-zero, it means results still need to be collected
+            // by some nodes even if the distributed lock list is empty.
+            m_currentParticipants = m_zk.getChildren(m_barrierParticipantsPath, null).size();
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
