@@ -1177,7 +1177,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // Poll pending container before polling m_committedBuffers.
             // If a pending container is present, this means we were export master so
             // don't check the export coordinator for this buffer.
-            if (pollPendingContainer(pollTask)) {
+            // I don't think comment above is correct, this stream can be a non-master
+            // while pending container is present.
+            if (isMaster() && pollPendingContainer(pollTask)) {
                 return;
             }
 
@@ -1403,6 +1405,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    if (isMaster()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Skip remote RELEASE_BUFFER message for " + seq +
+                                    " because current stream is master now");
+                        }
+                        return;
+                    }
                     // Reflect the remote ack in our state
                     localAck(seq, seq);
 
