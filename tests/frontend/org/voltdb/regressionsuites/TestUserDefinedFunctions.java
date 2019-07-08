@@ -65,7 +65,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  initial INSERT statement; and which <i>tableName</i> to INSERT into
      *  and SELECT from. (If unspecified, the <i>tableName</i> is chosen,
      *  randomly, as either R1 or P1.) */
-    private void testFunction(String functionCall, Object expected, VoltType returnType,
+    protected void testFunction(String functionCall, Object expected, VoltType returnType,
             String[] columnNames, String[] columnValues, String tableName)
             throws IOException, ProcCallException {
 
@@ -124,7 +124,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  <i>columnValues</i> (in addition to ID=0) to be specified in the
      *  initial INSERT statement. The table to INSERT into and SELECT from
      *  is chosen, randomly, as either R1 or P1. */
-    private void testFunction(String functionCall, Object expected, VoltType returnType,
+    protected void testFunction(String functionCall, Object expected, VoltType returnType,
             String[] columnNames, String[] columnValues)
             throws IOException, ProcCallException {
         testFunction(functionCall, expected, returnType, columnNames, columnValues, null);
@@ -136,7 +136,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  <i>functionCall</i> value (as well as the ID) from that row.
      *  The table to INSERT into and SELECT from is chosen, randomly,
      *  as either R1 or P1. */
-    private void testFunction(String functionCall, Object expected, VoltType returnType)
+    protected void testFunction(String functionCall, Object expected, VoltType returnType)
             throws IOException, ProcCallException {
         testFunction(functionCall, expected, returnType, null, null);
     }
@@ -152,7 +152,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  initial INSERT statement.
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
-    private void testFunctionThrowsException(String functionCall, VoltType returnType,
+    protected void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExcepCauseType,
             String[] columnNames, String[] columnValues) {
         Class<? extends Throwable> expectedExceptionType = ProcCallException.class;
@@ -186,7 +186,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  catching any Exception (or other Throwable) thrown.
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
-    private void testFunctionThrowsException(String functionCall, VoltType returnType,
+    protected void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExcepCauseType) {
         testFunctionThrowsException(functionCall, returnType, expectedExcepCauseType, null, null);
     }

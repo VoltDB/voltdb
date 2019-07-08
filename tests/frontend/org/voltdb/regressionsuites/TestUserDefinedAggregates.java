@@ -51,62 +51,6 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
         super(name);
     }
 
-    private void testFunction(String functionCall, Object expected, VoltType returnType,
-            String[] columnNames, String[] columnValues, String tableName) 
-    		throws IOException, ProcCallException {
-    	// If table not specified, randomly decide which one to test
-        if (tableName == null) {
-            tableName = "R1";
-            if (random.nextInt(100) < 50) {
-                tableName = "P1";
-            }
-        }
-
-        // Set the expected result of the SELECT query using the UDF
-        Object[][] expectedTable = new Object[1][2];
-        expectedTable[0][0] = 0;
-        expectedTable[0][1] = expected;
-
-        // INSERT one row into the table that we are using for testing
-        String allColumnNames  = "ID";
-        String allColumnValues = "0";
-        if (columnNames != null && columnNames.length > 0) {
-            allColumnNames = "ID, " + String.join(",", columnNames);
-        }
-        if (columnValues != null && columnValues.length > 0) {
-            allColumnValues = "0, " + String.join(",", columnValues);
-        }
-        Client client = getClient();
-        String insertStatement = "INSERT INTO "+tableName
-                + " ("+allColumnNames+") VALUES" + " ("+allColumnValues+")";
-        ClientResponse cr = client.callProcedure("@AdHoc", insertStatement);
-        assertEquals(insertStatement+" failed", ClientResponse.SUCCESS, cr.getStatus());
-
-        // Get the actual result of the SELECT query using the UDF
-        String selectStatement = "SELECT ID, "+functionCall+" FROM "+tableName+" WHERE ID = 0";
-        cr = client.callProcedure("@AdHoc", selectStatement);
-        assertEquals(selectStatement+" failed", ClientResponse.SUCCESS, cr.getStatus());
-        VoltTable vt = cr.getResults()[0];
-
-        // Compare the expected to the actual result
-        if (VoltType.FLOAT.equals(returnType)) {
-            RegressionSuite.assertApproximateContentOfTable(expectedTable, vt, EPSILON);
-        } else {
-            RegressionSuite.assertContentOfTable(expectedTable, vt);
-        }
-
-        // Clean-up
-        String truncateStatement = "TRUNCATE TABLE "+tableName;
-        cr = client.callProcedure("@AdHoc", truncateStatement);
-        assertEquals(truncateStatement+" (clean-up) failed", ClientResponse.SUCCESS, cr.getStatus());
-    }
-
-	private void testFunction(String functionCall, Object expected, VoltType returnType,
-            String[] columnNames, String[] columnValues)
-            throws IOException, ProcCallException {
-        testFunction(functionCall, expected, returnType, columnNames, columnValues, null);
-    }
-
 	public void testUavg() throws IOException, ProcCallException {
 		String[] columnNames = {"Number"};
 		String[] columnValues = {"1", "2", "3", "4"};
@@ -124,5 +68,20 @@ public class TestUserDefinedAggregates extends TestUserDefinedFunctions {
 		String[] columnValues = {"1", "3", "3", "3", "5", "5", "7"};
 		testFunction("Umode(Number)", 3.0D, VoltType.FLOAT, columnValues, columnNames);
 	}
+
+//	static public Test suite() {
+//		MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUserDefinedAggregates.class);
+//
+//		// build up a project builder for the workload
+//        VoltProjectBuilder project = new VoltProjectBuilder();
+//        project.setUseDDLSchema(true);
+//
+//        byte[] createFunctionsDDL = null;
+//        try {
+//            createFunctionsDDL = Files.readAllBytes(Paths.get("tests/testfuncs/org/voltdb_testfuncs/UserDefinedTestAggregates/UserDefinedTestAggregates-DDL.sql"));
+//        } catch (IOException e) {
+//            fail(e.getMessage());
+//        }
+//	}
 
 }
