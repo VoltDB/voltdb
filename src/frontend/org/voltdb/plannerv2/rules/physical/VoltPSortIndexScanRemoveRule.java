@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rules.physical;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -29,8 +28,8 @@ import org.voltdb.planner.AccessPath;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableIndexScan;
-import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+import org.voltdb.plannerv2.utils.VoltRexUtil;
 import org.voltdb.types.SortDirectionType;
 
 public class VoltPSortIndexScanRemoveRule extends RelOptRule {
@@ -58,10 +57,12 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
         final RelCollation scanSortCollation;
         final VoltPhysicalCalc calc;
         final VoltPhysicalTableIndexScan scan;
+        final RexProgram calcScanProgram;
         if (call.rels.length == 2) {
             calc = null;
             scan = call.rel(1);
             scanSortCollation = origSortCollation;
+            calcScanProgram = scan.getProgram();
         } else {
             calc = call.rel(1);
             scanSortCollation = VoltRelUtil.sortCollationCalcTranspose(origSortCollation, calc);
@@ -69,14 +70,12 @@ public class VoltPSortIndexScanRemoveRule extends RelOptRule {
                 return;
             }
             scan = call.rel(2);
+            calcScanProgram = VoltRexUtil.mergeProgram(scan.getProgram(), calc.getProgram(), scan.getCluster().getRexBuilder());
         }
-
-        final RexProgram program =  scan.getProgram();
-        Preconditions.checkNotNull(program);
 
         final RelCollation indexCollation = scan.getIndexCollation();
         final SortDirectionType sortDirection =
-                VoltRexUtil.areCollationsCompatible(scanSortCollation, indexCollation);
+                VoltRexUtil.areCollationsCompatible(scanSortCollation, indexCollation, calcScanProgram);
 
         if (SortDirectionType.INVALID != sortDirection) {
             // Update scan's sort direction

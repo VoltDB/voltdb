@@ -125,4 +125,85 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
                         "  VoltPhysicalTableSequentialScan(table=[[public, RI1]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
                 .pass();
     }
+
+    @Test
+    public void testIndexWithOrderBy() {
+        // Index INDEX RI2_IND2 ON RI2 (i, bi). Sort is redundant
+        m_tester.sql("SELECT * FROM RI2 WHERE i = 2 ORDER BY BI")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], expr#4=[2], expr#5=[=($t0, $t4)], proj#0..3=[{exprs}], $condition=[$t5], index=[RI2_IND2_ASCGTE1_1])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy1() {
+        // There is no index BI, or (SI, BI). Sequence scan with sort
+        m_tester.sql("SELECT * FROM RI2 WHERE si = 2 ORDER BY BI")
+        .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], split=[1])\n" +
+                    "  VoltPhysicalCalc(expr#0..3=[{inputs}], expr#4=[CAST($t1):INTEGER], expr#5=[2], expr#6=[=($t4, $t5)], proj#0..3=[{exprs}], $condition=[$t6], split=[1])\n" +
+                    "    VoltPhysicalTableSequentialScan(table=[[public, RI2]], split=[1], expr#0..3=[{inputs}], proj#0..3=[{exprs}])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy2() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable. Sort is redundant
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 and i = 3 ORDER BY III")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], expr#5=[3], expr#6=[=($t0, $t5)], expr#7=[AND($t4, $t6)], proj#0..2=[{exprs}], $condition=[$t7], index=[RI5_IND_I_II_III_ASCGTE2_2])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy3() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable. Sort is redundant
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy4() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is not applicable.
+        // Index RI5_IND_II_III ON RI5 (ii, iii) is applicable. Sort is redundant
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 and i > 3 ORDER BY III")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], expr#5=[3], expr#6=[>($t0, $t5)], expr#7=[AND($t4, $t6)], proj#0..2=[{exprs}], $condition=[$t7], index=[RI5_IND_II_III_ASCGTE1_1])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy5() {
+        // Indexes RI5_IND_I_II_III ON RI5 (i, ii, iii) and RI5_IND_II_III ON RI5 (ii, iii)
+        // are not applicable. Sort is required
+        m_tester.sql("SELECT * FROM RI5 WHERE ii > 2 and i = 3 ORDER BY III")
+        .transform("VoltPhysicalSort(sort0=[$2], dir0=[ASC], split=[1])\n" +
+                    "  VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[>($t1, $t3)], expr#5=[3], expr#6=[=($t0, $t5)], expr#7=[AND($t4, $t6)], proj#0..2=[{exprs}], $condition=[$t7], index=[RI5_UNIQUE_IND_I_INVALIDEQ1_1])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy6() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable applicable. Sort is redundant
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I, III")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_ASCEQ0_0])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy7() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is applicable applicable. Sort is redundant
+        // Sort Order is DESC
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I DESC, III DESC")
+        .transform("VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_I_II_III_DESCEQ0_0])\n")
+        .pass();
+    }
+
+    @Test
+    public void testIndexWithOrderBy8() {
+        // Index RI5_IND_I_II_III ON RI5 (i, ii, iii) is not applicable applicable - sort direction mismatch
+        // Sort is redundant
+        m_tester.sql("SELECT * FROM RI5 WHERE ii = 2 ORDER BY I ASC, III DESC")
+        .transform("VoltPhysicalSort(sort0=[$0], sort1=[$2], dir0=[ASC], dir1=[DESC], split=[1])\n" +
+                    "  VoltPhysicalTableIndexScan(table=[[public, RI5]], split=[1], expr#0..2=[{inputs}], expr#3=[2], expr#4=[=($t1, $t3)], proj#0..2=[{exprs}], $condition=[$t4], index=[RI5_IND_II_INVALIDEQ1_1])\n")
+        .pass();
+    }
+
 }
