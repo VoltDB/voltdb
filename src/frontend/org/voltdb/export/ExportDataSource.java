@@ -1405,7 +1405,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    if (!isMaster()) {
+                    if (isMaster()) {
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Skip remote RELEASE_BUFFER message for " + seq +
                                     " because current stream is master now");
