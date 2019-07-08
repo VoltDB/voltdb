@@ -379,12 +379,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     Map<Integer, ArrayList<ForeignHost>> m_picoZombieForeignHosts = new HashMap<> ();
 
     /*
-     * Reference to the target HSId to FH mapping
-     * Updates via COW
-     */
-    volatile ImmutableMap<Long, ForeignHost> m_fhMapping = ImmutableMap.of();
-
-    /*
      * References to all the local mailboxes
      * Updates via COW
      */
@@ -884,10 +878,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     return CoreUtils.getHostIdFromHSId(intput) != hostId;
                 }
             };
-
-            m_fhMapping = ImmutableMap.<Long, ForeignHost>builder()
-                    .putAll(Maps.filterKeys(m_fhMapping, hostIdNotEqual))
-                    .build();
         }
         assert(Thread.holdsLock(this)); // Make sure m_zombieForeignHosts is protected
         ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
@@ -1414,7 +1404,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return null;
         }
         ForeignHost fhost = null;
-        if (fhosts.size() == 1 || CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
+        int siteId = CoreUtils.getSiteIdFromHSId(hsId);
+        ImmutableList<ForeignHost> fhList = (ImmutableList<ForeignHost>)fhosts;
+        if (fhosts.size() == 1 || siteId < 0) {
             // Always use primary connection to send to well-known mailboxes
             fhost = getPrimary(fhosts, hostId);
         } else {
@@ -1426,16 +1418,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              */
             if (m_hasAllSecondaryConnectionCreated) {
                 // assign a foreign host for regular mailbox
-                fhost = m_fhMapping.get(hsId);
-                if (fhost == null) {
-                    int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
-                    fhost = (ForeignHost) fhosts.toArray()[index];
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
-                                " to " + fhost.hostnameAndIPAndPort());
-                    }
-                    bindForeignHost(hsId, fhost);
-                }
+                // Except well-known sites the id of rest sites starts from 0, increments by 1 at each creation.
+                // Because of that siteId modules number of foreign hosts will give an even distribution of site ids
+                // on each foreign host.
+                fhost = fhList.get(siteId % fhList.size());
+                assert (fhost != null);
             } else {
                 // otherwise use primary for a short while
                 // REPAIR_LOG_REQUEST, REPAIR_LOG_RESPONSE,DummyTaskMessage, DUMMY_TRANSACTION_RESPONSE will be sent on primary
@@ -1466,18 +1453,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
             m_siteMailboxes = b.build();
-        }
-    }
-
-    private void bindForeignHost(Long hsId, ForeignHost fh) {
-        synchronized (m_mapLock) {
-            if (m_fhMapping.containsKey(hsId)) {
-                return;
-            }
-            ImmutableMap.Builder<Long, ForeignHost> b = ImmutableMap.builder();
-            m_fhMapping = b.putAll(m_fhMapping)
-                           .put(hsId, fh)
-                           .build();
         }
     }
 
