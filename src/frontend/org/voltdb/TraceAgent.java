@@ -71,7 +71,7 @@ public class TraceAgent extends OpsAgent {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
                    numOfParams + ")";
         }
-        
+
         Object first = paramsArray[0];
         if (!(first instanceof String)) {
             return "First argument to @Trace must be a valid STRING selector, instead was " +
@@ -79,12 +79,12 @@ public class TraceAgent extends OpsAgent {
         }
 
         subselector = (String)first;
-        
+
         // check the validity of arguments
         if ("status".equalsIgnoreCase(subselector) || "dump".equalsIgnoreCase(subselector)) {
             if (numOfParams != 1) {
-                return "Incorrect number of arguments to @Trace " + 
-                        subselector + " (expected: 1,  received: " + 
+                return "Incorrect number of arguments to @Trace " +
+                        subselector + " (expected: 1,  received: " +
                         numOfParams + ")";
             }
 
@@ -95,8 +95,8 @@ public class TraceAgent extends OpsAgent {
 
         if ("enable".equalsIgnoreCase(subselector) || "disable".equalsIgnoreCase(subselector)) {
             if (numOfParams != 2) {
-                return "Incorrect number of arguments to @Trace " + 
-                        subselector + " (expected: 2,  received: " + 
+                return "Incorrect number of arguments to @Trace " +
+                        subselector + " (expected: 2,  received: " +
                         numOfParams + ")";
             }
 
@@ -107,21 +107,43 @@ public class TraceAgent extends OpsAgent {
                     obj.put("subselector", subselector);
                     obj.put("categories", params.toArray()[1]);
                     obj.put("interval", false);
-                    return null;               
+                    return null;
                 }
             }
 
-            return "Second argument to @Trace " + 
-                    subselector + " must be a valid STRING category, instead was " + 
+            return "Second argument to @Trace " +
+                    subselector + " must be a valid STRING category, instead was " +
                     categoryItem;
         }
 
-       return "Invalid @Trace selector " + subselector;
+        if ("filter".equalsIgnoreCase(subselector)) {
+            if (numOfParams != 2) {
+                return "Incorrect number of arguments to @Trace " +
+                        subselector + " (expected: 2,  received: " +
+                        numOfParams + ")";
+            }
+
+            String filterTime = paramsArray[1].toString();
+            try {
+                double time = Double.parseDouble(filterTime);
+            } catch (NumberFormatException | NullPointerException e) {
+                return "Incorrect type of second argument of @Trace filter " +
+                        filterTime + " (It must be an double number)";
+            }
+            obj.put("subselector", subselector);
+            obj.put("filterTime", filterTime);
+            obj.put("interval", false);
+            return null;
+        }
+
+        return "Invalid @Trace selector " + subselector;
     }
 
     @Override
     protected void handleJSONMessage(JSONObject obj) throws Exception
     {
+        //VoltTable[] results = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.STRING),
+        //                                                     new VoltTable.ColumnInfo("FILTER", VoltType.STRING))};
         VoltTable[] results = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.STRING))};
 
         OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
@@ -141,11 +163,27 @@ public class TraceAgent extends OpsAgent {
             VoltTrace.enableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
         } else if (subselector.equalsIgnoreCase("disable")) {
             VoltTrace.disableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
+        } else if (subselector.equalsIgnoreCase("filter")) {
+            VoltTrace.enableTraceEventFilter();
+            double time = Double.parseDouble(obj.getString("filterTime"));
+            VoltTrace.setFilterTime(time);
         } else if (subselector.equalsIgnoreCase("status")) {
             final Collection<VoltTrace.Category> enabledCategories = VoltTrace.enabledCategories();
             if (enabledCategories.isEmpty()) {
                 results[0].addRow("off");
+                /*
+                if (VoltTrace.isTraceEventFilterOn()) {
+                    results[0].addRow("off", "On");
+                } else {
+                    results[0].addRow("off", "Off");
+                }*/
             } else {
+                /*
+                if (VoltTrace.isTraceEventFilterOn()) {
+                    results[0].addRow(enabledCategories.toString(), "on");
+                } else {
+                    results[0].addRow(enabledCategories.toString(), "off");
+                }*/
                 results[0].addRow(enabledCategories.toString());
             }
         }
