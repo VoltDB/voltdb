@@ -25,6 +25,7 @@ package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.List;
@@ -117,5 +118,21 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
         ClientResponse res = m_client.callProcedure("@AdHoc", "MIGRATE FROM without_ttl where not migrating and ts < dateAdd(second, ?, now);", 1);
         assertEquals(res.getStatus(), ClientResponse.SUCCESS);
         teardownSystem();
+    }
+
+    @Test
+    public void testENG16879() throws Exception {
+        String ddl = "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT, ts TIMESTAMP);\n";
+        setup(ddl);
+        try {
+            m_client.callProcedure("@AdHoc", "MIGRATE FROM without_ttl WHERE NOT MIGRATING() \n" +
+                                             "AND without_ttl.i < (SELECT MIN(i) FROM without_ttl \n" +
+                                             "WHERE FLOOR(without_ttl.j) <> without_ttl.j ORDER BY NULL, without_ttl.i);");
+            fail("Hsql parser should fail when parsing this sql query.");
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("Expression is too complicated"));
+        } finally {
+            teardownSystem();
+        }
     }
 }
