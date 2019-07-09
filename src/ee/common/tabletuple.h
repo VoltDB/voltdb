@@ -188,8 +188,11 @@ public:
         size_t bytes = maxExportSerializationSize();
 
         int hiddenCols = m_schema->hiddenColumnCount();
+        HiddenColumnFilter filter = HiddenColumnFilter::create(HiddenColumnFilter::EXCLUDE_MIGRATE, m_schema);
         for (int i = 0; i < hiddenCols; ++i) {
-            bytes += maxExportSerializedHiddenColumnSize(i);
+            if (filter.include(i)) {
+                bytes += maxExportSerializedHiddenColumnSize(i);
+            }
         }
 
         return bytes;
