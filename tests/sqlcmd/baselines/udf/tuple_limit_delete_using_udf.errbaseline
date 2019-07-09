@@ -1,1 +1,1 @@
-Unexpected condition occurred applying DDL statements: Error: Table T has invalid DELETE statement for LIMIT PARTITION ROWS constraint: user defined function calls are not supported: "add2bigint"
+Error: Table T has invalid DELETE statement for LIMIT PARTITION ROWS constraint: user defined function calls are not supported: "add2bigint"

@@ -40,46 +40,44 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
     }
 
     static private void setUpSchema(VoltProjectBuilder project) throws IOException {
-        String literalSchema =
+        project.addLiteralSchema(
                 "CREATE TABLE S1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "PRIMARY KEY (ID) );" +
+                        "ID INTEGER DEFAULT 0 NOT NULL, " +
+                        "WAGE INTEGER, " +
+                        "DEPT INTEGER, " +
+                        "PRIMARY KEY (ID) );" +
 
-                "CREATE TABLE S2 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "PRIMARY KEY (ID) );" +
+                        "CREATE TABLE S2 ( " +
+                        "ID INTEGER DEFAULT 0 NOT NULL, " +
+                        "WAGE INTEGER, " +
+                        "DEPT INTEGER, " +
+                        "PRIMARY KEY (ID) );" +
 
-                "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP, " +
-                "PRIMARY KEY (ID) ); " +
+                        "CREATE TABLE R1 ( " +
+                        "ID INTEGER DEFAULT 0 NOT NULL, " +
+                        "DESC VARCHAR(300), " +
+                        "NUM INTEGER, " +
+                        "RATIO FLOAT, " +
+                        "PAST TIMESTAMP, " +
+                        "PRIMARY KEY (ID) ); " +
 
-                // Test unique generalized index on
-                // a function of an already indexed column.
-                "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
+                        // Test unique generalized index on
+                        // a function of an already indexed column.
+                        "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
 
-                // Test generalized expression index with a constant argument.
-                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
+                        // Test generalized expression index with a constant argument.
+                        "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
 
-                //Test generalized expression index with case when.
-                "CREATE INDEX R1_CASEWHEN " +
-                " ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
+                        //Test generalized expression index with case when.
+                        "CREATE INDEX R1_CASEWHEN " +
+                        " ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
 
-                "CREATE TABLE INLINED_VC_VB_TABLE (" +
-                "ID INTEGER DEFAULT 0 NOT NULL," +
-                "VC1 VARCHAR(6)," +     // inlined
-                "VC2 VARCHAR(16)," +    // not inlined
-                "VB1 VARBINARY(6)," +   // inlined
-                "VB2 VARBINARY(64));" + // not inlined
-                "";
-        project.addLiteralSchema(literalSchema);
+                        "CREATE TABLE INLINED_VC_VB_TABLE (" +
+                        "ID INTEGER DEFAULT 0 NOT NULL," +
+                        "VC1 VARCHAR(6)," +     // inlined
+                        "VC2 VARCHAR(16)," +    // not inlined
+                        "VB1 VARBINARY(6)," +   // inlined
+                        "VB2 VARBINARY(64));"); // not inlined
     }
 
     public void testIsDistinctFrom() throws Exception {
@@ -111,16 +109,12 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
         client.callProcedure("S2.insert", 5, 5253, 3);
     }
 
-    private void subTestIsDistinctFrom(Client client)
-            throws Exception {
+    private void subTestIsDistinctFrom(Client client) throws Exception {
         // Once support for 'is distinct from' is available on HSQL-backend,
         // remove the assert below.
         // The expected results below were validated against official HSQL
         // (version 2.3.2/2.3.3) and against postgres.
-        assert( ! isHSQL());
-
-        String sql;
-        long[][] expected;
+        assert(! isHSQL());
 
         //ENG-8946: NULL constant in runtime exception when trying to resolve in HSQL
         // NULL constant - results in non-parameterized plan
@@ -129,81 +123,54 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
         //validateTableOfLongs(client, sql, expected);
 
         // Non-Null constant results in parameterized plan
-        sql = "SELECT * FROM S2 A " +
-                "WHERE  A.WAGE is distinct from 1000.01 " +
-                "ORDER BY A.ID;";
-        expected = new long[][] {
-            {1,     1000,               2},
-            {4,     Long.MIN_VALUE,     2},
-            {5,     5253,               3}};
-        validateTableOfLongs(client, sql, expected);
+        validateTableOfLongs(client,
+                "SELECT * FROM S2 A WHERE  A.WAGE is distinct from 1000.01 ORDER BY A.ID;",
+                new long[][] {{1, 1000, 2}, {4, Long.MIN_VALUE, 2}, {5, 5253, 3}});
 
         // Join operation
         // case 1: on column that can't have null values
-        sql = "Select S1.ID ID," +
-                "S1.Wage, S1.Dept, " +
-                "S2.WAGE, S2.Dept " +
-                "from S1, S2 " +
-                "where S1.ID is not distinct from S2.ID order by S1.ID;";
-        expected = new long[][] {
-            {1, 1000, 1, 1000, 2},
-            {5, 2553, 3, 5253, 3}};
-        validateTableOfLongs(client, sql, expected);
+        validateTableOfLongs(client,
+                "Select S1.ID ID, S1.Wage, S1.Dept, S2.WAGE, S2.Dept from S1, S2 " +
+                        "where S1.ID is not distinct from S2.ID order by S1.ID;",
+                new long[][] {{1, 1000, 1, 1000, 2}, {5, 2553, 3, 5253, 3}});
 
         // case 2.1: on column that can have null values;
         // result set does not have null values
-        sql = "Select S1.Wage," +
-                "S1.ID, S1.Dept, " +
-                "S2.ID, S2.Dept " +
-                "from S1, S2 " +
-                "where S1.WAGE is not distinct from S2.WAGE order by S1.ID;";
-        expected = new long[][] {
-            {1000,              1,  1,  1,  2},
-            {Long.MIN_VALUE,    10, 2,  4,  2}};
-        validateTableOfLongs(client, sql, expected);
-
+        validateTableOfLongs(client,
+                "Select S1.Wage, S1.ID, S1.Dept, S2.ID, S2.Dept from S1, S2 " +
+                        "where S1.WAGE is not distinct from S2.WAGE order by S1.ID;",
+                new long[][] {{1000, 1, 1, 1, 2}, {Long.MIN_VALUE, 10, 2, 4, 2}});
 
         // case 2.2: on column that can have null values;
         // result set has null values
-        sql = "Select S1.ID ID," +
-                "S1.Wage, S1.Dept, " +
-                "S2.WAGE, S2.Dept " +
-                "from S1, S2 " +
-                "where S1.WAGE is distinct from S2.WAGE " +
-                "order by S1.ID, S2.WAGE ASC;";
-        expected = new long[][]{
-            {1,  1000,          1,  Long.MIN_VALUE, 2},
-            {1,  1000,          1,  5253,           3},
-            {3,  3000,          1,  Long.MIN_VALUE, 2},
-            {3,  3000,          1,  1000,           2},
-            {3,  3000,          1,  5253,           3},
-            {5,  2553,          3,  Long.MIN_VALUE, 2},
-            {5,  2553,          3,  1000,           2},
-            {5,  2553,          3,  5253,           3},
-            {7,  4552,          2,  Long.MIN_VALUE, 2},
-            {7,  4552,          2,  1000,           2},
-            {7,  4552,          2,  5253,           3},
-            {9,  5152,          2,  Long.MIN_VALUE, 2},
-            {9,  5152,          2,  1000,           2},
-            {9,  5152,          2,  5253,           3},
-            {10, Long.MIN_VALUE,2,  1000,           2},
-            {10, Long.MIN_VALUE,2,  5253,           3}
-        };
-        validateTableOfLongs(client, sql, expected);
-        /*
-        // ENG-15279, ENG-15234: NULL value, type promotion
-        // left join on column that has null values
-        sql = "Select S2.wage, S2.ID, count (*) " +
-                "from S1 left Join S2 " +
-                "on S2.WAGE is not distinct from S2.wage " +
-                "group by S2.wage, S2.ID " +
-                "order by s2.wage;";
-        expected = new long[][] {
-            {Long.MIN_VALUE,    4,   6},
-            {1000,              1,   6},
-            {5253,              5,   6}};
-        validateTableOfLongs(client, sql, expected);
-        */
+        validateTableOfLongs(client,
+                "Select S1.ID ID, S1.Wage, S1.Dept, S2.WAGE, S2.Dept from S1, S2 where S1.WAGE is distinct from S2.WAGE " +
+                        "order by S1.ID, S2.WAGE ASC;",
+                new long[][]{
+                        {1,  1000,          1,  Long.MIN_VALUE, 2},
+                        {1,  1000,          1,  5253,           3},
+                        {3,  3000,          1,  Long.MIN_VALUE, 2},
+                        {3,  3000,          1,  1000,           2},
+                        {3,  3000,          1,  5253,           3},
+                        {5,  2553,          3,  Long.MIN_VALUE, 2},
+                        {5,  2553,          3,  1000,           2},
+                        {5,  2553,          3,  5253,           3},
+                        {7,  4552,          2,  Long.MIN_VALUE, 2},
+                        {7,  4552,          2,  1000,           2},
+                        {7,  4552,          2,  5253,           3},
+                        {9,  5152,          2,  Long.MIN_VALUE, 2},
+                        {9,  5152,          2,  1000,           2},
+                        {9,  5152,          2,  5253,           3},
+                        {10, Long.MIN_VALUE,2,  1000,           2},
+                        {10, Long.MIN_VALUE,2,  5253,           3}
+                });
+        validateTableOfLongs(client,
+                "Select S2.wage, S2.ID, count (*) " +
+                        "from S1 left Join S2 " +
+                        "on S2.WAGE is not distinct from S2.wage " +
+                        "group by S2.wage, S2.ID " +
+                        "order by s2.wage;",
+                new long[][] {{Long.MIN_VALUE, 4, 6}, {1000, 1, 6}, {5253, 5, 6}});
     }
 
     private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception {
@@ -213,73 +180,50 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
         // (version 2.3.2/2.3.3) and against postgres.
         assert(! isHSQL());
 
-        String sql;
-        long[][] expected;
-
         // test cases below test different subquery condition paths in EE like
         // LHS NULL, RHS NOT NULL and so forth
-        sql = "SELECT wage salary, count(*) from S2 "+
-                "WHERE wage is distinct from " +
-                "(SELECT MIN(wage) FROM S1 where wage is distinct from 2553) " +
-                "GROUP BY wage " +
-                "HAVING COUNT(*) is distinct from 7 " +
-                "ORDER BY wage";
-        expected = new long[][] {{Long.MIN_VALUE,    1}, {5253,              1}};
-        validateTableOfLongs(client, sql, expected);
+        validateTableOfLongs(client,
+                "SELECT wage salary, count(*) from S2 WHERE wage is distinct from " +
+                        "(SELECT MIN(wage) FROM S1 where wage is distinct from 2553) " +
+                        "GROUP BY wage HAVING COUNT(*) is distinct from 7 ORDER BY wage",
+                new long[][] {{Long.MIN_VALUE, 1}, {5253, 1}});
 
-        sql = "SELECT id, wage, count(*) from S1 "+
-                "WHERE wage is distinct from " +
-                "(SELECT wage FROM S2 where id is not distinct from 4) " +
-                "GROUP BY wage, id " +
-                "HAVING COUNT(*) is distinct from 7 " +
-                "ORDER BY id;";
-        expected = new long[][] {
-            {1, 1000,   1},
-            {3, 3000,   1},
-            {5, 2553,   1},
-            {7, 4552,   1},
-            {9, 5152,   1}};
-        validateTableOfLongs(client, sql, expected);
+        validateTableOfLongs(client,
+                "SELECT id, wage, count(*) from S1 WHERE wage is distinct from " +
+                        "(SELECT wage FROM S2 where id is not distinct from 4) " +
+                        "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY id;",
+                new long[][] {{1, 1000, 1}, {3, 3000, 1}, {5, 2553, 1}, {7, 4552, 1}, {9, 5152, 1}});
 
-        sql = "SELECT id, wage salary, count(*)  from S1 " +
-                "WHERE  (select S2.wage from S2 " +
-                "where S2.ID<>1 and S2.id<>5) is not distinct from wage " +
-                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 " +
-                "ORDER BY wage;";
-        expected = new long[][] {{10, Long.MIN_VALUE, 1}};
-        validateTableOfLongs(client, sql, expected);
+        validateTableOfLongs(client,
+                "SELECT id, wage salary, count(*)  from S1 WHERE  (" +
+                        "select S2.wage from S2 where S2.ID<>1 and S2.id<>5) is not distinct from wage " +
+                        "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY wage;",
+                new long[][] {{10, Long.MIN_VALUE, 1}});
 
-        // temperally disabled, see ENG-15229
-//        sql = "select S1.wage, count(*) from S1 Right Join S2 "+
-//                "on S2.wage is distinct from " +
-//                "(SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +
-//                "GROUP BY S1.wage " +
-//                "HAVING COUNT(*) is not distinct from 1;";
-//        validateTableOfLongs(client, sql, new long[][] {});
+        if (!USING_CALCITE) { // temperally disabled, see ENG-15229
+            validateTableOfLongs(client,
+                    "select S1.wage, count(*) from S1 Right Join S2 " +
+                            "on S2.wage is distinct from (SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +
+                            "GROUP BY S1.wage HAVING COUNT(*) is not distinct from 1;",
+                    new long[][]{});
 
-        // temperally disabled, see ENG-15229
-//        sql = "select * from S1 where S1.wage = ANY " +
-//                "(select S2.wage from S2 " +
-//                "where S2.wage is distinct from 5253 " +
-//                "or S2.wage is not distinct from 1000);";
-//        expected = new long[][] {{1, 1000, 1}};
-//        validateTableOfLongs(client, sql, expected);
+            validateTableOfLongs(client,
+                    "select * from S1 where S1.wage = ANY (" +
+                            "select S2.wage from S2 where S2.wage is distinct from 5253 or S2.wage is not distinct from 1000);",
+                    new long[][]{{1, 1000, 1}});
+        }
 
         // currently ANY/ALL operator is not supported with "is distinct from"
         // comparison operator
-        sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
-                "(select S2.wage " +
-                "from S2 " +
-                "where S2.wage is distinct from 5253 " +
-                "or S2.Wage is not distinct from 1000);";
-        verifyStmtFails(client, sql, "unexpected token: SELECT");
+        verifyStmtFails(client,
+                "select * from S1 where S1.WAGE is not distinct from ANY " +
+                        "(select S2.wage from S2 where S2.wage is distinct from 5253 or S2.Wage is not distinct from 1000);",
+                "unexpected token: SELECT");
 
-        sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
-                "(select S2.wage " +
-                "from S2 " +
-                "where S2.wage is distinct from 5253 " +
-                "or S2.Wage is not distinct from Null);";
-        verifyStmtFails(client, sql, "unexpected token: SELECT");
+        verifyStmtFails(client,
+                "select * from S1 where S1.WAGE is not distinct from ANY " +
+                        "(select S2.wage from S2 where S2.wage is distinct from 5253 or S2.Wage is not distinct from Null);",
+                "unexpected token: SELECT");
     }
 
     private void subTestIsDistinctFromInCompatibleTypes(Client client) throws Exception {
@@ -298,20 +242,19 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
         cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         cl.callProcedure("R1.insert", 2, "Memsql",  5, 5.0, new Timestamp(1000000000000L));
 
-        sql = "SELECT ID, CASE WHEN num < 3 THEN 0 ELSE 8 END " +
-                "FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 0},{2, 8}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE WHEN num < 3 THEN 0 ELSE 8 END FROM R1 ORDER BY 1;",
+                new long[][] {{1, 0},{2, 8}});
 
-        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END " +
-                "FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 0},{2, 15}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END " +
+                        "FROM R1 ORDER BY 1;",
+                new long[][] {{1, 0},{2, 15}});
 
-        sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN num * 5 " +
-                "WHEN num >=5 THEN num * 10 ELSE num END FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 5},{2, 50}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN num * 5 " +
+                        "WHEN num >=5 THEN num * 10 ELSE num END FROM R1 ORDER BY 1;",
+                new long[][] {{1, 5},{2, 50}});
 
 
         // (2) Test case when Types.
@@ -340,7 +283,7 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    m_usingCalcite ? "ELSE clause or at least one THEN clause must be non-NULL" :  // Calcite message
+                    USING_CALCITE ? "ELSE clause or at least one THEN clause must be non-NULL" :  // Calcite message
                             "data type cast needed for parameter or null literal"));               // legacy message
         }
 
@@ -358,7 +301,7 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
             // hsql232 ENG-8586 CASE WHEN having no incompatibility problem with this: fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    m_usingCalcite ? "Illegal mixing of types in CASE or COALESCE statement" :
+                    USING_CALCITE ? "Illegal mixing of types in CASE or COALESCE statement" :
                             "incompatible data types in combination"));
         }
 
@@ -446,27 +389,25 @@ public class TestComparisonOperatorsSuite extends RegressionSuite {
     public void testCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
-        String sql;
-        long[][] expected;
 
         //      ID, DESC,   NUM, FLOAT, TIMESTAMP
         cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         cl.callProcedure("R1.insert", 2, "MySQL",  5, 5.0, new Timestamp(1000000000000L));
 
-        sql = "SELECT ID, CASE num WHEN 3 THEN 3*2 WHEN 1 THEN 0 ELSE 10 END FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 0},{2, 10}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE num WHEN 3 THEN 3*2 WHEN 1 THEN 0 ELSE 10 END FROM R1 ORDER BY 1;",
+                new long[][] {{1, 0},{2, 10}});
 
         // No ELSE clause
-        sql = "SELECT ID, CASE num WHEN 1 THEN 10 WHEN 2 THEN 1 END FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 10},{2, Long.MIN_VALUE}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE num WHEN 1 THEN 10 WHEN 2 THEN 1 END FROM R1 ORDER BY 1;",
+                new long[][] {{1, 10},{2, Long.MIN_VALUE}});
 
         // Test NULL
         cl.callProcedure("R1.insert", 3, "Oracle",  null, null, new Timestamp(1000000000000L));
-        sql = "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;";
-        expected = new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}};
-        validateTableOfLongs(cl, sql, expected);
+        validateTableOfLongs(cl,
+                "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;",
+                new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
     }
 
     static public junit.framework.Test suite() {

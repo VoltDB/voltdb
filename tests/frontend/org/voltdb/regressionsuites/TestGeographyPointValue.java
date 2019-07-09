@@ -312,7 +312,7 @@ public class TestGeographyPointValue extends RegressionSuite {
         final Client client = getClient();
         fillTable(client, 0);
         final String expectedErrorMessage =
-                m_usingCalcite ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
+                USING_CALCITE ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
         verifyStmtFails(client, "select pk, pt + pt from t order by pk", expectedErrorMessage);
         verifyStmtFails(client, "select pk, pt + 1 from t order by pk", expectedErrorMessage);
     }

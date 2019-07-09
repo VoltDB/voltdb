@@ -824,19 +824,20 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         // use user parameter with the constant in the expression index
         // not able to use the index scan here
         // ENG-15255
-//        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-?) = 1 AND ID >= ? ORDER BY ID;";
-//        vt = client.callProcedure("@Explain", sql).getResults()[0];
-//        assertFalse(vt.toString().contains("ABSIDX"));
-//        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
-//
-//        vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{3});
-//        checkPlannerCache(client, CACHE_MISS2);
-//
-//        vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{1, 2});
-//        checkPlannerCache(client, CACHE_HIT2);
+        if (!USING_CALCITE) {
+            sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-?) = 1 AND ID >= ? ORDER BY ID;";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            assertFalse(vt.toString().contains("ABSIDX"));
+            checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
 
+            vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{3});
+            checkPlannerCache(client, CACHE_MISS2);
+
+            vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{1, 2});
+            checkPlannerCache(client, CACHE_HIT2);
+        }
 
         //
         // no user parameters
