@@ -26,8 +26,9 @@ import org.voltcore.utils.Pair;
  * <p>
  * Steps to implement a function through Calcite:
  * <ul>
- * <li>Under the appropriate static class, create a static method that has the same
- * signature as the VoltDB SQL function.
+ * <li>Under the appropriate static class (create a new one if necessary), create a
+ * static method that has the same signature (argument types and return type) as the
+ * VoltDB SQL function.
  * <li>Add the method along with its argument classes into {@link #VOLT_SQL_FUNCTIONS}.
  * <li>Use {@link org.apache.calcite.sql.type.JavaToSqlTypeConversionRules} as a guideline
  * for the mapping from Java types to corresponding SQL types.
@@ -36,9 +37,12 @@ import org.voltcore.utils.Pair;
  * @since 9.1
  */
 public class VoltSqlFunctions {
-    // The map from method name to an ImmutableList of classes for registering
-    // volt extend sql functions. The first class in the list implements the method,
-    // the classes that follow are argument types.
+    // The map from method name to a triplet of objects representing the signature of
+    // volt extend sql functions. There are three components for each SQL function.
+    // 1. The first component is the static class the function is implemented in. (e.g. BitwiseFunctions)
+    // 2. The second component is the whether the function need its argument to match its declaration exactly.
+    //    This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
+    // 3. The last component is an array of class objects that represent the argument types of the function.
     public static final ImmutableMultimap<String, Triple<Class, Boolean, Class []>> VOLT_SQL_FUNCTIONS =
             ImmutableMultimap.<String, Triple<Class, Boolean, Class []>>builder()
                     .put("migrating", Triple.of(MigrationFunctions.class, false, new Class []{}))
@@ -58,7 +62,7 @@ public class VoltSqlFunctions {
     // We only need the sql function signature in validate&plan phase. The return value doesn't matter.
     // Calcite won't evaluate the function during planning
 
-    // MIGRATING() function
+    // Migration functions
     public static class MigrationFunctions {
         public static boolean migrating() {
             return true;
