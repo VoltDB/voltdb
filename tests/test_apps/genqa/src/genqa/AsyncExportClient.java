@@ -223,6 +223,7 @@ public class AsyncExportClient
         final boolean exportGroups;
         final int exportTimeout;
         final boolean usemigrate;
+        final boolean usetableexport;
         final boolean usemigrateonly;
 
         ConnectionConfig( AppHelper apph) {
@@ -239,6 +240,7 @@ public class AsyncExportClient
             exportGroups    = apph.booleanValue("exportgroups");
             exportTimeout   = apph.intValue("timeout");
             usemigrate      = apph.booleanValue("usemigrate");
+            usetableexport  = apph.booleanValue("usetableexport");
             usemigrateonly  = apph.booleanValue("usemigrateonly");
 
         }
@@ -296,6 +298,7 @@ public class AsyncExportClient
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("usemigrate","usemigrate","use DDL that includes TTL MIGRATE action","false")
+                .add("usetableexport","usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
                 .add("usemigrateonly","usemigrateonly","use DDL that includes MIGRATE without TTL","false")
                 .setArguments(args)
             ;
