@@ -18,6 +18,7 @@
 package org.voltdb.plannerv2.sqlfunctions;
 
 import com.google.common.collect.ImmutableMultimap;
+import org.apache.commons.lang3.tuple.Triple;
 import org.voltcore.utils.Pair;
 
 /**
@@ -38,16 +39,16 @@ public class VoltSqlFunctions {
     // The map from method name to an ImmutableList of classes for registering
     // volt extend sql functions. The first class in the list implements the method,
     // the classes that follow are argument types.
-    public static final ImmutableMultimap<String, Pair<Class, Class []>> VOLT_SQL_FUNCTIONS =
-            ImmutableMultimap.<String, Pair<Class, Class []>>builder()
-                    .put("migrating", Pair.of(MigrationFunctions.class, new Class []{}))
-                    .put("bitShiftLeft", Pair.of(BitwiseFunctions.class, new Class []{long.class, int.class}))
-                    .put("bitShiftRight", Pair.of(BitwiseFunctions.class, new Class []{long.class, int.class}))
-                    .put("bitAnd", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
-                    .put("bitNot", Pair.of(BitwiseFunctions.class, new Class []{long.class}))
-                    .put("bitOr", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
-                    .put("bitXor", Pair.of(BitwiseFunctions.class, new Class []{long.class, long.class}))
-                    .put("hex", Pair.of(StringFunctions.class, new Class []{long.class}))
+    public static final ImmutableMultimap<String, Triple<Class, Boolean, Class []>> VOLT_SQL_FUNCTIONS =
+            ImmutableMultimap.<String, Triple<Class, Boolean, Class []>>builder()
+                    .put("migrating", Triple.of(MigrationFunctions.class, false, new Class []{}))
+                    .put("bitShiftLeft", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, int.class}))
+                    .put("bitShiftRight", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, int.class}))
+                    .put("bitAnd", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
+                    .put("bitNot", Triple.of(BitwiseFunctions.class, true, new Class []{long.class}))
+                    .put("bitOr", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
+                    .put("bitXor", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
+                    .put("hex", Triple.of(StringFunctions.class, false, new Class []{long.class}))
                     .build();
 
     //-------------------------------------------------------------
