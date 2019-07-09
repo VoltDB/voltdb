@@ -455,8 +455,14 @@ public class ExportCoordinator {
                                 }
                             }
 
-                            // Get the EDS tracker (note, this is a duplicate)
-                            ExportSequenceNumberTracker tracker = m_eds.getTracker();
+                            // Try to get our normalized tracker first: in case the EDS tracker
+                            // is empty, a rejoining node might infer a leading gap that doesn't
+                            // exist (ENG-16589).
+                            ExportSequenceNumberTracker tracker = m_trackers.get(m_hostId);
+                            if (tracker == null) {
+                                // Otherwise, get the EDS tracker (note, this is a duplicate)
+                                tracker = m_eds.getTracker();
+                            }
                             lastReleasedSeqNo = m_eds.getLastReleaseSeqNo();
                             if (!tracker.isEmpty() && lastReleasedSeqNo > tracker.getFirstSeqNo()) {
                                 if (exportLog.isDebugEnabled()) {
