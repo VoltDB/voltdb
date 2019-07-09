@@ -513,11 +513,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                             "Cannot apply 'CHAR_LENGTH' to arguments of type 'CHAR_LENGTH(<VARBINARY(256)>)'. Supported form(s): 'CHAR_LENGTH(<CHARACTER>)'" :
                             "incompatible data type in operation"));
         }
-
-    }
-
-    @Test
-    public void testDECODE() throws IOException, ProcCallException {
     }
 
     @Test
@@ -926,10 +921,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
 
-        String[] procedures = {
-                "SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
-                "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS",
-                "SINCE_EPOCH_MICROSECOND"};
+        String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS", "SINCE_EPOCH_MILLISECOND",
+                "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
 
         for (String proc : procedures) {
             cr = client.callProcedure(proc, 0);
@@ -937,14 +930,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            switch (proc) {
-                case "SINCE_EPOCH_SECOND":
-                case "SINCE_EPOCH_MILLIS":
-                case "SINCE_EPOCH_MILLISECOND":
-                case "SINCE_EPOCH_MICROS":
-                case "SINCE_EPOCH_MICROSECOND":
-                    assertEquals(0, result.getLong(0));
-            }
+            assertEquals(0, result.getLong(0));
 
             cr = client.callProcedure(proc, 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());

@@ -270,7 +270,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
 
         // testing the same behavior for 0-Double.MAX_VALUE
-        cr = client.callProcedure("@AdHoc","select 0-ratio from P1 where desc='maxvalues'");
+        cr = client.callProcedure("@AdHoc", "select 0-ratio from P1 where desc='maxvalues'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -280,7 +280,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         client.callProcedure("@AdHoc",
                 "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
 
-        cr = client.callProcedure("@AdHoc","select -ratio from P1 where desc='minvalues'");
+        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='minvalues'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -323,7 +323,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
         assertEquals( rA.get( "C5", VoltType.FLOAT), rB.get( "C5", VoltType.FLOAT ));
         assertEquals( rA.get( "C6", VoltType.DECIMAL), rB.get( "C6", VoltType.DECIMAL ));
 
-        client.callProcedure("@AdHoc","delete from NUMBER_TYPES where INTEGERNUM = 1");
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = 1");
         client.callProcedure("NUMBER_TYPES.insert", Integer.MAX_VALUE, Byte.MAX_VALUE, Short.MAX_VALUE,
                 Long.MAX_VALUE, 0, 0);
 
@@ -374,7 +374,7 @@ public class TestFunctionsSuite2 extends RegressionSuite {
                 "INSERT INTO P1 VALUES (6, 'WCfDDvZBPoqhanfGN', 1414568, 1.14383710279231887164e-01, NULL)");
         cr = client.callProcedure("@AdHoc","select (5.25 + NUM) from P1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc","SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
+        cr = client.callProcedure("@AdHoc", "SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // This test case requires HSQL to be taught to do (truncating) integer division of integers as VoltDB does.
         // While not strictly required by the SQL standard, integer division is at least technically compliant,

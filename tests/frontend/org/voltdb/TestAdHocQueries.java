@@ -57,7 +57,7 @@ import org.voltdb.utils.VoltFile;
 
 public class TestAdHocQueries extends AdHocQueryTester {
 
-    Client m_client;
+    private Client m_client;
     private final static boolean m_debug = false;
 
     @AfterClass
@@ -69,8 +69,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testProcedureAdhoc() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
-        ServerThread localServer = new ServerThread(config);
+        final VoltDB.Configuration config = setUpSPDB();
+        final ServerThread localServer = new ServerThread(config);
 
         try {
             localServer.start();
@@ -86,13 +86,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // Test that a basic multipartition select works as well as a parameterized
             // query (it's in the procedure)
             //
-            VoltTable results[] = m_client.callProcedure(
-                    "executeSQLSP", 23, "select * from PARTED1")
-                    .getResults();
+            VoltTable[] results = m_client.callProcedure(
+                    "executeSQLSP", 23, "select * from PARTED1").getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[1].advanceRow());
 
-            results = m_client.callProcedure("executeSQLMP", 23, "       select * from PARTED1")
+            results = m_client.callProcedure("executeSQLMP", 23, "select * from PARTED1")
                     .getResults();
             assertTrue(results[0].advanceRow());
             assertTrue(results[1].advanceRow());
@@ -114,7 +113,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // Validate one sql statement per
             //
             try {
-                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5); select * from parted1;");
+                m_client.callProcedure("executeSQLSP",
+                        24, "insert into parted1 values (24,5); select * from parted1;");
                 fail("Procedure call should not have succeded");
             } catch (ProcCallException ignored) {}
 
@@ -133,9 +133,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //
             // Query the inserts and all the rest do it once for singe and once for multi
             //
-            results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
+            results = m_client.callProcedure("executeSQLMP",
+                    24, "select * from parted1 order by partval").getResults();
 
-            assertEquals( 3, results[0].getRowCount());
+            assertEquals(3, results[0].getRowCount());
             for (int ii = 3; ii < 6; ii++) {
                 assertTrue(results[0].advanceRow());
                 assertEquals(20 + ii, results[0].getLong(0));
@@ -143,24 +144,25 @@ public class TestAdHocQueries extends AdHocQueryTester {
             }
 
             //Output from the first preplanned statement
-            assertEquals( 3, results[1].getRowCount());
+            assertEquals(3, results[1].getRowCount());
             assertTrue(results[1].advanceRow());
-            assertEquals( 23, results[1].getLong(0));
-            assertEquals( 3, results[1].getLong(1));
+            assertEquals(23, results[1].getLong(0));
+            assertEquals(3, results[1].getLong(1));
 
             //Output from the second adhoc statement
-            assertEquals( 1, results[2].getRowCount());
+            assertEquals(1, results[2].getRowCount());
             assertTrue(results[2].advanceRow());
-            assertEquals( 24, results[2].getLong(0));
-            assertEquals( 4, results[2].getLong(1));
+            assertEquals(24, results[2].getLong(0));
+            assertEquals(4, results[2].getLong(1));
 
             //Output from the second preplanned statement
-            assertEquals( 3, results[3].getRowCount());
+            assertEquals(3, results[3].getRowCount());
             assertTrue(results[3].advanceRow());
-            assertEquals( 23, results[3].getLong(0));
-            assertEquals( 3, results[3].getLong(1));
+            assertEquals(23, results[3].getLong(0));
+            assertEquals(3, results[3].getLong(1));
 
-            results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
+            results = m_client.callProcedure("executeSQLSP",
+                    24, "select * from parted1 order by partval").getResults();
 
             //These constants break when partitioning changes
             //Recently 23, 24, and 25, started hashing to the same place /facepalm
@@ -193,14 +195,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             localServer.shutdown();
             localServer.join();
-            // no clue how helpful this is
-            System.gc();
         }
     }
 
     @Test
     public void testSP() throws Exception {
-        System.out.println("Starting testSP");
         VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
@@ -223,70 +222,75 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //Hashes to partition 1
             int hashableD = 4;
 
-            //If things break you can use this to find what hashes where and fix the constants
-//            for (int ii = 0; ii < 10; ii++) {
-//                System.out.println("Partition " + TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), ii) + " param " + ii);
-//            }
-
             // Unlike TestAdHocPlans, TestAdHocQueries runs the queries against actual (minimal) data.
             // Load that, here.
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableD, hashableD)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableD, hashableD)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc",
+                    String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
             // verify that inserts to a table partitioned on an integer get handled correctly - results not used later
             for (int i = -7; i <= 7; i++) {
-                modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED4 VALUES (%d, %d);", i, i)).getResults()[0];
+                modCount = m_client.callProcedure("@AdHoc",
+                        String.format("INSERT INTO PARTED4 VALUES (%d, %d);", i, i)).getResults()[0];
                 assertEquals(1, modCount.getRowCount());
                 assertEquals(1, modCount.asScalarLong());
             }
 
             runAllAdHocSPtests(hashableA, hashableB, hashableC, hashableD);
         } finally {
-            if (m_client != null) m_client.close();
-            m_client = null;
+            if (m_client != null) {
+                m_client.close();
+                m_client = null;
+            }
 
             localServer.shutdown();
             localServer.join();
-            // no clue how helpful this is
-            System.gc();
-            System.out.println("Ending testSP");
         }
     }
 
@@ -329,8 +333,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 m_catalogJar, m_pathToDeployment, 2, 2, 1);
         try {
             env.setUp();
-            Stream.of(
-                    "SELECT id FROM P0;",
+            Stream.of("SELECT id FROM P0;",
                     "SELECT VCHAR_INLINE FROM R21 WHERE (SELECT MIN(VCHAR_INLINE) FROM R21) LIKE 'abc%';")
                     .forEachOrdered(query -> {
                         try {
@@ -353,8 +356,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 m_catalogJar, m_pathToDeployment, 2, 2, 1);
         try {
             env.setUp();
-            Stream.of(
-                    "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) STARTS WITH V LIMIT 1;",
+            Stream.of("SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) STARTS WITH V LIMIT 1;",
                     "SELECT * FROM R0 WHERE V STARTS WITH (SELECT MAX('s') FROM R0);",
                     "SELECT * FROM R0 WHERE (SELECT TOP 1 V FROM R0 ORDER BY V) LIKE V LIMIT 1;",
                     "SELECT * FROM R0 WHERE V LIKE (SELECT MAX('s') FROM R0);")
@@ -379,21 +381,23 @@ public class TestAdHocQueries extends AdHocQueryTester {
         try {
             env.setUp();
 
-            VoltTable modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1, 1);").getResults()[0];
+            VoltTable modCount = env.m_client.callProcedure("@AdHoc",
+                    "INSERT INTO BLAH VALUES (1, 1, 1);").getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            VoltTable result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            VoltTable result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
 
             // test single-partition stuff
             // TODO: upgrade to use @GetPartitionKeys instead of TheHashinator interface
-            VoltTable result1 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH;",
-                    2).getResults()[0];
+            VoltTable result1 = env.m_client.callProcedure("@AdHocSpForTest",
+                    "SELECT * FROM BLAH;", 2).getResults()[0];
             //System.out.println(result1.toString());
-            VoltTable result2 = env.m_client.callProcedure("@AdHocSpForTest", "SELECT * FROM BLAH;",
-                    0).getResults()[0];
+            VoltTable result2 = env.m_client.callProcedure("@AdHocSpForTest",
+                    "SELECT * FROM BLAH;", 0).getResults()[0];
             //System.out.println(result2.toString());
             assertEquals(1, result1.getRowCount() + result2.getRowCount());
             assertEquals(0, result1.getRowCount());
@@ -411,61 +415,74 @@ public class TestAdHocQueries extends AdHocQueryTester {
             } catch (Exception ignored) {}
 
             // try a huge bigint literal
-            env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.123012', 5);");
-            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488301, '2011-06-24 10:30:28', 5);").getResults()[0];
+            env.m_client.callProcedure("@AdHoc",
+                    "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.123012', 5);");
+            modCount = env.m_client.callProcedure("@AdHoc",
+                    "INSERT INTO BLAH VALUES (974599638818488301, '2011-06-24 10:30:28', 5);").getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = '2011-06-24 10:30:26.123012';").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE TVAL = '2011-06-24 10:30:26.123012';").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > '2011-06-24 10:30:25';").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE TVAL > '2011-06-24 10:30:25';").getResults()[0];
             assertEquals(2, result.getRowCount());
             //System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < '2011-06-24 10:30:27';").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE TVAL < '2011-06-24 10:30:27';").getResults()[0];
             //System.out.println(result.toString());
             // We inserted a 1,1,1 row way earlier
             assertEquals(2, result.getRowCount());
 
             // try something like the queries in ENG-1242
             try {
-                env.m_client.callProcedure("@AdHoc", "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = 1;");
+                env.m_client.callProcedure("@AdHoc",
+                        "select * from blah; dfvsdfgvdf select * from blah WHERE IVAL = 1;");
                 fail("Bad SQL failed to throw expected exception");
             } catch (Exception ignored) {}
             env.m_client.callProcedure("@AdHoc", "select\n* from blah;");
 
             // try a decimal calculation (ENG-1093)
-            modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
+            modCount = env.m_client.callProcedure("@AdHoc",
+                    "INSERT INTO BLAH VALUES (2, '2011-06-24 10:30:26', 1.12345*1);").getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
 
             // test wasNull asScalarLong
             long value;
             boolean wasNull;
-            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as tinyInt) from BLAH").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "select top 1 cast(null as tinyInt) from BLAH").getResults()[0];
             value = result.asScalarLong();
             wasNull = result.wasNull();
             assertEquals(VoltType.NULL_TINYINT, value);
             assertTrue(wasNull);
 
-            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as smallInt) from BLAH").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "select top 1 cast(null as smallInt) from BLAH").getResults()[0];
             value = result.asScalarLong();
             wasNull = result.wasNull();
             assertEquals(VoltType.NULL_SMALLINT, value);
             assertTrue(wasNull);
 
-            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as integer) from BLAH").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "select top 1 cast(null as integer) from BLAH").getResults()[0];
             value = result.asScalarLong();
             wasNull = result.wasNull();
             assertEquals(VoltType.NULL_INTEGER, value);
             assertTrue(wasNull);
 
-            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as bigint) from BLAH").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc",
+                    "select top 1 cast(null as bigint) from BLAH").getResults()[0];
             value = result.asScalarLong();
             wasNull = result.wasNull();
             assertEquals(VoltType.NULL_BIGINT, value);
@@ -493,7 +510,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             int i = 0;
             while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
                 String randPhone = RandomStringUtils.randomNumeric(10);
-                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
+                VoltTable result = env.m_client.callProcedure("@AdHoc",
+                        "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
                 assertEquals(1, result.getRowCount());
                 adHocQueryTemp.append(randPhone);
                 adHocQueryTemp.append(", ");
@@ -631,7 +649,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
-    public void testAdHocQueryForStackOverFlowCondition() throws IOException, Exception {
+    public void testAdHocQueryForStackOverFlowCondition() throws Exception {
         System.out.println("Starting testLongAdHocQuery");
 
         VoltDB.Configuration config = setUpSPDB();
@@ -655,8 +673,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
         } finally {
             if (m_client != null) {
                 m_client.close();
+                m_client = null;
             }
-            m_client = null;
             localServer.shutdown();
             localServer.join();
         }
@@ -806,14 +824,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
     }
 
     @Test
-    public void testAdHocWithParamsNegative() throws Exception {
-        System.out.println("Starting testAdHocWithParamsNegative cases");
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
-        String adHocQuery;
+    public void testAdHocWithParamsNegative() {
+        final TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
 
         try {
             env.setUp();
 
+            String adHocQuery;
             // no constants
             adHocQuery = "SELECT * FROM AAA WHERE a1 = ? and a2 = ?;";
             verifyIncorrectParameterMessage(env, adHocQuery, new Integer[]{1});
@@ -839,30 +856,29 @@ public class TestAdHocQueries extends AdHocQueryTester {
             String errorMsg = AdHocNTBase.AdHocErrorResponseMessage;
             // test batch question mark parameter guards
 
-            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                env.m_client.callProcedure("@AdHoc",
+                        "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';", "a2");
                 fail();
             } catch (Exception ex) {
                 assertEquals(errorMsg, ex.getMessage());
             }
 
-            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                env.m_client.callProcedure("@AdHoc",
+                        "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;", "a2");
                 fail();
             } catch (Exception ex) {
                 assertEquals(errorMsg, ex.getMessage());
             }
         } finally {
             env.tearDown();
-            System.out.println("Ending testAdHocWithParamsNegative cases");
         }
     }
 
     @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        final TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -933,62 +949,42 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testXopenSubSelectQueries() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
-        String adHocQuery;
+        final TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
         try {
             env.setUp();
-
-            adHocQuery = "  UPDATE STAFF \n" +
-                    "          SET GRADE=10*STAFF.GRADE \n" +
-                    "          WHERE STAFF.EMPNUM NOT IN \n" +
-                    "                (SELECT WORKS.EMPNUM \n" +
-                    "                      FROM WORKS \n" +
-                    "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                env.m_client.callProcedure("@AdHoc",
+                        "UPDATE STAFF SET GRADE=10*STAFF.GRADE WHERE STAFF.EMPNUM NOT IN (SELECT WORKS.EMPNUM " +
+                                " FROM WORKS WHERE STAFF.EMPNUM = WORKS.EMPNUM);");
             } catch (ProcCallException ignored) {
                 fail("did fail on subquery In/Exists in UPDATE statement");
             }
 
-            adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
-                    "           FROM STAFF \n" +
-                    "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
-                    "                WHERE WORKS.EMPNUM = STAFF.EMPNUM) \n" +
-                    "                ORDER BY EMPNUM;";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                env.m_client.callProcedure("@AdHoc",
+                        "SELECT 'ZZ', EMPNUM, EMPNAME, -99 FROM STAFF WHERE NOT EXISTS (SELECT * FROM WORKS " +
+                                "WHERE WORKS.EMPNUM = STAFF.EMPNUM) ORDER BY EMPNUM;");
             } catch (Exception ignored) {
                 fail("did fail on exists clause");
             }
 
-            adHocQuery = "   SELECT STAFF.EMPNAME \n" +
-                    "          FROM STAFF \n" +
-                    "          WHERE STAFF.EMPNUM IN \n" +
-                    "                  (SELECT WORKS.EMPNUM \n" +
-                    "                        FROM WORKS \n" +
-                    "                        WHERE WORKS.PNUM IN \n" +
-                    "                              (SELECT PROJ.PNUM \n" +
-                    "                                    FROM PROJ \n" +
-                    "                                    WHERE PROJ.CITY='Tampa')); \n" +
-                    "";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                env.m_client.callProcedure("@AdHoc",
+                        "SELECT STAFF.EMPNAME FROM STAFF WHERE STAFF.EMPNUM IN \n" +
+                                "(SELECT WORKS.EMPNUM FROM WORKS WHERE WORKS.PNUM IN \n" +
+                                "(SELECT PROJ.PNUM FROM PROJ WHERE PROJ.CITY='Tampa'));");
             } catch (Exception ignored) {
                 fail("did fail on subquery");
             }
 
-            adHocQuery = "SELECT PNAME \n" +
-                    "         FROM PROJ \n" +
-                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
-                    "                           AND PNUM > 'P2';";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                env.m_client.callProcedure("@AdHoc",
+                        "SELECT PNAME FROM PROJ WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' AND PNUM > 'P2';");
             } catch (ProcCallException ignored) {
                 fail("failed on static clause");
             }
-            adHocQuery = "ROLLBACK;";
             try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                env.m_client.callProcedure("@AdHoc", "ROLLBACK;");
                 fail("did not fail on invalid SQL verb");
             } catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("this type of sql statement is not supported") > 0);
