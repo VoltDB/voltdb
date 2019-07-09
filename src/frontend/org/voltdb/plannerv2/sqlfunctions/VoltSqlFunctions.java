@@ -40,9 +40,9 @@ public class VoltSqlFunctions {
     // The map from method name to a triplet of objects representing the signature of
     // volt extend sql functions. There are three components for each SQL function.
     // 1. The first component is the static class the function is implemented in. (e.g. BitwiseFunctions)
-    // 2. The second component is the whether the function need its argument to match its declaration exactly.
+    // 2. The second component is the whether the function needs its argument to match its declaration exactly.
     //    This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
-    // 3. The last component is an array of class objects that represent the argument types of the function.
+    // 3. The last component is an array of class objects that represents the argument types of the function.
     public static final ImmutableMultimap<String, Triple<Class, Boolean, Class []>> VOLT_SQL_FUNCTIONS =
             ImmutableMultimap.<String, Triple<Class, Boolean, Class []>>builder()
                     .put("migrating", Triple.of(MigrationFunctions.class, false, new Class []{}))
