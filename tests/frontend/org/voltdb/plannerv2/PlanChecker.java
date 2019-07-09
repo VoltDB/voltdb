@@ -90,7 +90,9 @@ public class PlanChecker extends CalcitePlannerTestCase {
         if (calcitePlan.subPlanGraph != null && voltdbPlan.subPlanGraph != null) {
             comparePlanTree(calcitePlan.subPlanGraph, voltdbPlan.subPlanGraph, sql);
         } else if (calcitePlan.subPlanGraph != null || voltdbPlan.subPlanGraph != null) {
-            fail(String.format("Two-part MP plans mismatch.\n\nVoltDB plan: %s\n\nCalcite plan:%s\n", voltdbPlan.subPlanGraph.toExplainPlanString(), calcitePlan.subPlanGraph.toExplainPlanString()));
+            fail(String.format("Two-part MP plans mismatch.\n\nVoltDB plan: %s\n\nCalcite plan:%s\n",
+                    voltdbPlan.subPlanGraph.toExplainPlanString(),
+                    calcitePlan.subPlanGraph.toExplainPlanString()));
         }
         // Compare CompiledPlan attributes
         try {

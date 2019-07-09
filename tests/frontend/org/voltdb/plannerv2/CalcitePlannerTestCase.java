@@ -146,9 +146,11 @@ public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
 
     protected void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
         // Compare LIMIT/OFFSET
-        assertEquals("Plans with different limit or offset", voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
+        assertEquals("Plans with different limit or offset",
+                voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
         // Determinism
-        assertEquals("Plans with different determinism", voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
+        assertEquals("Plans with different determinism",
+                voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
         // Params
         ParameterValueExpression[] voltdbParams = voltdbPlan.getParameters();
         ParameterValueExpression[] calciteParams = calcitePlan.getParameters();
