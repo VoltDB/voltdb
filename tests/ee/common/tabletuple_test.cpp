@@ -106,12 +106,12 @@ TEST_F(TableTupleTest, HiddenColumns)
     EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
     EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(NValue::getNullValue(VALUE_TYPE_BIGINT)));
 
-    EXPECT_EQ(8 + (4 + 6) + 8 + 8, tuple.maxDRSerializationSize());
+    EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
 
     tuple.setHiddenNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
 
     // The hidden string is null, takes 8 serialized byte
-    EXPECT_EQ(8 + (4 + 6) + 8 + 8, tuple.maxDRSerializationSize());
+    EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
 
     nvalVisibleString.free();
 }
