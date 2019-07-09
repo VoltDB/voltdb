@@ -43,16 +43,20 @@ public class VoltSqlFunctions {
     // 2. The second component is the whether the function needs its argument to match its declaration exactly.
     //    This means that casting (providing a SMALLINT parameter to a BIGINT argument) is not allowed.
     // 3. The last component is an array of class objects that represents the argument types of the function.
-    public static final ImmutableMultimap<String, Triple<Class, Boolean, Class []>> VOLT_SQL_FUNCTIONS =
+    public static final ImmutableMultimap<String, Triple<Class, Boolean, Class[]>> VOLT_SQL_FUNCTIONS =
             ImmutableMultimap.<String, Triple<Class, Boolean, Class []>>builder()
-                    .put("migrating", Triple.of(MigrationFunctions.class, false, new Class []{}))
-                    .put("bitShiftLeft", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, int.class}))
-                    .put("bitShiftRight", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, int.class}))
-                    .put("bitAnd", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
-                    .put("bitNot", Triple.of(BitwiseFunctions.class, true, new Class []{long.class}))
-                    .put("bitOr", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
-                    .put("bitXor", Triple.of(BitwiseFunctions.class, true, new Class []{long.class, long.class}))
-                    .put("hex", Triple.of(StringFunctions.class, false, new Class []{long.class}))
+                    .put("migrating", Triple.of(MigrationFunctions.class, false, new Class[] {}))
+                    .put("bit_shift_left", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
+                    .put("bit_shift_right", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, int.class}))
+                    .put("bitAnd", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("bitNot", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class}))
+                    .put("bitOr", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("bitXor", Triple.of(BitwiseFunctions.class, true, new Class[] {long.class, long.class}))
+                    .put("inet6_aton", Triple.of(InternetFunctions.class, true, new Class[] {String.class}))
+                    .put("inet6_ntoa", Triple.of(InternetFunctions.class, true, new Class[] {byte[].class}))
+                    .put("inet_aton", Triple.of(InternetFunctions.class, true, new Class[] {String.class}))
+                    .put("inet_ntoa", Triple.of(InternetFunctions.class, true, new Class[] {long.class}))
+                    .put("hex", Triple.of(StringFunctions.class, false, new Class[] {long.class}))
                     .build();
 
     //-------------------------------------------------------------
@@ -71,11 +75,11 @@ public class VoltSqlFunctions {
 
     // Bitwise functions
     public static class BitwiseFunctions {
-        public static long bitShiftLeft(long value, int offset) {
+        public static long bit_shift_left(long value, int offset) {
             return 0;
         }
 
-        public static long bitShiftRight(long value, int offset) {
+        public static long bit_shift_right(long value, int offset) {
             return 0;
         }
 
@@ -93,6 +97,25 @@ public class VoltSqlFunctions {
 
         public static long bitXor(long value1, long value2) {
             return 0;
+        }
+    }
+
+    // Internet functions
+    public static class InternetFunctions {
+        public static byte[] inet6_aton(String address) {
+            return null;
+        }
+
+        public static String inet6_ntoa(byte[] ip) {
+            return null;
+        }
+
+        public static long inet_aton(String address) {
+            return 0;
+        }
+
+        public static String inet_ntoa(long ip) {
+            return null;
         }
     }
 
