@@ -248,6 +248,13 @@ public class AsyncExportClient
 
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
+    
+    // If testing Table/Export, count inserts, deletes, update fore & aft
+    private static int INSERT = 1;
+    private static int DELETE = 2;
+    private static int UPDATE_OLD = 3;
+    private static int UPDATE_NEW = 4;
+    private static final AtomicLongArray TransactionCounts = new AtomicLongArray(4);
 
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
@@ -370,6 +377,20 @@ public class AsyncExportClient
                     e.printStackTrace();
                     System.exit(-1);
                 }
+                
+                // Table with Export
+                try {
+                    clientRef.get().callProcedure(
+                                                  new AsyncCallback(writer, currentRowId),
+                                                  config.procedure,
+                                                  currentRowId,
+                                                  0);
+                }
+                catch (Exception e) {
+                    log.fatal("Exception: " + e);
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
 
                 // Migrate without TTL -- queue up a MIGRATE FROM randomly, roughly half the time
                 if (config.usemigrateonly && r.nextBoolean()) {
@@ -378,8 +399,7 @@ public class AsyncExportClient
                         log.info("Calling MigrateExport for rows older than " + i + " seconds before now.");
                         clientRef.get().callProcedure(
                                 new NullCallback(),
-                                "MigrateExport");
-                                // "MigrateExport", r.nextInt(10));
+                                "MigrateExport", i);
                     }
                     catch (Exception e) {
                         log.fatal("Exception: " + e);
