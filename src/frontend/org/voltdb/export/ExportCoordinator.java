@@ -1171,8 +1171,13 @@ public class ExportCoordinator {
             if (tracker.isEmpty()) {
                 tracker.append(lowestSeqNo, INFINITE_SEQNO);
             } else {
-                tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                if (tracker.getLastSeqNo() < INFINITE_SEQNO) {
+                    // Tracker not already normalized to infinite,
+                    // extend it (potentially creating trailing gap).
+                    tracker.append(highestSeqNo + 1, INFINITE_SEQNO);
+                }
                 if (tracker.getFirstSeqNo() > lowestSeqNo) {
+                    // Leading gap on tracker
                     tracker.addRange(lowestSeqNo, lowestSeqNo);
                 }
             }
