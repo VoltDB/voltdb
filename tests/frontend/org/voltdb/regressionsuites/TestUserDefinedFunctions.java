@@ -165,18 +165,17 @@ public class TestUserDefinedFunctions extends RegressionSuite {
             if (exceptionCause != null) {
                 actualExcepCauseType = exceptionCause.getClass();
             }
-
-            assertEquals("Unexpected Exception type for: "+functionCall, expectedExceptionType, actualExceptionType);
-
+            assertEquals("Unexpected Exception type for: " + functionCall,
+                    expectedExceptionType, actualExceptionType);
             // TODO: delete, once UDFs throwing exceptions with causes works (ENG-12863):
-            if (exceptionCause == null) {
-                return;
+            if (exceptionCause != null) {
+                assertEquals("Unexpected Exception *cause* type for " + functionCall,
+                        expectedExcepCauseType, actualExcepCauseType);
             }
-
-            assertEquals("Unexpected Exception *cause* type for "+functionCall, expectedExcepCauseType, actualExcepCauseType);
             return;
         }
-        fail(functionCall+" did not throw expected exception: "+expectedExceptionType+" (with "+expectedExcepCauseType+" cause)");
+        fail(functionCall + " did not throw expected exception: " + expectedExceptionType +
+                " (with " + expectedExcepCauseType + " cause)");
     }
 
     /** Tests the specified <i>functionCall</i>, and confirms that an Exception

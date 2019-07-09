@@ -59,8 +59,7 @@ public class TestLikeQueries extends TestCase {
         public String getClause() {
             String not = (this.addNot ? "NOT " : "");
             String escape = (this.escape != null ? String.format(" ESCAPE '%s'", this.escape) : "");
-            String clause = String.format("%sLIKE '%s'%s", not, this.pattern, escape);
-            return clause;
+            return String.format("%sLIKE '%s'%s", not, this.pattern, escape);
         }
     }
 
@@ -124,7 +123,6 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("ab_d_fg", 1),
             new LikeTest("%defg", 1),
             new LikeTest("%de%", 1),
-            // ENG-15264
             new LikeTest("â🀲x", 1),
             new LikeTest("â🀲x一xxéyyԱ", 1),
             new LikeTest("â🀲x_xxéyyԱ", 1),
@@ -138,7 +136,6 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("%%%", rowData.length),
 
             new NotLikeTest("aaa%", rowData.length - 1),
-            // ENG-15264
             new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
             new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
@@ -150,7 +147,6 @@ public class TestLikeQueries extends TestCase {
     static final LikeTest[] hsqlDiscrepencies = new LikeTest[] {
             // Patterns that fail on hsql (unsupported until someone fixes unicode handling).
             // We don't bother to run these in the head-to-head regression suite
-            // ENG-15264
             new LikeTest("â_x一xxéyyԱ", 1),
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
     };

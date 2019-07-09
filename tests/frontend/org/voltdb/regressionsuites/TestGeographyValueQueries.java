@@ -112,7 +112,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {1});
         ++startPk;
 
-        vt = client.callProcedure(tbl + ".Insert", startPk, "null poly", null).getResults()[0];
+        client.callProcedure(tbl + ".Insert", startPk, "null poly", null);
         ++startPk;
 
         return startPk;
@@ -137,13 +137,12 @@ public class TestGeographyValueQueries extends RegressionSuite {
             assertFalse(vt.advanceRow());
 
             // This produces a null geography since the function argument is null
-            // TODO ENG-15490 Enable NULL and ? as UDF function parameter in calcite
-//            vt = client.callProcedure("@AdHoc", "select polygonfromtext(null) from " + tbl).getResults()[0];
-//            assertTrue(vt.advanceRow());
-//            gv = vt.getGeographyValue(0);
-//            assertTrue(vt.wasNull());
-//            assertEquals(null, gv);
-//            assertFalse(vt.advanceRow());
+            vt = client.callProcedure("@AdHoc", "select polygonfromtext(null) from " + tbl).getResults()[0];
+            assertTrue(vt.advanceRow());
+            gv = vt.getGeographyValue(0);
+            assertTrue(vt.wasNull());
+            assertEquals(null, gv);
+            assertFalse(vt.advanceRow());
 
             // This tests the is null predicate for this type
             vt = client.callProcedure("@AdHoc", "select poly from " + tbl + " where poly is null").getResults()[0];
@@ -209,7 +208,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
             assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(2).toString());
             assertFalse(vt.advanceRow());
 
-            vt = client.callProcedure("@AdHoc", "select polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "') from " + tbl).getResults()[0];
+            vt = client.callProcedure("@AdHoc",
+                    "select polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "') from " + tbl).getResults()[0];
             assertTrue(vt.advanceRow());
             assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(0).toString());
             assertFalse(vt.advanceRow());
@@ -361,7 +361,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         final Client client = getClient();
         fillTable(client, "t", 0);
         final String expectedErrorMessage =
-                m_usingCalcite ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
+                USING_CALCITE ? "Cannot apply '\\+' to arguments of type" : "incompatible data types in combination";
         verifyStmtFails(client, "select pk, poly + poly from t order by pk", expectedErrorMessage);
         verifyStmtFails(client, "select pk, poly + 1 from t order by pk", expectedErrorMessage);
     }
@@ -394,13 +394,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
         List<GeographyValue> cheesyHoles = new ArrayList<>();
         List<List<GeographyPointValue>> loops = cheesyPolygon.getRings();
         for (int idx = 1; idx < loops.size(); idx += 1) {
-            List<GeographyPointValue> oneHole = loops.get(idx);
-            List<GeographyPointValue> rev = new ArrayList<>();
-            rev.addAll(oneHole);
-            Collections.reverse(rev);
-            List<List<GeographyPointValue>> holeLoops = new ArrayList<>();
-            holeLoops.add(rev);
-            cheesyHoles.add(new GeographyValue(holeLoops));
+            final List<GeographyPointValue> oneHole = loops.get(idx);
+            cheesyHoles.add(new GeographyValue(Collections.singletonList(new ArrayList<GeographyPointValue>() {{
+                addAll(oneHole);
+                Collections.reverse(this);
+            }})));
         }
         String cheesyOrigin = "POINT(0.0 0.0)";
         String cheesyInHole = "POINT(15  15)";
@@ -517,7 +515,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
         fillCheesyTable(client);
         VoltTable vt = client.callProcedure("@AdHoc", "select t.pk, area(t.poly), t.name from t order by t.pk;").getResults()[0];
-        double resmap[] = new double[2];
+        double[] resmap = new double[2];
         double holeArea = 0;
         while (vt.advanceRow()) {
             int key = (int)vt.getLong(0);
@@ -543,9 +541,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // Check that distances from exterior points are not affected
         // by holes.
         VoltTable vt = client.callProcedure("@AdHoc",
-                                  "select t.pk, l.pk, distance(t.poly, l.loc_point) "
-                                + "  from t, location as l "
-                                + "  where 200 <= l.pk and t.pk < 2 order by t.pk, l.pk;").getResults()[0];
+                "select t.pk, l.pk, distance(t.poly, l.loc_point)   from t, location as l "
+                        + "where 200 <= l.pk and t.pk < 2 order by t.pk, l.pk;")
+                .getResults()[0];
         // shellMap.get(n) is the distance between the shell and exterior point pk == n.
         // cheeseMap.get(n) is the distance between the cheese and exterior point with pk == n.
         // indices has all the indices, so that we can iterate over them.
@@ -660,25 +658,20 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
 
         for (String tbl : NOT_NULL_TABLES) {
-            verifyStmtFails(client,
-                    "insert into " + tbl + " (pk) values (0)",
+            verifyStmtFails(client, "insert into " + tbl + " (pk) values (0)",
                     "Column POLY has no default and is not nullable");
 
-            verifyStmtFails(client,
-                    "insert into " + tbl + " values (0, 'foo', null)",
+            verifyStmtFails(client, "insert into " + tbl + " values (0, 'foo', null)",
                     "Attempted violation of constraint");
 
-            verifyStmtFails(client,
-                    "insert into " + tbl + " values (0, 'foo', null)",
+            verifyStmtFails(client, "insert into " + tbl + " values (0, 'foo', null)",
                     "Attempted violation of constraint");
 
             validateTableOfScalarLongs(client,
-                    "insert into " + tbl + " values "
-                            + "(0, 'foo', polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "'))",
-                            new long[] {1});
+                    "insert into " + tbl + " values (0, 'foo', polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "'))",
+                    new long[] {1});
 
-            verifyStmtFails(client,
-                    "update " + tbl + " set poly = null where pk = 0",
+            verifyStmtFails(client, "update " + tbl + " set poly = null where pk = 0",
                     "Attempted violation of constraint");
         }
     }
@@ -696,10 +689,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             try {
                 client.callProcedure("select_in_" + tbl,
-                    (Object)(new Object[] {
-                            BERMUDA_TRIANGLE_POLY,
-                            VoltType.NULL_GEOGRAPHY,
-                            LOWELL_SQUARE_POLY}));
+                    (Object)(new Object[] {BERMUDA_TRIANGLE_POLY, VoltType.NULL_GEOGRAPHY, LOWELL_SQUARE_POLY}));
                 fail("Expected an exception to be thrown");
             }
             catch (RuntimeException rte) {
@@ -759,14 +749,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
     // This is really misplaced.  But we don't have a regression
     // suite test for testing points.  We ought to, but we don't.
     private void checkOnePoint(Client client, long pk, String txt) throws Exception {
-        try {
-            ClientResponse cr = client.callProcedure("@AdHoc",
-                                                     String.format("insert into location (pk, loc_point) values (%d, pointfromtext('%s'))",
-                                                                   pk, txt));
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        } catch (Exception ex) {
-            assertFalse("Unexpected compilation failure: " + ex.getMessage(), true);
-        }
+        final ClientResponse cr = client.callProcedure("@AdHoc",
+                String.format("insert into location (pk, loc_point) values (%d, pointfromtext('%s'))", pk, txt));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     public void testPointFromTextPositive() throws Exception {
@@ -813,30 +798,49 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
-        assertGeographyValueWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
-        assertGeographyValueWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON ()");
-        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON(3 3, 4 4, 5 5, 3 3)");
-        assertGeographyValueWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
-        assertGeographyValueWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
-        assertGeographyValueWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
-        assertGeographyValueWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
-        assertGeographyValueWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertGeographyValueWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
-        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
-        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
-        assertGeographyValueWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
+        assertGeographyValueWktParseError(client,
+                "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
+        assertGeographyValueWktParseError(client,
+                "missing left parenthesis after POLYGON", "POLYGON []");
+        assertGeographyValueWktParseError(client,
+                "expected left parenthesis to start a ring", "POLYGON ()");
+        assertGeographyValueWktParseError(client,
+                "A polygon ring must contain at least 4 points", "POLYGON (())");
+        assertGeographyValueWktParseError(client,
+                "expected left parenthesis to start a ring", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertGeographyValueWktParseError(client,
+                "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client,
+                "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client,
+                "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
+        assertGeographyValueWktParseError(client,
+                "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
+        assertGeographyValueWktParseError(client,
+                "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
+        assertGeographyValueWktParseError(client,
+                "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
+        assertGeographyValueWktParseError(client,
+                "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
+        assertGeographyValueWktParseError(client,
+                "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
+        assertGeographyValueWktParseError(client,
+                "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
         // that are separated only by a minus sign indicating that the second coordinate is negative.
         // But boost's tokenizer (at least as its currently configured) will consider "32.305-64.571" as a single
         // token.  This seems like an acceptable discrepancy?
-        assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
-        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '200'.  Longitude must be in the range \\[-180,180\\]",  "POLYGON((0 0,  200 0,  200   45, 0   45, 0 0))");
-        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '100'.  Latitude must be in the range \\[-90,90\\]",     "POLYGON((0 0,   45 0,   45  100, 0  100, 0 0))");
-        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '-200'.  Longitude must be in the range \\[-180,180\\]", "POLYGON((0 0, -200 0, -200   45, 0   45, 0 0))");
-        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '-100'.  Latitude must be in the range \\[-90,90\\]",    "POLYGON((0 0,   45 0,   45 -100, 0 -100, 0 0))");
+        assertGeographyValueWktParseError(client,
+                "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
+        assertGeographyValueWktParseError(client,
+                "Invalid input to POLYGONFROMTEXT: '200'.  Longitude must be in the range \\[-180,180\\]",  "POLYGON((0 0,  200 0,  200   45, 0   45, 0 0))");
+        assertGeographyValueWktParseError(client,
+                "Invalid input to POLYGONFROMTEXT: '100'.  Latitude must be in the range \\[-90,90\\]",     "POLYGON((0 0,   45 0,   45  100, 0  100, 0 0))");
+        assertGeographyValueWktParseError(client,
+                "Invalid input to POLYGONFROMTEXT: '-200'.  Longitude must be in the range \\[-180,180\\]", "POLYGON((0 0, -200 0, -200   45, 0   45, 0 0))");
+        assertGeographyValueWktParseError(client,
+                "Invalid input to POLYGONFROMTEXT: '-100'.  Latitude must be in the range \\[-90,90\\]",    "POLYGON((0 0,   45 0,   45 -100, 0 -100, 0 0))");
     }
 
     public void testGeographySize() throws Exception {
@@ -862,7 +866,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 + "1.0 1.0))";
         gv = GeographyValue.fromWKT(wktFiveVerts);
         assertEquals(203, gv.getLengthInBytes());
-        verifyProcFails(client, "The size 203 of the value exceeds the size of the GEOGRAPHY column \\(179 bytes\\)",
+        verifyProcFails(client,
+                "The size 203 of the value exceeds the size of the GEOGRAPHY column \\(179 bytes\\)",
                 "tiny_polygon.Insert", 1, gv);
 
         ClientResponse cr = client.callProcedure("@AdHoc",
@@ -887,12 +892,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeographyValueQueries.class);
+        VoltServerConfig config;
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestGeographyValueQueries.class);
         boolean success;
 
-        VoltProjectBuilder project = new VoltProjectBuilder();
+        final VoltProjectBuilder project = new VoltProjectBuilder();
 
         String literalSchema =
                 "CREATE TABLE T (\n"
@@ -933,18 +937,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 ;
         try {
             project.addLiteralSchema(literalSchema);
+        } catch (Exception e) {
+            fail(e.getMessage());
         }
-        catch (Exception e) {
-            fail();
-        }
-
         project.setUseDDLSchema(true);
-
         config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
         return builder;
     }
 
