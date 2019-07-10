@@ -57,6 +57,7 @@ public class VoltSqlFunctions {
                     .put("inet_aton", Triple.of(InternetFunctions.class, true, new Class[] {String.class}))
                     .put("inet_ntoa", Triple.of(InternetFunctions.class, true, new Class[] {long.class}))
                     .put("hex", Triple.of(StringFunctions.class, false, new Class[] {long.class}))
+                    .put("substring", Triple.of(StringFunctions.class, false, new Class[] {String.class, int.class}))
                     .build();
 
     //-------------------------------------------------------------
@@ -122,6 +123,10 @@ public class VoltSqlFunctions {
     // String functions
     public static class StringFunctions {
         public static String hex(long value) {
+            return "";
+        }
+
+        public static String substring(String s, int position) {
             return "";
         }
     }
