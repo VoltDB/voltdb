@@ -171,7 +171,7 @@ public abstract class CLIConfig {
             String[] leftargs = cmd.getArgs();
             int leftover = 0;
             // string key-value pairs
-            Map<String, String> kvMap = new TreeMap<String, String>();
+            Map<String, String> kvMap = new TreeMap<>();
             Field[] fields = new Field[allFields.size()];
             int n = 0;
             for (Field field : allFields) {
@@ -257,11 +257,11 @@ public abstract class CLIConfig {
      * @return a list of fields
      */
     public static List<Field> getFields(Class<?> startClass) {
-        List<Field> currentClassFields = new ArrayList<Field>();
+        List<Field> currentClassFields = new ArrayList<>();
         currentClassFields.addAll(Arrays.asList(startClass.getDeclaredFields()));
         Class<?> parentClass = startClass.getSuperclass();
         if (parentClass != null) {
-            List<Field> parentClassFields = (List<Field>) getFields(parentClass);
+            List<Field> parentClassFields = getFields(parentClass);
             currentClassFields.addAll(parentClassFields);
         }
         return currentClassFields;
