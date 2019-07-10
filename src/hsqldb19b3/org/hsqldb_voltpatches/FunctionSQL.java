@@ -156,6 +156,8 @@ public class FunctionSQL extends Expression {
     public static IntValueHashMap fullFuncMap = new IntValueHashMap();
 
     // TODO: expand fullFuncMap to include every function in regularFuncMap and its overloaded variants
+    // Register functions with overloading possibilities:
+    // <Function_Name> + <Operand_Count> + <Operand_Types> -> <Function_Enum>
     static {
         fullFuncMap.put(Tokens.T_SUBSTRING +
                         "3" +
@@ -169,7 +171,7 @@ public class FunctionSQL extends Expression {
                         VoltType.VARBINARY +
                         VoltType.INTEGER +
                         VoltType.INTEGER,
-                        FUNC_SUBSTRING_CHAR);
+                        FUNC_SUBSTRING_BINARY);
 
         fullFuncMap.put(Tokens.T_SUBSTRING +
                         "2"  +
