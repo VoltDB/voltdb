@@ -82,14 +82,31 @@ JAVA=`which java`
 if [ "$JAVA_HOME" != "" ]; then
   JAVA=$JAVA_HOME/bin/java
 fi
-
 if [ "$JAVA" = "" ]; then
   echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
   exit 1
 fi
 
-# check envvars to see if a user overrides log4j conf
-if [ -z "${LOG4J_CONFIG_PATH}" ]; then
+# add libs to CLASSPATH
+for f in $VOLTDB_LIB/*.jar; do
+    if $(echo $f | egrep -vq slf4j-log4j); then     # skip slf4j-log4j, since we are using slf4j-nop
+        CLASSPATH+=:$f
+    fi
+done
+# add test classes to CLASSPATH, make sure it works either release or debug build
+# if we have both debug and release build, we will use the release one.
+if [ -d $VOLTDB_HOME/obj/release/test ]; then
+    build=release
+elif [ -d $VOLTDB_HOME/obj/debug/test ]; then
+    build=debug
+else
+    echo "Cannot find build directory $VOLTDB_HOME/obj/release/{prod,test} or $VOLTDB_HOME/obj/debug/{prod,test}"
+    exit 1
+fi
+
+CLASSPATH+=:$VOLTDB_HOME/obj/$build/test:$VOLTDB_HOME/obj/$build/prod:$VOLTDB_HOME/third_party/java/jars/junit-4.12.jar
+
+if [ -z "$LOG4J_CONFIG_PATH" ]; then
   if [ -f "$VOLTDB_HOME/src/frontend/log4j.xml" ]; then
     LOG4J_CONFIG_PATH=$VOLTDB_HOME/src/frontend/log4j.xml
   elif [ -f "$VOLTDB_HOME/voltdb/log4j.xml" ]; then
@@ -100,20 +117,5 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-# add libs to CLASSPATH
-for f in $VOLTDB_LIB/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
 
-# add test classes to CLASSPATH, make sure it works either release or debug build
-# if we have both debug and release build, we will use the release one.
-CLASSPATH=${CLASSPATH}:$VOLTDB_HOME/obj/release/test:$VOLTDB_HOME/obj/debug/test
-
-# add junit jars to CLASSPATH
-CLASSPATH=${CLASSPATH}:$VOLTDB_HOME/third_party/java/jars/junit-dep-4.10.jar:$VOLTDB_HOME/third_party/java/jars/hamcrest-all-1.3.jar
-
-# run it
-export CMDVAL="$JAVA -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
-export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.plannerv2.PlanChecker"
-
-exec $CMDVAL "$@"
+exec $JAVA -Dlog4j.configuration=file://$LOG4J_CONFIG_PATH -classpath $CLASSPATH org.voltdb.plannerv2.PlanChecker "$@"
